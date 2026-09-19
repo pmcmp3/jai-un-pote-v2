@@ -1,0 +1,7 @@
+node_modules/
+dist/
+dist-pages/
+.DS_Store
+.claude/settings.local.json
+# Captures et sorties des scripts de mesure (outils/) — régénérables.
+outils/sorties/
