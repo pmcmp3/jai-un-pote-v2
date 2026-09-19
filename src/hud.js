@@ -241,14 +241,12 @@ export function renderBanner(ctx, width, height, banner, safeTop = 0) {
 export function renderTurbo(ctx, width, height, t, force) {
   if (force <= 0.01) return;
   ctx.save();
-  ctx.globalAlpha = force;
-  const g = ctx.createLinearGradient(width, 0, width * 0.7, 0);
-  g.addColorStop(0, "rgba(255,255,255,0.5)");
-  g.addColorStop(1, "rgba(255,255,255,0)");
-  ctx.fillStyle = g;
-  ctx.fillRect(width * 0.7, 0, width * 0.3, height);
-  ctx.fillStyle = "rgba(255,255,255,0.75)";
-  for (let i = 0; i < 16; i++) {
+  ctx.globalAlpha = force * 0.75;
+  // Plus de voile blanc sur le bord droit (20 septembre 2026 : « quand on a
+  // pris une brique de lait, t'as des overlays blancs sur la droite, enlève
+  // l'overlay blanc ») : il ne reste que les traits de vitesse.
+  ctx.fillStyle = "rgba(255,255,255,0.7)";
+  for (let i = 0; i < 14; i++) {
     const y = height * (0.2 + ((i * 0.618) % 1) * 0.7);
     const len = 50 + (i * 37) % 110;
     const x = width - ((t * (1100 + i * 80) + i * 173) % (width + len));

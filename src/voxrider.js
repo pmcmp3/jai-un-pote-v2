@@ -34,17 +34,20 @@ const TIRE = "#151518", RIM = "#8a8d98", FRAME = "#1b1b21", SKIN_SHOE = "#565a66
 // Ancré au sol en (u, v) = centre du vélo. `lift` = hauteur de saut.
 // `flip` (0..2π) = angle du salto (double saut) : tout le vélo tourne
 // autour de son axe latéral — le corps décrit un cercle vers l'avant.
-export function drawRider(ctx, u, v, lift, P, pedal, alpha = 1, flip = 0, ombre = true, roue = 0) {
+export function drawRider(ctx, u, v, lift, P, pedal, alpha = 1, flip = 0, ombre = true, roue = 0, pente = 0) {
   if (alpha < 1) { ctx.save(); ctx.globalAlpha = alpha; }
   // L'ombre reste au sol, dessinée AVANT toute rotation.
   if (ombre) drawShadow(ctx, u, v, 0.3, 0.6, 0.24);
   let tourne = false;
-  const angle = flip > 0.01 ? flip : (roue > 0 ? -Math.sin(Math.PI * roue) * 0.75 : 0);
+  // `pente` : sur la rampe d'une halle, le vélo suit l'inclinaison du plancher
+  // (20 septembre 2026 : « quand on monte ou qu'on descend la rampe, il faut
+  // que le personnage s'oriente vis-à-vis de la rampe »).
+  const angle = flip > 0.01 ? flip : (roue > 0 ? -Math.sin(Math.PI * roue) * 0.75 : pente);
   if (Math.abs(angle) > 0.01) {
     // Salto : tout le vélo tourne à l'écran. Roue arrière : il se cabre
     // autour de sa roue arrière (20 septembre 2026, demandé « une animation
     // marrante quand on glisse vers le bas »).
-    const c = flip > 0.01 ? project(u, v, lift + 0.9) : project(u, v - 0.5, lift + 0.25);
+    const c = flip > 0.01 ? project(u, v, lift + 0.9) : project(u, v - (roue > 0 ? 0.5 : 0), lift + 0.25);
     ctx.save();
     ctx.translate(c.x, c.y);
     ctx.rotate(angle);

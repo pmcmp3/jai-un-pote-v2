@@ -59,11 +59,16 @@ window.CONFIG = {
   // Tap court    → apex ~1,3 (poules, chats, chiens, moutons, bottes)
   // Appui tenu   → apex ~2,5 (cochons, vaches, tracteurs)
   // Re-tap en l'air → apex ~3,7 (fermiers, voitures) + salto
-  sautVitesse: 9.4,         // vitesse verticale au départ du saut (u/s) : apex 1,77 au tap, 3,22 en appui tenu, 4,38 au double
-  sautVitesseDouble: 7.6,   // impulsion du second saut, en l'air
-  sautGravite: 25,          // pesanteur normale
-  sautGraviteTenue: 12,     // pesanteur tant qu'on monte ET qu'on reste appuyé
-  sautTenueMaxS: 0.4,       // au-delà, l'appui ne fait plus monter
+  // ⚠️ 20 septembre 2026, soir : « il faudrait qu'on monte et qu'on retombe
+  // beaucoup plus vite, plus de gravité, là on flotte, on a l'impression
+  // d'être sur la lune ». Les hauteurs d'apex sont GARDÉES (1,74 / 3,08 /
+  // 4,20), c'est le TEMPS qui est comprimé d'un tiers : vitesse initiale et
+  // pesanteur montent ensemble.
+  sautVitesse: 17.4,        // vitesse verticale au départ du saut (u/s)
+  sautVitesseDouble: 13.6,  // impulsion du second saut, en l'air
+  sautGravite: 60,          // pesanteur normale
+  sautGraviteTenue: 29,     // pesanteur tant qu'on monte ET qu'on reste appuyé
+  sautTenueMaxS: 0.28,      // au-delà, l'appui ne fait plus monter
 
   // === GRILLE ===
   cadenceSpawnBeats: 1.5, // un créneau tous les 1,5 temps = 1,06 s à 85 BPM

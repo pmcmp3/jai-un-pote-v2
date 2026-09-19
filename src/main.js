@@ -39,6 +39,7 @@ const ctx = canvas.getContext("2d");
 let width = 0, height = 0, safeTop = 0;
 const safeProbe = document.getElementById("safe-probe");
 
+let dprCourant = 1;
 function resize() {
   // DPR plafonné à 1,5 sur mobile (2 sur ordinateur) : la scène est faite de
   // cubes à bords nets, la différence ne se voit pas, le coût de remplissage
@@ -49,6 +50,7 @@ function resize() {
   height = window.innerHeight;
   canvas.width = Math.round(width * dpr);
   canvas.height = Math.round(height * dpr);
+  dprCourant = dpr;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   scene.setViewport(width, height);
   // Encoche / barre d'état (iPhone en plein écran) : le HUD descend d'autant.
@@ -157,6 +159,11 @@ function jumpPhysics() {
   return { vJump: C.sautVitesse, vDouble: C.sautVitesseDouble, g: C.sautGravite, gTenu: C.sautGraviteTenue, tenueMax: C.sautTenueMaxS, sol: rows.solAt };
 }
 function multiplicateur() { return multRegle(friends.count(), game.turbo > 0); }
+// Hauteur du sol sous le joueur : la route (0), le plancher d'une halle, ou le
+// toit d'une voiture s'il arrive déjà au-dessus d'elle.
+function solSous(v, jumpY) { return Math.max(rows.solAt(v), rows.toitSous(rows.routeVivante(), v, jumpY)); }
+// Pente locale du sol, en radians : sert à incliner le vélo sur la rampe.
+function penteSol(v) { return Math.atan2(rows.solAt(v + 0.6) - rows.solAt(v - 0.6), 1.2); }
 function palierPrecedent() {
   const p = window.CONFIG.potesPaliers;
   if (game.cibleRachat !== null && game.cibleRachat !== undefined) return game.cibleRachat - (window.CONFIG.poteRachatPieces || 10);
@@ -270,6 +277,7 @@ function pousserPopup(texte, couleur) {
 let banner = null;
 function afficherBanner(titre, sous, couleur, duree = 2.4) { banner = { titre, sous, couleur, duree, timer: duree }; }
 const shake = { time: 0, duration: 0.5, amp: 6 };
+const rendusRates = new Set();   // une trace par message, pas une par image
 let damageFlash = 0;
 let hudAlpha = 0;
 const HUD_FADE = 0.6;
@@ -600,7 +608,7 @@ function step(dt) {
   // (rows.solAt). Décoller, retomber et « être au sol » se comparent donc à la
   // hauteur du sol SOUS le joueur, jamais à zéro.
   let marque = null; // « saut » ou « double » : la meute le refera au même endroit
-  const solIci = rows.solAt(player.v);
+  const solIci = solSous(player.v, player.jumpY);
   const tap = consumeJumpPress();
   if (tap && player.jumpY <= solIci + 0.02) {
     player.jumpVy = phys.vJump; player.jumpY = solIci + 0.001; player.doubled = false; player.tHaut = 0; player.tenueMarquee = false;
@@ -641,13 +649,14 @@ function step(dt) {
     game.metres += dv * window.CONFIG.metresParUnite * multiplicateur();
   }
   player.pedal += vitesse * dt * 3.2;
-  // Retombée / roulage sur la rampe de la halle : le vélo colle au plancher.
-  const solApres = rows.solAt(player.v);
+  // Retombée / roulage sur la rampe de la halle, ou atterrissage sur le toit
+  // d'une voiture : le vélo colle au plancher trouvé sous lui.
+  const solApres = solSous(player.v, player.jumpY);
   if (player.jumpY <= solApres) {
     if (player.jumpVy < -0.5 && game.surHalle === false) sfx.saut();
     player.jumpY = solApres; player.jumpVy = 0; player.doubled = false; player.flip = 0; player.tHaut = 0;
   }
-  const surHalle = solApres > 0.05;
+  const surHalle = rows.solAt(player.v) > 0.05;
   if (surHalle && !game.surHalle) afficherBanner("LES HALLES !", "ramasse tout là-haut", JAUNE, 1.6);
   game.surHalle = surHalle;
   if (now >= 0) fantome.enregistrer(now, player.u, player.v, player.jumpY);
@@ -795,6 +804,11 @@ function renderAlertes(now, vitesse) {
 }
 
 function render(alpha) {
+  // ⚠️ On repart d'une matrice propre à chaque image. Un seul `ctx.save()` non
+  // rendu — une exception au milieu d'une rotation, par exemple — laissait
+  // sinon TOUT le jeu penché jusqu'au rechargement de la page.
+  ctx.setTransform(dprCourant, 0, 0, dprCourant, 0, 0);
+  ctx.globalAlpha = 1;
   const now = clock.now();
   const u = player.prevU + (player.u - player.prevU) * alpha;
   const v = player.prevV + (player.v - player.prevV) * alpha;
@@ -892,7 +906,8 @@ function render(alpha) {
   } });
   for (const g of ghosts) items.push({ d: scene.depth(g.u + 0.01, g.v), draw: () => drawRider(ctx, g.u, g.v, g.h, paletteJoueur, pedal, 0.22 * (1 - g.age / 0.35), g.flip, false) });
   items.push({ d: scene.depth(u, v), draw: () => {
-    drawRider(ctx, u, v, jy, paletteJoueur, pedal, 1, flip, true, player.prevRoue + (player.roue - player.prevRoue) * alpha);
+    drawRider(ctx, u, v, jy, paletteJoueur, pedal, 1, flip, true, player.prevRoue + (player.roue - player.prevRoue) * alpha,
+      player.jumpY <= rows.solAt(player.v) + 0.02 ? penteSol(v) : 0);
     // Chevron « c'est toi » au-dessus de la tête : dans la meute, le joueur
     // se perdait parmi ses potes (même maillot possible).
     if (gameStarted && !game.ended) {
@@ -906,7 +921,10 @@ function render(alpha) {
     }
   } });
   items.sort((a, b) => b.d - a.d);
-  for (const it of items) it.draw();
+  for (const it of items) {
+    // Un objet qui plante ne doit emporter ni l'image ni l'état du canvas.
+    try { it.draw(); } catch (e) { if (!rendusRates.has(String(e))) { rendusRates.add(String(e)); console.error("rendu d'objet :", e); } ctx.setTransform(dprCourant, 0, 0, dprCourant, 0, 0); ctx.globalAlpha = 1; }
+  }
 
   for (const sp of sparkles) {
     const g = scene.project(sp.u, sp.v, sp.h);

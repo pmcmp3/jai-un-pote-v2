@@ -30,7 +30,7 @@ export function dureeCourse() {
 // les règles changent la route — les scores et fantômes d'une ligue sont
 // filtrés sur la graine, une nouvelle version repart donc sur un classement
 // vierge sans rien supprimer en base.
-export const VERSION_COURSE = 5; // 20 septembre 2026 (soir) : boîtes de collision réelles, arcs de pièces, halles, contresens
+export const VERSION_COURSE = 6; // 20 septembre 2026 (nuit) : saut plus sec, tailles recalées, plus de grosse pièce
 export function graineDepuisTexte(txt) {
   let h = 7;
   for (const ch of String(txt)) h = (h * 31 + ch.charCodeAt(0)) % 100000;

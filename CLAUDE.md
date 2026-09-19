@@ -87,6 +87,31 @@ Sept renversements, tous demandés :
    (texte blanc + ombre 25 %), bandeaux et bestiaire en carte blanche à bord noir avec onglet
    rouge de travers, bestiaire en 10 s une famille à la fois, « +40 PTS » en doré. Boue supprimée.
 
+## Troisième passe du 20 septembre 2026 (nuit)
+
+⚠️ **BUG DU CANVAS PENCHÉ, et pourquoi il faut s'en souvenir.** Tout le jeu s'affichait de
+travers, définitivement, après quelques secondes. Cause : `drawStaticTombe` redessine la bête
+percutée à une rangée **décimale** (elle recule en basculant), et le chat, le chien et la
+voiture choisissaient leur couleur par `tableau[Math.abs(r) % 3]`. Index fractionnaire →
+`undefined` → `parseColor` lève → l'exception tombe au milieu du `ctx.save()` + `ctx.rotate()`
+de la bascule → la rotation n'est jamais rendue → **toutes les images suivantes sont peintes
+par-dessus**. Trois corrections, à garder :
+1. les couleurs se choisissent sur un index ENTIER (`Math.abs(Math.round(r))`) ;
+2. `parseColor` rend du gris plutôt que de lever ;
+3. `render()` **repart d'une matrice propre à chaque image** et chaque objet est dessiné dans
+   un `try/catch` qui remet la matrice — un objet qui plante ne peut plus salir le reste.
+⚠️ Ne jamais supposer qu'un index de tableau dérivé d'une position est entier.
+
+Le reste de la passe : **saut plus sec** (pesanteur 25 → 60, apex 2,50 / 4,44 / 5,97, 0,58 s
+en l'air pour un tap contre 0,75 — « on flotte, on a l'impression d'être sur la lune »), toutes
+les tailles **recalées ensemble** pour que les trois familles gardent au moins 45 ms de marge
+au pire cas (vitesse minimale), **voiture MONTABLE** (2,8 u, couleur unique crème, on peut se
+poser sur son toit — `rows.toitSous`), **grosse pièce dorée retirée**, mouton qui ne tourne
+plus, chats plus gros et plus contrastés, **rampe lisse** au lieu d'un escalier, **toit de
+halle opaque** (`drawBox` peint désormais la sous-face d'une boîte entièrement au-dessus de la
+caméra), cycliste **incliné dans la pente**, plus de voile blanc au turbo, et **deux bourgs
+régionaux** : brique et ardoise au Nord (3e tranche), ocre et tuile romaine au Sud (7e).
+
 ⏳ **Pas fait** : le système de ligue / points (remis à plus tard par l'artiste).
 
 🗄️ **Ligue de test** : `supabase/ligue-test-v2.sql` + `supabase/MODE-D-EMPLOI-LIGUE-TEST.md`.

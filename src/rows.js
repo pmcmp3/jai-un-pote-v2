@@ -55,22 +55,27 @@ import { V_UNIT, vitesseAuRang, rangAuTemps } from "./regles.js";
 // hauteur qu'il faut dépasser.
 export const KINDS = {
   // Traversants : ils roulent le long de u, donc c'est `larg` qui barre la route.
-  tracteur:    { traverse: true, cout: 3, vitesse: 2.2, vmax: 3.2, long: 4.2, larg: 1.8, h: 2.3, plancher: "double", nom: "un tracteur" },
+  tracteur:    { traverse: true, cout: 3, vitesse: 2.2, vmax: 3.2, long: 4.2, larg: 1.6, h: 2.3, plancher: "double", nom: "un tracteur" },
   poulelancee: { traverse: true, cout: 1, vitesse: 4.5, vmax: 9,   long: 0.7, larg: 0.6, h: 0.7, nom: "une poule lancée" },
   // En SENS INVERSE : elle roule sur la route, vers le joueur (20 septembre
   // 2026 : « une voiture qui roule en sens inverse, pour que ce soit vraiment
   // difficile »). Sa vitesse s'ajoute à celle du joueur.
-  contresens:  { contresens: true, cout: 2, vitesse: 3.4, long: 3.9, larg: 1.7, h: 1.55, plancher: "double", nom: "une voiture en face" },
+  contresens:  { contresens: true, cout: 2, vitesse: 3.4, long: 2.8, larg: 1.6, h: 1.45, plancher: "double", nom: "une voiture en face" },
   // Posés sur la route.
-  poule:   { cout: 1, long: 0.70, larg: 0.60, h: 0.75, nom: "une poule" },
-  chat:    { cout: 1, long: 0.80, larg: 0.50, h: 0.60, nom: "un chat" },
-  chien:   { cout: 1, long: 1.00, larg: 0.55, h: 0.80, nom: "un chien" },
-  mouton:  { cout: 1, long: 1.05, larg: 0.80, h: 0.85, nom: "un mouton" },
-  botte:   { cout: 1, long: 1.00, larg: 0.90, h: 0.80, nom: "une botte de foin" },
-  cochon:  { cout: 2, long: 1.40, larg: 0.85, h: 1.05, nom: "un cochon" },
-  vache:   { cout: 2, long: 2.10, larg: 1.00, h: 1.50, nom: "une vache" },
+  poule:   { cout: 1, long: 0.65, larg: 0.60, h: 0.70, nom: "une poule" },
+  chat:    { cout: 1, long: 0.80, larg: 0.60, h: 0.78, nom: "un chat" },
+  chien:   { cout: 1, long: 0.80, larg: 0.55, h: 0.78, nom: "un chien" },
+  mouton:  { cout: 1, long: 0.80, larg: 0.80, h: 0.78, nom: "un mouton" },
+  botte:   { cout: 1, long: 0.85, larg: 0.85, h: 0.75, nom: "une botte de foin" },
+  cochon:  { cout: 2, long: 1.30, larg: 0.85, h: 1.05, nom: "un cochon" },
+  vache:   { cout: 2, long: 1.60, larg: 1.00, h: 1.35, nom: "une vache" },
   fermier: { cout: 2, long: 0.70, larg: 0.60, h: 1.85, nom: "un fermier" },
-  voiture: { cout: 2, long: 3.90, larg: 1.70, h: 1.55, plancher: "double", nom: "une voiture" },
+  // ⚠️ MONTABLE (20 septembre 2026, soir : « ça serait normal qu'on puisse
+  // monter sur le toit d'une voiture ») : son toit devient un plancher dès
+  // qu'on arrive au-dessus. Raccourcie de 3,9 à 3,0 le même jour, avec le
+  // saut rendu plus sec — « les voitures sont trop grandes, j'arrive pas à
+  // les passer ». Deux façons de la franchir : par-dessus, ou en s'y posant.
+  voiture: { cout: 2, long: 2.80, larg: 1.60, h: 1.45, plancher: "double", montable: true, nom: "une voiture" },
 };
 
 // --- Boîte de collision -----------------------------------------------------------
@@ -80,7 +85,7 @@ export const KINDS = {
 // 0,48 = la moitié de l'empattement : ce sont les ROUES qui accrochent, pas
 // les épaules du cycliste. Généreux pour le joueur, volontairement (il s'est
 // plaint de se prendre des bêtes qu'il avait visiblement passées).
-export const VELO_DEMI = 0.48;
+export const VELO_DEMI = 0.44;
 export const MARGE_H = 0.04;
 export function hauteurAFranchir(kind) { return KINDS[kind].h + MARGE_H; }
 // Demi-longueur d'un obstacle LE LONG DE LA ROUTE (un traversant barre la
@@ -152,7 +157,10 @@ function fenetreSecondes(kind) {
   const vRel = vMinRangees() + (K.contresens ? K.vitesse : 0);
   return rangees / vRel;
 }
-const MARGE_FENETRE = 0.06; // secondes de confort : on ne veut aucun saut « au pixel »
+// Marge de confort : la plus grande possible sans rendre le saut mou. Les
+// tailles ci-dessus et la pesanteur de config.js ont été cherchées ensemble
+// pour que la plus petite marge du bestiaire reste au-dessus de 45 ms.
+const MARGE_FENETRE = 0.04;
 let FAMILLE = null;
 export function familleDe(kind) {
   if (!FAMILLE) {
@@ -244,6 +252,23 @@ export function solAt(v) {
   return HALLE_HAUT * (1 - (p - HALLE_MONTEE - HALLE_PLAT) / HALLE_DESCENTE);
 }
 function dansHalle(r) { const d = halleA(r); return d !== null && r >= d && r <= d + HALLE_ROWS; }
+
+// Hauteur du toit d'un obstacle MONTABLE sous la position v, mais seulement si
+// le cycliste arrive déjà au-dessus (`jumpY`). En dessous, ce n'est pas un
+// plancher, c'est un mur : la collision s'en charge.
+export function toitSous(route, v, jumpY) {
+  for (let r = Math.floor(v - 2); r <= Math.ceil(v + 2); r++) {
+    if (r < 0) continue;
+    const row = route.rowAt(r);
+    if (row.type !== "statique") continue;
+    const K = KINDS[row.kind];
+    if (!K.montable) continue;
+    if (Math.abs(v - r) >= K.long / 2 + VELO_DEMI * 0.5) continue;
+    const toit = K.h + MARGE_H;
+    if (jumpY >= toit - 0.02) return toit;
+  }
+  return 0;
+}
 
 // --- Paquets d'espèces ------------------------------------------------------------
 const PAQUETS = [
@@ -425,7 +450,10 @@ export class Route {
     };
     for (let p = 0; p < BLOC; p++) {
       const r = r0 + p;
-      const kind = r % LAIT_EVERY === LAIT_EVERY / 2 ? "lait" : r % GROSSE_EVERY === 40 ? "grosse" : null;
+      // La grosse pièce dorée est RETIRÉE le 20 septembre 2026 au soir
+      // (« vire-la pour l'instant, c'est trop bizarre ») : sa rangée reste
+      // réservée, elle ne porte plus rien.
+      const kind = r % LAIT_EVERY === LAIT_EVERY / 2 ? "lait" : null;
       if (!kind) continue;
       let q = null;
       for (let d = 0; d < BLOC && q === null; d++) { if (dispo(p + d)) q = p + d; else if (dispo(p - d)) q = p - d; }
@@ -531,6 +559,8 @@ export function crossersAt(r, row, t) {
 
 // --- L'instance VIVANTE (celle du jeu) ------------------------------------------------
 let live = new Route();
+// La Route en cours (la simulation, elle, crée les siennes).
+export function routeVivante() { return live; }
 export function getSeed() { return live.seed; }
 export function reseed(force) { live = new Route(force); }
 export function reset() { live.reset(); }

@@ -87,33 +87,37 @@ function drawTracteur(ctx, K, u, v, dir, t) {
 export function drawVoiture(ctx, K, uCenter, v, sens, t) {
   const L = K.long, Wd = K.larg, H = K.h;
   const x = uCenter - Wd / 2;
-  // `A(a)` : position le long de la route, a = 0 à l'arrière de la voiture.
   const A = (a) => (sens > 0 ? v - L / 2 + a : v + L / 2 - a);
   const bloc = (a, da, b, db, h, hh, col) => drawBox(ctx, x + b, sens > 0 ? A(a) : A(a) - da, db, da, h, col, hh);
-  const col = ["#2f5fb0", "#e13e26", "#e9e4d8", "#3a8f5c"][Math.abs(Math.round(v)) % 4];
+  // UNE seule teinte : la petite voiture crème de village. Les quatre couleurs
+  // tirées au hasard ne voulaient rien dire et changeaient à chaque partie.
+  const CAISSE = "#e6e0d2", BAS = "#cfc7b6", TOIT = "#c9c2b2";
   drawShadow(ctx, uCenter, v, Wd / 2, L / 2, 0.26);
-  // Roues (0,70 m de diamètre), des deux côtés.
-  for (const a of [0.8, L - 0.85]) {
-    for (const uu of [x - 0.04, x + Wd - 0.28]) {
-      drawDisque(ctx, uu, A(a), 0.35, 0.35, BLACK);
-      drawDisque(ctx, uu - 0.02, A(a), 0.35, 0.16, "#8a8d98");
+  const rRoue = 0.33;
+  for (const a of [0.72, L - 0.72]) {
+    for (const uu of [x - 0.05, x + Wd - 0.26]) {
+      drawDisque(ctx, uu, A(a), rRoue, rRoue, BLACK);
+      drawDisque(ctx, uu - 0.02, A(a), rRoue, rRoue * 0.45, "#8a8d98");
     }
+    bloc(a - 0.42, 0.84, 0.02, Wd - 0.04, 0.16, 0.5, "#2b2b31");   // passage de roue
   }
-  // Bas de caisse, capot, cabine.
-  bloc(0.1, L - 0.2, 0.02, Wd - 0.04, 0.42, 0.32, col);
-  bloc(0.0, L, 0.0, Wd, 0.28, 0.74, col);
-  bloc(1.05, L - 2.0, 0.13, Wd - 0.26, 0.55, 1.0, col);
-  // Vitres : pare-brise, custode, lunette arrière.
-  bloc(1.15, L - 2.2, 0.1, Wd - 0.2, 0.42, 1.04, VITRE);
-  bloc(1.05, L - 2.0, 0.17, Wd - 0.34, 0.08, H - 0.08, col);
-  // Pare-chocs, feux : blancs devant, rouges derrière.
-  bloc(0.0, 0.14, 0.05, Wd - 0.1, 0.26, 0.5, "#2b2b31");
-  bloc(L - 0.14, 0.14, 0.05, Wd - 0.1, 0.26, 0.5, "#2b2b31");
-  for (const b of [0.12, Wd - 0.44]) {
-    bloc(L - 0.1, 0.12, b, 0.32, 0.2, 0.82, getNight() > 0.2 ? "#fff6c8" : "#f0ead2");
-    bloc(0.0, 0.12, b, 0.32, 0.18, 0.84, "#c8301c");
+  // Caisse : bas de caisse, ceinture, cabine, toit PLAT (on s'y pose).
+  bloc(0.06, L - 0.12, 0.03, Wd - 0.06, 0.34, 0.3, BAS);
+  bloc(0.0, L, 0.0, Wd, 0.3, 0.64, CAISSE);
+  bloc(0.85, L - 1.7, 0.1, Wd - 0.2, 0.42, 0.94, CAISSE);
+  bloc(0.95, L - 1.9, 0.06, Wd - 0.12, 0.3, 0.98, VITRE);
+  bloc(0.85, L - 1.7, 0.08, Wd - 0.16, 0.09, H - 0.09, TOIT);
+  // Galerie de toit : elle DIT que le toit est une surface, pas une bosse.
+  for (const a of [1.15, L - 1.15]) bloc(a, 0.08, 0.14, Wd - 0.28, 0.1, H, "#5c5348");
+  bloc(1.15, L - 2.3, 0.16, 0.1, 0.06, H + 0.04, "#5c5348");
+  bloc(1.15, L - 2.3, Wd - 0.26, 0.1, 0.06, H + 0.04, "#5c5348");
+  // Pare-chocs et feux : blancs devant, rouges derrière.
+  bloc(0.0, 0.12, 0.04, Wd - 0.08, 0.2, 0.46, "#2b2b31");
+  bloc(L - 0.12, 0.12, 0.04, Wd - 0.08, 0.2, 0.46, "#2b2b31");
+  for (const b of [0.1, Wd - 0.38]) {
+    bloc(L - 0.09, 0.1, b, 0.28, 0.16, 0.74, getNight() > 0.2 ? "#fff6c8" : "#f0ead2");
+    bloc(0.0, 0.1, b, 0.28, 0.15, 0.76, "#c8301c");
   }
-  // Celle qui arrive en face allume ses phares sur la route.
   if (sens < 0) {
     ctx.save(); ctx.globalAlpha *= getNight() > 0.2 ? 0.55 : 0.22;
     drawFlat(ctx, x - 0.1, v - L / 2 - 4.2, Wd + 0.2, 4.2, "#fff2b0", true);
@@ -124,6 +128,12 @@ export function drawVoiture(ctx, K, uCenter, v, sens, t) {
 // Statique centré sur (uCenter, r). `t` anime les animaux sur place.
 export function drawStatic(ctx, kind, uCenter, r, t) {
   const K = KINDS[kind];
+  // ⚠️ `r` peut être DÉCIMAL : drawStaticTombe recule la bête qui bascule.
+  // Les couleurs se choisissent donc sur un index ENTIER. Sans ça,
+  // ["gris","blanc","noir"][74.35 % 3] rendait `undefined`, parseColor plantait
+  // au milieu d'une rotation du canvas, et la rotation restait : tout le jeu
+  // partait de travers jusqu'au rechargement (bug vécu le 20 septembre 2026).
+  const ri = Math.abs(Math.round(r));
   const wob = Math.sin(t * 2.2 + r) * 0.05;
   const B = corps(ctx, uCenter, r, K);
   if (kind !== "mouton") drawShadow(ctx, uCenter, r, K.larg / 2, K.long / 2, 0.22);
@@ -136,20 +146,12 @@ export function drawStatic(ctx, kind, uCenter, r, t) {
     B(0.22, 0.24, 0.1, 0.12, 0.2, ORANGE);
     B(0.44, 0.5, 0.1, 0.12, 0.2, ORANGE);
   } else if (kind === "mouton") {
-    // 360 SUR LUI-MÊME (20 septembre 2026 : « le mouton, tu lui fais faire un
-    // 360 3D »). Vraie rotation autour de l'axe vertical : chaque morceau est
-    // une boîte tournée, placée à un décalage lui-même tourné.
-    const ang = (t * 1.05 + r * 0.7) % (Math.PI * 2);
-    const ca = Math.cos(ang), sa = Math.sin(ang);
-    const place = (da, db, du, dv, h, lift, col) => {
-      drawBoxR(ctx, uCenter + (du * ca - dv * sa), r + (du * sa + dv * ca), da, db, h, col, lift, ang);
-    };
-    drawShadow(ctx, uCenter, r, K.larg / 2, K.long / 2, 0.2);
-    for (const [du, dv] of [[-0.24, -0.38], [0.24, -0.38], [-0.24, 0.34], [0.24, 0.34]]) place(0.16, 0.16, du, dv, 0.3, 0, BLACK);
-    place(K.larg * 0.92, K.long * 0.78, 0, 0.06, K.h * 0.52, 0.3, "#f7f4ee");
-    place(K.larg * 0.72, K.long * 0.6, 0, 0.06, 0.1, K.h * 0.82 + 0.02, "#ffffff");
-    place(0.3, 0.3, 0, -K.long * 0.44, 0.3, K.h * 0.46, BLACK);
-    place(0.1, 0.16, 0, K.long * 0.42, 0.1, K.h * 0.6, "#efe9e0");   // queue
+    for (const [la, lb] of [[0.12, 0.1], [0.12, 0.66], [0.68, 0.1], [0.68, 0.66]]) B(la, lb, 0.1, 0.18, 0.34, BLACK);
+    B(0.03 + wob, 0.04, 0.78, 0.9, 0.46, "#f7f4ee", 0.34);
+    B(0.12 + wob, 0.12, 0.6, 0.72, 0.12, "#ffffff", 0.78);
+    B(0.78 + wob, 0.18, 0.22, 0.62, 0.3, BLACK, 0.44);
+    B(0.96 + wob, 0.3, 0.08, 0.36, 0.12, "#2b2b31", 0.5);
+    B(-0.02, 0.42, 0.08, 0.16, 0.1, "#efe9e0", 0.62);
   } else if (kind === "cochon") {
     for (const [la, lb] of [[0.12, 0.1], [0.12, 0.62], [0.72, 0.1], [0.72, 0.62]]) B(la, lb, 0.1, 0.16, 0.24, "#e08a9a");
     B(0.04 + wob, 0.06, 0.72, 0.84, 0.46, PINK, 0.24);
@@ -188,15 +190,20 @@ export function drawStatic(ctx, kind, uCenter, r, t) {
   } else if (kind === "voiture") {
     drawVoiture(ctx, K, uCenter, r, 1, t);
   } else if (kind === "chat") {
-    const col = ["#8a8d98", "#f4efe4", "#1a1a1e"][Math.abs(r) % 3];
-    B(0.08 + wob * 0.5, 0.06, 0.52, 0.66, 0.4, col, 0.2);
-    B(0.56 + wob * 0.5, 0.12, 0.3, 0.6, 0.34, col, 0.38);
-    B(0.6, 0.06, 0.1, 0.16, 0.16, col, 0.72);
-    B(0.78, 0.5, 0.1, 0.16, 0.16, col, 0.72);
-    B(-0.14, 0.32, 0.22, 0.14, 0.1, col, 0.46 + Math.abs(wob) * 2);
-    B(0.16, 0.08, 0.08, 0.14, 0.2, col); B(0.44, 0.52, 0.08, 0.14, 0.2, col);
+    // Plus de gris : il se perdait sur l'asphalte (« les chats gris, on ne les
+    // voit pas assez »). Noir, blanc ou roux foncé, et une tache de contraste.
+    const noir = ri % 3 === 0;
+    const col = noir ? "#1a1a1e" : ri % 3 === 1 ? "#f4efe4" : "#6b3a20";
+    const tache = noir ? "#f4efe4" : "#1a1a1e";
+    for (const [la, lb] of [[0.14, 0.08], [0.14, 0.64], [0.62, 0.08], [0.62, 0.64]]) B(la, lb, 0.1, 0.18, 0.3, col);
+    B(0.06 + wob * 0.5, 0.06, 0.62, 0.78, 0.36, col, 0.3);
+    B(0.66 + wob * 0.5, 0.12, 0.26, 0.66, 0.34, col, 0.44);
+    B(0.7, 0.08, 0.1, 0.18, 0.16, col, 0.78);
+    B(0.86, 0.56, 0.1, 0.18, 0.16, col, 0.78);
+    B(0.18, 0.14, 0.26, 0.4, 0.1, tache, 0.64);
+    B(-0.16, 0.36, 0.24, 0.16, 0.12, col, 0.52 + Math.abs(wob) * 2);
   } else if (kind === "chien") {
-    const col = Math.abs(r) % 2 ? "#5a3a22" : "#2a2a30";
+    const col = ri % 2 ? "#5a3a22" : "#2a2a30";
     for (const [la, lb] of [[0.1, 0.08], [0.1, 0.62], [0.58, 0.08], [0.58, 0.62]]) B(la, lb, 0.1, 0.18, 0.3, col);
     B(0.04 + wob * 0.5, 0.06, 0.66, 0.72, 0.34, col, 0.28);
     B(0.66 + wob * 0.5, 0.1, 0.24, 0.62, 0.32, col, 0.42);
