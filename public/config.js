@@ -123,13 +123,21 @@ window.CONFIG = {
   lienSuivre: "https://open.spotify.com/artist/3TqmTXwzfX2UCduNYwW9iq",
   lienInsta: "https://www.instagram.com/pmc.mp3/",
 
-  // === BACKEND === (V1 locale : rien n'est envoyé)
-  // Ligues entre potes (7 septembre 2026) : même projet Supabase que le premier
-  // jeu, tables de jai-un-pote/supabase-migration-ligues.sql. Clé « anon
-  // public » : publique par nature, protégée par la RLS côté serveur.
-  apiBase: "https://lmlltogosjpxkgofpcdy.supabase.co/rest/v1",
-  apiKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxtbGx0b2dvc2pweGtnb2ZwY2R5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU5NTIxMDYsImV4cCI6MjEwMTUyODEwNn0.vC1XpJ9qG0FASbugtcsCBWFV1CIJUgTHKJO5E-HVxBs",
-  lienJeu: "https://la-ville-est-belle-pmc.fr/jai-un-pote/", // base des liens de ligue (?ligue=CODE)
+  // === BACKEND ===
+  // ⚠️ v2 (19 septembre 2026) : la v2 a SA PROPRE base Supabase, jamais celle
+  // de la v1 (où tourne la bêta fermée : ses classements, son relais de la
+  // semaine et ses événements ne doivent pas recevoir de courses v2).
+  // Tant que le projet Supabase v2 n'existe pas, les deux champs restent VIDES :
+  // net.js ne fait alors aucun appel, le jeu tourne avec la ligue de démo
+  // (potesDefaut), sans ligue ni classement. Pour brancher la base : créer le
+  // projet, exécuter supabase/schema-v2.sql, copier les ligues
+  // (outils/copier-ligues-v1-vers-v2.mjs), puis coller ici l'URL REST
+  // (https://<ref>.supabase.co/rest/v1) et la clé « anon public ».
+  apiBase: "",
+  apiKey: "",
+  // Base des liens de ligue (?ligue=CODE). L'adresse github.io reste valable
+  // quand le sous-domaine sera branché : GitHub la redirige alors (301).
+  lienJeu: "https://pmcmp3.github.io/jai-un-pote-v2/",
   apiScores: "",
   apiScoresKey: "",
 

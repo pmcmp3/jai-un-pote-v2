@@ -62,14 +62,14 @@ const pauseReplayButton = $("pause-replay-button");
 // Clés PROPRES à « J'ai un pote » depuis le 7 septembre 2026 : quelqu'un qui a
 // déjà franchi le tiroir sur « La ville est belle » repasse par l'album ici
 // (« la personne avait déjà joué, elle a pu rejouer sans passer par Spotify »).
-const CLE_MORCEAU_OUVERT = "jaipMorceauOuvert";
-const CLE_PMC_SUIVI = "jaipPmcSuivi";
-const CLE_PLATEFORME = "jaipPlateformeAlbum";
-const CLE_PSEUDO = "jaipPseudo";
-const CLE_RECORD = "jaipRecord";
-const CLE_PARTIES = "jaipParties";
-const CLE_LIGUE = "jaipLigue";
-const CLE_INSTA = "jaipInsta", CLE_VILLE = "jaipVille", CLE_SKIN = "jaipSkin", CLE_SOURCE = "jaipSource", CLE_SPRINT = "jaipSprint";
+const CLE_MORCEAU_OUVERT = "jp2MorceauOuvert";
+const CLE_PMC_SUIVI = "jp2PmcSuivi";
+const CLE_PLATEFORME = "jp2PlateformeAlbum";
+const CLE_PSEUDO = "jp2Pseudo";
+const CLE_RECORD = "jp2Record";
+const CLE_PARTIES = "jp2Parties";
+const CLE_LIGUE = "jp2Ligue";
+const CLE_INSTA = "jp2Insta", CLE_VILLE = "jp2Ville", CLE_SKIN = "jp2Skin", CLE_SOURCE = "jp2Source", CLE_SPRINT = "jp2Sprint";
 
 // --- Bêta fermée (16 septembre 2026) -----------------------------------------
 // Une seule ligue pour les fans du groupe WhatsApp : on arrive par
