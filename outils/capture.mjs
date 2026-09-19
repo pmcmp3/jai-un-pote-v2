@@ -28,7 +28,9 @@ if (!surBuild) await serveur.listen();
 const port = surBuild ? new URL(serveur.resolvedUrls.local[0]).port : serveur.config.server.port;
 const url = `http://localhost:${port}/?debug`;
 const navigateur = await chromium.launch({ channel: "chrome", headless: true, args: ["--autoplay-policy=no-user-gesture-required"] });
-const contexte = await navigateur.newContext({ viewport: { width: 375, height: 812 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+// ECRAN=petit : iPhone SE / 8 (375×667), le pire cas pour le menu.
+const petit = process.env.ECRAN === "petit";
+const contexte = await navigateur.newContext({ viewport: { width: 375, height: petit ? 667 : 812 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
 const page = await contexte.newPage();
 const erreurs = [];
 page.on("pageerror", (e) => erreurs.push(e.stack || e.message));
@@ -43,8 +45,8 @@ await page.goto(url);
 const attendre = (ms) => page.waitForTimeout(ms);
 const photo = async (nom) => { await page.screenshot({ path: `${sorties}${nom}.png` }); console.log("  →", `outils/sorties/${nom}.png`); };
 
-await attendre(1500);
-await photo("00-menu");
+await attendre(1800);
+await photo(petit ? "00-menu-petit" : "00-menu");
 await page.waitForFunction(() => !document.getElementById("play-button").disabled, null, { timeout: 15000 });
 await page.click("#play-button");
 await page.waitForFunction(() => window.__pote && window.__pote.estDemarre(), null, { timeout: 8000 });
@@ -78,6 +80,18 @@ const SCENES = {
   },
   turbo: async () => { await page.keyboard.press("KeyL"); await attendre(600); await photo("09-turbo"); await attendre(5000); },
   nuit: async () => { await page.keyboard.press("KeyN"); await attendre(1500); await photo("10-nuit"); },
+  // Le roller (20 septembre 2026) : on l'équipe depuis le menu.
+  roller: async () => {
+    await course(() => { const sk = JSON.parse(localStorage.getItem("jp2Skin") || "{}"); sk.velo = "roller"; localStorage.setItem("jp2Skin", JSON.stringify(sk)); });
+    await page.reload();
+    await page.waitForFunction(() => !document.getElementById("play-button").disabled, null, { timeout: 15000 });
+    await photo("21-menu-roller");
+    await page.click("#play-button");
+    await page.waitForFunction(() => window.__pote && window.__pote.estDemarre(), null, { timeout: 8000 });
+    await page.keyboard.press("KeyD");
+    await attendre(4200); await photo("22-roller");
+    await page.keyboard.press("KeyD");
+  },
   // Coût de rendu avec le processeur ralenti 4× (≈ téléphone moyen) : moyenne
   // des temps de frame lus dans l'overlay pendant 4 s, meute complète, plein village.
   perf: async () => {

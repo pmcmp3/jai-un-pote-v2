@@ -46,7 +46,8 @@ export function maxReached() { return maxCount; }
 // Le plafond protège aussi la ligue de bêta, qui peut compter 60 personnes.
 export function max() { return Math.min(listeMembres().length, window.CONFIG.potesMax); }
 
-// Marque un saut (`type` = "saut") ou un salto ("salto") du joueur en v.
+// Marque un saut ("saut"), un saut tenu ("haut") ou un double saut ("double")
+// du joueur en v : la meute le refait au même endroit.
 export function recordPlayer(v, type) {
   if (type) marques.push({ v, type });
   const minV = vDuSlot(v, max() + 1) - 1;
@@ -79,6 +80,10 @@ function tirerSelection() {
   const choisis = pool.slice(0, max);
   const manquants = potesParDefaut().filter((d) => !choisis.some((m) => m.nom === d.nom));
   selection = choisis.concat(manquants).slice(0, max);
+}
+// Le joueur a gardé l'appui : la dernière marque devient un saut tenu.
+export function marquerTenue() {
+  for (let i = marques.length - 1; i >= 0; i--) { if (marques[i].type === "saut") { marques[i].type = "haut"; return; } if (marques[i].type === "double") return; }
 }
 export function enLigue() { return nomsLigue !== null; }
 function potesParDefaut() { return window.CONFIG.potesDefaut || (window.CONFIG.potesNoms || ["paul"]).map((n) => ({ nom: n, skin: null })); }
@@ -144,16 +149,23 @@ export function update(dt, player, phys) {
     }
     p.u += (cibleU - p.u) * Math.min(1, 4 * dt);
     p.v = cibleV;
-    // Sauts et saltos aux marques du joueur.
+    // Sauts, sauts tenus et doubles sauts, aux marques du joueur.
     for (const m of marques) {
       if (m.v <= p.lastMark || m.v > p.v) continue;
       p.lastMark = m.v;
-      if (m.type === "saut" && p.jumpY <= 0) { p.jumpVy = phys.vJump; p.jumpY = 0.001; p.doubled = false; }
-      else if (m.type === "salto" && p.jumpY > 0 && !p.doubled) { p.jumpVy = phys.vJump; p.doubled = true; p.flip = 0.001; }
+      if ((m.type === "saut" || m.type === "haut") && p.jumpY <= 0) {
+        p.jumpVy = phys.vJump; p.jumpY = 0.001; p.doubled = false;
+        p.tenue = m.type === "haut" ? phys.tenueMax : 0;   // il tient l'appui comme le joueur
+      } else if (m.type === "double" && p.jumpY > 0 && !p.doubled) {
+        p.jumpVy = phys.vDouble; p.doubled = true; p.flip = 0.001;
+      }
     }
     if (p.jumpY > 0) {
-      p.jumpVy -= phys.g * dt; p.jumpY += p.jumpVy * dt;
-      if (p.jumpY <= 0) { p.jumpY = 0; p.jumpVy = 0; p.doubled = false; p.flip = 0; }
+      const tenu = p.tenue > 0 && p.jumpVy > 0;
+      if (tenu) p.tenue -= dt;
+      p.jumpVy -= (tenu ? phys.gTenu : phys.g) * dt;
+      p.jumpY += p.jumpVy * dt;
+      if (p.jumpY <= 0) { p.jumpY = 0; p.jumpVy = 0; p.doubled = false; p.flip = 0; p.tenue = 0; }
     }
     if (p.flip > 0) p.flip = Math.min(Math.PI * 2, p.flip + dt * (Math.PI * 2 / 0.5));
   }

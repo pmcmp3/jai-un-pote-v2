@@ -13,7 +13,7 @@ window.CONFIG = {
   dureeMorceau: 173.65,
   fichierAudio: "assets/jai-un-pote.mp3", // 96 kbps, 2,1 Mo (le 320 de l'EPK fait 6,9 Mo)
   boucleMorceau: false,     // contre-la-montre : la fin du morceau = la fin de la partie (6 septembre 2026)
-  chargementMinS: 5,        // la barre de chargement dure au moins 5 s : tout est en cache avant JOUER (demandé)
+  chargementMinS: 1.8,      // 5 → 1,8 le 20 septembre 2026 (« le démarrage est vraiment extrêmement lent »)
   fonduEntree: 1.2,
   fonduSortie: 2.0,
   pauseFiltreHz: 800,
@@ -52,9 +52,18 @@ window.CONFIG = {
   // garder ~1,6 s de lecture devant soi.
   cameraJoueurX: [0.3, 0.25],
 
-  // === SAUT (tap) ===
-  sautHauteur: 1.25,     // apex du saut (unités-monde) — passe au-dessus des poules et des bottes
-  sautDuree: 0.55,       // durée du saut en secondes
+  // === SAUT (20 septembre 2026 : « faudrait que les personnages puissent
+  // sauter beaucoup plus haut, et si on reste appuyé un peu plus longtemps,
+  // on peut sauter un peu plus haut [...] et si on double-tape après, un
+  // double saut, un peu comme dans tous les jeux d'arcade ») ===
+  // Tap court    → apex ~1,3 (poules, chats, chiens, moutons, bottes)
+  // Appui tenu   → apex ~2,5 (cochons, vaches, tracteurs)
+  // Re-tap en l'air → apex ~3,7 (fermiers, voitures) + salto
+  sautVitesse: 8.2,         // vitesse verticale au départ du saut (unités/s)
+  sautVitesseDouble: 7.6,   // impulsion du second saut, en l'air
+  sautGravite: 25,          // pesanteur normale
+  sautGraviteTenue: 12,     // pesanteur tant qu'on monte ET qu'on reste appuyé
+  sautTenueMaxS: 0.4,       // au-delà, l'appui ne fait plus monter
 
   // === GRILLE ===
   cadenceSpawnBeats: 1.5, // un créneau tous les 1,5 temps = 1,06 s à 85 BPM
@@ -66,10 +75,7 @@ window.CONFIG = {
   // Chaque pote ajoute ce pourcentage aux mètres gagnés (×1 seul, ×3 avec 8 potes).
   potesBonusMetres: 0.25,
   // Mètres bonus par pièce ramassée (avant multiplicateur de potes).
-  // v2 : 4 → 2,6. La vue de profil pose ~1,5× plus de pièces (les arcs
-  // au-dessus des obstacles) ; 2,6 garde leur poids dans le score parfait au
-  // niveau de la v1 (~50 %), mesuré par outils/mesurer.mjs.
-  pieceMetres: 2.6,
+  pieceMetres: 4,
 
   // === POTES ===
   // PIÈCES cumulées qui font venir le pote n°1, n°2… (croissant : chaque pote
@@ -86,6 +92,10 @@ window.CONFIG = {
   potesRecul: 1.0,
   potesEcart: 0.5,
   potesPaliers: [5, 12, 20, 30, 42],
+  // Après le dernier palier, un pote PERDU se rachète pour ce nombre de
+  // pièces (20 septembre 2026 : « j'ai perdu tous mes potes et j'arrive pas
+  // à les regagner »).
+  poteRachatPieces: 10,
   // Prénoms des potes, dans l'ordre d'arrivée (Soberland en premier, verrouillé).
   // Sans ligue, le peloton c'est la LIGUE DE DÉMO (7 septembre 2026) : Paul et
   // ses quatre potes, avec leurs skins. Dans une ligue, ce sont les membres.
@@ -111,15 +121,12 @@ window.CONFIG = {
   relaisDistance: 30000,    // mètres cumulés d'une ligue pour gagner le relais
   sprintDureeS: 60,         // le sprint du dimanche : 60 s, même route pour tous
 
-  // === DOUBLE SAUT (6 septembre 2026) ===
-  // Un second tap en l'air = salto. Il consomme la barre d'élan, qui se
-  // recharge en `elanRechargeS` secondes — pas de double saut en continu.
-  // v2 : le salto devient OBLIGATOIRE pour les obstacles hauts (tracteur,
-  // fermier, voiture). Deux obstacles « salto » ne se suivent jamais (rows.js) :
-  // le suivant est au moins 8 rangées plus loin, soit 1,18 s à vitesse max —
-  // la barre doit donc se recharger en moins de ça, même sans pièce.
-  elanRechargeS: 1.1,       // 2,5 en v1
-  elanParPiece: 0.1,        // 0,25 en v1 (il y a ~3× plus de pièces : les arcs)
+  // === DOUBLE SAUT ===
+  // Plus de barre d'élan depuis le 20 septembre 2026 (« mets pas de barre de
+  // chargement de saltos ») : le double saut est toujours disponible, une
+  // fois par saut. Les deux clés restent lues par d'anciens réglages.
+  elanRechargeS: 0,
+  elanParPiece: 0,
   piecesLogo: false,        // « mets juste des pièces jaunes pour l'instant, enlève les dessins »
   laitDureeS: 5,            // brique de lait : ×2 sur les mètres pendant 5 s
   laitVitesse: 1.2,         // et seulement +20 % de vitesse (« pas ×2, c'est n'importe quoi »)

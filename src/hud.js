@@ -47,14 +47,12 @@ function fitFont(ctx, weight, size, text, maxW, min = 9) {
 export function renderHud(ctx, width, height, hud) {
   ctx.save();
   const top = hud.safeTop || 0;
-  const bandH = 128 + top;
-  const band = ctx.createLinearGradient(0, 0, 0, bandH);
-  band.addColorStop(0, "rgba(13,13,16,0.8)");
-  band.addColorStop(0.72, "rgba(13,13,16,0.55)");
-  band.addColorStop(1, "rgba(13,13,16,0)");
-  ctx.fillStyle = band;
-  ctx.fillRect(0, 0, width, bandH);
+  // Plus de bandeau sombre en haut de l'écran (20 septembre 2026 : « enlève
+  // le flou en haut de l'écran par-dessus le score et les potes ») : chaque
+  // texte porte son propre contour noir, lisible sur le ciel comme sur le blé.
   ctx.textBaseline = "top";
+  ctx.lineJoin = "round";
+  const ecrire = (txt, x, y, taille = 0) => { ctx.lineWidth = Math.max(3, taille * 0.16); ctx.strokeStyle = "rgba(13,13,16,0.85)"; ctx.strokeText(txt, x, y); ctx.fillText(txt, x, y); };
 
   // Colonnes : gauche = 14..(14+96), droite = 8 cases de 10 px.
   const cell = 10, gap = 3, total = hud.potesMax;
@@ -76,17 +74,17 @@ export function renderHud(ctx, width, height, hud) {
   ctx.fillStyle = BLANC;
   ctx.textAlign = "left";
   ctx.font = `900 ${taille}px ${POLICE_TITRE}`;
-  ctx.fillText(num, x0, top + PAD - 6);
+  ecrire(num, x0, top + PAD - 6, taille);
   ctx.font = `700 14px ${POLICE}`;
-  ctx.fillText(" pts", x0 + wNum, top + PAD + taille * 0.5 - 4);
+  ecrire(" pts", x0 + wNum, top + PAD + taille * 0.5 - 4, 14);
 
   // Chrono sous les mètres.
   if (hud.restantS !== undefined) {
     const s = Math.max(0, hud.restantS);
     ctx.font = `700 12px ${POLICE}`;
     ctx.textAlign = "center";
-    ctx.fillStyle = s <= 10 ? ROUGE : "rgba(255,255,255,0.75)";
-    ctx.fillText(`${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`, cx, top + PAD + taille * 0.9 + 2);
+    ctx.fillStyle = s <= 10 ? ROUGE : BLANC;
+    ecrire(`${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`, cx, top + PAD + taille * 0.9 + 2, 12);
   }
   // Pastille ×N sous le chrono.
   if (hud.mult > 1.001) {
@@ -110,9 +108,9 @@ export function renderHud(ctx, width, height, hud) {
   }
   ctx.font = `700 11px ${POLICE}`;
   ctx.textAlign = "right";
-  ctx.fillStyle = "rgba(255,255,255,0.85)";
-  ctx.fillText(total === 0 ? "INVITE TES POTES" : hud.potes === 0 ? "TOUT SEUL" : hud.potes === 1 ? "1 POTE" : `${hud.potes} POTES`, width - PAD, ry + cell + 5);
-  if (total > 0 && hud.potes < total) {
+  ctx.fillStyle = BLANC;
+  ecrire(total === 0 ? "INVITE TES POTES" : hud.potes === 0 ? "TOUT SEUL" : hud.potes === 1 ? "1 POTE" : `${hud.potes} POTES`, width - PAD, ry + cell + 5, 11);
+  if (total > 0 && !hud.plein) {
     const gy = ry + cell + 22;
     ctx.fillStyle = "rgba(255,255,255,0.22)";
     roundRect(ctx, rx, gy, rowW, 4, 2);
@@ -122,21 +120,9 @@ export function renderHud(ctx, width, height, hud) {
     ctx.fill();
     fitFont(ctx, "700", 10, `PROCHAIN POTE : ${hud.restant}`, rowW + 30, 8);
     ctx.fillStyle = JAUNE;
-    ctx.fillText(`PROCHAIN POTE : ${hud.restant} PIÈCE${hud.restant > 1 ? "S" : ""}`, width - PAD, gy + 9);
+    ecrire(`PROCHAIN POTE : ${hud.restant} PIÈCE${hud.restant > 1 ? "S" : ""}`, width - PAD, gy + 9, 10);
   }
 
-  // Gauche : barre SALTO sous le bouton pause (44 px de haut à 14 + safeTop).
-  const ex = 14, ey = top + 14 + 44 + 18, ew = 96;
-  ctx.font = `700 9px ${POLICE}`;
-  ctx.textAlign = "left";
-  ctx.fillStyle = "rgba(255,255,255,0.8)";
-  ctx.fillText(hud.elan >= 1 ? "SALTO PRÊT" : "SALTO", ex, ey - 12);
-  ctx.fillStyle = "rgba(255,255,255,0.22)";
-  roundRect(ctx, ex, ey, ew, 5, 2);
-  ctx.fill();
-  ctx.fillStyle = hud.elan >= 1 ? JAUNE : "rgba(255,255,255,0.6)";
-  roundRect(ctx, ex, ey, Math.max(3, ew * Math.min(1, hud.elan)), 5, 2);
-  ctx.fill();
   ctx.restore();
 }
 
@@ -174,7 +160,7 @@ export function renderCountIn(ctx, width, height, t, beatPeriod, beats, linger) 
 // Rappel des commandes, en bas, pendant les premières secondes de course.
 export function renderHint(ctx, width, height, alpha) {
   if (alpha <= 0.01) return;
-  const txt = "TAP = SAUT  ·  RE-TAP EN L'AIR = SALTO";
+  const txt = "TAP = SAUT  ·  RESTE APPUYÉ = PLUS HAUT  ·  RE-TAP = DOUBLE";
   ctx.save();
   ctx.globalAlpha = alpha;
   fitFont(ctx, "700", 12, txt, width - 60, 8);
@@ -250,6 +236,46 @@ export function renderTurbo(ctx, width, height, t, force) {
   ctx.restore();
 }
 
+// « Qui tu vas croiser » : le bestiaire du début de course (20 septembre
+// 2026 : « le mec qui lance ses poules, je connais le jeu mais les gens ne
+// vont pas le voir — il faudra mettre un panneau au tout début qui présente
+// tous les types d'ennemis »). Les vignettes sont dessinées par le VRAI
+// moteur (main.js les pré-rend une fois), le geste est écrit à côté.
+export function renderBestiaire(ctx, width, height, alpha, groupes, safeTop = 0) {
+  if (alpha <= 0.01 || !groupes || !groupes.length) return;
+  const w = Math.min(width - 28, 350), lh = 62, h = 34 + groupes.length * lh;
+  const x = width / 2 - w / 2, y = Math.max(safeTop + 96, height * 0.16);
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = "rgba(13,13,16,0.82)";
+  roundRect(ctx, x, y, w, h, 4);
+  ctx.fill();
+  ctx.fillStyle = JAUNE;
+  roundRect(ctx, x, y, w, 3, 1);
+  ctx.fill();
+  ctx.textAlign = "center"; ctx.textBaseline = "top";
+  ctx.font = `700 10px ${POLICE}`;
+  ctx.fillStyle = "rgba(255,255,255,0.65)";
+  ctx.fillText("QUI TU VAS CROISER", width / 2, y + 10);
+  groupes.forEach((g, i) => {
+    const ly = y + 30 + i * lh;
+    let vx = x + 14;
+    for (const img of g.images) {
+      const ih = 52, iw = ih * (img.width / img.height);
+      ctx.drawImage(img, vx, ly, iw, ih);
+      vx += iw + 2;
+    }
+    ctx.textAlign = "right"; ctx.textBaseline = "middle";
+    ctx.font = `900 14px ${POLICE}`;
+    ctx.fillStyle = BLANC;
+    ctx.fillText(g.geste, x + w - 14, ly + 20);
+    ctx.font = `500 11px ${POLICE}`;
+    ctx.fillStyle = "rgba(255,255,255,0.75)";
+    ctx.fillText(g.texte, x + w - 14, ly + 38);
+  });
+  ctx.restore();
+}
+
 // Tutoriel du tout début : une consigne à la fois, en gros, jusqu'au geste.
 export function renderTuto(ctx, width, height, tuto) {
   if (!tuto) return;
@@ -290,7 +316,7 @@ export function renderFin(ctx, width, height, age) {
   const sc = 1.4 - 0.4 * tPop;
   ctx.scale(sc * 0.66, sc); // condensé comme le titre « j'ai un pote » (scaleX 0,66)
   ctx.textAlign = "center"; ctx.textBaseline = "middle";
-  ctx.font = `900 ${Math.min(120, width * 0.3)}px ${POLICE_TITRE}`;
+  ctx.font = `900 ${Math.min(74, width * 0.19)}px ${POLICE_TITRE}`;
   ctx.fillStyle = NOIR;
   ctx.fillText("terminé !", 4, 4);
   ctx.fillStyle = BLANC;

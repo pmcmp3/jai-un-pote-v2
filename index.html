@@ -40,10 +40,10 @@
       -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
     }
     #app { position: fixed; inset: 0; }
-    #game-canvas { display: block; width: 100%; height: 100%; transition: filter 0.6s ease; }
-    #game-canvas.game-over-bw { filter: grayscale(1); }
+    #game-canvas { display: block; width: 100%; height: 100%; transition: filter 0.6s ease; filter: saturate(1.28) contrast(1.03); }
+    #game-canvas.game-over-bw { filter: grayscale(1) saturate(0); }
     #game-canvas.danger { animation: canvas-danger 4s ease-in-out infinite; }
-    #game-canvas.turbo { filter: saturate(1.7) contrast(1.06); }
+    #game-canvas.turbo { filter: saturate(1.95) contrast(1.1); }
     @keyframes canvas-danger { 0%, 15%, 100% { filter: grayscale(0); } 7.5% { filter: grayscale(0.8); } }
 
     #vignette {
@@ -154,7 +154,7 @@
     .champ-row input:focus { outline: none; border-bottom-color: var(--rouge); }
     #step2-back, #step3-links { margin-top: 10px; }
     #step3-links { display: flex; gap: 18px; }
-    #skin-canvas { display: block; width: 220px; height: 150px; margin: -6px 0 2px; }
+    #skin-canvas { display: block; width: 200px; height: 120px; margin: -10px 0 0; }
     #skin-options { display: flex; flex-direction: column; gap: 5px; width: 250px; margin-bottom: 12px; }
     .skin-row { display: flex; align-items: center; gap: 8px; }
     .skin-label { width: 68px; flex: none; font: 700 10px var(--police); letter-spacing: 0.1em; text-transform: uppercase; color: rgba(0,0,0,0.55); }
@@ -406,12 +406,9 @@
         <div class="panel-body">
           <canvas id="skin-canvas" width="220" height="200" aria-label="Aperçu de ton cycliste"></canvas>
           <div id="skin-options">
-            <div class="skin-row"><span class="skin-label">T-shirt</span><div class="chips" data-cle="c1"></div></div>
-            <div class="skin-row"><span class="skin-label">Motif</span><div class="chips" data-cle="motif"></div></div>
-            <div class="skin-row"><span class="skin-label">Short</span><div class="chips" data-cle="short"></div></div>
+            <div class="skin-row"><span class="skin-label">Maillot</span><div class="chips" data-cle="c1"></div></div>
             <div class="skin-row"><span class="skin-label">Chapeau</span><div class="chips" data-cle="chapeau"></div></div>
-            <div class="skin-row"><span class="skin-label">Chaussures</span><div class="chips" data-cle="chaussures"></div></div>
-            <div class="skin-row"><span class="skin-label">Vélo</span><div class="chips" data-cle="velo"></div></div>
+            <div class="skin-row"><span class="skin-label">Engin</span><div class="chips" data-cle="velo"></div></div>
           </div>
           <div id="loading">
             <div id="loading-track"><div id="loading-fill"></div></div>
@@ -516,7 +513,7 @@
       <p id="revive-title">Tes potes t'attendent</p>
       <p id="revive-text"></p>
       <button id="revive-cta" class="btn btn-primary" type="button">Continuer la course</button>
-      <button id="revive-replay" type="button" class="btn btn-secondary">Rejouer</button>
+      <button id="revive-replay" type="button" class="link-minimal">Rejouer depuis le début</button>
       <button id="revive-decline" type="button" class="link-minimal">Voir ma course</button>
     </div>
   </div>

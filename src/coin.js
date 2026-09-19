@@ -29,14 +29,17 @@ export function drawCoin(ctx, R, spin, rouge = false) {
   if (rouge) {
     // Pièce ROUGE rare = un pote direct : « il faut qu'elle brille énormément,
     // comme un soleil au milieu de la route ».
-    const halo = ctx.createRadialGradient(0, 0, R * 0.3, 0, 0, R * 3.2);
-    halo.addColorStop(0, "rgba(255,90,60,0.75)");
-    halo.addColorStop(0.5, "rgba(255,120,60,0.25)");
-    halo.addColorStop(1, "rgba(255,140,60,0)");
+    // 20 septembre 2026 : la pièce rouge se lisait comme un POISON. Même
+    // pièce dorée que les autres, mais deux fois plus grosse et qui brille
+    // énormément (« c'est les mêmes pièces, mais elles brillent beaucoup plus »).
+    const halo = ctx.createRadialGradient(0, 0, R * 0.2, 0, 0, R * 3.4);
+    halo.addColorStop(0, "rgba(255,240,150,0.95)");
+    halo.addColorStop(0.45, "rgba(255,205,60,0.35)");
+    halo.addColorStop(1, "rgba(255,190,60,0)");
     ctx.fillStyle = halo;
     ctx.fillRect(-R * 3.2, -R * 3.2, R * 6.4, R * 6.4);
   }
-  const FACE_C = rouge ? "#ff4a2e" : FACE, FACE_HI_C = rouge ? "#ff8a72" : FACE_HI, RIM_C = rouge ? "#a12c1c" : RIM, EDGE_C = rouge ? "#7a1f12" : EDGE;
+  const FACE_C = rouge ? "#ffe066" : FACE, FACE_HI_C = rouge ? "#fff6c8" : FACE_HI, RIM_C = rouge ? "#d99a0c" : RIM, EDGE_C = rouge ? "#b87d06" : EDGE;
   const rx = Math.max(R * 0.08, R * Math.abs(c));
   const thick = R * 0.16;
   // Tranche : décalée du côté qui s'éloigne, visible surtout de profil.
@@ -57,6 +60,13 @@ export function drawCoin(ctx, R, spin, rouge = false) {
   ctx.beginPath();
   ctx.ellipse(-rx * 0.25, -R * 0.3, rx * 0.35, R * 0.22, 0, 0, Math.PI * 2);
   ctx.fill();
+  // Contour sombre : sans lui, une pièce dorée se perd sur le champ de blé
+  // et dans le ciel (20 septembre 2026, « on ne les voit pas très bien »).
+  ctx.strokeStyle = "rgba(60,38,4,0.85)";
+  ctx.lineWidth = Math.max(1.2, R * 0.13);
+  ctx.beginPath();
+  ctx.ellipse(0, 0, rx, R, 0, 0, Math.PI * 2);
+  ctx.stroke();
   // Logo, écrasé horizontalement avec l'angle, masqué de profil.
   if (window.CONFIG.piecesLogo && Math.abs(c) > 0.22) {
     const px = (R * 1.25) / LOGO_H;

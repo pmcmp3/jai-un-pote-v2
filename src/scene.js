@@ -44,6 +44,7 @@ let camV = 0, vCentre = 0, joueurX = 0.28;
 let horizonY = 430;
 let night = 0;
 let decorT = 0;
+let heure = 0;   // 0 = début de course, 1 = fin : le soleil traverse le ciel
 
 function cfg(cle, defaut) { const c = window.CONFIG || {}; return c[cle] !== undefined ? c[cle] : defaut; }
 
@@ -68,6 +69,10 @@ export function getVCentre() { return vCentre; }
 export function unitesDevant() { return (1 - joueurX) * W / K; }
 export function unitesDerriere() { return joueurX * W / K; }
 export function setNight(n) { night = Math.max(0, Math.min(1, n)); }
+// Avancement de la journée (20 septembre 2026, demandé : « le soleil qui
+// tourne de gauche à droite de l'écran jusqu'à la nuit, où la lune fait
+// pareil — on a l'impression que la temporalité passe »).
+export function setHeure(t) { heure = Math.max(0, Math.min(1, t)); }
 export function getNight() { return night; }
 export function setDecorTime(t) { decorT = t; }
 export function scale() { return K; }
@@ -306,24 +311,28 @@ export function renderGround(ctx, boueAt) {
   g.addColorStop(1, rgbA(bas));
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, W, horizonY + 4);
-  // Soleil couchant à droite, lune et étoiles la nuit.
-  if (night < 0.98) {
-    const sx = W * 0.8, sy = horizonY * 0.5;
-    const sg = ctx.createRadialGradient(sx, sy, 0, sx, sy, W * 0.7);
-    sg.addColorStop(0, `rgba(255,222,160,${0.85 * (1 - night)})`);
-    sg.addColorStop(0.3, `rgba(245,170,130,${0.35 * (1 - night)})`);
-    sg.addColorStop(1, "rgba(160,150,210,0)");
-    ctx.fillStyle = sg;
-    ctx.fillRect(0, 0, W, horizonY + 4);
-    ctx.fillStyle = `rgba(255,236,190,${1 - night})`;
-    ctx.beginPath(); ctx.arc(sx, sy, K * 0.9, 0, Math.PI * 2); ctx.fill();
-  }
+  // Le soleil traverse le ciel pendant la course : il se lève à gauche,
+  // passe au plus haut vers la mi-course, se couche à droite ; la lune prend
+  // le même chemin la nuit.
+  const astre = (t, couleur, rayon, halo) => {
+    const x = W * (0.08 + 0.84 * t), y = horizonY * (1.02 - 0.86 * Math.sin(Math.PI * Math.max(0, Math.min(1, t))));
+    if (halo > 0) {
+      const g2 = ctx.createRadialGradient(x, y, 0, x, y, W * 0.75);
+      g2.addColorStop(0, `rgba(255,222,160,${0.85 * halo})`);
+      g2.addColorStop(0.3, `rgba(245,170,130,${0.35 * halo})`);
+      g2.addColorStop(1, "rgba(160,150,210,0)");
+      ctx.fillStyle = g2;
+      ctx.fillRect(0, 0, W, horizonY + 4);
+    }
+    ctx.fillStyle = couleur;
+    ctx.beginPath(); ctx.arc(x, y, rayon, 0, Math.PI * 2); ctx.fill();
+  };
+  if (night < 0.98) astre(heure, `rgba(255,236,190,${1 - night})`, K * 0.9, 1 - night);
   if (night > 0.3) {
     const a = Math.min(1, (night - 0.3) / 0.5);
     ctx.fillStyle = `rgba(255,255,255,${0.75 * a})`;
     for (let i = 0; i < 40; i++) ctx.fillRect(hash(i * 7.1) * W, hash(i * 3.3) * (horizonY - 30), 2, 2);
-    ctx.fillStyle = `rgba(250,244,220,${a})`;
-    ctx.beginPath(); ctx.arc(W * 0.22, horizonY * 0.35, K * 0.7, 0, Math.PI * 2); ctx.fill();
+    astre(Math.max(0, heure - 0.55), `rgba(250,244,220,${a})`, K * 0.7, 0);
   }
   nuages(ctx);
   // Montagnes au loin (les villages du jeu sont en Isère : les Alpes en toile
@@ -439,9 +448,10 @@ export function rowDecor(ctx, r, clear) {
   if (r % 5 === 0 && zone !== "foret") {
     const u = ROAD_HALF + 1.55, v = r - 0.05;
     push(u, v, () => {
-      drawBox(ctx, u, v, 0.14, 0.14, 2.6, "#5c4a3a");
-      drawBox(ctx, u - 0.35, v + 0.02, 0.85, 0.1, 0.1, "#3a2e24", 2.35);
-      const a = project(u + 0.07, v + 0.07, 2.42), b = project(u + 0.07, v + 5.07, 2.42);
+      drawBox(ctx, u, v, 0.2, 0.2, 3.9, "#5c4a3a");
+      drawBox(ctx, u - 0.5, v + 0.02, 1.2, 0.14, 0.14, "#3a2e24", 3.5);
+      drawBox(ctx, u - 0.35, v + 0.04, 0.9, 0.1, 0.1, "#3a2e24", 3.0);
+      const a = project(u + 0.1, v + 0.1, 3.6), b = project(u + 0.1, v + 5.1, 3.6);
       ctx.strokeStyle = night > 0.5 ? "rgba(20,20,30,0.7)" : "rgba(40,34,30,0.55)";
       ctx.lineWidth = 1;
       ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.quadraticCurveTo((a.x + b.x) / 2, a.y + K * 0.35, b.x, b.y); ctx.stroke();
@@ -529,6 +539,13 @@ function decorVillage(ctx, push, r, side, sway) {
     const u = pres ? ROAD_HALF + 1.4 : ROAD_HALF + 6.4, v = r - 0.5;
     push(u, v, () => maison(ctx, u, v, 1.1, 1.3, 1, murs[k % 4], toits[(k + 1) % 4], null));
   }
+  // Troisième plan : des toits au fond, qui donnent la profondeur du bourg
+  // (20 septembre 2026 : « revois un peu plus la perspective des bâtiments
+  // entre eux »).
+  if (rz % 3 === (pres ? 2 : 0)) {
+    const u = pres ? ROAD_HALF + 11.5 : ROAD_HALF + 13.5, v = r - 0.8;
+    push(u, v, () => maison(ctx, u, v, 1.8, 2.2, 2, murs[(k + 3) % 4], toits[(k + 2) % 4], null));
+  }
   if (rz % 5 === (pres ? 0 : 2)) {
     const u = pres ? ROAD_HALF + 3.6 : ROAD_HALF + 8.6, v = r - 0.6;
     const hab = ["#e13e26", "#ffcf2e", "#3f63b4", "#2f7a46"][k % 4];
@@ -591,7 +608,7 @@ export function lampsIn(from, to) {
 // Panneau de village sur le bas-côté du fond : deux poteaux, une plaque rouge,
 // le nom écrit sur la face qui regarde la caméra (un rectangle à l'écran).
 export function drawSign(ctx, r, village) {
-  const [nom, dep] = village;
+  const [nom] = village;   // le département ne sert à rien (20 septembre 2026)
   const u = ROAD_HALF + 0.55, v = r;
   const w = 2.3, hb = 0.85, base = 1.2;
   drawBox(ctx, u, v - w / 2 + 0.2, 0.12, 0.12, base, "#8a8d98");
@@ -607,7 +624,5 @@ export function drawSign(ctx, r, village) {
   let taille = s * 0.34;
   ctx.font = `900 ${taille}px "Helvetica Neue", Helvetica, Arial, sans-serif`;
   while (ctx.measureText(nom).width > (B.x - A.x) - 4 * m && taille > 5) { taille -= 1; ctx.font = `900 ${taille}px "Helvetica Neue", Helvetica, Arial, sans-serif`; }
-  ctx.fillText(nom, cx, A.y + hh * 0.42);
-  ctx.font = `500 ${s * 0.18}px "Helvetica Neue", Helvetica, Arial, sans-serif`;
-  ctx.fillText(`(${dep})`, cx, A.y + hh * 0.75);
+  ctx.fillText(nom, cx, A.y + hh * 0.5);
 }

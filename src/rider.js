@@ -169,7 +169,7 @@ export const COULEURS = [
 export const SHORTS = [["gris", "#3a3e4e"], ["bleu", "#3f63b4"], ["rouge", "#b8402c"], ["sable", "#c8963a"]];
 export const CHAUSSURES = [["blanc", "#f2ede2"], ["noir", "#33353d"], ["orange", "#e0742e"], ["jaune", "#ffcf2e"]];
 export const CHAPEAUX = ["casquette", "bob", "paille", "aucun"];
-export const VELOS = ["vtt", "grandbi"];
+export const VELOS = ["vtt", "grandbi", "roller"];
 export const SKIN_DEFAUT = { motif: "raye", c1: "#2f7a46", c2: "#f2ede2", short: "#3a3e4e", chapeau: "casquette", chaussures: "#565a66", velo: "vtt" };
 
 export function paletteDepuisSkin(skin, base = PALETTES.pmc) {

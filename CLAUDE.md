@@ -37,16 +37,34 @@ En ligne : **https://pmcmp3.github.io/jai-un-pote-v2/** (dépôt `pmcmp3/jai-un-
 - **D3** Nouveau projet Supabase ; ligues et membres copiés, **pas les scores**.
 - **D4** **Portrait conservé** : caméra de profil, joueur à gauche (30 % → 25 % avec la vitesse),
   alerte « ! » au bord droit pour ce qui arrive hors champ.
-- **D5** Gestes : **tap = saut, re-tap en l'air = salto**, rien d'autre (swipe latéral ignoré).
-- **D6** **Pièces en hauteur** : arcs au-dessus des obstacles, piles sur les rangées libres.
+- **D5** Gestes : **tap = saut, appui maintenu = saut plus haut, re-tap en l'air = double saut**
+  (revu le 20 septembre 2026), swipe bas = roue arrière, swipe latéral ignoré.
+- **D6** **Pièces sur deux hauteurs** : au sol, ou en l'air de part et d'autre d'un obstacle
+  (elles dessinent le geste à faire).
 - **D7** Traversants (tracteur, poule lancée) : ils arrivent **du fond** et coupent la route ;
   armement sur le passage du joueur inchangé.
 
+## Retours téléphone du 20 septembre 2026 (première vraie partie)
+
+Mis en place : saut à trois étages (tap, appui maintenu, double saut ; plus de barre d'élan),
+obstacles et animaux plus gros, voitures énormes, écarts calculés sur la physique du saut
+(jamais de paquet d'obstacles, jamais de ligne droite vide), pièces sur DEUX hauteurs seulement
+et trois fois moins nombreuses, pièce rouge devenue pièce dorée qui brille, brique de lait qui
+tourne, potes rachetables après le dernier palier, bestiaire « qui tu vas croiser » au départ,
+menu réduit à trois réglages + roller, chargement 5 s → 1,8 s, HUD sans bandeau ni barre,
+« terminé ! » plus petit, soleil qui traverse le ciel, couleurs saturées en permanence, panneaux
+sans département et jamais deux à la fois, jambes du cycliste rattachées, roue arrière au swipe
+vers le bas, carte de mort qui met CONTINUER en avant.
+
+⏳ **Pas fait** : les halles de marché avec rampe (mécanique de plateforme, chantier à part) et
+le système de ligue / points (remis à plus tard par l'artiste).
+
 ## Invariants de la v2 (mesurés, `outils/mesurer.mjs`)
 
-- Deux obstacles consécutifs : **4 rangées** entre deux sauts, **5 dès qu'un salto est en jeu**,
-  **jamais deux saltos d'affilée**. Un joueur idéal scripté ne touche **aucun** obstacle sur 40
-  graines ; un joueur immobile les touche tous. À re-mesurer après toute modif du générateur.
+- L'écart entre deux obstacles vient de la PHYSIQUE du saut (`ecartMin` : retombée du premier +
+  élan du second), jamais d'un nombre fixe, et jamais deux « double saut » d'affilée. Un joueur
+  idéal scripté ne touche **aucun** obstacle sur 40 graines ; un joueur immobile les touche tous.
+  À re-mesurer après toute modification du saut ou du générateur.
 - Quotas identiques d'une graine à l'autre (22 laits, 15 pièces rouges, ±1 par espèce).
 - **Rien qui ressemble à un obstacle juste derrière la route** (de profil, la profondeur se lit
   mal) ; rien au premier plan plus haut que le bord de la route (`hauteurMaxPremierPlan`).

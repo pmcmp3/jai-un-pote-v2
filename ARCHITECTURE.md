@@ -57,54 +57,78 @@ s = K · camD / (camD + u)        x = W/2 + (v − vCentre) · s        y = hori
 
 ## 3. Le gameplay en hauteur (`rows.js`, `simulation.js`)
 
-Une seule voie : plus de contournement, tout se règle en hauteur.
+Une seule voie : plus de contournement, tout se règle en hauteur. **Refonte du
+20 septembre 2026** après le premier test sur iPhone (« faudrait que les personnages puissent
+sauter beaucoup plus haut, et si on reste appuyé un peu plus longtemps, on peut sauter un peu
+plus haut ; et si on double-tape après, un double saut, comme dans tous les jeux d'arcade »).
 
-| Franchissement | Obstacles | Hauteur à avoir au passage |
+### Le saut, à trois étages
+
+| Geste | Apex | Ce que ça franchit |
 |---|---|---|
-| **saut** (tap) | poule, chat, chien, mouton, botte, cochon, vache, poule lancée | bas des roues ≥ 0,45 |
-| **salto** (re-tap en l'air) | tracteur, fermier, voiture garée | bas des roues ≥ 1,45 (apex d'un saut simple : 1,25) |
+| Tap court | ~1,3 | poule, chat, chien, mouton, botte, poule lancée |
+| Appui **maintenu** (≤ 0,4 s) | ~2,5 | cochon, vache, tracteur |
+| **Re-tap en l'air** (+ salto) | ~3,7 | fermier, voiture |
 
-- L'obstacle est jugé **à l'instant où le centre du vélo passe sa rangée** (aussi tolérant que la
-  v1, qui jugeait au premier contact).
-- **Pièces en hauteur** : ramassées si leur hauteur tombe dans le corps (bas des roues + 0,25 à
-  + 1,75). Au sol : 0,9. **Arc au-dessus de chaque obstacle** (côtés sur r ± 1, sommet sur r) :
-  1,9 / 2,3 pour un saut, 3,1 / 3,4 pour un salto — hors de portée au sol, et l'arc « salto » hors
-  de portée d'un saut simple. L'arc dessine le geste à faire. **Piles** sur 25 % des rangées libres,
-  tirées d'un paquet fixe de 10 : 5 au sol, 3 en l'air (2,2), 1 double (0,9 + 1,9), 1 au salto (3,3).
-- **Écarts** : 4 rangées entre deux sauts, **5 dès qu'un salto est en jeu**, jamais deux saltos
-  consécutifs dans l'ordre des dangers (paquets remélangés jusqu'à ce que ça tienne).
-- **Traversants** : ils arrivent TOUS du fond (`dir = −1`), coupent la route et s'effacent en
-  sortant vers la caméra. Armement inchangé (4 s avant le passage du joueur). **Alerte « ! »** au
-  bord droit (rouge = tracteur, jaune = poule lancée) tant que la rangée n'est pas à l'écran.
-- **Barre d'élan** : `elanRechargeS` 2,5 → **1,1 s**, `elanParPiece` 0,25 → **0,1**. Le salto est
-  devenu obligatoire pour trois espèces ; deux saltos consécutifs sont à ≥ 1,18 s à vitesse max.
-- **Pièce** : `pieceMetres` 4 → **2,6** — ~1,5× plus de pièces (les arcs) ; 2,6 garde leur poids
-  dans le score au niveau de la v1. `potesPaliers` inchangés (5, 12, 20, 30, 42).
-- **Meute** (`friends.js`) : plus de file indienne (elle sortait de l'écran en portrait). Premier
-  pote à 1,0 rangée, puis 0,5 par pote (`potesRecul`, `potesEcart`), chacun à sa profondeur sur la
-  largeur de la route ; ils refont **sauts ET saltos** du joueur au même endroit (marques). Prénom
-  affiché 3 s à l'arrivée seulement. Chevron blanc au-dessus du joueur.
-- **Fantôme** : dessiné à u + 0,7 (sur une voie, il serait pile derrière le joueur).
-- **Gestes** (`input.js`) : tap = saut, re-tap en l'air = salto, swipe haut = saut. Le swipe
-  latéral est ignoré. **Tuto** en 3 étapes (saut, salto, pièces).
+Le saut part au TOUCHER (c'est ce qui permet de mesurer la durée de l'appui) ; tant que le doigt
+reste posé ET que le cycliste monte, la pesanteur est réduite (`sautGraviteTenue`). Le double
+saut n'est plus rationné : **la barre d'élan a disparu** (« mets pas de barre de chargement de
+saltos »). Hauteurs à avoir au passage : `H_FRANCHIR` = 0,45 / 1,5 / 2,8.
+**Swipe vers le bas = roue arrière**, purement décoratif.
 
-### Mesures (`node outils/mesurer.mjs 40`, 19 septembre 2026)
+### La route : une chaîne, pas des blocs
+
+Les obstacles sont posés **à la suite**, avec l'écart que la physique du saut impose entre les
+deux espèces (`ecartMin` = retombée du premier + élan du second, en rangées à vitesse maximale),
+plus une marge aléatoire qui se resserre au fil de la course (8 rangées au départ, 1 à la fin).
+Résultat : jamais deux obstacles collés, jamais de longue ligne droite vide (« des fois il y a
+trop d'obstacles au même moment, des fois de grandes lignes droites où il ne se passe rien »).
+Les espèces sortent toujours d'un paquet fixe de 12 mélangé par la graine, avec trois paquets
+selon la phase (petits sauts, puis gros animaux et tracteurs, puis fermiers et voitures), et
+jamais deux « double saut » consécutifs.
+
+### Les pièces : deux hauteurs, pas une de plus
+
+Au sol (0,9) ou en l'air (2,1) — « soit à hauteur 0, soit à hauteur 1, la moitié du joueur quand
+il saute ». Deux pièces en l'air encadrent chaque obstacle, d'autant plus écartées que le saut
+demandé est grand (1, 2 ou 3 rangées) : elles **dessinent le geste à faire**. Le reste est posé
+sur 15 % des rangées libres. La pièce ramassée si sa hauteur tombe dans le corps du cycliste.
+⚠️ La **pièce rouge est devenue une grosse pièce dorée qui brille** (elle se lisait comme un
+poison) ; la **brique de lait tourne sur elle-même** et montre son bec.
+
+### Le reste
+
+- **Potes** : meute serrée qui refait les sauts, les sauts tenus ET les doubles sauts du joueur.
+  ⚠️ Après le dernier palier, un pote perdu se **rachète** pour `poteRachatPieces` (10) pièces :
+  sans ça, le HUD affichait « prochain pote : 0 pièce » et le peloton ne revenait jamais.
+- **Vitesse** : doublement toutes les **88 s** (70 avant) — la montée devait être plus progressive.
+- **Bestiaire au départ** (`hud.renderBestiaire`) : trois familles, deux vignettes chacune
+  dessinées par le VRAI moteur au préchauffage, avec le geste en face. S'affiche 6 s au départ,
+  ou juste après le tutoriel.
+- **HUD** : plus de bandeau sombre ni de barre de salto ; chaque texte porte son contour.
+- **Menu** : trois réglages (maillot, chapeau, engin) au lieu de six — le short et les chaussures
+  suivent le maillot. **Roller** en plus du VTT et du Grand Bi. Chargement : 5 s → 1,8 s.
+- **Ciel** : le soleil traverse l'écran sur la durée du morceau, la lune prend le relais la nuit.
+  Couleurs saturées en permanence (`filter: saturate(1.28)`), panneaux sans numéro de département,
+  jamais deux panneaux à la fois, poteaux électriques plus hauts, village sur trois plans.
+
+### Mesures (`node outils/mesurer.mjs 40`, 20 septembre 2026)
 
 | Mesure | v2 | v1 |
 |---|---|---|
-| Dangers / 1 100 rangées | 134–135 (saut 98–100, salto 35–37) | 134–135 |
-| Laits / pièces rouges | 22 / 15 sur toutes les graines | 22 / 15 |
-| Pièces posées / 1 100 rangées | 585–589 | ~330 |
-| Écart minimal entre deux saltos | 10 rangées | — |
-| Joueur idéal scripté | **0 obstacle touché sur 5 360** | — |
-| Joueur immobile | 5 360 touchés sur 5 360 | — |
-| Score parfait, 5 potes | 8 041 (±6 % selon la graine) | 8 374 |
-| Score parfait, seul | 3 663 | 3 834 |
-| Arrivée des 5 potes (joueur idéal) | 3 · 7 · 12 · 17 · 24 s | 3 · 7 · 9 · 15 · 21 s |
+| Obstacles / 1 100 rangées | 105–112 (tap 63–66, tenu 34–37, double 8–12) | 134–135 |
+| Écart entre deux obstacles | 6 à 18 rangées, 0 paire plus serrée que le saut ne permet | — |
+| Pièces posées / 1 100 rangées | 309–323 (dont ~235 en l'air) | ~330 |
+| Laits / pièces dorées | 22 / 15 sur toutes les graines | 22 / 15 |
+| Joueur idéal scripté | **0 obstacle touché sur 4 343** | — |
+| Joueur immobile | 4 343 touchés sur 4 343 | — |
+| Apex maximal atteint | 3,48 unités | — |
+| Score parfait, 5 potes | 7 554 | 8 374 |
+| Arrivée des 5 potes (joueur idéal) | 3 · 7 · 14 · 21 · 29 s | 3 · 7 · 9 · 15 · 21 s |
 | Rendu, CPU ralenti ×4, village, 5 potes | 60 images/s | — |
 
-Captures et coût de rendu : `node outils/capture.mjs [scènes]` (Chrome headless 375×812,
-`SERVIR=dist` pour tester le build, `PARTIES=0` pour le tuto) → `outils/sorties/` (gitignoré).
+Captures et coût de rendu : `node outils/capture.mjs [scènes]` (Chrome headless 375×812 ;
+`ECRAN=petit` pour un iPhone SE, `SERVIR=dist` pour le build, `PARTIES=0` pour le tuto).
 
 ## 4. Domaine : `pote.la-ville-est-belle-pmc.fr` (à brancher)
 
@@ -133,6 +157,11 @@ de ligue, pas de classement, pas de fantôme, la ligue de démo pédale derrièr
 ## 6. Reste à faire / points ouverts
 
 - Base Supabase v2 et sous-domaine : bloqués sur les deux actions de l'artiste ci-dessus.
+- **Demandé le 20 septembre 2026, PAS encore fait** : les **halles de marché** (un bâtiment avec
+  une rampe où l'on monte, et où l'on roule au premier étage en voyant à travers) — c'est une
+  mécanique de plateforme, donc un sol variable : gros morceau, à faire à part. Le système de
+  ligue et de points est volontairement remis à plus tard (« après, on réfléchira au système de
+  ligue »).
 - **Test sur un vrai téléphone** : lisibilité de profil (cycliste ~50 px), 1,6 s de lecture à
   vitesse max, timing du salto (double tap) — rien de tout ça ne se juge en headless.
 - Le ciel occupe beaucoup de hauteur en portrait (inévitable avec une largeur fixe en unités).

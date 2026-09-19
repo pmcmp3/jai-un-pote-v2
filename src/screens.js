@@ -8,7 +8,7 @@
 import * as audio from "./audio.js";
 import * as net from "./net.js";
 import * as friends from "./friends.js";
-import { COULEURS, SHORTS, CHAUSSURES, CHAPEAUX, VELOS, SKIN_DEFAUT } from "./rider.js";
+import { COULEURS, CHAPEAUX, VELOS, SKIN_DEFAUT } from "./rider.js";
 import { graineLigue } from "./regles.js";
 import { scoreParfait } from "./simulation.js";
 
@@ -125,7 +125,11 @@ export function getSkin() {
 function setSkin(cle, val) { getSkin()[cle] = val; lsSet(CLE_SKIN, JSON.stringify(skin)); construireSkinUi(); }
 function construireSkinUi() {
   const sk = getSkin();
-  const listes = { c1: COULEURS, short: SHORTS, chaussures: CHAUSSURES, motif: [["uni", "uni"], ["rayé", "raye"], ["carreaux", "carreaux"]], chapeau: CHAPEAUX.map((c) => [c, c]), velo: [["VTT", "vtt"], ["Grand Bi", "grandbi"]] };
+  // Menu réduit le 20 septembre 2026 (« il faut réduire : si on choisit le
+  // T-shirt, on ne choisit pas le short ») : trois réglages au lieu de six —
+  // le short et les chaussures se déduisent du maillot. Sur un petit iPhone,
+  // la carte tenait à peine à l'écran.
+  const listes = { c1: COULEURS, chapeau: CHAPEAUX.map((c) => [c, c]), velo: [["VTT", "vtt"], ["Grand Bi", "grandbi"], ["Roller", "roller"]] };
   document.querySelectorAll("#skin-options .chips").forEach((box) => {
     const cle = box.dataset.cle;
     box.textContent = "";
@@ -135,7 +139,18 @@ function construireSkinUi() {
       const couleur = cle === "c1" || cle === "short" || cle === "chaussures";
       b.className = `chip${couleur ? " couleur" : ""}${sk[cle] === val ? " actif" : ""}`;
       if (couleur) { b.style.background = val; b.title = label; b.setAttribute("aria-label", label); } else b.textContent = label;
-      b.addEventListener("click", (e) => { e.stopPropagation(); setSkin(cle, val); if (cle === "c1" && sk.motif === "raye") setSkin("c2", val === "#f2ede2" ? "#e13e26" : "#f2ede2"); });
+      b.addEventListener("click", (e) => {
+        e.stopPropagation();
+        setSkin(cle, val);
+        // Le reste de la tenue suit le maillot : short foncé assorti,
+        // chaussures claires ou sombres selon la couleur choisie.
+        if (cle === "c1") {
+          const clair = ["#f2ede2", "#ffcf2e"].includes(val);
+          setSkin("c2", clair ? "#e13e26" : "#f2ede2");
+          setSkin("short", clair ? "#3a3e4e" : "#33353d");
+          setSkin("chaussures", clair ? "#33353d" : "#f2ede2");
+        }
+      });
       box.appendChild(b);
     }
   });
@@ -583,9 +598,11 @@ export function showEndScreen({ metres, potesMax, record, fin, sprint, scoreMax 
   if (scoreMax) endMax.innerHTML = `Score parfait sur cette course : <b>${pts(scoreMax)}</b> · tu es à ${Math.min(100, Math.round(100 * metres / scoreMax))} %`;
   // Le but : arriver au bout du morceau avec un max de potes.
   const potesTxt = potesMax === 0 ? "0 pote" : `${potesMax} pote${potesMax > 1 ? "s" : ""}`;
-  endSub.textContent = fin ? `Au bout du morceau · ${potesTxt}` : `Tombé avant la fin · ${potesTxt}`;
+  // Aller au bout du morceau, c'est la victoire : on le dit (20 septembre
+  // 2026 : « bravo d'avoir joué avec tes potes, tu peux écouter le morceau »).
+  endSub.textContent = fin ? `Bravo, tu es allé au bout du morceau avec ${potesTxt}` : `Tombé avant la fin · ${potesTxt}`;
   endBest.classList.toggle("hidden", !record);
-  $("end-eyebrow").textContent = sprint ? "Sprint du dimanche" : fin ? "Course terminée" : "Ta course";
+  $("end-eyebrow").textContent = sprint ? "Sprint du dimanche" : fin ? "Terminé !" : "Ta course";
   if (sprint) endSub.textContent = `Sprint · ${potesTxt}`;
   setTimeout(() => { setView("end"); showOverlay(); }, fin ? 1500 : 600);
 }

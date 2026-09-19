@@ -26,7 +26,7 @@ import * as hud from "./hud.js";
 import * as screens from "./screens.js";
 import * as net from "./net.js";
 import * as debugOverlay from "./debug.js";
-import { consumeJumpPress, setAirborne } from "./input.js";
+import { consumeJumpPress, consumeWheelie, isHolding } from "./input.js";
 import { PALETTES, paletteDepuisSkin } from "./rider.js";
 import { drawRider, RIDER_HEIGHT } from "./voxrider.js";
 import { drawCoin } from "./coin.js";
@@ -133,11 +133,11 @@ document.addEventListener("visibilitychange", () => { hiddenPaused = document.hi
 const game = {
   metres: 0, points: 0, potesGagnes: 0, etoiles: 0,
   ended: false, endReason: null, reviveOffered: false, sansFaute: true, startedAt: 0,
-  turbo: 0, finAge: -1, boue: 0, sprint: false,
+  turbo: 0, finAge: -1, boue: 0, sprint: false, cibleRachat: null,
   graine: 0, ligueCourse: false, scoreMax: null, // course de LIGUE : graine partagée, score parfait
 };
 // Une seule voie : le joueur reste en u = 0 (u est gardé pour le fantôme).
-const player = { u: 0, prevU: 0, v: 0, prevV: 0, jumpY: 0, prevJumpY: 0, jumpVy: 0, pedal: 0, prevPedal: 0, doubled: false, flip: 0, prevFlip: 0, elan: 1 };
+const player = { u: 0, prevU: 0, v: 0, prevV: 0, jumpY: 0, prevJumpY: 0, jumpVy: 0, pedal: 0, prevPedal: 0, doubled: false, flip: 0, prevFlip: 0, tHaut: 0, roue: 0, prevRoue: 0 };
 // Position du joueur à l'écran (fraction de la largeur), lissée : la caméra
 // prend de l'avance quand la vitesse monte (config.cameraJoueurX).
 let cameraX = null;
@@ -145,13 +145,37 @@ let speed = V_UNIT * window.CONFIG.vitesseBase;
 let slowMul = 1; // boue (lissé)
 // Courbe de vitesse et multiplicateur : regles.js (partagés avec la simulation).
 const targetSpeed = targetSpeedRegle;
+// Saut à hauteur VARIABLE (20 septembre 2026, demandé : « on peut sauter un
+// peu haut si on reste appuyé 0,5 s, et si on double-tape après, on peut
+// faire un double saut, comme dans tous les jeux d'arcade ») :
+//   - tap court        → apex ~1,3 (les poules, les chats, les moutons) ;
+//   - appui maintenu   → la pesanteur est réduite tant qu'on monte, apex ~2,5
+//                        (les vaches, les tracteurs) ;
+//   - re-tap en l'air  → on REMONTE d'un coup (apex ~3,7 depuis un saut
+//                        maintenu) + salto (les fermiers, les voitures).
 function jumpPhysics() {
-  const T = window.CONFIG.sautDuree, apex = window.CONFIG.sautHauteur;
-  return { vJump: 4 * apex / T, g: 8 * apex / (T * T) };
+  const C = window.CONFIG;
+  return { vJump: C.sautVitesse, vDouble: C.sautVitesseDouble, g: C.sautGravite, gTenu: C.sautGraviteTenue, tenueMax: C.sautTenueMaxS };
 }
 function multiplicateur() { return multRegle(friends.count(), game.turbo > 0); }
-function palierPrecedent() { const p = window.CONFIG.potesPaliers; return game.potesGagnes === 0 ? 0 : p[game.potesGagnes - 1]; }
-function prochainPalier() { const p = window.CONFIG.potesPaliers; return p[Math.min(game.potesGagnes, p.length - 1)]; }
+function palierPrecedent() {
+  const p = window.CONFIG.potesPaliers;
+  if (game.cibleRachat !== null && game.cibleRachat !== undefined) return game.cibleRachat - (window.CONFIG.poteRachatPieces || 10);
+  return game.potesGagnes === 0 ? 0 : p[game.potesGagnes - 1];
+}
+// Pièces à ramasser pour le prochain pote. Après le dernier palier, un pote
+// perdu se RACHÈTE (20 septembre 2026 : « j'ai perdu tous mes potes et
+// j'arrive pas à les regagner ») : une cible relative est posée à la perte.
+function prochainPalier() {
+  const p = window.CONFIG.potesPaliers;
+  if (game.cibleRachat !== null && game.cibleRachat !== undefined) return game.cibleRachat;
+  return p[Math.min(game.potesGagnes, p.length - 1)];
+}
+function armerRachat() {
+  if (friends.count() >= friends.max()) { game.cibleRachat = null; return; }
+  if (game.potesGagnes < window.CONFIG.potesPaliers.length) return; // les paliers suffisent
+  game.cibleRachat = game.points + (window.CONFIG.poteRachatPieces || 10);
+}
 const sparkles = [];
 function semerSparkles(u, v, n = 9, couleur = null) {
   for (let i = 0; i < n; i++) sparkles.push({ u, v, h: 0.6, vu: (Math.random() - 0.5) * 3, vv: (Math.random() - 0.5) * 3, vh: 1.5 + Math.random() * 2.5, age: 0, couleur });
@@ -164,7 +188,8 @@ const ghosts = []; // traînée du salto
 // tuto la vitesse est bridée et la route reste sans danger (rows.GRACE).
 const TUTO_ETAPES = [
   { titre: "TAP = SAUTER", sous: "les poules, les chats, les moutons se sautent", test: (ev) => ev === "jump" },
-  { titre: "RE-TAP EN L'AIR = SALTO", sous: "les tracteurs et les fermiers, c'est au salto", test: (ev) => ev === "salto" },
+  { titre: "RESTE APPUYÉ = PLUS HAUT", sous: "les vaches et les tracteurs demandent un grand saut", test: (ev) => ev === "haut" },
+  { titre: "RE-TAP EN L'AIR = DOUBLE SAUT", sous: "les fermiers et les voitures, c'est en double saut", test: (ev) => ev === "salto" },
   { titre: "LES PIÈCES APPELLENT TES POTES", sous: "plus de potes = plus de mètres", test: (ev) => ev === "piece" },
 ];
 const tuto = { actif: false, index: 0, ok: 0, timer: 0, alpha: 0 };
@@ -186,12 +211,50 @@ function tutoStep(dt, now) {
     tuto.timer += dt;
     if (tuto.timer > 25) { tuto.index += 1; tuto.timer = 0; }
   }
-  if (tuto.index >= TUTO_ETAPES.length) tuto.actif = false;
+  if (tuto.index >= TUTO_ETAPES.length) { tuto.actif = false; lancerBestiaire(5); }
 }
 function tutoVue() {
   if (!tuto.actif) return null;
   const e = TUTO_ETAPES[tuto.index];
   return { titre: e.titre, sous: e.sous, index: tuto.index + 1, total: TUTO_ETAPES.length, ok: tuto.ok > 0, alpha: tuto.alpha };
+}
+
+// --- Bestiaire du début de course ------------------------------------------------
+// Trois familles, deux vignettes chacune, dessinées UNE fois par le moteur
+// (comme l'aperçu du cycliste) puis affichées au-dessus de la route pendant
+// les premières secondes, quand la route est encore vide.
+const BESTIAIRE = [
+  { geste: "TAP", texte: "un petit saut", kinds: ["poule", "mouton"] },
+  { geste: "RESTE APPUYÉ", texte: "un grand saut", kinds: ["vache", "tracteur"] },
+  { geste: "DOUBLE TAP", texte: "saute, puis re-tape", kinds: ["fermier", "voiture"] },
+];
+let bestiaire = null, bestiaireT = 0;
+function prechaufferBestiaire() {
+  const VW = 700;
+  bestiaire = BESTIAIRE.map((g) => {
+    const images = g.kinds.map((kind) => {
+      const K = rows.KINDS[kind];
+      const cv = document.createElement("canvas");
+      const dpr = 2, larg = Math.round(46 + K.long * 26), haut = 108;
+      cv.width = larg * dpr; cv.height = haut * dpr;
+      const c2 = cv.getContext("2d");
+      c2.setTransform(dpr, 0, 0, dpr, 0, 0);
+      scene.setViewport(VW, VW);
+      scene.setJoueurX(0.5);
+      scene.setCamera(0);
+      const a = scene.project(0, 0, 0);
+      c2.save();
+      c2.translate(larg / 2 - a.x, haut - 14 - a.y);
+      try {
+        if (K.traverse) props.drawCrosser(c2, kind, 0, 0, -1, 0.3, 1);
+        else props.drawStatic(c2, kind, 0, 0, 0.3);
+      } catch (e) { /* une vignette ratée ne doit rien casser */ }
+      c2.restore();
+      return cv;
+    });
+    return { geste: g.geste, texte: g.texte, images };
+  });
+  scene.setViewport(width, height);
 }
 
 // --- Effets ------------------------------------------------------------------
@@ -259,10 +322,12 @@ function requestGameStart(opts = {}) {
   semerCourse();
   preparerJoueur();
   if (screens.getParties() === 0) net.evenement("premiere_course", { pseudo: screens.getPseudo(), source: screens.getSource(), ligue: screens.getLigue() ? screens.getLigue().code : null });
-  if (screens.getParties() < (window.CONFIG.tutoParties || 0) && !game.sprint) tutoDemarrer();
+  if (screens.getParties() < (window.CONFIG.tutoParties || 0) && !game.sprint) tutoDemarrer(); else lancerBestiaire();
   screens.compterPartie();
 }
 function isGameStartRequested() { return startRequested; }
+
+function lancerBestiaire(duree = 6) { bestiaireT = duree; }
 
 function resetRun() {
   game.metres = 0; game.points = 0; game.potesGagnes = 0; game.etoiles = 0;
@@ -270,7 +335,8 @@ function resetRun() {
   game.turbo = 0; game.finAge = -1; game.boue = 0;
   game.startedAt = perfClock();
   player.u = 0; player.prevU = 0; player.v = 0; player.prevV = 0; cameraX = null;
-  player.jumpY = 0; player.prevJumpY = 0; player.jumpVy = 0; player.doubled = false; player.flip = 0; player.prevFlip = 0; player.elan = 1;
+  player.jumpY = 0; player.prevJumpY = 0; player.jumpVy = 0; player.doubled = false; player.flip = 0; player.prevFlip = 0; player.tHaut = 0; player.roue = 0; player.prevRoue = 0;
+  game.cibleRachat = null;
   sparkles.length = 0; ghosts.length = 0;
   speed = V_UNIT * window.CONFIG.vitesseBase; slowMul = 1; nuitDebut = null;
   friends.reset();
@@ -297,7 +363,7 @@ function restartGame() {
   ancrerDepartSurLaGrille();
   gameStarted = true;
   startRequested = true;
-  if (screens.getParties() < (window.CONFIG.tutoParties || 0)) tutoDemarrer();
+  if (screens.getParties() < (window.CONFIG.tutoParties || 0)) tutoDemarrer(); else lancerBestiaire();
   screens.compterPartie();
 }
 
@@ -385,13 +451,19 @@ function gagnerPiece(u, v) {
   game.points += 1;
   game.metres += m;
   game.etoiles += 1;
-  player.elan = Math.min(1, player.elan + (window.CONFIG.elanParPiece || 0));
   semerSparkles(u, v);
   sfx.piece();
   tutoEvenement("piece");
   while (game.potesGagnes < window.CONFIG.potesPaliers.length && game.points >= window.CONFIG.potesPaliers[game.potesGagnes]) {
     game.potesGagnes += 1;
     arriveePote(friends.join(player), false);
+  }
+  // Rachat d'un pote perdu une fois tous les paliers franchis.
+  if (game.cibleRachat !== null && game.cibleRachat !== undefined && game.points >= game.cibleRachat) {
+    game.cibleRachat = null;
+    const pote = friends.join(player);
+    if (pote) arriveePote(pote, false);
+    armerRachat();
   }
 }
 function gagnerLait(u, v) {
@@ -426,6 +498,7 @@ function toucherJoueur(ev) {
     // Juste « −1 POTE » au-dessus du joueur (« tu enlèves le wording, tu dis
     // juste −1 pote en pop-up par-dessus et voilà »).
     pousserPopup(perdus.length > 1 ? `−${perdus.length} POTES` : "−1 POTE", ROUGE);
+    armerRachat();
   } else {
     mourir();
   }
@@ -482,6 +555,8 @@ function step(dt) {
   if (damageFlash > 0) damageFlash = Math.max(0, damageFlash - dt);
   if (shake.time > 0) shake.time = Math.max(0, shake.time - dt);
   if (hintTimer > 0 && gameStarted) hintTimer -= dt;
+  // Le bestiaire s'affiche au départ, ou juste après le tutoriel.
+  if (gameStarted && !game.ended && bestiaireT > 0) bestiaireT -= dt;
 
   if (gameStarted) {
     const enDecompte = clock.now() < -COUNT_IN_BEATS * clock.beatPeriod;
@@ -507,29 +582,39 @@ function step(dt) {
   // --- Nuit : tombe à partir de nuitDebutS, 30 s de transition ---
   const nd = nuitDebut !== null ? nuitDebut : window.CONFIG.nuitDebutS;
   if (nd !== undefined) scene.setNight(Math.max(0, Math.min(1, (now - nd) / 30)));
+  // Le soleil traverse le ciel sur toute la durée du morceau.
+  scene.setHeure(now / Math.max(1, window.CONFIG.dureeMorceau));
 
-  // --- Saut / salto ---
-  let marque = null; // « saut » ou « salto » : la meute le refera au même endroit
+  // --- Saut : tap, maintien, double saut ---
+  let marque = null; // « saut » ou « double » : la meute le refera au même endroit
   const tap = consumeJumpPress();
-  if (tap && player.jumpY <= 0) { player.jumpVy = phys.vJump; player.jumpY = 0.001; marque = "saut"; player.doubled = false; sfx.saut(); tutoEvenement("jump"); }
-  else if (tap && player.jumpY > 0 && !player.doubled && player.elan >= 1) {
-    player.jumpVy = phys.vJump * 1.0; player.doubled = true; player.elan = 0; player.flip = 0.001; marque = "salto";
-    sfx.salto(); vibrer(25);
+  if (tap && player.jumpY <= 0) {
+    player.jumpVy = phys.vJump; player.jumpY = 0.001; player.doubled = false; player.tHaut = 0; player.tenueMarquee = false;
+    marque = "saut"; sfx.saut(); tutoEvenement("jump");
+  } else if (tap && player.jumpY > 0 && !player.doubled) {
+    player.jumpVy = phys.vDouble; player.doubled = true; player.flip = 0.001; player.tHaut = phys.tenueMax;
+    marque = "double"; sfx.salto(); vibrer(25);
     semerSparkles(player.u, player.v, 12);
     tutoEvenement("salto");
   }
   if (player.jumpY > 0) {
-    player.jumpVy -= phys.g * dt;
+    // Tant que le doigt reste appuyé et qu'on monte, la pesanteur est réduite.
+    const tenu = isHolding() && player.jumpVy > 0 && player.tHaut < phys.tenueMax;
+    if (tenu) player.tHaut += dt;
+    player.jumpVy -= (tenu ? phys.gTenu : phys.g) * dt;
     player.jumpY += player.jumpVy * dt;
-    if (player.jumpY <= 0) { player.jumpY = 0; player.jumpVy = 0; player.doubled = false; player.flip = 0; }
+    if (player.tHaut > 0.12 && !player.tenueMarquee) { player.tenueMarquee = true; friends.marquerTenue(); tutoEvenement("haut"); }
+    if (player.jumpY <= 0) { player.jumpY = 0; player.jumpVy = 0; player.doubled = false; player.flip = 0; player.tHaut = 0; }
   }
   if (player.flip > 0) {
-    player.flip = Math.min(Math.PI * 2, player.flip + dt * (Math.PI * 2 / 0.5));
+    player.flip = Math.min(Math.PI * 2, player.flip + dt * (Math.PI * 2 / 0.55));
     const last = ghosts[ghosts.length - 1];
     if (!last || last.t + 0.04 < now) ghosts.push({ u: player.u, v: player.v, h: player.jumpY, flip: player.flip, age: 0, t: now });
   }
-  setAirborne(player.jumpY > 0 && !player.doubled && player.elan >= 1);
-  if (player.elan < 1) player.elan = Math.min(1, player.elan + dt / window.CONFIG.elanRechargeS);
+  // Roue arrière (swipe vers le bas) : purement décoratif, au sol seulement.
+  if (consumeWheelie() && player.jumpY <= 0 && player.roue <= 0) { player.roue = 0.001; sfx.saut(); }
+  player.prevRoue = player.roue;
+  if (player.roue > 0) { player.roue = player.roue + dt / 0.9; if (player.roue >= 1) player.roue = 0; }
 
   // --- Turbo lait ---
   if (game.turbo > 0) { game.turbo -= dt; if (game.turbo <= 0) { game.turbo = 0; canvas.classList.remove("turbo"); } }
@@ -599,9 +684,18 @@ window.addEventListener("keydown", (e) => {
 
 // --- Rendu ---------------------------------------------------------------------
 const SIGN_EVERY = 45;
+// Un seul panneau à la fois : celui d'entrée de village (la ville du joueur)
+// efface le panneau régulier voisin (20 septembre 2026 : « j'ai eu deux
+// panneaux en même temps, c'est assez bizarre »).
+function panneauVilleProche(r) {
+  if (!scene.villeDuJoueur()) return false;
+  for (let d = -9; d <= 9; d++) if (scene.debutVillage(r + d)) return true;
+  return false;
+}
 function signAt(r) {
   const villages = window.CONFIG.villages || [];
   if (!villages.length || r % SIGN_EVERY !== 20) return null;
+  if (panneauVilleProche(r)) return null;
   return villages[Math.floor(r / SIGN_EVERY) % villages.length];
 }
 
@@ -609,17 +703,22 @@ function signAt(r) {
 // de la route (rangée r).
 function drawPiece(r, h, now, kind) {
   const bob = Math.sin(now * 3 + r * 0.7) * 0.05;
+  const spin = (now * Math.PI * 2) / (clock.beatPeriod * 2) + r * 0.9 + h;
   if (kind === "lait") {
-    // Brique de lait : cube blanc à bande bleue.
+    // Brique de lait qui TOURNE sur elle-même (20 septembre 2026 : « on ne
+    // comprend pas très bien, il faudrait la faire tourner ») : sa largeur
+    // suit le cosinus, et la face bleue n'apparaît que de trois quarts.
+    const c = Math.cos(spin), dv = 0.12 + 0.34 * Math.abs(c);
     scene.drawShadow(ctx, 0, r, 0.2, 0.22, 0.18);
-    scene.drawBox(ctx, -0.2, r - 0.2, 0.4, 0.4, 0.62, "#f6f6f2", h - 0.31 + bob);
-    scene.drawBox(ctx, -0.21, r - 0.21, 0.42, 0.42, 0.16, "#2f7fd6", h - 0.11 + bob);
-    scene.drawBox(ctx, -0.2, r - 0.2, 0.4, 0.4, 0.08, "#f6f6f2", h + 0.31 + bob);
+    scene.drawBox(ctx, -0.2, r - dv / 2, 0.4, dv, 0.66, "#f8f8f4", h - 0.33 + bob);
+    scene.drawBox(ctx, -0.21, r - dv / 2 - 0.005, 0.42, dv + 0.01, 0.18, "#2f7fd6", h - 0.12 + bob);
+    if (c > 0.2) scene.drawBox(ctx, -0.19, r - dv / 2 + 0.02, 0.1, Math.max(0.04, dv - 0.04), 0.1, "#f8f8f4", h - 0.06 + bob);
+    // Le bec de la brique, pour qu'on lise « lait » et pas « caisse ».
+    scene.drawBox(ctx, -0.12, r - 0.05, 0.24, 0.1, 0.12, "#e8e8e2", h + 0.33 + bob);
     return;
   }
-  const p = scene.project(-0.05, r, h + bob);
-  const R = scene.scale() * (kind === "rouge" ? 0.4 : 0.3);
-  const spin = (now * Math.PI * 2) / (clock.beatPeriod * 2) + r * 0.9 + h;
+  const p = scene.project(-0.35, r, h + bob);
+  const R = scene.scale() * (kind === "rouge" ? 0.46 : 0.34);
   ctx.save();
   ctx.translate(p.x, p.y);
   drawCoin(ctx, R, spin, kind === "rouge");
@@ -636,28 +735,35 @@ function renderAlertes(now, vitesse) {
     const row = rows.rowAt(r);
     if (row.type !== "traverse" || !row.armed) continue;
     const tRest = (r - player.v) / Math.max(0.5, vitesse);
-    const urgence = Math.max(0, Math.min(1, 1 - (tRest - 1.2) / 2.5));
-    const pouls = 0.75 + 0.25 * Math.sin(now * 14);
-    const taille = (16 + 10 * urgence) * pouls;
-    const y = scene.project(0, player.v, 1.1).y;
-    const x = width - 14 - taille;
+    const urgence = Math.max(0, Math.min(1, 1 - (tRest - 1) / 2.5));
+    const pouls = 0.82 + 0.18 * Math.sin(now * 16);
+    const taille = (26 + 16 * urgence) * pouls;
+    const y = scene.project(0, player.v, 1.4).y;
+    const x = width - 18 - taille;
     ctx.save();
-    ctx.globalAlpha = 0.7 + 0.3 * urgence;
+    // Halo puis panneau plein, contour blanc : il doit sauter aux yeux
+    // (20 septembre 2026 : « le panneau d'attention n'est pas du tout assez visible »).
+    const halo = ctx.createRadialGradient(x + taille, y, 0, x + taille, y, taille * 2.4);
+    const teinte = row.kind === "tracteur" ? "225,62,38" : "255,207,46";
+    halo.addColorStop(0, `rgba(${teinte},${0.5 * urgence + 0.2})`);
+    halo.addColorStop(1, `rgba(${teinte},0)`);
+    ctx.fillStyle = halo;
+    ctx.fillRect(x + taille - taille * 2.4, y - taille * 2.4, taille * 4.8, taille * 4.8);
     ctx.fillStyle = row.kind === "tracteur" ? "#e13e26" : "#ffcf2e";
     ctx.strokeStyle = "#ffffff";
-    ctx.lineWidth = 2.5;
+    ctx.lineWidth = 3.5;
     ctx.lineJoin = "round";
     ctx.beginPath();
-    ctx.moveTo(x + taille, y - taille * 1.05);
-    ctx.lineTo(x + taille * 2, y + taille * 0.75);
-    ctx.lineTo(x, y + taille * 0.75);
+    ctx.moveTo(x + taille, y - taille * 1.15);
+    ctx.lineTo(x + taille * 2, y + taille * 0.8);
+    ctx.lineTo(x, y + taille * 0.8);
     ctx.closePath();
     ctx.stroke();
     ctx.fill();
-    ctx.fillStyle = "#0d0d10";
+    ctx.fillStyle = row.kind === "tracteur" ? "#ffffff" : "#0d0d10";
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    ctx.font = `900 ${Math.round(taille * 1.05)}px "Helvetica Neue", Helvetica, Arial, sans-serif`;
-    ctx.fillText("!", x + taille, y + taille * 0.18);
+    ctx.font = `900 ${Math.round(taille * 1.15)}px "Helvetica Neue", Helvetica, Arial, sans-serif`;
+    ctx.fillText("!", x + taille, y + taille * 0.22);
     ctx.restore();
     break;
   }
@@ -739,7 +845,7 @@ function render(alpha) {
   } });
   for (const g of ghosts) items.push({ d: scene.depth(g.u + 0.01, g.v), draw: () => drawRider(ctx, g.u, g.v, g.h, paletteJoueur, pedal, 0.22 * (1 - g.age / 0.35), g.flip, false) });
   items.push({ d: scene.depth(u, v), draw: () => {
-    drawRider(ctx, u, v, jy, paletteJoueur, pedal, 1, flip);
+    drawRider(ctx, u, v, jy, paletteJoueur, pedal, 1, flip, true, player.prevRoue + (player.roue - player.prevRoue) * alpha);
     // Chevron « c'est toi » au-dessus de la tête : dans la meute, le joueur
     // se perdait parmi ses potes (même maillot possible).
     if (gameStarted && !game.ended) {
@@ -807,11 +913,12 @@ function render(alpha) {
     ctx.save();
     ctx.globalAlpha = hudAlpha;
     const paliers = window.CONFIG.potesPaliers;
-    const gaugeT = game.potesGagnes >= paliers.length ? 1 : (game.points - palierPrecedent()) / (prochainPalier() - palierPrecedent());
+    const plein = friends.count() >= friends.max();
+    const gaugeT = plein ? 1 : Math.max(0, Math.min(1, (game.points - palierPrecedent()) / Math.max(1, prochainPalier() - palierPrecedent())));
     hud.renderHud(ctx, width, height, {
       metres: game.metres, potes: friends.count(), potesMax: friends.max(), gaugeT,
-      mult: Math.round(multiplicateur() * 100) / 100, restant: Math.max(0, prochainPalier() - game.points),
-      elan: player.elan, restantS: game.ended ? 0 : tempsRestant(), turbo: game.turbo > 0, safeTop,
+      mult: Math.round(multiplicateur() * 100) / 100, restant: plein ? 0 : Math.max(0, prochainPalier() - game.points), plein,
+      restantS: game.ended ? 0 : tempsRestant(), turbo: game.turbo > 0, safeTop,
     });
     hud.renderBanner(ctx, width, height, banner, safeTop);
     ctx.restore();
@@ -819,6 +926,7 @@ function render(alpha) {
   if (gameStarted && !game.ended) {
     if (now < COUNT_IN_GO_LINGER_S) hud.renderCountIn(ctx, width, height, now, clock.beatPeriod, COUNT_IN_BEATS, COUNT_IN_GO_LINGER_S);
     hud.renderTuto(ctx, width, height, tutoVue());
+    if (!tuto.actif) hud.renderBestiaire(ctx, width, height, Math.min(1, bestiaireT), bestiaire, safeTop);
     if (now >= 0 && !banner && !tuto.actif) hud.renderHint(ctx, width, height, Math.min(1, hintTimer));
   }
   if (game.finAge >= 0) hud.renderFin(ctx, width, height, game.finAge);
@@ -879,6 +987,7 @@ function prechauffer() {
     () => { drawRider(c, 0, 0, 0, PALETTES.pmc, 0, 1, 0); drawRider(c, 0, 0, 0, PALETTES.soberland, 0, 1, 1); for (const P of PALETTES.potes) drawRider(c, 0, 0, 0, P, 0); },
     () => { c.translate(32, 32); drawCoin(c, 10, 0.3); drawCoin(c, 10, 0.3, true); c.setTransform(1, 0, 0, 1, 0, 0); scene.drawSign(c, 20, ["CYSOING", "59"]); },
     () => { for (let r = 0; r < 60; r++) scene.rowDecor(c, r, false).forEach((it) => it.draw()); },
+    () => prechaufferBestiaire(),
   ];
   const suite = () => {
     try { etapes[i](); } catch (e) { /* le préchauffage ne doit jamais bloquer */ }

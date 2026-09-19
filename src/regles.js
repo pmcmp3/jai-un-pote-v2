@@ -4,7 +4,10 @@
 // la ligue. Aucun état ici.
 
 export const V_UNIT = 2.6;          // rangées/s par unité de « vitesse » de config.js
-export const V_DOUBLING_S = 70;     // la vitesse double toutes les 70 s (jusqu'au plafond)
+// 70 → 88 s le 20 septembre 2026 (« la vitesse au tout début est très bien,
+// faut vraiment que ce soit progressif et que plus on avance, plus ce soit
+// compliqué ») : le plafond est atteint vers 2 min au lieu de 1 min 30.
+export const V_DOUBLING_S = 88;
 export const LEAD_IN = 3.3;         // décompte avant le GO (ancré sur la grille du morceau)
 
 export function targetSpeed(t) {
