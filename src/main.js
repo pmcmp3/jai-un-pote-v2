@@ -133,7 +133,7 @@ document.addEventListener("visibilitychange", () => { hiddenPaused = document.hi
 const game = {
   metres: 0, points: 0, potesGagnes: 0, etoiles: 0,
   ended: false, endReason: null, reviveOffered: false, sansFaute: true, startedAt: 0,
-  turbo: 0, finAge: -1, boue: 0, sprint: false, cibleRachat: null,
+  turbo: 0, finAge: -1, sprint: false, cibleRachat: null, surHalle: false,
   graine: 0, ligueCourse: false, scoreMax: null, // course de LIGUE : graine partagée, score parfait
 };
 // Une seule voie : le joueur reste en u = 0 (u est gardé pour le fantôme).
@@ -142,7 +142,6 @@ const player = { u: 0, prevU: 0, v: 0, prevV: 0, jumpY: 0, prevJumpY: 0, jumpVy:
 // prend de l'avance quand la vitesse monte (config.cameraJoueurX).
 let cameraX = null;
 let speed = V_UNIT * window.CONFIG.vitesseBase;
-let slowMul = 1; // boue (lissé)
 // Courbe de vitesse et multiplicateur : regles.js (partagés avec la simulation).
 const targetSpeed = targetSpeedRegle;
 // Saut à hauteur VARIABLE (20 septembre 2026, demandé : « on peut sauter un
@@ -155,7 +154,7 @@ const targetSpeed = targetSpeedRegle;
 //                        maintenu) + salto (les fermiers, les voitures).
 function jumpPhysics() {
   const C = window.CONFIG;
-  return { vJump: C.sautVitesse, vDouble: C.sautVitesseDouble, g: C.sautGravite, gTenu: C.sautGraviteTenue, tenueMax: C.sautTenueMaxS };
+  return { vJump: C.sautVitesse, vDouble: C.sautVitesseDouble, g: C.sautGravite, gTenu: C.sautGraviteTenue, tenueMax: C.sautTenueMaxS, sol: rows.solAt };
 }
 function multiplicateur() { return multRegle(friends.count(), game.turbo > 0); }
 function palierPrecedent() {
@@ -188,9 +187,9 @@ const ghosts = []; // traînée du salto
 // tuto la vitesse est bridée et la route reste sans danger (rows.GRACE).
 const TUTO_ETAPES = [
   { titre: "TAP = SAUTER", sous: "les poules, les chats, les moutons se sautent", test: (ev) => ev === "jump" },
-  { titre: "RESTE APPUYÉ = PLUS HAUT", sous: "les vaches et les tracteurs demandent un grand saut", test: (ev) => ev === "haut" },
-  { titre: "RE-TAP EN L'AIR = DOUBLE SAUT", sous: "les fermiers et les voitures, c'est en double saut", test: (ev) => ev === "salto" },
-  { titre: "LES PIÈCES APPELLENT TES POTES", sous: "plus de potes = plus de mètres", test: (ev) => ev === "piece" },
+  { titre: "RESTE APPUYÉ = PLUS HAUT", sous: "les vaches, les cochons, les fermiers", test: (ev) => ev === "haut" },
+  { titre: "RE-TAP EN L'AIR = DOUBLE SAUT", sous: "tout ce qui roule se passe en double saut", test: (ev) => ev === "salto" },
+  { titre: "LES PIÈCES APPELLENT TES POTES", sous: "elles dessinent le saut à faire", test: (ev) => ev === "piece" },
 ];
 const tuto = { actif: false, index: 0, ok: 0, timer: 0, alpha: 0 };
 function tutoDemarrer() { tuto.actif = true; tuto.index = 0; tuto.ok = 0; tuto.timer = 0; tuto.alpha = 0; }
@@ -198,7 +197,7 @@ function tutoEvenement(ev) {
   if (!tuto.actif || tuto.ok > 0) return;
   if (TUTO_ETAPES[tuto.index].test(ev)) { tuto.ok = 0.8; sfx.piece(); }
 }
-function tutoStep(dt, now) {
+function tutoStep(dt, now) {   // eslint-disable-line no-shadow
   if (!tuto.actif) return;
   if (now < 0) return;
   tuto.alpha = Math.min(1, tuto.alpha + dt * 3);
@@ -211,7 +210,7 @@ function tutoStep(dt, now) {
     tuto.timer += dt;
     if (tuto.timer > 25) { tuto.index += 1; tuto.timer = 0; }
   }
-  if (tuto.index >= TUTO_ETAPES.length) { tuto.actif = false; lancerBestiaire(5); }
+  if (tuto.index >= TUTO_ETAPES.length) { tuto.actif = false; lancerBestiaire(); }
 }
 function tutoVue() {
   if (!tuto.actif) return null;
@@ -224,10 +223,14 @@ function tutoVue() {
 // (comme l'aperçu du cycliste) puis affichées au-dessus de la route pendant
 // les premières secondes, quand la route est encore vide.
 const BESTIAIRE = [
-  { geste: "TAP", texte: "un petit saut", kinds: ["poule", "mouton"] },
-  { geste: "RESTE APPUYÉ", texte: "un grand saut", kinds: ["vache", "tracteur"] },
-  { geste: "DOUBLE TAP", texte: "saute, puis re-tape", kinds: ["fermier", "voiture"] },
+  { geste: "TAP", texte: "les petits animaux", kinds: ["poule", "chien", "mouton"] },
+  { geste: "RESTE APPUYÉ", texte: "les gros et les fermiers", kinds: ["cochon", "vache", "fermier"] },
+  { geste: "DOUBLE TAP", texte: "tout ce qui roule", kinds: ["voiture", "tracteur"] },
 ];
+// 10 s au total, UNE famille à la fois (20 septembre 2026 : « le menu du début,
+// laisse un décompte de 10, c'est très bien, mais fais une étape par une
+// étape »). Le décompte s'affiche, le joueur roule sur une route encore vide.
+const BESTIAIRE_S = 10;
 let bestiaire = null, bestiaireT = 0;
 function prechaufferBestiaire() {
   const VW = 700;
@@ -327,18 +330,18 @@ function requestGameStart(opts = {}) {
 }
 function isGameStartRequested() { return startRequested; }
 
-function lancerBestiaire(duree = 6) { bestiaireT = duree; }
+function lancerBestiaire(duree = BESTIAIRE_S) { bestiaireT = duree; }
 
 function resetRun() {
   game.metres = 0; game.points = 0; game.potesGagnes = 0; game.etoiles = 0;
   game.ended = false; game.endReason = null; game.reviveOffered = false; game.sansFaute = true;
-  game.turbo = 0; game.finAge = -1; game.boue = 0;
+  game.turbo = 0; game.finAge = -1; game.surHalle = false; tombes.clear();
   game.startedAt = perfClock();
   player.u = 0; player.prevU = 0; player.v = 0; player.prevV = 0; cameraX = null;
   player.jumpY = 0; player.prevJumpY = 0; player.jumpVy = 0; player.doubled = false; player.flip = 0; player.prevFlip = 0; player.tHaut = 0; player.roue = 0; player.prevRoue = 0;
   game.cibleRachat = null;
   sparkles.length = 0; ghosts.length = 0;
-  speed = V_UNIT * window.CONFIG.vitesseBase; slowMul = 1; nuitDebut = null;
+  speed = V_UNIT * window.CONFIG.vitesseBase; nuitDebut = null;
   friends.reset();
   klaxonne = new Set();
   popups.length = 0; banner = null; damageFlash = 0; shake.time = 0; hudAlpha = 0; hintTimer = 6;
@@ -471,7 +474,7 @@ function gagnerLait(u, v) {
   sfx.lait();
   vibrer(40);
   semerSparkles(u, v, 16, "#ffffff");
-  afficherBanner("TURBO LAIT ! ×2 MÈTRES", null, JAUNE, 1.4);
+  afficherBanner("TURBO LAIT", "×2 sur tes points pendant 5 s", JAUNE, 1.6);
   canvas.classList.add("turbo");
   // Pas d'obstacles pendant le turbo : la route devient sûre au-delà de
   // l'écran (les rangées déjà visibles sont couvertes par l'invulnérabilité).
@@ -483,11 +486,18 @@ function gagnerRouge(u, v) {
   semerSparkles(u, v, 22, "#ff5a3c");
   const pote = friends.join(player);
   if (pote) arriveePote(pote, true);
-  else { game.metres += 40 * multiplicateur(); pousserPopup("+40 m", ROUGE); }
+  else { game.metres += 40 * multiplicateur(); pousserPopup("+40 PTS", JAUNE); }
 }
+
+// Une bête percutée tombe (20 septembre 2026) : on retient la rangée et
+// l'instant, le rendu la fait basculer pendant 1,6 s.
+const tombes = new Map();
+function marquerTombe(ev, now) { if (ev.r !== undefined && !KINDS_ROULANTS.has(ev.kind)) tombes.set(ev.r, now); }
+const KINDS_ROULANTS = new Set(["tracteur", "voiture", "contresens", "poulelancee"]);
 
 function toucherJoueur(ev) {
   if (clock.now() < reviveShieldUntil || invincible || game.turbo > 0) return;
+  marquerTombe(ev, clock.now());
   if (friends.count() > 0) {
     const perdus = friends.lose(ev.cout);
     game.sansFaute = false;
@@ -511,11 +521,11 @@ function armerTraversees(now, vitesse) {
   const rMax = r0 + Math.ceil(vitesse * ARM_AHEAD_S) + 1;
   for (let r = Math.max(0, r0); r <= rMax; r++) {
     const row = rows.rowAt(r);
-    if (row.type !== "traverse" || row.armed) continue;
+    if ((row.type !== "traverse" && row.type !== "contresens") || row.armed) continue;
     const tArr = now + (r - player.v) / Math.max(0.5, vitesse);
     if (tArr - now > ARM_AHEAD_S) continue;
     rows.armer(row, now, tArr);
-    if (row.kind === "tracteur" && !klaxonne.has(r)) { klaxonne.add(r); sfx.klaxon(); }
+    if ((row.kind === "tracteur" || row.kind === "contresens") && !klaxonne.has(r)) { klaxonne.add(r); sfx.klaxon(); }
   }
 }
 
@@ -556,7 +566,7 @@ function step(dt) {
   if (shake.time > 0) shake.time = Math.max(0, shake.time - dt);
   if (hintTimer > 0 && gameStarted) hintTimer -= dt;
   // Le bestiaire s'affiche au départ, ou juste après le tutoriel.
-  if (gameStarted && !game.ended && bestiaireT > 0) bestiaireT -= dt;
+  if (gameStarted && !game.ended && bestiaireT > 0 && clock.now() >= 0) bestiaireT -= dt;
 
   if (gameStarted) {
     const enDecompte = clock.now() < -COUNT_IN_BEATS * clock.beatPeriod;
@@ -586,25 +596,28 @@ function step(dt) {
   scene.setHeure(now / Math.max(1, window.CONFIG.dureeMorceau));
 
   // --- Saut : tap, maintien, double saut ---
+  // ⚠️ Le sol n'est plus toujours 0 : sur une halle, le plancher monte
+  // (rows.solAt). Décoller, retomber et « être au sol » se comparent donc à la
+  // hauteur du sol SOUS le joueur, jamais à zéro.
   let marque = null; // « saut » ou « double » : la meute le refera au même endroit
+  const solIci = rows.solAt(player.v);
   const tap = consumeJumpPress();
-  if (tap && player.jumpY <= 0) {
-    player.jumpVy = phys.vJump; player.jumpY = 0.001; player.doubled = false; player.tHaut = 0; player.tenueMarquee = false;
+  if (tap && player.jumpY <= solIci + 0.02) {
+    player.jumpVy = phys.vJump; player.jumpY = solIci + 0.001; player.doubled = false; player.tHaut = 0; player.tenueMarquee = false;
     marque = "saut"; sfx.saut(); tutoEvenement("jump");
-  } else if (tap && player.jumpY > 0 && !player.doubled) {
+  } else if (tap && player.jumpY > solIci && !player.doubled) {
     player.jumpVy = phys.vDouble; player.doubled = true; player.flip = 0.001; player.tHaut = phys.tenueMax;
     marque = "double"; sfx.salto(); vibrer(25);
     semerSparkles(player.u, player.v, 12);
     tutoEvenement("salto");
   }
-  if (player.jumpY > 0) {
+  if (player.jumpY > solIci) {
     // Tant que le doigt reste appuyé et qu'on monte, la pesanteur est réduite.
     const tenu = isHolding() && player.jumpVy > 0 && player.tHaut < phys.tenueMax;
     if (tenu) player.tHaut += dt;
     player.jumpVy -= (tenu ? phys.gTenu : phys.g) * dt;
     player.jumpY += player.jumpVy * dt;
     if (player.tHaut > 0.12 && !player.tenueMarquee) { player.tenueMarquee = true; friends.marquerTenue(); tutoEvenement("haut"); }
-    if (player.jumpY <= 0) { player.jumpY = 0; player.jumpVy = 0; player.doubled = false; player.flip = 0; player.tHaut = 0; }
   }
   if (player.flip > 0) {
     player.flip = Math.min(Math.PI * 2, player.flip + dt * (Math.PI * 2 / 0.55));
@@ -619,22 +632,24 @@ function step(dt) {
   // --- Turbo lait ---
   if (game.turbo > 0) { game.turbo -= dt; if (game.turbo <= 0) { game.turbo = 0; canvas.classList.remove("turbo"); } }
 
-  // --- Boue : une voie boueuse freine (au sol seulement) ---
-  const rowIci = rows.rowAt(Math.max(0, Math.floor(player.v + 0.5)));
-  const dansBoue = rowIci.boue !== null && rowIci.boue !== undefined && rowIci.boue === player.col && player.jumpY <= 0.1;
-  slowMul += ((dansBoue ? 0.5 : 1) - slowMul) * Math.min(1, 8 * dt);
-  if (dansBoue && game.boue <= 0) { game.boue = 1; }
-  if (!dansBoue && game.boue > 0) game.boue = Math.max(0, game.boue - dt);
-
   // --- Avance ---
   speed += (targetSpeed(now) - speed) * Math.min(1, 3 * dt);
-  const vitesse = speed * (game.turbo > 0 ? (window.CONFIG.laitVitesse || 1.2) : 1) * slowMul * (tuto.actif ? 0.55 : 1);
+  const vitesse = speed * (game.turbo > 0 ? (window.CONFIG.laitVitesse || 1.2) : 1) * (tuto.actif ? 0.55 : 1);
   if (now >= 0) {
     const dv = vitesse * dt;
     player.v += dv;
     game.metres += dv * window.CONFIG.metresParUnite * multiplicateur();
   }
   player.pedal += vitesse * dt * 3.2;
+  // Retombée / roulage sur la rampe de la halle : le vélo colle au plancher.
+  const solApres = rows.solAt(player.v);
+  if (player.jumpY <= solApres) {
+    if (player.jumpVy < -0.5 && game.surHalle === false) sfx.saut();
+    player.jumpY = solApres; player.jumpVy = 0; player.doubled = false; player.flip = 0; player.tHaut = 0;
+  }
+  const surHalle = solApres > 0.05;
+  if (surHalle && !game.surHalle) afficherBanner("LES HALLES !", "ramasse tout là-haut", JAUNE, 1.6);
+  game.surHalle = surHalle;
   if (now >= 0) fantome.enregistrer(now, player.u, player.v, player.jumpY);
   friends.recordPlayer(player.v, marque);
   friends.update(dt, player, phys);
@@ -683,6 +698,7 @@ window.addEventListener("keydown", (e) => {
 });
 
 // --- Rendu ---------------------------------------------------------------------
+const GEO_HALLE = { haut: rows.HALLE_HAUT, montee: 7, plat: 26, descente: 7, total: rows.HALLE_ROWS };
 const SIGN_EVERY = 45;
 // Un seul panneau à la fois : celui d'entrée de village (la ville du joueur)
 // efface le panneau régulier voisin (20 septembre 2026 : « j'ai eu deux
@@ -705,25 +721,29 @@ function drawPiece(r, h, now, kind) {
   const bob = Math.sin(now * 3 + r * 0.7) * 0.05;
   const spin = (now * Math.PI * 2) / (clock.beatPeriod * 2) + r * 0.9 + h;
   if (kind === "lait") {
-    // Brique de lait qui TOURNE sur elle-même (20 septembre 2026 : « on ne
-    // comprend pas très bien, il faudrait la faire tourner ») : sa largeur
-    // suit le cosinus, et la face bleue n'apparaît que de trois quarts.
-    const c = Math.cos(spin), dv = 0.12 + 0.34 * Math.abs(c);
-    scene.drawShadow(ctx, 0, r, 0.2, 0.22, 0.18);
-    scene.drawBox(ctx, -0.2, r - dv / 2, 0.4, dv, 0.66, "#f8f8f4", h - 0.33 + bob);
-    scene.drawBox(ctx, -0.21, r - dv / 2 - 0.005, 0.42, dv + 0.01, 0.18, "#2f7fd6", h - 0.12 + bob);
-    if (c > 0.2) scene.drawBox(ctx, -0.19, r - dv / 2 + 0.02, 0.1, Math.max(0.04, dv - 0.04), 0.1, "#f8f8f4", h - 0.06 + bob);
-    // Le bec de la brique, pour qu'on lise « lait » et pas « caisse ».
-    scene.drawBox(ctx, -0.12, r - 0.05, 0.24, 0.1, 0.12, "#e8e8e2", h + 0.33 + bob);
+    // Brique de lait : une VRAIE boîte qui tourne autour de son axe vertical
+    // (scene.drawBoxR). L'astuce précédente — réduire la largeur au cosinus —
+    // ne pouvait pas marcher : drawBox ne peint que des boîtes alignées sur
+    // les axes, donc la brique s'écrasait au lieu de tourner (20 septembre
+    // 2026 : « ça ne marche toujours pas en 3D, il faut que tu voies la logique »).
+    const bas = h - 0.42 + bob;
+    scene.drawShadow(ctx, 0, r, 0.22, 0.22, 0.18);
+    scene.drawBoxR(ctx, 0, r, 0.42, 0.42, 0.74, "#f8f8f4", bas, spin);
+    scene.drawBoxR(ctx, 0, r, 0.44, 0.44, 0.2, "#2f7fd6", bas + 0.2, spin);
+    scene.drawBoxR(ctx, 0, r, 0.16, 0.16, 0.14, "#e8e8e2", bas + 0.74, spin);   // le bec
     return;
   }
+  // UNE SEULE taille de pièce, et la grosse dorée exactement 1,6 fois plus
+  // grande (20 septembre 2026 : « les tailles et l'espacement entre les
+  // pièces, ça n'a aucun sens »).
   const p = scene.project(-0.35, r, h + bob);
-  const R = scene.scale() * (kind === "rouge" ? 0.46 : 0.34);
+  const R = scene.scale() * (kind === "grosse" ? PIECE_R * 1.6 : PIECE_R);
   ctx.save();
   ctx.translate(p.x, p.y);
-  drawCoin(ctx, R, spin, kind === "rouge");
+  drawCoin(ctx, R, spin, kind === "grosse");
   ctx.restore();
 }
+const PIECE_R = 0.3;
 
 // Avertisseur « ! » au bord droit (comme les missiles de Jetpack Joyride) :
 // une traversée est armée mais sa rangée n'est pas encore à l'écran.
@@ -733,23 +753,28 @@ function renderAlertes(now, vitesse) {
   const r0 = Math.floor(player.v + devant) + 1, r1 = Math.floor(player.v + vitesse * ARM_AHEAD_S) + 2;
   for (let r = r0; r <= r1; r++) {
     const row = rows.rowAt(r);
-    if (row.type !== "traverse" || !row.armed) continue;
+    if ((row.type !== "traverse" && row.type !== "contresens") || !row.armed) continue;
     const tRest = (r - player.v) / Math.max(0.5, vitesse);
     const urgence = Math.max(0, Math.min(1, 1 - (tRest - 1) / 2.5));
     const pouls = 0.82 + 0.18 * Math.sin(now * 16);
     const taille = (26 + 16 * urgence) * pouls;
     const y = scene.project(0, player.v, 1.4).y;
-    const x = width - 18 - taille;
+    // ⚠️ Le panneau tenait sur `width − 18 − taille` et son sommet droit
+    // partait donc HORS de l'écran (20 septembre 2026 : « il est coupé sur la
+    // droite, il apparaît pas dans tout l'écran »). Il est désormais posé sur
+    // sa largeur réelle, 2 × taille, avec une marge franche.
+    const x = width - 14 - taille * 2;
     ctx.save();
     // Halo puis panneau plein, contour blanc : il doit sauter aux yeux
     // (20 septembre 2026 : « le panneau d'attention n'est pas du tout assez visible »).
     const halo = ctx.createRadialGradient(x + taille, y, 0, x + taille, y, taille * 2.4);
-    const teinte = row.kind === "tracteur" ? "225,62,38" : "255,207,46";
+    const grave = row.kind === "tracteur" || row.kind === "contresens";
+    const teinte = grave ? "225,62,38" : "255,207,46";
     halo.addColorStop(0, `rgba(${teinte},${0.5 * urgence + 0.2})`);
     halo.addColorStop(1, `rgba(${teinte},0)`);
     ctx.fillStyle = halo;
     ctx.fillRect(x + taille - taille * 2.4, y - taille * 2.4, taille * 4.8, taille * 4.8);
-    ctx.fillStyle = row.kind === "tracteur" ? "#e13e26" : "#ffcf2e";
+    ctx.fillStyle = grave ? "#e13e26" : "#ffcf2e";
     ctx.strokeStyle = "#ffffff";
     ctx.lineWidth = 3.5;
     ctx.lineJoin = "round";
@@ -760,7 +785,7 @@ function renderAlertes(now, vitesse) {
     ctx.closePath();
     ctx.stroke();
     ctx.fill();
-    ctx.fillStyle = row.kind === "tracteur" ? "#ffffff" : "#0d0d10";
+    ctx.fillStyle = grave ? "#ffffff" : "#0d0d10";
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
     ctx.font = `900 ${Math.round(taille * 1.15)}px "Helvetica Neue", Helvetica, Arial, sans-serif`;
     ctx.fillText("!", x + taille, y + taille * 0.22);
@@ -793,10 +818,19 @@ function render(alpha) {
     ctx.translate((Math.random() - 0.5) * shake.amp * k, (Math.random() - 0.5) * shake.amp * k);
   }
 
-  scene.renderGround(ctx, (r) => (r >= 0 ? rows.rowAt(r).boue : null));
+  scene.renderGround(ctx, null);   // plus de boue depuis le 20 septembre 2026
 
   const items = [];
   const { from, to } = scene.rowRange();
+  // Les halles : la rampe, le plancher et la charpente, posés à la profondeur
+  // du bord ARRIÈRE de la route pour que le joueur reste peint par-dessus.
+  const hallesVues = new Set();
+  for (let r = from; r <= to; r++) {
+    const d = rows.halleA(r);
+    if (d === null || hallesVues.has(d)) continue;
+    hallesVues.add(d);
+    items.push({ d: scene.depth(scene.ROAD_HALF + 0.5, d), draw: () => scene.drawHalle(ctx, d, GEO_HALLE, from, to) });
+  }
   const vc = scene.getVCentre(), largeurRoute = scene.demiLargeurRoute() + 2;
   for (let r = from; r <= to; r++) {
     const row = r >= 0 ? rows.rowAt(r) : null;
@@ -807,6 +841,14 @@ function render(alpha) {
     // Entrée du biome village : le panneau porte la ville du joueur.
     if (scene.villeDuJoueur() && scene.debutVillage(r)) items.push({ d: scene.depth(scene.ROAD_HALF + 0.55, r + 1), draw: () => scene.drawSign(ctx, r + 1, [scene.villeDuJoueur(), "chez toi"]) });
     if (!row) continue;
+    // La voiture en face : elle roule SUR la route, vers le joueur (20
+    // septembre 2026 : « une voiture qui roule en sens inverse, pour que ce
+    // soit vraiment difficile »).
+    if (row.type === "contresens") {
+      const t = gameStarted ? now : perfClock();
+      const inst = rows.contresensAt(r, row, t);
+      if (inst) items.push({ d: scene.depth(0, inst.v), draw: () => props.drawVoiture(ctx, inst.K, 0, inst.v, -1, t) });
+    }
     // Les traversants se voient de loin (ils arrivent du fond) : tout l'intervalle.
     if (row.type === "traverse") {
       const t = gameStarted ? now : perfClock();
@@ -822,8 +864,13 @@ function render(alpha) {
     if (Math.abs(r - vc) > largeurRoute) continue;
     row.coins.forEach((h, i) => { if (!rows.coinTaken(r, i)) items.push({ d: scene.depth(-0.3, r), draw: () => drawPiece(r, h, now, "piece") }); });
     if (row.lait !== undefined && !rows.bonusTaken(r, "lait")) items.push({ d: scene.depth(-0.3, r), draw: () => drawPiece(r, row.lait, now, "lait") });
-    if (row.rouge !== undefined && !rows.bonusTaken(r, "rouge")) items.push({ d: scene.depth(-0.3, r), draw: () => drawPiece(r, row.rouge, now, "rouge") });
-    if (row.type === "statique") items.push({ d: scene.depth(0, r), draw: () => props.drawStatic(ctx, row.kind, 0, r, tAnim) });
+    if (row.grosse !== undefined && !rows.bonusTaken(r, "grosse")) items.push({ d: scene.depth(-0.3, r), draw: () => drawPiece(r, row.grosse, now, "grosse") });
+    if (row.type === "statique") {
+      const tombe = tombes.get(r);
+      items.push({ d: scene.depth(0, r), draw: () => (tombe !== undefined
+        ? props.drawStaticTombe(ctx, row.kind, 0, r, tAnim, Math.max(0, now - tombe))
+        : props.drawStatic(ctx, row.kind, 0, r, tAnim)) });
+    }
   }
   if (gameStarted) for (const dr of friends.drawables(ctx, pedal)) items.push({ d: scene.depth(dr.u, dr.v), draw: dr.draw });
   // Le fantôme du meilleur de la ligue : transparent, sans ombre, étiqueté.
@@ -926,7 +973,13 @@ function render(alpha) {
   if (gameStarted && !game.ended) {
     if (now < COUNT_IN_GO_LINGER_S) hud.renderCountIn(ctx, width, height, now, clock.beatPeriod, COUNT_IN_BEATS, COUNT_IN_GO_LINGER_S);
     hud.renderTuto(ctx, width, height, tutoVue());
-    if (!tuto.actif) hud.renderBestiaire(ctx, width, height, Math.min(1, bestiaireT), bestiaire, safeTop);
+    if (!tuto.actif && bestiaireT > 0) {
+      const ecoule = BESTIAIRE_S - bestiaireT;
+      const parEtape = BESTIAIRE_S / BESTIAIRE.length;
+      const idx = Math.min(BESTIAIRE.length - 1, Math.floor(ecoule / parEtape));
+      const dansEtape = ecoule - idx * parEtape;
+      hud.renderBestiaire(ctx, width, height, Math.min(1, bestiaireT * 2, dansEtape * 4 + 0.15), bestiaire, safeTop, idx, Math.ceil(bestiaireT));
+    }
     if (now >= 0 && !banner && !tuto.actif) hud.renderHint(ctx, width, height, Math.min(1, hintTimer));
   }
   if (game.finAge >= 0) hud.renderFin(ctx, width, height, game.finAge);
@@ -1044,6 +1097,8 @@ if (debugOverlay.isEnabled()) {
     injecterFantome: (pts, pseudo = "test") => { ghost = { graine: game.graine, pseudo, metres: 0, palette: PALETTES.potes[0], trace: { hz: fantome.HZ, pts } }; },
     estDemarre: () => gameStarted,
     fps: () => perf.fps,
+    frameMs: () => perf.frameMs,
+    tombes: () => tombes.size,
   };
 }
 requestAnimationFrame(frame);

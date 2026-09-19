@@ -56,16 +56,55 @@ menu réduit à trois réglages + roller, chargement 5 s → 1,8 s, HUD sans ban
 sans département et jamais deux à la fois, jambes du cycliste rattachées, roue arrière au swipe
 vers le bas, carte de mort qui met CONTINUER en avant.
 
-⏳ **Pas fait** : les halles de marché avec rampe (mécanique de plateforme, chantier à part) et
-le système de ligue / points (remis à plus tard par l'artiste).
+## Retours téléphone du 20 septembre 2026, SOIR (deuxième passe)
+
+Sept renversements, tous demandés :
+
+1. **Boîtes de collision réelles.** Un obstacle n'est plus jugé au passage du centre du vélo
+   contre un seuil FIXE par famille de saut, mais par recouvrement des boîtes (`rows.KINDS`,
+   `VELO_DEMI`, `MARGE_H`) : « je me suis pris un mouton mais je me le suis pas pris », « j'ai
+   sauté par-dessus le paysan et je me le suis pris ». Le seuil d'une espèce, c'est sa hauteur.
+2. **La famille de saut est CALCULÉE** (`familleDe`, rows.js) : on intègre les trois arcs et on
+   retient le plus petit qui reste au-dessus de l'obstacle pendant tout le franchissement.
+   ⚠️ Le pire cas est la vitesse MINIMALE (un obstacle est long en RANGÉES : plus on roule
+   lentement, plus on reste longtemps dessus). Règle de lisibilité par-dessus : **tout ce qui
+   roule est au double saut** (`plancher`). Résultat : petits animaux = tap, gros animaux et
+   fermier = appui tenu, véhicules = double saut — exactement les trois familles du bestiaire.
+3. **Les pièces dessinent le geste** : plus de tirage, on pose l'ARC du saut au-dessus de chaque
+   obstacle, une pièce toutes les `ESPACEMENT` (= 2) rangées, à hauteur du buste ; traînées au
+   sol sur les lignes droites. **Une seule taille** (`PIECE_R`), la grosse dorée exactement ×1,6.
+4. **Les HALLES** (`solAt`, `HALLE_*`, `scene.drawHalle`) : toutes les ~40 s une rampe monte à
+   4,2 u, un plancher file en l'air couvert de pièces, une rampe redescend. ⚠️ **Le sol du jeu
+   n'est plus toujours 0** — joueur, potes et simulation comparent tout à `rows.solAt(v)`.
+5. **Voiture en sens inverse** (`contresens`) : elle roule sur la route vers le joueur, armée
+   comme une traversée. Sa fenêtre de franchissement compte les DEUX vitesses.
+6. **Tout est à l'échelle, 1 unité ≈ 1 mètre** : villageois 1,75 u (0,78 avant), étage de maison
+   2,9 (1,0), voiture 3,9 × 1,55, poteau électrique 8, lampadaire 6,5, arbres 5 à 9. C'était ça,
+   « les perspectives ça va pas du tout » et « les vaches sont plus grosses que les voitures ».
+7. **Rendu et DA** : brique de lait en VRAIE rotation 3D (`scene.drawBoxR` — réduire la largeur
+   au cosinus ne pouvait pas marcher), mouton qui fait un 360, bête percutée qui bascule
+   (`drawStaticTombe`), panneau « ! » qui ne déborde plus de l'écran, HUD sans contour noir
+   (texte blanc + ombre 25 %), bandeaux et bestiaire en carte blanche à bord noir avec onglet
+   rouge de travers, bestiaire en 10 s une famille à la fois, « +40 PTS » en doré. Boue supprimée.
+
+⏳ **Pas fait** : le système de ligue / points (remis à plus tard par l'artiste).
+
+🗄️ **Ligue de test** : `supabase/ligue-test-v2.sql` + `supabase/MODE-D-EMPLOI-LIGUE-TEST.md`.
+Code `TESTV2`, qui est aussi `config.ligueBeta` (menu simplifié + bouton « Laisser un retour »).
 
 ## Invariants de la v2 (mesurés, `outils/mesurer.mjs`)
 
 - L'écart entre deux obstacles vient de la PHYSIQUE du saut (`ecartMin` : retombée du premier +
   élan du second), jamais d'un nombre fixe, et jamais deux « double saut » d'affilée. Un joueur
-  idéal scripté ne touche **aucun** obstacle sur 40 graines ; un joueur immobile les touche tous.
-  À re-mesurer après toute modification du saut ou du générateur.
-- Quotas identiques d'une graine à l'autre (22 laits, 15 pièces rouges, ±1 par espèce).
+  idéal scripté ne touche **aucun** obstacle sur 20 graines (1 531 franchis) ; un joueur immobile
+  les touche tous. À re-mesurer après toute modification du saut ou du générateur.
+- ⚠️ La fenêtre de franchissement se calcule à la vitesse MINIMALE, pas maximale : un obstacle
+  est long en rangées, donc c'est en roulant lentement qu'on reste le plus longtemps dessus.
+  (Mesuré : à 5,3 rangées/s le pilote idéal accrochait moutons et bottes, jamais à 6,8.)
+- Le sol vaut `rows.solAt(v)`, jamais 0 : tout ce qui décolle, retombe ou « est au sol » s'y
+  compare (joueur, potes, simulation, pilotes de mesure).
+- Quotas identiques d'une graine à l'autre (20 laits, 12-13 grosses pièces, ±1 par espèce),
+  244 à 286 pièces par course.
 - **Rien qui ressemble à un obstacle juste derrière la route** (de profil, la profondeur se lit
   mal) ; rien au premier plan plus haut que le bord de la route (`hauteurMaxPremierPlan`).
 - Toute modif du générateur ou des règles de route : **`VERSION_COURSE += 1`** (regles.js).

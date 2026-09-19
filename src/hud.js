@@ -47,12 +47,13 @@ function fitFont(ctx, weight, size, text, maxW, min = 9) {
 export function renderHud(ctx, width, height, hud) {
   ctx.save();
   const top = hud.safeTop || 0;
-  // Plus de bandeau sombre en haut de l'écran (20 septembre 2026 : « enlève
-  // le flou en haut de l'écran par-dessus le score et les potes ») : chaque
-  // texte porte son propre contour noir, lisible sur le ciel comme sur le blé.
+  // Ni bandeau sombre, ni contour noir (20 septembre 2026 : « les points en
+  // haut, c'est super, mais enlève le contour noir — laisse le texte blanc,
+  // avec une ombre portée à 25 % d'opacité, ça fera très bien le taf »).
   ctx.textBaseline = "top";
-  ctx.lineJoin = "round";
-  const ecrire = (txt, x, y, taille = 0) => { ctx.lineWidth = Math.max(3, taille * 0.16); ctx.strokeStyle = "rgba(13,13,16,0.85)"; ctx.strokeText(txt, x, y); ctx.fillText(txt, x, y); };
+  ctx.shadowColor = "rgba(0,0,0,0.25)";
+  ctx.shadowOffsetY = 2;
+  const ecrire = (txt, x, y, taille = 0) => { ctx.shadowBlur = Math.max(3, taille * 0.12); ctx.fillText(txt, x, y); };
 
   // Colonnes : gauche = 14..(14+96), droite = 8 cases de 10 px.
   const cell = 10, gap = 3, total = hud.potesMax;
@@ -88,6 +89,7 @@ export function renderHud(ctx, width, height, hud) {
   }
   // Pastille ×N sous le chrono.
   if (hud.mult > 1.001) {
+    ctx.shadowBlur = 0; ctx.shadowColor = "transparent";
     const txt = `×${String(hud.mult).replace(".", ",")}${hud.turbo ? " TURBO" : ""}`;
     ctx.font = `900 12px ${POLICE}`;
     const w = ctx.measureText(txt).width + 16;
@@ -97,20 +99,26 @@ export function renderHud(ctx, width, height, hud) {
     ctx.fillStyle = "#4a3305";
     ctx.textAlign = "center";
     ctx.fillText(txt, cx, top + PAD + taille * 0.9 + 22);
+    ctx.shadowColor = "rgba(0,0,0,0.25)"; ctx.shadowOffsetY = 2;
   }
 
-  // Droite : cases, compte, jauge.
+  // Droite : cases, compte, jauge. Les aplats ne portent pas l'ombre du texte.
+  const sansOmbre = () => { ctx.shadowBlur = 0; ctx.shadowColor = "transparent"; };
+  const avecOmbre = () => { ctx.shadowColor = "rgba(0,0,0,0.25)"; ctx.shadowOffsetY = 2; };
   const ry = top + PAD + 2;
+  sansOmbre();
   for (let i = 0; i < total; i++) {
     ctx.fillStyle = i < hud.potes ? BLANC : "rgba(255,255,255,0.28)";
     roundRect(ctx, rx + i * (cell + gap), ry, cell, cell, 2);
     ctx.fill();
   }
+  avecOmbre();
   ctx.font = `700 11px ${POLICE}`;
   ctx.textAlign = "right";
   ctx.fillStyle = BLANC;
   ecrire(total === 0 ? "INVITE TES POTES" : hud.potes === 0 ? "TOUT SEUL" : hud.potes === 1 ? "1 POTE" : `${hud.potes} POTES`, width - PAD, ry + cell + 5, 11);
   if (total > 0 && !hud.plein) {
+    sansOmbre();
     const gy = ry + cell + 22;
     ctx.fillStyle = "rgba(255,255,255,0.22)";
     roundRect(ctx, rx, gy, rowW, 4, 2);
@@ -118,6 +126,7 @@ export function renderHud(ctx, width, height, hud) {
     ctx.fillStyle = JAUNE;
     roundRect(ctx, rx, gy, Math.max(4, rowW * Math.min(1, hud.gaugeT)), 4, 2);
     ctx.fill();
+    avecOmbre();
     fitFont(ctx, "700", 10, `PROCHAIN POTE : ${hud.restant}`, rowW + 30, 8);
     ctx.fillStyle = JAUNE;
     ecrire(`PROCHAIN POTE : ${hud.restant} PIÈCE${hud.restant > 1 ? "S" : ""}`, width - PAD, gy + 9, 10);
@@ -163,17 +172,15 @@ export function renderHint(ctx, width, height, alpha) {
   const txt = "TAP = SAUT  ·  RESTE APPUYÉ = PLUS HAUT  ·  RE-TAP = DOUBLE";
   ctx.save();
   ctx.globalAlpha = alpha;
-  fitFont(ctx, "700", 12, txt, width - 60, 8);
-  const w = ctx.measureText(txt).width + 28;
-  const h = 30;
-  const x = width / 2 - w / 2, y = height * 0.82;
-  ctx.fillStyle = PANNEAU;
-  roundRect(ctx, x, y, w, h, 4);
-  ctx.fill();
+  // Ni panneau ni contour : texte blanc, ombre portée à 25 %, comme le score.
+  fitFont(ctx, "800", 12, txt, width - 40, 8);
+  ctx.shadowColor = "rgba(0,0,0,0.25)";
+  ctx.shadowBlur = 4;
+  ctx.shadowOffsetY = 2;
   ctx.fillStyle = BLANC;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText(txt, width / 2, y + h / 2);
+  ctx.fillText(txt, width / 2, height * 0.845);
   ctx.restore();
 }
 
@@ -184,32 +191,46 @@ export function renderBanner(ctx, width, height, banner, safeTop = 0) {
   const age = banner.duree - banner.timer;
   ctx.save();
   ctx.globalAlpha = Math.min(1, banner.timer * 2, age * 6);
-  const maxW = Math.min(width - 48, 340);
-  let ft = 22; ctx.font = `900 ${ft}px ${POLICE_TITRE}`;
-  while (ctx.measureText(banner.titre).width > maxW - 40 && ft > 13) { ft -= 1; ctx.font = `900 ${ft}px ${POLICE_TITRE}`; }
-  const w = Math.max(180, Math.min(maxW, ctx.measureText(banner.titre).width + 44));
-  const h = banner.sous ? 58 : 42;
-  const y = safeTop + 150; // sous les trois étages du HUD
+  const maxW = Math.min(width - 48, 330);
+  let ft = 20; ctx.font = `900 ${ft}px ${POLICE_TITRE}`;
+  while (ctx.measureText(banner.titre).width > maxW - 44 && ft > 12) { ft -= 1; ctx.font = `900 ${ft}px ${POLICE_TITRE}`; }
+  const w = Math.max(170, Math.min(maxW, ctx.measureText(banner.titre).width + 46));
+  const h = banner.sous ? 56 : 40;
+  const y = safeTop + 150;
   const tPop = Math.min(1, age / 0.3);
   const scale = 0.85 + 0.15 * tPop + 0.05 * Math.sin(tPop * Math.PI);
   ctx.translate(width / 2, y + h / 2);
   ctx.scale(scale, scale);
   ctx.translate(-width / 2, -(y + h / 2));
   const x = (width - w) / 2;
-  ctx.fillStyle = PANNEAU;
-  roundRect(ctx, x, y, w, h, 4);
-  ctx.fill();
+  // Carte BLANCHE à bord noir, comme les panneaux du jeu et l'e-card de l'EP
+  // (20 septembre 2026 : « quand il y a Hugo affiché, pas un panneau avec un
+  // fond gris — que ce soit à la DA du jeu, là ça va pas du tout »).
+  ctx.fillStyle = "rgba(0,0,0,0.18)";
+  roundRect(ctx, x + 2, y + 4, w, h, 3); ctx.fill();
+  ctx.fillStyle = "#ffffff";
+  roundRect(ctx, x, y, w, h, 3); ctx.fill();
+  ctx.strokeStyle = NOIR; ctx.lineWidth = 1.5;
+  roundRect(ctx, x, y, w, h, 3); ctx.stroke();
+  // L'onglet de couleur, posé de travers à cheval sur le bord haut.
+  const tw = Math.min(w - 30, 92), th = 15;
+  ctx.save();
+  ctx.translate(x + 18 + tw / 2, y);
+  ctx.rotate(-0.035);
   ctx.fillStyle = banner.couleur;
-  roundRect(ctx, x, y, w, 3, 1);
-  ctx.fill();
+  ctx.fillRect(-tw / 2, -th / 2, tw, th);
+  ctx.strokeStyle = NOIR; ctx.lineWidth = 1.2;
+  ctx.strokeRect(-tw / 2, -th / 2, tw, th);
+  ctx.restore();
   ctx.textAlign = "center";
   ctx.textBaseline = "top";
-  ctx.fillStyle = banner.couleur;
-  ctx.fillText(banner.titre, width / 2, y + 9);
+  ctx.fillStyle = NOIR;
+  ctx.font = `900 ${ft}px ${POLICE_TITRE}`;
+  ctx.fillText(banner.titre, width / 2, y + (banner.sous ? 13 : 9));
   if (banner.sous) {
-    fitFont(ctx, "500", 12, banner.sous, w - 20, 9);
-    ctx.fillStyle = "rgba(255,255,255,0.85)";
-    ctx.fillText(banner.sous, width / 2, y + 35);
+    fitFont(ctx, "500", 12, banner.sous, w - 24, 9);
+    ctx.fillStyle = "rgba(13,13,16,0.6)";
+    ctx.fillText(banner.sous, width / 2, y + 36);
   }
   ctx.restore();
 }
@@ -241,38 +262,61 @@ export function renderTurbo(ctx, width, height, t, force) {
 // vont pas le voir — il faudra mettre un panneau au tout début qui présente
 // tous les types d'ennemis »). Les vignettes sont dessinées par le VRAI
 // moteur (main.js les pré-rend une fois), le geste est écrit à côté.
-export function renderBestiaire(ctx, width, height, alpha, groupes, safeTop = 0) {
+export function renderBestiaire(ctx, width, height, alpha, groupes, safeTop = 0, index = 0, restant = 0) {
   if (alpha <= 0.01 || !groupes || !groupes.length) return;
-  const w = Math.min(width - 28, 350), lh = 62, h = 34 + groupes.length * lh;
-  const x = width / 2 - w / 2, y = Math.max(safeTop + 96, height * 0.16);
+  const g = groupes[Math.min(index, groupes.length - 1)];
+  const w = Math.min(width - 32, 330), h = 150;
+  const x = width / 2 - w / 2, y = Math.max(safeTop + 104, height * 0.15);
   ctx.save();
-  ctx.globalAlpha = alpha;
-  ctx.fillStyle = "rgba(13,13,16,0.82)";
-  roundRect(ctx, x, y, w, h, 4);
-  ctx.fill();
-  ctx.fillStyle = JAUNE;
-  roundRect(ctx, x, y, w, 3, 1);
-  ctx.fill();
-  ctx.textAlign = "center"; ctx.textBaseline = "top";
-  ctx.font = `700 10px ${POLICE}`;
-  ctx.fillStyle = "rgba(255,255,255,0.65)";
-  ctx.fillText("QUI TU VAS CROISER", width / 2, y + 10);
-  groupes.forEach((g, i) => {
-    const ly = y + 30 + i * lh;
-    let vx = x + 14;
-    for (const img of g.images) {
-      const ih = 52, iw = ih * (img.width / img.height);
-      ctx.drawImage(img, vx, ly, iw, ih);
-      vx += iw + 2;
-    }
-    ctx.textAlign = "right"; ctx.textBaseline = "middle";
-    ctx.font = `900 14px ${POLICE}`;
-    ctx.fillStyle = BLANC;
-    ctx.fillText(g.geste, x + w - 14, ly + 20);
-    ctx.font = `500 11px ${POLICE}`;
-    ctx.fillStyle = "rgba(255,255,255,0.75)";
-    ctx.fillText(g.texte, x + w - 14, ly + 38);
-  });
+  ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
+  // Même carte blanche à bord noir que le reste du jeu.
+  ctx.fillStyle = "rgba(0,0,0,0.18)";
+  roundRect(ctx, x + 2, y + 4, w, h, 3); ctx.fill();
+  ctx.fillStyle = "#ffffff";
+  roundRect(ctx, x, y, w, h, 3); ctx.fill();
+  ctx.strokeStyle = NOIR; ctx.lineWidth = 1.5;
+  roundRect(ctx, x, y, w, h, 3); ctx.stroke();
+  // Onglet rouge de travers : « QUI TU VAS CROISER », plus le décompte.
+  ctx.save();
+  ctx.translate(x + 16 + 86, y);
+  ctx.rotate(-0.035);
+  ctx.fillStyle = ROUGE;
+  ctx.fillRect(-86, -8, 172, 16);
+  ctx.strokeStyle = NOIR; ctx.lineWidth = 1.2;
+  ctx.strokeRect(-86, -8, 172, 16);
+  ctx.fillStyle = "#ffffff";
+  ctx.font = `800 9px ${POLICE}`;
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.fillText("QUI TU VAS CROISER", 0, 0.5);
+  ctx.restore();
+  // Les vignettes de la famille en cours, dessinées par le vrai moteur.
+  const ih = 66;
+  let total = 0;
+  for (const img of g.images) total += ih * (img.width / img.height) + 6;
+  let vx = width / 2 - total / 2;
+  for (const img of g.images) {
+    const iw = ih * (img.width / img.height);
+    ctx.drawImage(img, vx, y + 22, iw, ih);
+    vx += iw + 6;
+  }
+  ctx.textAlign = "center";
+  ctx.textBaseline = "top";
+  ctx.fillStyle = NOIR;
+  fitFont(ctx, "900", 21, g.geste, w - 28, 12);
+  ctx.fillText(g.geste, width / 2, y + 94);
+  ctx.font = `500 12px ${POLICE}`;
+  ctx.fillStyle = "rgba(13,13,16,0.6)";
+  ctx.fillText(g.texte, width / 2, y + 120);
+  // Décompte de 10 et pastilles d'étape, en bas à droite de la carte.
+  ctx.font = `800 11px ${POLICE}`;
+  ctx.fillStyle = "rgba(13,13,16,0.45)";
+  ctx.textAlign = "right";
+  ctx.fillText(`${Math.max(0, restant)}`, x + w - 12, y + h - 18);
+  for (let i = 0; i < groupes.length; i++) {
+    ctx.fillStyle = i === index ? ROUGE : "rgba(13,13,16,0.2)";
+    roundRect(ctx, x + 12 + i * 12, y + h - 14, 8, 5, 2);
+    ctx.fill();
+  }
   ctx.restore();
 }
 

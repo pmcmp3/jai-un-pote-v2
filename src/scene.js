@@ -37,6 +37,8 @@ export const ROWS_AHEAD = 14;
 export const ROWS_BEHIND = 5;
 
 const U_DECOR = 16;   // au-delà : champs lointains unis, puis collines
+// Hauteurs réelles du mobilier de bord de route (1 unité ≈ 1 mètre).
+export const POTEAU_H = 8.0, LAMPE_H = 6.5;
 
 let W = 375, H = 812, K = 26;
 let camD = 11, camH = 3.6;
@@ -152,6 +154,41 @@ export function drawBox(ctx, u, v, du, dv, h, color, lift = 0) {
   }
   ctx.fillStyle = t.avant;
   ctx.fillRect(x0, y1, x1 - x0, y0 - y1);
+}
+
+// Boîte TOURNÉE autour de son axe vertical, centrée sur (cu, cv) : un vrai
+// prisme à quatre arêtes, dont on peint les faces du fond vers l'avant. C'est
+// ce qui manquait à la brique de lait (20 septembre 2026 : « les briques de
+// lait, ça ne marche toujours pas en 3D, il faut que tu voies la logique ») —
+// drawBox ne sait peindre qu'une boîte alignée sur les axes, donc réduire sa
+// largeur au cosinus donnait une boîte écrasée, jamais une boîte qui tourne.
+// Sert aussi au mouton qui fait un 360.
+export function drawBoxR(ctx, cu, cv, du, dv, h, color, lift = 0, angle = 0) {
+  const t = teintes(color, cu);
+  const ca = Math.cos(angle), sa = Math.sin(angle);
+  const hu = du / 2, hv = dv / 2;
+  // Les quatre coins, dans le plan (u, v).
+  const coins = [[-hu, -hv], [hu, -hv], [hu, hv], [-hu, hv]].map(([a, b]) => ({
+    u: cu + a * ca - b * sa,
+    v: cv + a * sa + b * ca,
+  }));
+  const h0 = lift, h1 = lift + h;
+  const pt = (c, hh) => { const s = echelle(c.u); return { x: W * 0.5 + (c.v - vCentre) * s, y: horizonY + (camH - hh) * s }; };
+  // Faces verticales : on garde celles qui tournent le dos au fond, peintes
+  // de la plus lointaine à la plus proche.
+  const faces = [];
+  for (let i = 0; i < 4; i++) {
+    const a = coins[i], b = coins[(i + 1) % 4];
+    const milieuU = (a.u + b.u) / 2;
+    // Normale sortante (le contour est dans le sens trigonométrique en (u, v)).
+    const nu = b.v - a.v;
+    if (nu >= 0) continue;                       // face qui regarde le fond
+    faces.push({ d: milieuU, pts: [pt(a, h0), pt(b, h0), pt(b, h1), pt(a, h1)], col: i % 2 ? t.avant : t.lumiere });
+  }
+  faces.sort((x, y) => y.d - x.d);
+  for (const f of faces) poly(ctx, f.pts, f.col);
+  if (h1 < camH) poly(ctx, coins.map((c) => pt(c, h1)), t.dessus);
+  else poly(ctx, coins.map((c) => pt(c, h0)), t.ombre);
 }
 
 export function drawFlat(ctx, u, v, du, dv, color, raw = false) {
@@ -353,10 +390,10 @@ export function renderGround(ctx, boueAt) {
   }
   bande(ctx, ROAD_HALF + 0.22, ROAD_HALF + 1.0, (r) => teintes(HERBE[zoneAt(r)], 1).plat);
   bande(ctx, ROAD_HALF, ROAD_HALF + 0.22, () => teintes(DIRT, 1).plat);
-  // La route : asphalte, boue, lignes de rive en tirets (repère de vitesse).
-  bande(ctx, -ROAD_HALF, ROAD_HALF, (r) => (boueAt && r >= 0 && boueAt(r) !== null && boueAt(r) !== undefined ? teintes(shadeHex(MUD, 14), 0).plat : teintes(r % 2 ? ROAD : shadeHex(ROAD, 3), 0).plat));
-  bande(ctx, -0.5, -0.36, (r) => (boueAt && r >= 0 && boueAt(r) != null ? teintes(MUD, 0).plat : teintes(r % 2 ? ROAD : shadeHex(ROAD, 3), 0).plat));
-  bande(ctx, 0.36, 0.5, (r) => (boueAt && r >= 0 && boueAt(r) != null ? teintes(MUD, 0).plat : teintes(r % 2 ? ROAD : shadeHex(ROAD, 3), 0).plat));
+  // La route : asphalte et lignes de rive en tirets (repère de vitesse). Plus
+  // de flaques de boue depuis le 20 septembre 2026 (« enlève les trucs de
+  // terre par terre, les gens comprennent pas, je pense »).
+  bande(ctx, -ROAD_HALF, ROAD_HALF, (r) => teintes(r % 2 ? ROAD : shadeHex(ROAD, 3), 0).plat);
   const rive = (r) => (r % 3 === 0 ? teintes(ROAD, 0).plat : teintes(LINE, 0).plat);
   bande(ctx, ROAD_HALF - 0.2, ROAD_HALF - 0.12, rive);
   bande(ctx, -ROAD_HALF + 0.12, -ROAD_HALF + 0.2, rive);
@@ -424,7 +461,7 @@ export function rowDecor(ctx, r, clear) {
           const fl = a < 0.5 ? "#ffffff" : "#ffcf2e";
           push(u, v, () => { const sw = sway(k); drawBox(ctx, u + 0.05, v + 0.05, 0.06, 0.06, 0.3, "#4f7a2a"); drawBox(ctx, u, v + sw, 0.16, 0.16, 0.1, fl, 0.3); });
         } else if (zone === "foret") {
-          const h = 1.4 + a * 1.2;
+          const h = 5.0 + a * 4.0;
           push(u, v, () => arbre(ctx, u, v, h, sway(k)));
         }
       }
@@ -432,7 +469,7 @@ export function rowDecor(ctx, r, clear) {
       if ((r + (side > 0 ? 1 : 0)) % 2 === 0 && zone !== "village") {
         const a = hash(r * 13 + side * 7);
         const u = (side > 0 ? ROAD_HALF + 6.6 : ROAD_HALF + 11.2) + a * 0.8, v = r - 0.4, k = r * 2.3 + side * 5;
-        push(u, v, () => arbre(ctx, u, v, 1.6 + a * 0.8, sway(k) * 1.4));
+        push(u, v, () => arbre(ctx, u, v, 5.5 + a * 3.0, sway(k) * 1.4));
       }
     }
     // (Plus de bottes de foin sur le bas-côté : de profil, elles se
@@ -445,29 +482,38 @@ export function rowDecor(ctx, r, clear) {
   }
   // Poteaux électriques (fils tendus jusqu'au suivant) et lampadaires, sur le
   // bas-côté du fond. Même sur une rangée traversée : ils sont hors du chemin.
+  // Poteaux électriques (8 m, comme dans la vraie vie) et lampadaires (6,5 m) :
+  // ils faisaient la taille du cycliste (20 septembre 2026, « je fais la même
+  // taille qu'un lampadaire, il faudrait qu'ils soient plus grands »).
   if (r % 5 === 0 && zone !== "foret") {
     const u = ROAD_HALF + 1.55, v = r - 0.05;
     push(u, v, () => {
-      drawBox(ctx, u, v, 0.2, 0.2, 3.9, "#5c4a3a");
-      drawBox(ctx, u - 0.5, v + 0.02, 1.2, 0.14, 0.14, "#3a2e24", 3.5);
-      drawBox(ctx, u - 0.35, v + 0.04, 0.9, 0.1, 0.1, "#3a2e24", 3.0);
-      const a = project(u + 0.1, v + 0.1, 3.6), b = project(u + 0.1, v + 5.1, 3.6);
-      ctx.strokeStyle = night > 0.5 ? "rgba(20,20,30,0.7)" : "rgba(40,34,30,0.55)";
-      ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.quadraticCurveTo((a.x + b.x) / 2, a.y + K * 0.35, b.x, b.y); ctx.stroke();
+      drawBox(ctx, u, v, 0.28, 0.28, POTEAU_H, "#5c4a3a");
+      drawBox(ctx, u - 0.9, v + 0.02, 2.1, 0.18, 0.18, "#3a2e24", POTEAU_H - 0.5);
+      drawBox(ctx, u - 0.65, v + 0.04, 1.6, 0.14, 0.14, "#3a2e24", POTEAU_H - 1.3);
+      ctx.strokeStyle = night > 0.5 ? "rgba(20,20,30,0.75)" : "rgba(40,34,30,0.6)";
+      ctx.lineWidth = 1.2;
+      for (const [dh, du] of [[-0.42, -0.75], [-0.42, 0.75], [-1.22, -0.5], [-1.22, 0.5]]) {
+        const a = project(u + du * 0.2, v + 0.1, POTEAU_H + dh), b = project(u + du * 0.2, v + 5.1, POTEAU_H + dh);
+        ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.quadraticCurveTo((a.x + b.x) / 2, a.y + K * 0.38, b.x, b.y); ctx.stroke();
+      }
     });
   }
   if (r % 6 === 3) {
     const u = ROAD_HALF + 0.3, v = r - 0.1;
     push(u, v, () => {
-      drawBox(ctx, u, v, 0.12, 0.12, 2.2, "#3a3a40");
-      drawBox(ctx, u - 0.55, v - 0.05, 0.62, 0.22, 0.12, "#3a3a40", 2.2);
-      drawBox(ctx, u - 0.5, v - 0.02, 0.3, 0.16, 0.06, night > 0.2 ? "#fff1b0" : "#c8c4b8", 2.14);
+      drawBox(ctx, u, v, 0.2, 0.2, LAMPE_H - 0.9, "#3a3a40");
+      // Col de cygne : deux marches vers la route, larges le long de v pour
+      // qu'on les VOIE (un bras qui part en profondeur est vu en bout).
+      drawBox(ctx, u - 0.3, v - 0.02, 0.4, 0.3, 0.5, "#3a3a40", LAMPE_H - 0.9);
+      drawBox(ctx, u - 0.75, v - 0.04, 0.5, 0.34, 0.4, "#3a3a40", LAMPE_H - 0.5);
+      drawBox(ctx, u - 1.0, v - 0.22, 0.42, 0.72, 0.22, "#4a4a52", LAMPE_H - 0.3);
+      drawBox(ctx, u - 0.98, v - 0.2, 0.38, 0.68, 0.1, night > 0.2 ? "#fff1b0" : "#d8d4c6", LAMPE_H - 0.4);
     });
   }
   // Premier plan : herbes, fleurs, épis, clôture — jamais plus haut que la route.
   const pres = hash(r * 57 + 3);
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < 2; i++) {
     const a = hash(r * 23 + i * 11 + 5), b = hash(r * 29 + i * 3 + 9);
     const u = -(ROAD_HALF + 1.4 + a * 3.6), v = r - 0.5 + b;
     const s = echelle(u);
@@ -482,9 +528,9 @@ export function rowDecor(ctx, r, clear) {
       const h = Math.min(hmax, 0.95);
       push(u, v, () => { const sw = sway(k); drawBox(ctx, u, v + 0.06, 0.08, 0.08, h - 0.3, "#4f7a2a"); drawBox(ctx, u - 0.06, v - 0.08 + sw, 0.16, 0.36, 0.36, "#f2c02c", h - 0.36); drawBox(ctx, u - 0.08, v + 0.04 + sw, 0.06, 0.12, 0.14, "#5a3a1a", h - 0.26); });
     } else {
-      const h = Math.min(hmax, 0.18 + pres * 0.14);
+      const h = Math.min(hmax, 0.12 + pres * 0.1);
       const fl = zone === "foret" ? "#3a7a33" : pres < 0.4 ? "#ffffff" : pres < 0.7 ? "#ffcf2e" : "#e13e26";
-      push(u, v, () => { drawBox(ctx, u, v, 0.1, 0.1, h, zone === "vigne" ? "#6b4b2e" : "#4f7a2a"); if (zone !== "foret") drawBox(ctx, u - 0.03, v - 0.03, 0.16, 0.16, 0.1, fl, h); });
+      push(u, v, () => { drawBox(ctx, u, v, 0.06, 0.06, h, zone === "vigne" ? "#6b4b2e" : "#4f7a2a"); if (zone !== "foret") drawBox(ctx, u - 0.02, v - 0.02, 0.1, 0.1, 0.07, fl, h); });
     }
   }
   // Clôture de bois du premier plan : un piquet toutes les deux rangées,
@@ -502,106 +548,185 @@ export function rowDecor(ctx, r, clear) {
   return out;
 }
 
+// Arbre : 1 unité ≈ 1 mètre ici aussi (un pommier de bord de route fait 5 à
+// 9 m, pas 2). Le tronc porte deux étages de feuillage.
 function arbre(ctx, u, v, h, sw) {
-  drawBox(ctx, u + 0.15, v + 0.15, 0.2, 0.2, h * 0.4, "#5c4a3a");
-  drawBox(ctx, u - 0.25, v - 0.25 + sw * 0.5, 0.9, 0.9, h * 0.45, "#2f6a2a", h * 0.35);
-  drawBox(ctx, u - 0.05, v + sw, 0.5, 0.5, h * 0.4, "#3a7a33", h * 0.78);
+  drawBox(ctx, u + 0.3, v + 0.3, 0.45, 0.45, h * 0.42, "#5c4a3a");
+  drawBox(ctx, u - 0.7, v - 0.7 + sw * 0.5, 2.4, 2.4, h * 0.42, "#2f6a2a", h * 0.34);
+  drawBox(ctx, u - 0.2, v - 0.2 + sw, 1.5, 1.5, h * 0.34, "#3a7a33", h * 0.72);
 }
 
 // --- Le village : tout derrière la route, portes et fenêtres sur la façade
 // qui regarde la caméra. Emplacements FIXES par rangée de la tranche (rz) :
 // rien ne se marche dessus. Côté +1 = juste derrière la route, côté −1 = au
 // fond (les deux rives de la v1).
+// ⚠️ TOUT LE VILLAGE EST À L'ÉCHELLE DEPUIS LE 20 SEPTEMBRE 2026 (« on a un
+// background avec des maisons, des voitures et des personnages : les
+// perspectives, ça va pas du tout [...] j'ai des personnages beaucoup plus
+// petits que des voitures »). Le bug n'était pas la projection, qui est juste,
+// mais les MODÈLES : un villageois faisait 0,78 unité de haut et un étage de
+// maison 1,0 — soit un bonhomme de 78 cm devant une maison de 1 m. Règle
+// désormais : 1 unité ≈ 1 mètre, comme le cycliste (1,8 u).
+const PERSO_H = 1.75, ETAGE_H = 2.9;
 function personnage(ctx, u, v, lift, haut, bas) {
-  drawBox(ctx, u, v, 0.14, 0.14, 0.32, bas, lift);
-  drawBox(ctx, u - 0.03, v - 0.03, 0.2, 0.2, 0.3, haut, lift + 0.32);
-  drawBox(ctx, u, v, 0.14, 0.14, 0.16, "#d69a68", lift + 0.62);
+  const l = 0.42;   // épaules
+  drawBox(ctx, u, v, 0.3, l * 0.8, PERSO_H * 0.46, bas, lift);                       // jambes
+  drawBox(ctx, u - 0.05, v - 0.05, 0.4, l, PERSO_H * 0.33, haut, lift + PERSO_H * 0.46); // buste
+  drawBox(ctx, u + 0.02, v + 0.04, 0.3, 0.3, PERSO_H * 0.21, "#d69a68", lift + PERSO_H * 0.79); // tête
 }
 function maison(ctx, u, v, prof, larg, etages, mur, toit, balcon) {
-  const h = 1.0 * etages;
+  const h = ETAGE_H * etages;
   drawBox(ctx, u, v, prof, larg, h, mur);
-  drawBox(ctx, u - 0.03, v + larg * 0.3, 0.04, 0.3, 0.55, "#3a3a40");                 // porte
-  for (let e = 0; e < etages; e++) drawBox(ctx, u - 0.03, v + larg * 0.66, 0.04, 0.24, 0.25, "#a8d8f0", 0.5 + e);
-  if (balcon) {
-    drawBox(ctx, u - 0.35, v + 0.15, 0.35, larg - 0.3, 0.08, "#6b4b2e", 1.0);
-    personnage(ctx, u - 0.24, v + larg * 0.42, 1.08, balcon, "#3a3e4e");
-    drawBox(ctx, u - 0.36, v + 0.15, 0.05, larg - 0.3, 0.3, "#6b4b2e", 1.08);
+  drawBox(ctx, u - 0.05, v + larg * 0.3, 0.06, 0.95, 2.1, "#3a3a40");                 // porte (2,1 m)
+  for (let e = 0; e < etages; e++) {
+    drawBox(ctx, u - 0.05, v + larg * 0.62, 0.06, 0.85, 1.15, "#a8d8f0", 1.15 + e * ETAGE_H);
+    if (larg > 2.4) drawBox(ctx, u - 0.05, v + larg * 0.1, 0.06, 0.85, 1.15, "#a8d8f0", 1.15 + e * ETAGE_H);
   }
-  drawBox(ctx, u - 0.12, v - 0.12, prof + 0.24, larg + 0.24, 0.3, toit, h);
-  drawBox(ctx, u + 0.2, v + 0.2, prof - 0.4, larg - 0.4, 0.28, toit, h + 0.3);
+  if (balcon) {
+    drawBox(ctx, u - 0.8, v + 0.2, 0.8, larg - 0.4, 0.14, "#6b4b2e", ETAGE_H);
+    personnage(ctx, u - 0.55, v + larg * 0.42, ETAGE_H + 0.14, balcon, "#3a3e4e");
+    drawBox(ctx, u - 0.82, v + 0.2, 0.08, larg - 0.4, 0.95, "#6b4b2e", ETAGE_H + 0.14);
+  }
+  drawBox(ctx, u - 0.25, v - 0.25, prof + 0.5, larg + 0.5, 0.35, toit, h);
+  drawBox(ctx, u + 0.3, v + 0.3, prof - 0.6, larg - 0.6, 0.9, toit, h + 0.35);
 }
 function decorVillage(ctx, push, r, side, sway) {
   const rz = ((r % ZONE_ROWS) + ZONE_ROWS) % ZONE_ROWS;
   const pres = side > 0;
   const murs = ["#f2ede2", "#e8d8b8", "#d9c3a0", "#f0e0d0"], toits = ["#b8402c", "#5c4a3a", "#3a3a40", "#8a6a45"];
   const k = r * 7 + (pres ? 0 : 3);
-  if (rz % 4 === (pres ? 3 : 1) && rz !== 27 && rz !== 12) {
-    const u = pres ? ROAD_HALF + 1.4 : ROAD_HALF + 6.4, v = r - 0.5;
-    push(u, v, () => maison(ctx, u, v, 1.1, 1.3, 1, murs[k % 4], toits[(k + 1) % 4], null));
+  if (rz % 6 === (pres ? 4 : 1) && rz !== 27 && rz !== 12) {
+    const u = pres ? ROAD_HALF + 2.2 : ROAD_HALF + 8.0, v = r - 1.2;
+    push(u, v, () => maison(ctx, u, v, 4.0, 3.2, 1, murs[k % 4], toits[(k + 1) % 4], null));
   }
-  // Troisième plan : des toits au fond, qui donnent la profondeur du bourg
-  // (20 septembre 2026 : « revois un peu plus la perspective des bâtiments
-  // entre eux »).
-  if (rz % 3 === (pres ? 2 : 0)) {
-    const u = pres ? ROAD_HALF + 11.5 : ROAD_HALF + 13.5, v = r - 0.8;
-    push(u, v, () => maison(ctx, u, v, 1.8, 2.2, 2, murs[(k + 3) % 4], toits[(k + 2) % 4], null));
+  // Troisième plan : des toits au fond, qui donnent la profondeur du bourg.
+  if (rz % 4 === (pres ? 2 : 0)) {
+    const u = pres ? ROAD_HALF + 15.0 : ROAD_HALF + 21.0, v = r - 1.8;
+    push(u, v, () => maison(ctx, u, v, 5.0, 4.6, 2, murs[(k + 3) % 4], toits[(k + 2) % 4], null));
   }
-  if (rz % 5 === (pres ? 0 : 2)) {
-    const u = pres ? ROAD_HALF + 3.6 : ROAD_HALF + 8.6, v = r - 0.6;
+  if (rz % 7 === (pres ? 0 : 3)) {
+    const u = pres ? ROAD_HALF + 6.2 : ROAD_HALF + 11.5, v = r - 1.5;
     const hab = ["#e13e26", "#ffcf2e", "#3f63b4", "#2f7a46"][k % 4];
-    push(u, v, () => maison(ctx, u, v, 1.6, 1.9, 2, murs[(k + 2) % 4], toits[k % 4], hab));
+    push(u, v, () => maison(ctx, u, v, 4.4, 4.0, 2, murs[(k + 2) % 4], toits[k % 4], hab));
   }
-  // L'église, au milieu du village : nef, clocher, croix.
+  // L'église : nef de 7 m, clocher de 17 m, croix.
   if (!pres && rz === 27) {
-    const u = ROAD_HALF + 4.4, v = r - 1.2;
+    const u = ROAD_HALF + 6.5, v = r - 2.6;
     push(u, v, () => {
-      drawBox(ctx, u, v, 1.8, 2.6, 1.4, "#e8e0cc");
-      drawBox(ctx, u - 0.1, v - 0.1, 2.0, 2.8, 0.5, "#5c4a3a", 1.4);
-      drawBox(ctx, u + 0.5, v + 2.6, 0.8, 0.8, 3.2, "#e8e0cc");
-      drawBox(ctx, u + 0.4, v + 2.5, 1.0, 1.0, 0.6, "#3a3a40", 3.2);
-      drawBox(ctx, u + 0.85, v + 2.95, 0.1, 0.1, 0.6, "#3a3a40", 3.8);
-      drawBox(ctx, u + 0.85, v + 2.8, 0.1, 0.4, 0.1, "#3a3a40", 4.2);
-      drawBox(ctx, u - 0.03, v + 1.05, 0.04, 0.5, 0.9, "#6b4b2e");
+      drawBox(ctx, u, v, 5.2, 6.0, 7.0, "#e8e0cc");
+      drawBox(ctx, u - 0.3, v - 0.3, 5.8, 6.6, 1.3, "#5c4a3a", 7.0);
+      drawBox(ctx, u + 1.4, v + 6.0, 2.4, 2.4, 14.0, "#e8e0cc");
+      drawBox(ctx, u + 1.1, v + 5.7, 3.0, 3.0, 2.2, "#3a3a40", 14.0);
+      drawBox(ctx, u + 2.45, v + 7.05, 0.3, 0.3, 1.6, "#3a3a40", 16.2);
+      drawBox(ctx, u + 2.45, v + 6.6, 0.3, 1.2, 0.3, "#3a3a40", 17.2);
+      drawBox(ctx, u - 0.05, v + 2.4, 0.06, 1.2, 2.6, "#6b4b2e");
     });
   }
   // L'école : long bâtiment bas, une cour devant avec des enfants.
   if (pres && rz === 12) {
-    const u = ROAD_HALF + 2.4, v = r - 1.5;
+    const u = ROAD_HALF + 3.6, v = r - 3.5;
     push(u, v, () => {
-      drawBox(ctx, u, v, 2.2, 3.2, 1.1, "#f0e0d0");
-      drawBox(ctx, u - 0.1, v - 0.1, 2.4, 3.4, 0.25, "#8a6a45", 1.1);
-      for (let i = 0; i < 4; i++) drawBox(ctx, u - 0.03, v + 0.3 + i * 0.7, 0.04, 0.4, 0.4, "#a8d8f0", 0.45);
+      drawBox(ctx, u, v, 5.0, 8.0, 3.4, "#f0e0d0");
+      drawBox(ctx, u - 0.25, v - 0.25, 5.5, 8.5, 0.6, "#8a6a45", 3.4);
+      for (let i = 0; i < 4; i++) drawBox(ctx, u - 0.06, v + 1.0 + i * 1.7, 0.06, 1.1, 1.3, "#a8d8f0", 1.1);
     });
     for (let i = 0; i < 3; i++) {
-      const pu = ROAD_HALF + 1.2 + (i % 2) * 0.4, pv = r - 1 + i * 0.7;
-      push(pu, pv, () => personnage(ctx, pu, pv + Math.sin(decorT * 3 + i) * 0.15, 0, ["#e13e26", "#ffcf2e", "#3f63b4"][i], "#3a3e4e"));
+      const pu = ROAD_HALF + 1.7 + (i % 2) * 0.8, pv = r - 2.2 + i * 1.4;
+      // Des enfants : un tiers plus petits que les adultes.
+      push(pu, pv, () => { ctx.save(); personnage(ctx, pu, pv + Math.sin(decorT * 3 + i) * 0.15, 0, ["#e13e26", "#ffcf2e", "#3f63b4"][i], "#3a3e4e"); ctx.restore(); });
     }
   }
-  // Voitures garées le long de la route (côté fond), une tous les 6 rangées.
+  // Voitures garées le long de la route (côté fond) : 4 m de long, 1,5 de haut.
   if (pres && rz % 6 === 1) {
-    const cu = ROAD_HALF + 2.3, cv = r - 0.5, col = ["#2f5fb0", "#e13e26", "#e9e4d8"][k % 3];
+    const cu = ROAD_HALF + 2.6, cv = r - 1.0, col = ["#2f5fb0", "#e13e26", "#e9e4d8"][k % 3];
     push(cu, cv, () => {
-      drawShadow(ctx, cu + 0.4, cv + 0.85, 0.45, 0.9, 0.22);
-      for (const [lu, lv] of [[-0.03, 0.2], [-0.03, 1.2], [0.65, 0.2], [0.65, 1.2]]) drawBox(ctx, cu + lu, cv + lv, 0.18, 0.3, 0.28, "#1a1a1e");
-      drawBox(ctx, cu, cv, 0.8, 1.7, 0.4, col, 0.15);
-      drawBox(ctx, cu + 0.08, cv + 0.45, 0.64, 0.7, 0.3, "#a8d8f0", 0.55);
+      drawShadow(ctx, cu + 0.85, cv + 2.0, 0.9, 2.0, 0.22);
+      for (const [lu, lv] of [[-0.05, 0.6], [-0.05, 2.9], [1.5, 0.6], [1.5, 2.9]]) drawBox(ctx, cu + lu, cv + lv, 0.4, 0.66, 0.62, "#1a1a1e");
+      drawBox(ctx, cu, cv, 1.7, 4.0, 0.68, col, 0.3);
+      drawBox(ctx, cu + 0.16, cv + 1.05, 1.38, 1.85, 0.62, "#a8d8f0", 0.95);
+      drawBox(ctx, cu + 0.22, cv + 1.15, 1.26, 1.65, 0.1, col, 1.52);
     });
   }
   // Un skateur, un passant, de temps en temps.
   if (pres && rz % 11 === 5) {
-    const su = ROAD_HALF + 1.3, sv = r - 0.3, k2 = r * 1.3;
-    push(su, sv, () => { const roll = Math.sin(decorT * 2 + k2) * 0.3; drawBox(ctx, su, sv + roll, 0.25, 0.7, 0.06, "#e13e26", 0.12); personnage(ctx, su + 0.05, sv + 0.2 + roll, 0.18, "#ffcf2e", "#3a3e4e"); });
+    const su = ROAD_HALF + 1.6, sv = r - 0.3, k2 = r * 1.3;
+    push(su, sv, () => { const roll = Math.sin(decorT * 2 + k2) * 0.4; drawBox(ctx, su, sv + roll, 0.4, 1.0, 0.1, "#e13e26", 0.16); personnage(ctx, su + 0.05, sv + 0.2 + roll, 0.26, "#ffcf2e", "#3a3e4e"); });
   }
   if (!pres && rz % 9 === 6) {
-    const pu = ROAD_HALF + 1.4, pv = r - 0.4;
+    const pu = ROAD_HALF + 2.0, pv = r - 0.4;
     push(pu, pv, () => personnage(ctx, pu, pv + sway(r) * 4, 0, ["#e13e26", "#3f63b4", "#2f7a46"][k % 3], "#3a3e4e"));
+  }
+}
+
+// --- Les HALLES DE MARCHÉ (20 septembre 2026) ---------------------------------------
+// « Un bâtiment un peu comme des halles de marché typiques françaises, où il y
+// a une rampe [...] on est au premier étage des halles. » Une rampe de bois
+// monte depuis la route, un plancher file à HALLE_HAUT, une rampe redescend ;
+// au-dessus, la charpente et le toit de tuiles sur des piliers de pierre, tous
+// posés DERRIÈRE la route pour ne jamais cacher le joueur.
+export function drawHalle(ctx, rDebut, geo, rFrom = -Infinity, rTo = Infinity) {
+  const { haut, montee, plat, descente, total } = geo;
+  const visible = (v0, v1) => v1 >= rFrom - 2 && v0 <= rTo + 2;
+  const uG = -ROAD_HALF - 0.2, du = ROAD_HALF * 2 + 0.4;
+  const BOIS = "#7a5632", BOIS_CLAIR = "#a9855a", PIERRE = "#ded3c0", TUILE = "#b8402c", POUTRE = "#5c4326";
+  const TOIT = haut + 3.6;
+  // Piliers de pierre et charpente, tous les 6 rangs, côté fond.
+  for (let i = 0; i <= total; i += 6) {
+    const v = rDebut + i;
+    if (!visible(v, v + 0.8)) continue;
+    drawBox(ctx, ROAD_HALF + 0.5, v, 0.8, 0.8, TOIT, PIERRE);
+    drawBox(ctx, ROAD_HALF + 0.35, v - 0.1, 1.1, 1.0, 0.45, PIERRE, TOIT);
+  }
+  // Toit : panne faîtière puis deux rangs de tuiles qui débordent sur la route.
+  drawBox(ctx, ROAD_HALF + 0.25, rDebut, 1.2, total, 0.5, POUTRE, TOIT + 0.45);
+  drawBox(ctx, -ROAD_HALF - 0.9, rDebut - 0.5, ROAD_HALF * 2 + 2.4, total + 1.0, 0.35, TUILE, TOIT + 0.95);
+  drawBox(ctx, -ROAD_HALF - 0.3, rDebut - 0.25, ROAD_HALF * 2 + 1.4, total + 0.5, 0.45, TUILE, TOIT + 1.3);
+  // La RAMPE : un plan incliné de planches, pas des marches — la première
+  // version se lisait comme une botte de foin posée sur la route. Bois foncé,
+  // nez de marche clair, et deux bandes rouges à l'entrée qui disent « monte ».
+  const pente = (i, n, sens) => {
+    const v0 = rDebut + (sens > 0 ? i : montee + plat + i);
+    if (!visible(v0, v0 + 1)) return;
+    const a = sens > 0 ? i / n : 1 - i / n, b = sens > 0 ? (i + 1) / n : 1 - (i + 1) / n;
+    const bas = Math.min(a, b) * haut, hautMarche = Math.max(a, b) * haut;
+    drawBox(ctx, uG, v0, du, 1.02, hautMarche - bas + 0.2, BOIS, bas);
+    drawBox(ctx, uG + 0.06, v0 + 0.02, du - 0.12, 0.98, 0.08, BOIS_CLAIR, hautMarche + 0.14);
+  };
+  for (let i = 0; i < montee; i++) pente(i, montee, 1);
+  for (let i = 0; i < descente; i++) pente(i, descente, -1);
+  if (visible(rDebut - 0.6, rDebut + 0.4)) {
+    drawBox(ctx, uG, rDebut - 0.55, du, 0.5, 0.16, "#e13e26", 0);
+    drawBox(ctx, uG, rDebut - 1.15, du, 0.5, 0.16, "#f7f2e6", 0);
+  }
+  // Le plancher du premier étage, sa lisse côté caméra et ses poteaux.
+  drawBox(ctx, uG, rDebut + montee, du, plat, 0.4, BOIS, haut - 0.4);
+  drawBox(ctx, uG, rDebut + montee, du, plat, 0.1, BOIS_CLAIR, haut);
+  for (let i = 0; i <= plat; i += 3) {
+    const v = rDebut + montee + i;
+    if (!visible(v, v + 0.2)) continue;
+    drawBox(ctx, uG - 0.16, v, 0.16, 0.18, 0.75, POUTRE, haut);
+  }
+  drawBox(ctx, uG - 0.18, rDebut + montee, 0.18, plat, 0.13, POUTRE, haut + 0.62);
+  // L'enseigne « HALLES » sur le premier pilier.
+  if (visible(rDebut - 1, rDebut + 4)) {
+    const p = project(ROAD_HALF + 0.46, rDebut - 0.3, TOIT - 0.4), sc = echelle(ROAD_HALF + 0.46);
+    ctx.save();
+    ctx.fillStyle = teintes("#f7f2e6", ROAD_HALF).plat;
+    ctx.fillRect(p.x, p.y, sc * 3.6, sc * 1.0);
+    ctx.strokeStyle = "#0d0d10"; ctx.lineWidth = 1.2;
+    ctx.strokeRect(p.x, p.y, sc * 3.6, sc * 1.0);
+    ctx.fillStyle = "#0d0d10";
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.font = `900 ${Math.max(6, sc * 0.58)}px "Helvetica Neue", Helvetica, Arial, sans-serif`;
+    ctx.fillText("HALLES", p.x + sc * 1.8, p.y + sc * 0.52);
+    ctx.restore();
   }
 }
 
 // Lampadaires visibles (halos peints par-dessus la nuit, main.js).
 export function lampsIn(from, to) {
   const out = [];
-  for (let r = from; r <= to; r++) if (r % 6 === 3) out.push({ u: ROAD_HALF - 0.2, v: r, h: 2.14 });
+  for (let r = from; r <= to; r++) if (r % 6 === 3) out.push({ u: ROAD_HALF - 0.2, v: r, h: LAMPE_H - 0.2 });
   return out;
 }
 

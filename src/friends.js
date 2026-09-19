@@ -149,24 +149,26 @@ export function update(dt, player, phys) {
     }
     p.u += (cibleU - p.u) * Math.min(1, 4 * dt);
     p.v = cibleV;
+    const sol = phys.sol ? phys.sol(p.v) : 0;
     // Sauts, sauts tenus et doubles sauts, aux marques du joueur.
     for (const m of marques) {
       if (m.v <= p.lastMark || m.v > p.v) continue;
       p.lastMark = m.v;
-      if ((m.type === "saut" || m.type === "haut") && p.jumpY <= 0) {
-        p.jumpVy = phys.vJump; p.jumpY = 0.001; p.doubled = false;
+      if ((m.type === "saut" || m.type === "haut") && p.jumpY <= sol + 0.02) {
+        p.jumpVy = phys.vJump; p.jumpY = sol + 0.001; p.doubled = false;
         p.tenue = m.type === "haut" ? phys.tenueMax : 0;   // il tient l'appui comme le joueur
-      } else if (m.type === "double" && p.jumpY > 0 && !p.doubled) {
+      } else if (m.type === "double" && p.jumpY > sol && !p.doubled) {
         p.jumpVy = phys.vDouble; p.doubled = true; p.flip = 0.001;
       }
     }
-    if (p.jumpY > 0) {
+    if (p.jumpY > sol) {
       const tenu = p.tenue > 0 && p.jumpVy > 0;
       if (tenu) p.tenue -= dt;
       p.jumpVy -= (tenu ? phys.gTenu : phys.g) * dt;
       p.jumpY += p.jumpVy * dt;
-      if (p.jumpY <= 0) { p.jumpY = 0; p.jumpVy = 0; p.doubled = false; p.flip = 0; p.tenue = 0; }
     }
+    // Comme le joueur, le pote colle au plancher de la halle (rows.solAt).
+    if (p.jumpY <= sol) { p.jumpY = sol; p.jumpVy = 0; p.doubled = false; p.flip = 0; p.tenue = 0; }
     if (p.flip > 0) p.flip = Math.min(Math.PI * 2, p.flip + dt * (Math.PI * 2 / 0.5));
   }
   potes = potes.filter((p) => !p.leave || p.leave.t < 1);
@@ -198,12 +200,11 @@ export function drawables(ctx, pedalPhase) {
           const g = project(u, v, y + RIDER_HEIGHT + 0.2);
           ctx.save();
           ctx.globalAlpha *= vu;
-          ctx.font = `700 10px "Helvetica Neue", Helvetica, Arial, sans-serif`;
+          ctx.font = `800 12px "Helvetica Neue", Helvetica, Arial, sans-serif`;
           ctx.textAlign = "center"; ctx.textBaseline = "bottom";
-          ctx.lineWidth = 3; ctx.strokeStyle = "rgba(0,0,0,0.55)"; ctx.lineJoin = "round";
-          ctx.strokeText(`@${p.name}`, g.x, g.y);
+          ctx.shadowColor = "rgba(0,0,0,0.25)"; ctx.shadowBlur = 3; ctx.shadowOffsetY = 2;
           ctx.fillStyle = "#fff";
-          ctx.fillText(`@${p.name}`, g.x, g.y);
+          ctx.fillText(p.name.toUpperCase(), g.x, g.y);
           ctx.restore();
         }
       },

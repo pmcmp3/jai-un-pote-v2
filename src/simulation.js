@@ -15,7 +15,7 @@
 // re-tap du salto part quand il reste le temps d'une montée avant la cible.
 // Jamais freiné par la boue, jamais un pote perdu. ~20 000 pas : quelques ms.
 
-import { Route, KINDS, CORPS_HAUT } from "./rows.js";
+import { Route, KINDS, CORPS_HAUT, familleDe, montee, solAt, armer } from "./rows.js";
 import { ROWS_AHEAD } from "./scene.js";
 import { V_UNIT, targetSpeed, multiplicateur, dureeCourse } from "./regles.js";
 
@@ -30,12 +30,13 @@ function montees(C) {
   return { tap: tTap, haut: tHaut, double: tHaut + tDouble * 0.6, tDouble };
 }
 
-// Ce que demande une rangée : null, "tap", "haut" ou "double".
+// Ce que demande une rangée : null, "tap", "haut" ou "double". Depuis le
+// 20 septembre 2026 les pièces en l'air DESSINENT l'arc d'un obstacle voisin :
+// le pilote n'a plus à les viser séparément, il les ramasse en sautant.
 function cibleDe(route, r) {
   const row = route.rowAt(r);
-  if (row.type !== "safe") return KINDS[row.kind].franchir;
-  if (!row.coins.length) return null;
-  return Math.max(...row.coins) > CORPS_HAUT ? "tap" : null;   // pièce en l'air : un petit saut suffit
+  if (row.type !== "safe") return familleDe(row.kind);
+  return null;
 }
 
 export function scoreParfait(seed, potesMax) {
@@ -46,6 +47,7 @@ export function scoreParfait(seed, potesMax) {
   const M = montees(C);
   let v = 0, prevV = 0, speed = V_UNIT * C.vitesseBase;
   let jumpY = 0, vy = 0, doubled = false, tHaut = 0, plan = null;
+  // Le sol n'est plus toujours 0 : les halles portent le vélo en l'air.
   let metres = 0, points = 0, potesGagnes = 0, potes = 0, turbo = 0, cible = null;
   const stats = { pieces: 0, laits: 0, rouges: 0, sauts: 0, doubles: 0, rangees: 0 };
   for (let now = 0; now < T; now += dt) {
@@ -56,31 +58,38 @@ export function scoreParfait(seed, potesMax) {
     v += vitesse * dt;
     metres += vitesse * dt * C.metresParUnite * multiplicateur(potes, turbo > 0);
 
+    const sol = solAt(v);
     // Pilote : au sol, il vise la prochaine cible et part au bon moment.
-    if (jumpY <= 0 && !plan) {
+    if (jumpY <= sol + 0.02 && !plan) {
       for (let r = Math.floor(v) + 1; r <= Math.floor(v) + REGARD; r++) {
         const c = cibleDe(route, r);
         if (!c) continue;
-        if (r - v <= vitesse * M[c]) {
+        if (r - v <= vitesse * montee(c)) {
           plan = { r, type: c };
-          jumpY = 0.001; vy = C.sautVitesse; doubled = false; tHaut = 0; stats.sauts += 1;
+          jumpY = sol + 0.001; vy = C.sautVitesse; doubled = false; tHaut = 0; stats.sauts += 1;
         }
         break;
       }
     }
     // Re-tap : le second sommet doit tomber sur la cible.
-    if (plan && plan.type === "double" && !doubled && jumpY > 0 && (plan.r - v) <= vitesse * M.tDouble) {
+    if (plan && plan.type === "double" && !doubled && jumpY > sol && vy <= 0) {
       vy = C.sautVitesseDouble; doubled = true; stats.doubles += 1;
     }
-    if (jumpY > 0) {
+    if (jumpY > sol) {
       // Il garde l'appui tant qu'il monte, sauf pour un simple saut.
       const tenu = plan && plan.type !== "tap" && vy > 0 && tHaut < C.sautTenueMaxS;
       if (tenu) tHaut += dt;
       vy -= (tenu ? C.sautGraviteTenue : C.sautGravite) * dt;
       jumpY += vy * dt;
-      if (jumpY <= 0) { jumpY = 0; vy = 0; doubled = false; tHaut = 0; plan = null; }
     }
+    if (jumpY <= sol) { jumpY = sol; vy = 0; doubled = false; tHaut = 0; plan = null; }
 
+    for (let r = Math.floor(v + 0.5); r <= Math.floor(v + 0.5) + Math.ceil(vitesse * 4) + 1; r++) {
+      const row = route.rowAt(r);
+      if ((row.type !== "traverse" && row.type !== "contresens") || row.armed) continue;
+      const tArr = now + (r - v) / Math.max(0.5, vitesse);
+      if (tArr - now <= 4) armer(row, now, tArr);
+    }
     for (const ev of route.checkMember("sim", prevV, v, jumpY, now)) {
       const mult = multiplicateur(potes, turbo > 0);
       if (ev.type === "piece") {
@@ -107,20 +116,20 @@ export function scoreParfait(seed, potesMax) {
 // quotas (outil de mesure).
 export function recenser(seed, nRangees = 1100) {
   const route = new Route(seed);
-  const n = { dangers: 0, pieces: 0, piecesAir: 0, laits: 0, rouges: 0, boue: 0, tap: 0, haut: 0, double: 0, ecartMin: 99, ecartMax: 0 };
+  const n = { dangers: 0, pieces: 0, piecesAir: 0, laits: 0, grosses: 0, halles: 0, tap: 0, haut: 0, double: 0, ecartMin: 99, ecartMax: 0 };
   let dernier = null;
   for (let r = 0; r < nRangees; r++) {
     const row = route.rowAt(r);
     if (row.type !== "safe") {
-      n.dangers += 1; n[row.kind] = (n[row.kind] || 0) + 1; n[KINDS[row.kind].franchir] += 1;
+      n.dangers += 1; n[row.kind] = (n[row.kind] || 0) + 1; n[familleDe(row.kind)] += 1;
       if (dernier !== null) { n.ecartMin = Math.min(n.ecartMin, r - dernier); n.ecartMax = Math.max(n.ecartMax, r - dernier); }
       dernier = r;
     }
     n.pieces += row.coins.length;
     for (const h of row.coins) if (h > CORPS_HAUT) n.piecesAir += 1;
     if (row.lait !== undefined) n.laits += 1;
-    if (row.rouge !== undefined) n.rouges += 1;
-    if (row.boue !== null && row.boue !== undefined) n.boue += 1;
+    if (row.grosse !== undefined) n.grosses += 1;
+    if (solAt(r) > 0.05) n.halles += 1;
   }
   return n;
 }

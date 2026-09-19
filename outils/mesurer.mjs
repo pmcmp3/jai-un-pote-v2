@@ -6,7 +6,7 @@
 //      joueur immobile : touche TOUS les obstacles (la collision marche dans les deux sens).
 import { chargerConfig } from "./charger-config.mjs";
 const C = chargerConfig();
-const { Route, KINDS, armer, crossersAt, CORPS_HAUT, ecartMin: ecartMinTheorique, H_FRANCHIR } = await import("../src/rows.js");
+const { Route, KINDS, armer, familleDe, montee, solAt, ecartMin: ecartMinTheorique } = await import("../src/rows.js");
 const { scoreParfait, recenser } = await import("../src/simulation.js");
 const { V_UNIT, targetSpeed, dureeCourse } = await import("../src/regles.js");
 
@@ -28,7 +28,11 @@ for (const g of graines) {
     if (row.type === "safe") continue;
     if (dernier !== null) {
       const d = r - dernier;
-      ecartMin = Math.min(ecartMin, d); ecartMax = Math.max(ecartMax, d);
+      // Les halles coupent la route en deux : l'écart qui les enjambe n'est
+      // pas un « trou », c'est la variation voulue. On ne le compte pas.
+      let halle = false;
+      for (let q = dernier; q <= r && !halle; q++) if (solAt(q) > 0.05) halle = true;
+      if (!halle) { ecartMin = Math.min(ecartMin, d); ecartMax = Math.max(ecartMax, d); }
       if (d < ecartMinTheorique(dernierKind, row.kind)) serres += 1;
     }
     dernier = r; dernierKind = row.kind;
@@ -61,28 +65,29 @@ function course(seed, pilote) {
     prevV = v; v += speed * dt;
     for (let r = Math.floor(v + 0.5); r <= Math.floor(v + 0.5) + Math.ceil(speed * 4) + 1; r++) {
       const row = route.rowAt(r);
-      if (row.type !== "traverse" || row.armed) continue;
+      if ((row.type !== "traverse" && row.type !== "contresens") || row.armed) continue;
       const tArr = now + (r - v) / speed;
       if (tArr - now <= 4) armer(row, now, tArr);
     }
-    if (pilote && jumpY <= 0 && !plan) {
+    const sol = solAt(v);
+    if (pilote && jumpY <= sol + 0.02 && !plan) {
       for (let r = Math.floor(v) + 1; r <= Math.floor(v) + 12; r++) {
         const row = route.rowAt(r);
         if (row.type === "safe") continue;
-        const type = KINDS[row.kind].franchir;
-        if (r - v <= speed * M[type]) { plan = { r, type }; jumpY = 0.001; vy = C.sautVitesse; doubled = false; tHaut = 0; }
+        const type = familleDe(row.kind);
+        if (r - v <= speed * montee(type)) { plan = { r, type }; jumpY = sol + 0.001; vy = C.sautVitesse; doubled = false; tHaut = 0; }
         break;
       }
     }
-    if (plan && plan.type === "double" && !doubled && jumpY > 0 && (plan.r - v) <= speed * M.tDouble) { vy = C.sautVitesseDouble; doubled = true; }
-    if (jumpY > 0) {
+    if (plan && plan.type === "double" && !doubled && jumpY > sol && vy <= 0) { vy = C.sautVitesseDouble; doubled = true; }
+    if (jumpY > sol) {
       const tenu = plan && plan.type !== "tap" && vy > 0 && tHaut < tTenue;
       if (tenu) tHaut += dt;
       vy -= (tenu ? C.sautGraviteTenue : C.sautGravite) * dt;
       jumpY += vy * dt;
       apexMax = Math.max(apexMax, jumpY);
-      if (jumpY <= 0) { jumpY = 0; vy = 0; doubled = false; tHaut = 0; plan = null; }
     }
+    if (jumpY <= sol) { jumpY = sol; vy = 0; doubled = false; tHaut = 0; plan = null; }
     for (const ev of route.checkMember("j", prevV, v, jumpY, now)) {
       if (ev.type === "obstacle") { touches += 1; parEspece[ev.kind] = (parEspece[ev.kind] || 0) + 1; }
       if (ev.type === "piece") { pieces += 1; const p = C.potesPaliers[tPotes.length]; if (p !== undefined && pieces >= p) tPotes.push(now); }

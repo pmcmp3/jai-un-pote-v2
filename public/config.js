@@ -59,7 +59,7 @@ window.CONFIG = {
   // Tap court    → apex ~1,3 (poules, chats, chiens, moutons, bottes)
   // Appui tenu   → apex ~2,5 (cochons, vaches, tracteurs)
   // Re-tap en l'air → apex ~3,7 (fermiers, voitures) + salto
-  sautVitesse: 8.2,         // vitesse verticale au départ du saut (unités/s)
+  sautVitesse: 9.4,         // vitesse verticale au départ du saut (u/s) : apex 1,77 au tap, 3,22 en appui tenu, 4,38 au double
   sautVitesseDouble: 7.6,   // impulsion du second saut, en l'air
   sautGravite: 25,          // pesanteur normale
   sautGraviteTenue: 12,     // pesanteur tant qu'on monte ET qu'on reste appuyé
@@ -91,7 +91,7 @@ window.CONFIG = {
   // sortait de l'écran dès le 2e pote.
   potesRecul: 1.0,
   potesEcart: 0.5,
-  potesPaliers: [5, 12, 20, 30, 42],
+  potesPaliers: [5, 14, 28, 46, 68],   // re-étalés le 20 septembre 2026 : les 5 potes arrivaient tous avant 25 s
   // Après le dernier palier, un pote PERDU se rachète pour ce nombre de
   // pièces (20 septembre 2026 : « j'ai perdu tous mes potes et j'arrive pas
   // à les regagner »).
@@ -114,7 +114,12 @@ window.CONFIG = {
   // menu (plus de choix de ligue, plus de sprint, plus de tiroir album) : on
   // ne joue QUE dans cette ligue. Les autres visiteurs gardent le jeu normal.
   // Table et plafond (60) créés par supabase-migration-beta.sql.
-  ligueBeta: "BETA",
+  // 20 septembre 2026 : nouvelle ligue de test pour la v2 (« crée la ligue
+  // test [...] après, c'est tous les gens qui vont se rajouter à la ligue avec
+  // le code de partage »). C'est ELLE qui déclenche le menu simplifié, le
+  // plafond à 60 et le bouton « Laisser un retour ».
+  // ⚠️ Créée par supabase/ligue-test-v2.sql, À EXÉCUTER avant de partager le lien.
+  ligueBeta: "TESTV2",
   ligueBetaPlafond: 60,
   betaRetours: true,        // le bouton « Laisser un retour » sur l'écran de fin
   liguesParVague: 5,        // 5 ligues jouables en même temps, au-delà : lundi prochain

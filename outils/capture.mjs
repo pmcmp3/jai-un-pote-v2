@@ -74,6 +74,25 @@ const SCENES = {
     await attendre(1200); await photo("06-tracteur-alerte");
     await attendre(1100); await photo("07-tracteur-visible");
   },
+  // Les halles : la rampe, le plancher en l'air, la charpente (20 sept. 2026).
+  halle: async () => {
+    // La première halle, lue dans le moteur (ses rangées dépendent de la
+    // courbe de vitesse : jamais les recopier à la main).
+    const d = await course(() => { const p = window.__pote; for (let r = 40; r < 1200; r++) if (p.rows.halleA(r) !== null) return p.rows.halleA(r); return 0; });
+    await course((d) => { window.__pote.player.v = d - 6; }, d);
+    await attendre(900); await photo("19-halle-approche");
+    await course((d) => { window.__pote.player.v = d + 14; }, d);
+    await attendre(900); await photo("20-halle-dessus");
+  },
+  // Choc : la bête percutée bascule (20 septembre 2026).
+  choc: async () => {
+    for (let i = 0; i < 4; i++) await page.keyboard.press("KeyP");
+    await page.keyboard.press("KeyI"); // redevient vulnérable
+    const r = await course(() => { const p = window.__pote; for (let r = Math.ceil(p.player.v) + 14; r < 3000; r++) { const row = p.rows.rowAt(r); if (row.type === "statique" && ["vache", "cochon", "mouton"].includes(row.kind)) return r; } return 0; });
+    await course((r) => { window.__pote.player.v = r - 2.2; }, r);
+    await attendre(650); await photo("23-choc");
+    await page.keyboard.press("KeyI");
+  },
   village: async () => {
     await course(() => { const p = window.__pote; let r = Math.ceil(p.player.v); while (Math.floor(r / 55) % 6 !== 3) r++; p.player.v = r + 20; });
     await attendre(900); await photo("08-village");
@@ -100,8 +119,12 @@ const SCENES = {
     await course(() => { const p = window.__pote; let r = Math.ceil(p.player.v); while (Math.floor(r / 55) % 6 !== 3) r++; p.player.v = r + 8; });
     await cdp.send("Emulation.setCPUThrottlingRate", { rate: 4 });
     const ms = await course(async () => { const t = []; const t0 = performance.now(); let last = t0; await new Promise((ok) => { const f = (n) => { t.push(n - last); last = n; if (n - t0 < 4000) requestAnimationFrame(f); else ok(); }; requestAnimationFrame(f); }); t.sort((a, b) => a - b); return { moyenne: t.reduce((a, b) => a + b, 0) / t.length, p95: t[Math.floor(t.length * 0.95)], n: t.length }; });
+    // ⚠️ Le Chrome headless plafonne à 30 images/s : l'intervalle ne dit rien.
+    // Ce qui compte, c'est le TEMPS DE TRAVAIL par image (perf.frameMs), qui
+    // doit rester bien sous 16 ms pour tenir 60 images/s sur un vrai téléphone.
+    const travail = await course(async () => { const t = []; for (let i = 0; i < 90; i++) { await new Promise((ok) => requestAnimationFrame(ok)); t.push(window.__pote.frameMs()); } t.sort((a, b) => a - b); return { moy: t.reduce((a, b) => a + b, 0) / t.length, p95: t[Math.floor(t.length * 0.95)] }; });
     await cdp.send("Emulation.setCPUThrottlingRate", { rate: 1 });
-    console.log(`  CPU ×4 : intervalle moyen entre images ${ms.moyenne.toFixed(1)} ms (${(1000 / ms.moyenne).toFixed(0)} images/s), 95e centile ${ms.p95.toFixed(1)} ms, sur ${ms.n} images`);
+    console.log(`  CPU ×4 : travail par image ${travail.moy.toFixed(1)} ms en moyenne, ${travail.p95.toFixed(1)} ms au 95e centile (intervalle ${ms.moyenne.toFixed(1)} ms, plafonné par le headless)`);
   },
   // Tutoriel (lancer avec PARTIES=0) : consigne 1, un tap, consigne 2.
   tuto: async () => {
