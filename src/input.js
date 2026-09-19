@@ -1,12 +1,13 @@
-// input.js — Deux gestes (refonte Crossy Road, 4 septembre 2026) :
-//   swipe gauche / droite → une colonne (un cran par contact)
+// input.js — v2 (19 septembre 2026, une seule voie) : il n'y a plus de voie
+// à changer, donc plus de swipe latéral. Restent :
 //   tap (toucher-relâcher sans bouger) → saut
+//   re-tap en l'air → salto (géré par main.js)
+//   swipe vers le haut → saut aussi (réflexe du premier jeu)
 // Le saut part au RELÂCHER : c'est ce qui permet de distinguer un tap d'un
 // début de swipe (~80 ms de latence, imperceptible). Clavier : flèches/QD,
 // espace / flèche haut.
 
 const SWIPE_THRESHOLD = 28;
-const laneQueue = [];
 let jumpPressed = false;
 // 6 septembre 2026 (« le double saut n'a pas marché ») : en l'air, le second
 // tap part AU TOUCHER, pas au relâcher — zéro latence, le salto sort à coup
@@ -14,7 +15,6 @@ let jumpPressed = false;
 let airborne = false;
 export function setAirborne(a) { airborne = a; }
 
-export function consumeLaneMove() { return laneQueue.length ? laneQueue.shift() : 0; }
 export function consumeJumpPress() { if (jumpPressed) { jumpPressed = false; return true; } return false; }
 export function isHolding() { return false; }
 
@@ -32,8 +32,7 @@ function move(x, y) {
   if (activeId === null || consumed) return;
   const dx = x - originX, dy = y - originY;
   if (Math.abs(dx) >= SWIPE_THRESHOLD && Math.abs(dx) > Math.abs(dy) * 1.2) {
-    if (laneQueue.length < 2) laneQueue.push(dx > 0 ? 1 : -1);
-    consumed = true;
+    consumed = true; // swipe latéral : ignoré (une seule voie), mais ce n'est pas un tap
   } else if (Math.abs(dy) >= SWIPE_THRESHOLD && dy < 0 && Math.abs(dy) > Math.abs(dx) * 1.2) {
     jumpPressed = true; // swipe vers le haut = saut aussi (réflexe du premier jeu)
     consumed = true;
@@ -59,7 +58,5 @@ export function isTypingTarget(target) {
 }
 window.addEventListener("keydown", (e) => {
   if (e.repeat || isTypingTarget(e.target)) return;
-  if (e.code === "ArrowLeft" || e.code === "KeyA" || e.code === "KeyQ") laneQueue.push(-1);
-  else if (e.code === "ArrowRight" || e.code === "KeyD") laneQueue.push(1);
-  else if (e.code === "Space" || e.code === "ArrowUp") jumpPressed = true;
+  if (e.code === "Space" || e.code === "ArrowUp" || e.code === "KeyW" || e.code === "KeyZ") jumpPressed = true;
 });

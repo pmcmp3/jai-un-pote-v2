@@ -39,6 +39,19 @@ window.CONFIG = {
   vitesseBase: 1.7,
   vitesseMax: 2.6,          // 3,6 → 2,6 le 7 septembre 2026 (« quand ça va vite, ça va vraiment trop vite »)
 
+  // === VUE DE PROFIL (v2, 19 septembre 2026) ===
+  // « Une seule voie, en 2D, exactement comme Jetpack Joyride ou Zombie
+  // Tsunami ». Caméra posée à côté de la route (scene.js) : le joueur file
+  // vers la droite, le fond défile moins vite que la route (parallaxe).
+  unitesVisibles: 14.5,     // largeur de l'écran en unités, à la profondeur de la route (portrait)
+  solEcran: 0.7,            // hauteur de la route à l'écran (fraction, depuis le haut)
+  cameraDistance: 11,       // distance caméra → route (unités) : plus petit = perspective plus forte
+  cameraHauteur: 3.6,       // hauteur de la caméra : plus grand = on voit plus le dessus des choses
+  // Où est le joueur à l'écran (fraction de la largeur) : au départ, puis à
+  // vitesse maximale — la caméra prend de l'avance quand ça accélère, pour
+  // garder ~1,6 s de lecture devant soi.
+  cameraJoueurX: [0.3, 0.25],
+
   // === SAUT (tap) ===
   sautHauteur: 1.25,     // apex du saut (unités-monde) — passe au-dessus des poules et des bottes
   sautDuree: 0.55,       // durée du saut en secondes
@@ -53,7 +66,10 @@ window.CONFIG = {
   // Chaque pote ajoute ce pourcentage aux mètres gagnés (×1 seul, ×3 avec 8 potes).
   potesBonusMetres: 0.25,
   // Mètres bonus par pièce ramassée (avant multiplicateur de potes).
-  pieceMetres: 4,
+  // v2 : 4 → 2,6. La vue de profil pose ~1,5× plus de pièces (les arcs
+  // au-dessus des obstacles) ; 2,6 garde leur poids dans le score parfait au
+  // niveau de la v1 (~50 %), mesuré par outils/mesurer.mjs.
+  pieceMetres: 2.6,
 
   // === POTES ===
   // PIÈCES cumulées qui font venir le pote n°1, n°2… (croissant : chaque pote
@@ -64,8 +80,11 @@ window.CONFIG = {
   // éloignés de toi, parce que c'est trop difficile sinon ») : le premier
   // pote roule `potesRecul` rangées derrière le joueur, puis `potesEcart`
   // rangées entre chaque pote (avant : 1,5 et 1,5).
-  potesRecul: 3.0,
-  potesEcart: 1.6,
+  // v2 (vue de profil) : MEUTE serrée — en portrait on ne voit que ~3,5
+  // unités derrière le joueur, la file indienne de la v1 (3,0 + 1,6 × rang)
+  // sortait de l'écran dès le 2e pote.
+  potesRecul: 1.0,
+  potesEcart: 0.5,
   potesPaliers: [5, 12, 20, 30, 42],
   // Prénoms des potes, dans l'ordre d'arrivée (Soberland en premier, verrouillé).
   // Sans ligue, le peloton c'est la LIGUE DE DÉMO (7 septembre 2026) : Paul et
@@ -95,8 +114,12 @@ window.CONFIG = {
   // === DOUBLE SAUT (6 septembre 2026) ===
   // Un second tap en l'air = salto. Il consomme la barre d'élan, qui se
   // recharge en `elanRechargeS` secondes — pas de double saut en continu.
-  elanRechargeS: 2.5,       // 5 → 2,5 (« la barre doit se recharger beaucoup plus vite »)
-  elanParPiece: 0.25,       // et chaque pièce recharge un quart
+  // v2 : le salto devient OBLIGATOIRE pour les obstacles hauts (tracteur,
+  // fermier, voiture). Deux obstacles « salto » ne se suivent jamais (rows.js) :
+  // le suivant est au moins 8 rangées plus loin, soit 1,18 s à vitesse max —
+  // la barre doit donc se recharger en moins de ça, même sans pièce.
+  elanRechargeS: 1.1,       // 2,5 en v1
+  elanParPiece: 0.1,        // 0,25 en v1 (il y a ~3× plus de pièces : les arcs)
   piecesLogo: false,        // « mets juste des pièces jaunes pour l'instant, enlève les dessins »
   laitDureeS: 5,            // brique de lait : ×2 sur les mètres pendant 5 s
   laitVitesse: 1.2,         // et seulement +20 % de vitesse (« pas ×2, c'est n'importe quoi »)

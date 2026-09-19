@@ -174,7 +174,7 @@ export function renderCountIn(ctx, width, height, t, beatPeriod, beats, linger) 
 // Rappel des commandes, en bas, pendant les premières secondes de course.
 export function renderHint(ctx, width, height, alpha) {
   if (alpha <= 0.01) return;
-  const txt = "SWIPE = VOIE  ·  TAP = SAUT  ·  RE-TAP EN L'AIR = SALTO";
+  const txt = "TAP = SAUT  ·  RE-TAP EN L'AIR = SALTO";
   ctx.save();
   ctx.globalAlpha = alpha;
   fitFont(ctx, "700", 12, txt, width - 60, 8);
@@ -228,26 +228,24 @@ export function renderBanner(ctx, width, height, banner, safeTop = 0) {
   ctx.restore();
 }
 
-// Effets du TURBO LAIT : flou de vitesse sur les côtés (bandes translucides
-// qui filent). Les couleurs saturées viennent du CSS (canvas.turbo).
+// Effets du TURBO LAIT : flou de vitesse (v2, vue de profil) — voile sur le
+// bord qui arrive et traits HORIZONTAUX qui filent vers la gauche. Les
+// couleurs saturées viennent du CSS (canvas.turbo).
 export function renderTurbo(ctx, width, height, t, force) {
   if (force <= 0.01) return;
   ctx.save();
   ctx.globalAlpha = force;
-  for (const side of [0, 1]) {
-    const g = ctx.createLinearGradient(side ? width : 0, 0, side ? width - width * 0.28 : width * 0.28, 0);
-    g.addColorStop(0, "rgba(255,255,255,0.55)");
-    g.addColorStop(1, "rgba(255,255,255,0)");
-    ctx.fillStyle = g;
-    ctx.fillRect(side ? width * 0.72 : 0, 0, width * 0.28, height);
-  }
+  const g = ctx.createLinearGradient(width, 0, width * 0.7, 0);
+  g.addColorStop(0, "rgba(255,255,255,0.5)");
+  g.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = g;
+  ctx.fillRect(width * 0.7, 0, width * 0.3, height);
   ctx.fillStyle = "rgba(255,255,255,0.75)";
-  for (let i = 0; i < 14; i++) {
-    const side = i % 2;
-    const x = side ? width - 6 - (i * 13) % 90 : 6 + (i * 13) % 90;
-    const len = 60 + (i * 37) % 120;
-    const y = ((t * (900 + i * 90) + i * 173) % (height + len)) - len;
-    ctx.fillRect(x, y, 2, len);
+  for (let i = 0; i < 16; i++) {
+    const y = height * (0.2 + ((i * 0.618) % 1) * 0.7);
+    const len = 50 + (i * 37) % 110;
+    const x = width - ((t * (1100 + i * 80) + i * 173) % (width + len));
+    ctx.fillRect(x, y, len, 2);
   }
   ctx.restore();
 }

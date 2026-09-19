@@ -1,38 +1,35 @@
-// friends.js — Le peloton derrière le joueur (7 septembre 2026 : « ce qui
-// serait dingue, c'est qu'ils ne soient pas assignés à une seule ligne mais
-// qu'ils naviguent entre les lignes, et qu'ils réussissent TOUJOURS à éviter
-// les objets »). Chaque pote roule SPACING rangées derrière le précédent,
-// choisit sa propre voie : il se balade d'une voie à l'autre quand c'est
-// libre, et change TOUJOURS de voie avant un obstacle posé, une flaque de
-// boue ou une voiture garée. Il saute là où le joueur a sauté (pour le
-// plaisir des yeux). Les potes ne prennent aucun dégât ; ils ramassent les
-// pièces qu'ils croisent.
+// friends.js — Les potes derrière le joueur.
+//
+// v2 (19 septembre 2026, vue de profil, une voie) : la file indienne de la
+// v1 (premier pote 3 rangées derrière, puis 1,6 par pote) sortait de l'écran
+// en portrait — on ne voit que ~3,5 unités derrière le joueur. Les potes
+// roulent donc en MEUTE serrée, comme la horde de Zombie Tsunami : chacun a
+// sa place en profondeur (u) sur la largeur de la route, ils se chevauchent
+// sans se cacher. Ils refont les sauts ET les saltos du joueur au même
+// endroit (marques posées par main.js), ce qui donne la vague de la meute qui
+// saute l'un après l'autre. Aucun dégât ; ils ramassent les pièces qu'ils
+// croisent.
 
-import { project, ROAD_HALF, COLS, colU } from "./iso.js";
-import * as rows from "./rows.js";
+import { project } from "./scene.js";
 import { PALETTES, paletteDepuisSkin } from "./rider.js";
 import { drawRider, RIDER_HEIGHT } from "./voxrider.js";
 
-// Écart entre potes (0,95 → 1,5 : « beaucoup trop serré derrière moi, ça gêne
-// la vue »), et DISTANCE du premier pote derrière le joueur (9 septembre
-// 2026 : « il faut que les potes soient un peu plus éloignés de toi, c'est
-// trop difficile sinon ») — réglages dans config.js, valeurs de repli ici.
-export const SPACING = 1.5;
+// Profondeur de chaque place de la meute (+ = côté fond, − = côté caméra).
+const U_MEUTE = [0.55, -0.45, 0.95, -0.15, 0.3, -0.6, 0.75, 0.1];
+export const SPACING = 0.5;
 function ecart() { return window.CONFIG.potesEcart || SPACING; }
-function premierRecul() { return window.CONFIG.potesRecul || 3.0; }
+function premierRecul() { return window.CONFIG.potesRecul || 1.0; }
 // Rangée d'un pote de rang `slot` (0 = juste derrière le joueur).
 function vDuSlot(playerV, slot) { return playerV - premierRecul() - slot * ecart(); }
-const LEAVE_S = 0.7;
+const LEAVE_S = 0.8;
 const ARRIVAL_S = 1.1;
-const LANE_TWEEN = 7;
-const LOOK_AHEAD = 3;   // rangées regardées devant pour éviter
 
 let potes = [];
 let maxCount = 0;
 let joins = 0;
-let jumpMarks = [];
+let marques = []; // { v, type: "saut" | "salto" } — là où le joueur a sauté
 
-export function reset() { potes = []; maxCount = 0; joins = 0; jumpMarks = []; tirerSelection(); }
+export function reset() { potes = []; maxCount = 0; joins = 0; marques = []; tirerSelection(); }
 export function alive() { return potes.filter((p) => !p.leave); }
 export function count() { return alive().length; }
 export function maxReached() { return maxCount; }
@@ -49,10 +46,11 @@ export function maxReached() { return maxCount; }
 // Le plafond protège aussi la ligue de bêta, qui peut compter 60 personnes.
 export function max() { return Math.min(listeMembres().length, window.CONFIG.potesMax); }
 
-export function recordPlayer(u, v, jumped) {
-  if (jumped) jumpMarks.push(v);
+// Marque un saut (`type` = "saut") ou un salto ("salto") du joueur en v.
+export function recordPlayer(v, type) {
+  if (type) marques.push({ v, type });
   const minV = vDuSlot(v, max() + 1) - 1;
-  jumpMarks = jumpMarks.filter((m) => m > minV);
+  if (marques.length && marques[0].v < minV) marques = marques.filter((m) => m.v > minV);
 }
 
 // Les potes portent les pseudos de la LIGUE quand il y en a une (5 membres
@@ -107,12 +105,13 @@ export function join(player) {
   const base = PALETTES.potes[idx % PALETTES.potes.length];
   const palette = membre && membre.skin ? paletteDepuisSkin(membre.skin, base) : base;
   joins += 1;
-  const side = slot % 2 ? 1 : -1;
+  // Il arrive du champ, derrière, et rejoint sa place dans la meute.
+  const v = vDuSlot(player.v, slot);
   const pote = {
     slot, palette, name,
-    col: player.col, u: side * (ROAD_HALF + 3.2), v: vDuSlot(player.v, slot),
-    arrive: 0, leave: null, pedal: Math.random() * 6,
-    jumpY: 0, jumpVy: 0, lastMark: -Infinity, balade: 1 + Math.random() * 2.5,
+    u: 3.4, v: v - 2.2, prevV: v - 2.2, u0: 3.4, dv0: -2.2,
+    arrive: 0, leave: null, pedal: Math.random() * 6, phase: Math.random() * 6,
+    jumpY: 0, jumpVy: 0, doubled: false, flip: 0, lastMark: player.v,
   };
   potes.push(pote);
   maxCount = Math.max(maxCount, vivants.length + 1);
@@ -122,81 +121,72 @@ export function join(player) {
 export function lose(n) {
   const vivants = alive().sort((a, b) => b.slot - a.slot);
   const perdus = vivants.slice(0, n);
-  for (const p of perdus) p.leave = { t: 0, dir: p.u >= 0 ? 1 : -1 };
+  for (const p of perdus) p.leave = { t: 0 };
   return perdus;
-}
-
-// Voies bloquées sur les LOOK_AHEAD prochaines rangées : obstacle posé,
-// boue, voiture garée. Les traversants ne comptent pas (les potes ne
-// prennent pas de dégât, et un tracteur est imprévisible pour eux).
-function voiesBloquees(v) {
-  const r0 = Math.floor(v + 0.5);
-  const bloc = new Set();
-  for (let r = Math.max(0, r0); r <= r0 + LOOK_AHEAD; r++) {
-    const row = rows.rowAt(r);
-    if (row.type === "statique") for (const c of row.cols) bloc.add(c);
-    if (row.boue !== null && row.boue !== undefined) bloc.add(row.boue);
-  }
-  return bloc;
-}
-
-function choisirVoie(p, bloc, forcer) {
-  if (!forcer && !bloc.has(p.col)) return p.col;
-  // Voisines d'abord, puis n'importe quelle voie libre.
-  const toutes = Array.from({ length: COLS }, (_, c) => c);
-  const cands = [p.col - 1, p.col + 1, ...toutes].filter((c) => c >= 0 && c < COLS && c !== p.col && !bloc.has(c));
-  if (!cands.length) return p.col;
-  return cands[Math.floor(Math.random() * Math.min(2, cands.length))];
 }
 
 export function update(dt, player, phys) {
   const vivants = alive().sort((a, b) => a.slot - b.slot);
   vivants.forEach((p, i) => { p.slot = i; });
   for (const p of potes) {
+    p.prevV = p.v;
     if (p.leave) { p.leave.t += dt / LEAVE_S; continue; }
-    p.v = vDuSlot(player.v, p.slot);
+    p.phase += dt;
+    p.age = (p.age || 0) + dt;
+    const cibleU = U_MEUTE[p.slot % U_MEUTE.length] + Math.sin(p.phase * 0.9) * 0.08;
+    const cibleV = vDuSlot(player.v, p.slot) + Math.sin(p.phase * 0.7 + p.slot) * 0.12;
     if (p.arrive < 1) {
       p.arrive = Math.min(1, p.arrive + dt / ARRIVAL_S);
-      p.u += (colU(p.col) - p.u) * Math.min(1, 3.2 * dt);
+      const e = 1 - Math.pow(1 - p.arrive, 3);
+      p.u = p.u0 + (cibleU - p.u0) * e;
+      p.v = cibleV + p.dv0 * (1 - e);
       continue;
     }
-    const bloc = voiesBloquees(p.v);
-    if (bloc.has(p.col)) {
-      p.col = choisirVoie(p, bloc, true);
-      p.balade = 1.5 + Math.random() * 2;
-    } else {
-      p.balade -= dt;
-      if (p.balade <= 0) { p.col = choisirVoie(p, bloc, true); p.balade = 1.5 + Math.random() * 3; }
+    p.u += (cibleU - p.u) * Math.min(1, 4 * dt);
+    p.v = cibleV;
+    // Sauts et saltos aux marques du joueur.
+    for (const m of marques) {
+      if (m.v <= p.lastMark || m.v > p.v) continue;
+      p.lastMark = m.v;
+      if (m.type === "saut" && p.jumpY <= 0) { p.jumpVy = phys.vJump; p.jumpY = 0.001; p.doubled = false; }
+      else if (m.type === "salto" && p.jumpY > 0 && !p.doubled) { p.jumpVy = phys.vJump; p.doubled = true; p.flip = 0.001; }
     }
-    p.u += (colU(p.col) - p.u) * Math.min(1, LANE_TWEEN * dt);
-    const mark = jumpMarks.find((m) => m > p.lastMark && m <= p.v);
-    if (mark !== undefined && p.jumpY <= 0) { p.jumpVy = phys.vJump; p.jumpY = 0.001; p.lastMark = mark; }
-    if (p.jumpY > 0) { p.jumpVy -= phys.g * dt; p.jumpY += p.jumpVy * dt; if (p.jumpY <= 0) { p.jumpY = 0; p.jumpVy = 0; } }
+    if (p.jumpY > 0) {
+      p.jumpVy -= phys.g * dt; p.jumpY += p.jumpVy * dt;
+      if (p.jumpY <= 0) { p.jumpY = 0; p.jumpVy = 0; p.doubled = false; p.flip = 0; }
+    }
+    if (p.flip > 0) p.flip = Math.min(Math.PI * 2, p.flip + dt * (Math.PI * 2 / 0.5));
   }
   potes = potes.filter((p) => !p.leave || p.leave.t < 1);
 }
 
 export function members() {
-  return alive().filter((p) => p.arrive >= 1).map((p) => ({ id: `p${p.slot}`, u: p.u, v: p.v, pote: p }));
+  return alive().filter((p) => p.arrive >= 1).map((p) => ({ id: `p${p.slot}`, u: p.u, v: p.v, prevV: p.prevV, jumpY: p.jumpY, pote: p }));
 }
 
 export function drawables(ctx, pedalPhase) {
   const out = [];
   for (const p of potes) {
-    let u = p.u, y = p.jumpY, alpha = 1;
+    let u = p.u, v = p.v, y = p.jumpY, alpha = 1;
     if (p.leave) {
+      // Il décroche : il ralentit, part dans le champ du fond, s'efface.
       const t = p.leave.t;
-      u += p.leave.dir * t * 4;
-      y += Math.sin(Math.min(1, t) * Math.PI) * 1.6;
+      v -= t * t * 3.5;
+      u += t * 2.2;
+      y += Math.sin(Math.min(1, t) * Math.PI) * 1.2;
       alpha = 1 - t;
     }
     out.push({
-      u, v: p.v, draw: () => {
-        drawRider(ctx, u, p.v, y, p.palette, pedalPhase + p.pedal, alpha);
-        if (p.name && p.arrive >= 1 && !p.leave) {
-          const g = project(u, p.v, y + RIDER_HEIGHT + 0.15);
+      u, v, draw: () => {
+        drawRider(ctx, u, v, y, p.palette, pedalPhase + p.pedal, alpha, p.flip);
+        // Le prénom s'affiche 3 s à l'arrivée du pote, puis s'efface : dans
+        // une meute serrée, cinq étiquettes permanentes se marchaient dessus.
+        const vu = p.arrive >= 1 ? Math.max(0, Math.min(1, (3.6 - p.age) / 0.6)) : 0;
+        if (p.name && vu > 0 && !p.leave) {
+          const g = project(u, v, y + RIDER_HEIGHT + 0.2);
           ctx.save();
-          ctx.font = `700 11px "Helvetica Neue", Helvetica, Arial, sans-serif`;
+          ctx.globalAlpha *= vu;
+          ctx.font = `700 10px "Helvetica Neue", Helvetica, Arial, sans-serif`;
           ctx.textAlign = "center"; ctx.textBaseline = "bottom";
           ctx.lineWidth = 3; ctx.strokeStyle = "rgba(0,0,0,0.55)"; ctx.lineJoin = "round";
           ctx.strokeText(`@${p.name}`, g.x, g.y);
