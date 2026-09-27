@@ -29,6 +29,37 @@ function roue2(ctx, u, v, hc, R, angle) {
   drawDisque(ctx, u - 0.004, v, hc, R * 0.14, RIM);
 }
 
+// Cadre de VTT en vrais tubes (27 septembre 2026 : « le bonhomme est un peu
+// écrasé, il faudrait que tu revoies le cadre du vélo »). Avant : une barre
+// horizontale et deux piquets, en cubes — de profil, ça ne ressemblait à
+// rien. Désormais le losange d'un vrai vélo, tracé dans le plan des roues :
+// bases, haubans, tube de selle, tube horizontal, tube diagonal, fourche,
+// pédalier qui tourne. Couleur du maillot, cernée de noir pour se lire sur
+// l'asphalte comme sur le ciel.
+function cadre(ctx, um, y, L, lift, pedal, P) {
+  const pt = (dv, h) => project(um - 0.002, y + dv, lift + h);
+  const moyeuAr = pt(0.25, 0.25), moyeuAv = pt(L - 0.25, 0.25), pedalier = pt(0.5, 0.24);
+  const selle = pt(0.4, 0.84), douille = pt(0.86, 0.8), douilleBas = pt(0.83, 0.58);
+  const e = echelle(um);
+  const tubes = [[moyeuAr, pedalier], [moyeuAr, selle], [pedalier, selle], [selle, douille], [pedalier, douilleBas], [douilleBas, douille], [douilleBas, moyeuAv]];
+  ctx.lineCap = "round"; ctx.lineJoin = "round";
+  for (const [larg, coul] of [[0.11, "#141418"], [0.065, P.top1 || FRAME]]) {
+    ctx.strokeStyle = coul; ctx.lineWidth = Math.max(1.5, larg * e);
+    ctx.beginPath();
+    for (const [a, b] of tubes) { ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); }
+    ctx.stroke();
+  }
+  // Selle et manivelle.
+  ctx.strokeStyle = "#141418"; ctx.lineWidth = Math.max(2, 0.09 * e);
+  ctx.beginPath();
+  const s1 = pt(0.3, 0.9), s2 = pt(0.5, 0.9);
+  ctx.moveTo(s1.x, s1.y); ctx.lineTo(s2.x, s2.y);
+  const r = 0.16 * e;
+  ctx.moveTo(pedalier.x - Math.cos(pedal) * r, pedalier.y - Math.sin(pedal) * r);
+  ctx.lineTo(pedalier.x + Math.cos(pedal) * r, pedalier.y + Math.sin(pedal) * r);
+  ctx.stroke();
+}
+
 const TIRE = "#151518", RIM = "#8a8d98", FRAME = "#1b1b21", SKIN_SHOE = "#565a66";
 
 // Ancré au sol en (u, v) = centre du vélo. `lift` = hauteur de saut.
@@ -90,10 +121,11 @@ export function drawRider(ctx, u, v, lift, P, pedal, alpha = 1, flip = 0, ombre 
     roue2(ctx, um, y + 0.25, lift + 0.25, 0.25, v / 0.25);
     roue2(ctx, um, y + L - 0.25, lift + 0.25, 0.25, v / 0.25);
   }
-  if (!roller) {
+  if (grandBi) {
     drawBox(ctx, um - 0.04, y + 0.3, 0.08, 0.6, 0.1, FRAME, liftSelle + 0.4);
-    drawBox(ctx, um - 0.05, y + 0.35, 0.1, 0.1, 0.35, FRAME, liftSelle + 0.45);
     drawBox(ctx, um - 0.05, y + 0.85, 0.1, 0.1, 0.4, FRAME, liftSelle + 0.45);
+  } else if (!roller) cadre(ctx, um, y, L, lift, pedal, P);
+  if (!roller) {
     drawBox(ctx, x - 0.08, y + 0.92, W + 0.16, 0.08, 0.08, "#33333b", liftSelle + 0.85);
     drawBox(ctx, um - 0.12, y + 0.28, 0.24, 0.18, 0.08, P.pants, liftSelle + 0.8);
   }

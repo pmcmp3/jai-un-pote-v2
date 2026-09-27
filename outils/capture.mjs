@@ -54,6 +54,7 @@ await page.keyboard.press("KeyI"); // invincible : la course va au bout des capt
 const course = (expr, arg) => page.evaluate(expr, arg);
 
 const SCENES = {
+  decompte: async () => { await page.keyboard.press("KeyD"); await attendre(250); await photo("00b-decompte"); await page.keyboard.press("KeyD"); },
   depart: async () => { await attendre(4500); await photo("01-depart"); },
   potes: async () => { for (let i = 0; i < 5; i++) await page.keyboard.press("KeyP"); await attendre(1800); await photo("02-meute"); },
   obstacles: async () => {
@@ -79,10 +80,14 @@ const SCENES = {
     // La première halle, lue dans le moteur (ses rangées dépendent de la
     // courbe de vitesse : jamais les recopier à la main).
     const d = await course(() => { const p = window.__pote; for (let r = 40; r < 1200; r++) if (p.rows.halleA(r) !== null) return p.rows.halleA(r); return 0; });
+    await page.keyboard.press("KeyD");
     await course((d) => { window.__pote.player.v = d - 6; }, d);
     await attendre(900); await photo("19-halle-approche");
+    await course((d) => { window.__pote.player.v = d + 3; }, d);
+    await attendre(500); await photo("19b-halle-rampe");
     await course((d) => { window.__pote.player.v = d + 14; }, d);
     await attendre(900); await photo("20-halle-dessus");
+    await page.keyboard.press("KeyD");
   },
   // Choc : la bête percutée bascule (20 septembre 2026).
   choc: async () => {
@@ -153,6 +158,60 @@ const SCENES = {
   fantome: async () => {
     await course(() => { const p = window.__pote; const pts = []; for (let i = 0; i < 1800; i++) { const t = i / 10; pts.push([0, 4.6 * t + 1.5, 0]); } p.injecterFantome(pts, "lea"); });
     await attendre(1500); await photo("18-fantome");
+  },
+  // La poule jetée (27 septembre 2026) : le fermier face au joueur, puis la poule qui court.
+  poule: async () => {
+    await page.keyboard.press("KeyD");
+    const r = await course(() => { const p = window.__pote; for (let r = Math.ceil(p.player.v) + 20; r < 3000; r++) { const row = p.rows.rowAt(r); if (row.kind === "poulejetee" && !row.armed) return r; } return 0; });
+    await course((r) => { window.__pote.player.v = r - 12; }, r);
+    await attendre(450); await photo("24-poule-fermier");
+    await attendre(900); await photo("25-poule-jetee");
+    await page.keyboard.press("KeyD");
+  },
+  // La voiture en face (plus lente, montable) : l'alerte, puis la voiture.
+  enface: async () => {
+    await page.keyboard.press("KeyD");
+    const r = await course(() => { const p = window.__pote; for (let r = Math.ceil(p.player.v) + 40; r < 3000; r++) { const row = p.rows.rowAt(r); if (row.type === "contresens" && row.kind === "contresens" && !row.armed) return r; } return 0; });
+    await course((r) => { window.__pote.player.v = r - 30; }, r);
+    await attendre(1800); await photo("26-enface-alerte");
+    await course((r) => { const p = window.__pote; const row = p.rows.rowAt(r); p.player.v = Math.max(p.player.v, r - 9); }, r);
+    await attendre(250); await photo("27-enface-visible");
+    await page.keyboard.press("KeyD");
+  },
+  // Voiture garée sur la route, vue de près.
+  voiture: async () => {
+    await page.keyboard.press("KeyD");
+    const r = await course(() => { const p = window.__pote; for (let r = Math.ceil(p.player.v) + 12; r < 3000; r++) { const row = p.rows.rowAt(r); if (row.type === "statique" && row.kind === "voiture") return r; } return 0; });
+    await course((r) => { window.__pote.player.v = r - 6; }, r);
+    await attendre(300); await photo("28-voiture");
+    await page.keyboard.press("KeyD");
+  },
+  // Menu « Mon cycliste » atteint depuis l'écran de fin (bouton Menu).
+  menuFin: async () => {
+    await page.keyboard.press("KeyF"); await attendre(700); await photo("29-termine");
+    await attendre(1600); await photo("30-fin");
+    await page.click("#end-menu"); await attendre(800); await photo("31-menu-apres");
+  },
+  // Boîtes de collision contre dessins (27 septembre 2026 : « vérifiez bien la
+  // hitbox de tous les éléments ») : pour chaque espèce, l'enveloppe de ce qui
+  // est DESSINÉ, comparée à la boîte qui sert aux collisions (rows.KINDS).
+  hitbox: async () => {
+    const t = await course(async () => {
+      const scene = await import("/src/scene.js"), props = await import("/src/props.js"), rows = await import("/src/rows.js");
+      const out = [];
+      for (const [k, K] of Object.entries(rows.KINDS)) {
+        const b = scene.mesurerModele((c) => {
+          if (K.traverse) props.drawCrosser(c, k, 0, 0, -1, 0);
+          else if (k === "poulejetee") props.drawPouleJetee(c, 0, 0, 0);
+          else if (k === "contresens") props.drawVoiture(c, K, 0, 0, -1, 0);
+          else props.drawStatic(c, k, 0, 0, 0);
+        });
+        const longDessin = K.traverse ? b.u1 - b.u0 : b.v1 - b.v0;
+        out.push(`${k.padEnd(11)} dessin : long ${longDessin.toFixed(2)} h ${b.h1.toFixed(2)}  |  collision : long ${(K.traverse ? K.long : K.long).toFixed(2)} (barre ${(K.traverse ? K.larg : K.long).toFixed(2)}) h ${K.h.toFixed(2)}`);
+      }
+      return out;
+    });
+    console.log(t.join("\n"));
   },
   // Sans l'overlay de debug (touche D), pour juger l'image telle que le joueur la voit.
   propre: async () => { await page.keyboard.press("KeyD"); await attendre(400); await photo("11-propre"); await page.keyboard.press("KeyD"); },

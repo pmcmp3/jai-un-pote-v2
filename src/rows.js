@@ -56,19 +56,31 @@ import { V_UNIT, vitesseAuRang, rangAuTemps } from "./regles.js";
 export const KINDS = {
   // Traversants : ils roulent le long de u, donc c'est `larg` qui barre la route.
   tracteur:    { traverse: true, cout: 3, vitesse: 2.2, vmax: 3.2, long: 4.2, larg: 1.6, h: 2.3, plancher: "double", nom: "un tracteur" },
-  poulelancee: { traverse: true, cout: 1, vitesse: 4.5, vmax: 9,   long: 0.7, larg: 0.6, h: 0.7, nom: "une poule lancée" },
   // En SENS INVERSE : elle roule sur la route, vers le joueur (20 septembre
   // 2026 : « une voiture qui roule en sens inverse, pour que ce soit vraiment
   // difficile »). Sa vitesse s'ajoute à celle du joueur.
-  contresens:  { contresens: true, cout: 2, vitesse: 3.4, long: 2.8, larg: 1.6, h: 1.45, plancher: "double", nom: "une voiture en face" },
+  // ⚠️ 27 septembre 2026 : 3,4 → 2,0 rangées/s et armée plus tôt (« elle doit
+  // arriver plus tôt [...] qu'on ait le temps de sauter par-dessus ») — à
+  // 3,4 elle traversait l'écran en une seconde à peine. MONTABLE comme la
+  // voiture garée (« faut qu'on ait la possibilité de rouler sur la voiture
+  // qui arrive en sens inverse ») : voir toitSous().
+  contresens:  { contresens: true, cout: 2, vitesse: 2.0, arme: 5.5, long: 2.8, larg: 1.6, h: 1.45, plancher: "double", montable: true, nom: "une voiture en face" },
+  // La POULE JETÉE (27 septembre 2026) remplace la poule lancée depuis le fond
+  // (« enlève le paysan dans le fond qui lance une poule, on le voit pas
+  // arriver [...] il faudrait qu'il soit face à nous, il envoie la poule vers
+  // nous »). Le fermier attend sur le bas-côté, `lanceur` rangées PLUS LOIN
+  // que la rangée de croisement, tourné vers le joueur ; quand le joueur
+  // approche, il jette la poule, qui court sur la route vers lui. Mécanique
+  // d'une voiture en face (type « contresens »), en tout petit : un tap.
+  poulejetee:  { contresens: true, cout: 1, vitesse: 4.5, lanceur: 3.5, long: 0.65, larg: 0.6, h: 0.76, nom: "une poule jetée" },
   // Posés sur la route.
   poule:   { cout: 1, long: 0.65, larg: 0.60, h: 0.70, nom: "une poule" },
-  chat:    { cout: 1, long: 0.80, larg: 0.60, h: 0.78, nom: "un chat" },
-  chien:   { cout: 1, long: 0.80, larg: 0.55, h: 0.78, nom: "un chien" },
-  mouton:  { cout: 1, long: 0.80, larg: 0.80, h: 0.78, nom: "un mouton" },
+  chat:    { cout: 1, long: 0.80, larg: 0.60, h: 0.74, nom: "un chat" },
+  chien:   { cout: 1, long: 0.80, larg: 0.55, h: 0.70, nom: "un chien" },
+  mouton:  { cout: 1, long: 0.80, larg: 0.80, h: 0.72, nom: "un mouton" },
   botte:   { cout: 1, long: 0.85, larg: 0.85, h: 0.75, nom: "une botte de foin" },
-  cochon:  { cout: 2, long: 1.30, larg: 0.85, h: 1.05, nom: "un cochon" },
-  vache:   { cout: 2, long: 1.60, larg: 1.00, h: 1.35, nom: "une vache" },
+  cochon:  { cout: 2, long: 1.30, larg: 0.85, h: 0.92, nom: "un cochon" },
+  vache:   { cout: 2, long: 1.60, larg: 1.00, h: 1.22, nom: "une vache" },
   fermier: { cout: 2, long: 0.70, larg: 0.60, h: 1.85, nom: "un fermier" },
   // ⚠️ MONTABLE (20 septembre 2026, soir : « ça serait normal qu'on puisse
   // monter sur le toit d'une voiture ») : son toit devient un plancher dès
@@ -77,6 +89,12 @@ export const KINDS = {
   // les passer ». Deux façons de la franchir : par-dessus, ou en s'y posant.
   voiture: { cout: 2, long: 2.80, larg: 1.60, h: 1.45, plancher: "double", montable: true, nom: "une voiture" },
 };
+
+// ⚠️ 27 septembre 2026 (« vérifiez bien la hitbox de tous les éléments ») :
+// les hauteurs ont été re-mesurées sur les DESSINS (capture.mjs hitbox, qui
+// prend l'enveloppe réelle de chaque modèle) — cochon 1,05 → 0,92, vache
+// 1,35 → 1,22, chien 0,78 → 0,70, mouton 0,78 → 0,72, chat 0,78 → 0,74. On se
+// prenait une bête qu'on avait visiblement passée.
 
 // --- Boîte de collision -----------------------------------------------------------
 // Le cycliste occupe [v − VELO_DEMI, v + VELO_DEMI] le long de la route ; ses
@@ -255,15 +273,18 @@ function dansHalle(r) { const d = halleA(r); return d !== null && r >= d && r <=
 
 // Hauteur du toit d'un obstacle MONTABLE sous la position v, mais seulement si
 // le cycliste arrive déjà au-dessus (`jumpY`). En dessous, ce n'est pas un
-// plancher, c'est un mur : la collision s'en charge.
-export function toitSous(route, v, jumpY) {
-  for (let r = Math.floor(v - 2); r <= Math.ceil(v + 2); r++) {
+// plancher, c'est un mur : la collision s'en charge. La voiture EN FACE est
+// montable aussi (27 septembre 2026) : on cherche où elle est à l'instant t.
+export function toitSous(route, v, jumpY, t = 0) {
+  for (let r = Math.floor(v - 4); r <= Math.ceil(v + 40); r++) {
     if (r < 0) continue;
     const row = route.rowAt(r);
-    if (row.type !== "statique") continue;
+    if (row.type !== "statique" && row.type !== "contresens") continue;
+    if (r > v + 2 && row.type === "statique") continue;
     const K = KINDS[row.kind];
     if (!K.montable) continue;
-    if (Math.abs(v - r) >= K.long / 2 + VELO_DEMI * 0.5) continue;
+    const centre = row.type === "statique" ? r : (row.armed ? r + row.v0 - row.vitesse * (t - row.t0) : null);
+    if (centre === null || Math.abs(v - centre) >= K.long / 2 + VELO_DEMI * 0.5) continue;
     const toit = K.h + MARGE_H;
     if (jumpY >= toit - 0.02) return toit;
   }
@@ -273,11 +294,11 @@ export function toitSous(route, v, jumpY) {
 // --- Paquets d'espèces ------------------------------------------------------------
 const PAQUETS = [
   // Départ : que des petits sauts.
-  ["poule", "poule", "poule", "chat", "chat", "chien", "chien", "mouton", "mouton", "botte", "botte", "poulelancee"],
+  ["poule", "poule", "poule", "chat", "chat", "chien", "chien", "mouton", "mouton", "botte", "botte", "poulejetee"],
   // Ensuite : les gros animaux (appui maintenu) et les premiers véhicules.
-  ["poule", "poule", "chat", "chien", "mouton", "botte", "poulelancee", "cochon", "cochon", "vache", "tracteur", "voiture"],
+  ["poule", "poule", "chat", "chien", "mouton", "botte", "poulejetee", "cochon", "cochon", "vache", "tracteur", "voiture"],
   // Fin : fermiers, voitures, et la voiture qui arrive en face.
-  ["poule", "chat", "mouton", "botte", "poulelancee", "cochon", "vache", "tracteur", "tracteur", "fermier", "voiture", "contresens"],
+  ["poule", "chat", "mouton", "botte", "poulejetee", "cochon", "vache", "tracteur", "tracteur", "fermier", "voiture", "contresens"],
 ];
 function paquetPour(d) { return PAQUETS[d < 2 ? 0 : d < 4 ? 1 : 2]; }
 function estDouble(kind) { return familleDe(kind) === "double"; }
@@ -526,14 +547,25 @@ function estReservee(r) { return r % LAIT_EVERY === LAIT_EVERY / 2 || r % GROSSE
 
 // Armement : la traversée part du FOND et atteint la route à `tArrivee` ; la
 // voiture en sens inverse part de DEVANT et arrive sur la rangée au même
-// instant.
+// instant ; la poule jetée part des mains du fermier, `lanceur` rangées plus
+// loin, et court juste assez vite pour croiser le joueur sur la rangée.
+// Délai d'armement (secondes avant l'arrivée du joueur sur la rangée) :
+// partagé par main.js, la simulation et l'outil de mesure.
+export function delaiArmement(row) {
+  const K = KINDS[row.kind];
+  if (K.lanceur) return K.lanceur / K.vitesse;
+  return K.arme || 4.0;
+}
 export function armer(row, now, tArrivee) {
   if (row.armed) return;
   row.armed = true;
   row.t0 = now;
   const K = KINDS[row.kind];
   const dt = Math.max(0.6, tArrivee - now);
-  if (row.type === "contresens") { row.vitesse = K.vitesse; row.v0 = row.vitesse * dt; return; }
+  if (row.type === "contresens") {
+    if (K.lanceur) { row.v0 = K.lanceur; row.vitesse = K.lanceur / dt; return; }
+    row.vitesse = K.vitesse; row.v0 = row.vitesse * dt; return;
+  }
   row.u0 = -row.dir * (ROAD_HALF + 6.0);
   const dist = Math.abs(row.u0);
   row.vitesse = Math.max(1.8, Math.min(K.vmax || 9, dist / dt));

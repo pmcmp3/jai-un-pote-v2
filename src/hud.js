@@ -158,9 +158,20 @@ export function renderCountIn(ctx, width, height, t, beatPeriod, beats, linger) 
   ctx.scale(scale, scale);
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.shadowColor = "rgba(0,0,0,0.55)";
-  ctx.shadowBlur = 18;
-  ctx.font = `900 ${t < 0 ? 78 : 64}px ${POLICE_TITRE}`;
+  ctx.font = `900 ${t < 0 ? 84 : 66}px ${POLICE_TITRE}`;
+  // OMBRE PORTÉE franche (27 septembre 2026 : « il y a un problème avec les
+  // chiffres : pas d'ombre portée ») — l'ancien flou noir à 55 % se perdait
+  // sur le ciel clair. Un double décalé net, puis un flou doux dessous.
+  ctx.fillStyle = "rgba(13,13,16,0.55)";
+  ctx.fillText(texte, 4, 6);
+  ctx.shadowColor = "rgba(0,0,0,0.35)";
+  ctx.shadowBlur = 10;
+  ctx.shadowOffsetY = 2;
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = NOIR;
+  ctx.lineJoin = "round";
+  ctx.strokeText(texte, 0, 0);
+  ctx.shadowColor = "transparent";
   ctx.fillStyle = t < 0 ? BLANC : JAUNE;
   ctx.fillText(texte, 0, 0);
   ctx.restore();
@@ -347,21 +358,47 @@ export function renderTuto(ctx, width, height, tuto) {
   ctx.restore();
 }
 
-// Fin du morceau = fin de la course : « TERMINÉ ! » en énorme, en serif.
-export function renderFin(ctx, width, height, age) {
-  const tPop = Math.min(1, age / 0.25);
+// Fin du morceau = fin de la course. Refait le 27 septembre 2026 (« quand il
+// y a marqué Terminé, c'est quand même pas très esthétique ») : plus de voile
+// blanc ni de serif condensée en contour noir, mais le STICKER rouge posé de
+// travers de toute la DA (cartes, onglets, e-card de l'EP), qui tombe sur
+// l'écran avec un rebond, et une ligne dessous.
+export function renderFin(ctx, width, height, age, sous = "Tu es allé au bout du morceau") {
+  const tPop = Math.min(1, age / 0.32);
+  const rebond = 1 + 0.12 * Math.sin(tPop * Math.PI) * (1 - tPop * 0.4);
   ctx.save();
-  ctx.globalAlpha = Math.min(1, age * 4);
-  ctx.fillStyle = `rgba(255,255,255,${Math.max(0, 0.8 - age * 1.2)})`;
+  ctx.globalAlpha = Math.min(1, age * 5);
+  ctx.fillStyle = `rgba(13,13,16,${Math.min(0.28, age * 0.6)})`;
   ctx.fillRect(0, 0, width, height);
-  ctx.translate(width / 2, height * 0.34);
-  const sc = 1.4 - 0.4 * tPop;
-  ctx.scale(sc * 0.66, sc); // condensé comme le titre « j'ai un pote » (scaleX 0,66)
-  ctx.textAlign = "center"; ctx.textBaseline = "middle";
-  ctx.font = `900 ${Math.min(74, width * 0.19)}px ${POLICE_TITRE}`;
-  ctx.fillStyle = NOIR;
-  ctx.fillText("terminé !", 4, 4);
+  const cx = width / 2, cy = height * 0.36;
+  ctx.translate(cx, cy);
+  ctx.rotate(-0.045);
+  const sc = (0.6 + 0.4 * tPop) * rebond;
+  ctx.scale(sc, sc);
+  const txt = "T E R M I N É  !";
+  const taille = Math.min(34, width * 0.085);
+  ctx.font = `900 ${taille}px ${POLICE}`;
+  const w = ctx.measureText(txt).width + 44, h = taille + 30;
+  ctx.fillStyle = "rgba(0,0,0,0.3)";
+  ctx.fillRect(-w / 2 + 4, -h / 2 + 6, w, h);
+  ctx.fillStyle = ROUGE;
+  ctx.fillRect(-w / 2, -h / 2, w, h);
+  ctx.strokeStyle = NOIR; ctx.lineWidth = 2;
+  ctx.strokeRect(-w / 2, -h / 2, w, h);
   ctx.fillStyle = BLANC;
-  ctx.fillText("terminé !", 0, 0);
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.fillText(txt, 0, 2);
   ctx.restore();
+  // La ligne dessous, qui arrive juste après le sticker.
+  const a2 = Math.max(0, Math.min(1, (age - 0.3) * 4));
+  if (a2 > 0) {
+    ctx.save();
+    ctx.globalAlpha = a2;
+    ctx.textAlign = "center"; ctx.textBaseline = "top";
+    ctx.font = `700 15px ${POLICE}`;
+    ctx.shadowColor = "rgba(0,0,0,0.4)"; ctx.shadowBlur = 6; ctx.shadowOffsetY = 2;
+    ctx.fillStyle = BLANC;
+    ctx.fillText(sous, width / 2, cy + 44 + (1 - a2) * 8);
+    ctx.restore();
+  }
 }

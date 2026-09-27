@@ -132,10 +132,96 @@ function poly(ctx, pts, color) {
   ctx.fill();
 }
 
+// --- Modèles TRIÉS (27 septembre 2026) ----------------------------------------
+// Un modèle (voiture, tracteur, bête) est une pile de cubes peints dans l'ordre
+// où le code les appelle. Tant que cet ordre était écrit à la main, il ne
+// valait que pour UN point de vue : dès que le véhicule passait de l'autre
+// côté du centre de l'écran, un phare du flanc du fond se peignait par-dessus
+// la carrosserie (« on voit les phares à travers la coque du véhicule »), une
+// roue du fond par-dessus le châssis (« le tracteur a un gros problème de
+// modélisation 3D »). `groupe()` collecte les cubes d'un modèle et les peint
+// selon la VRAIE géométrie : deux cubes qui se recouvrent à l'écran sont
+// départagés par un plan qui les sépare (celui qui est du côté de la caméra
+// passe devant). Les ombres et aplats au sol partent en premier.
+let groupeOps = null;
+export function groupe(ctx, fn) {
+  if (groupeOps) { fn(); return; }        // imbriqué : le groupe parent trie tout
+  const ops = [];
+  groupeOps = ops;
+  try { fn(); } finally { groupeOps = null; peindreGroupe(ctx, ops); }
+}
+// Boîte englobante (u, v, h) de ce que dessine `fn(ctx)`, sans rien peindre :
+// sert à vérifier qu'un modèle ne ment pas sur sa boîte de collision.
+export function mesurerModele(fn) {
+  const ops = [], faux = { globalAlpha: 1, save() {}, restore() {}, translate() {}, rotate() {}, scale() {} };
+  groupeOps = ops;
+  try { fn(faux); } finally { groupeOps = null; }
+  const b = { u0: Infinity, u1: -Infinity, v0: Infinity, v1: -Infinity, h0: Infinity, h1: -Infinity };
+  for (const o of ops) if (!o.sol) for (const k of ["u", "v", "h"]) { b[`${k}0`] = Math.min(b[`${k}0`], o[`${k}0`]); b[`${k}1`] = Math.max(b[`${k}1`], o[`${k}1`]); }
+  return b;
+}
+function pousser(ctx, op) { op.a = ctx.globalAlpha; groupeOps.push(op); }
+// Rectangle écran d'une opération (pour ne comparer que ce qui se recouvre).
+function boiteEcran(op) {
+  if (op.sol) return null;
+  let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+  for (const u of [op.u0, op.u1]) {
+    const s = echelle(u);
+    for (const v of [op.v0, op.v1]) { const x = W * 0.5 + (v - vCentre) * s; if (x < x0) x0 = x; if (x > x1) x1 = x; }
+    for (const h of [op.h0, op.h1]) { const y = horizonY + (camH - h) * s; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+  }
+  return { x0, x1, y0, y1 };
+}
+// true : `a` se peint AVANT `b` ; false : après ; null : rien ne les sépare.
+function avant(a, b) {
+  const e = 1e-4;
+  if (a.u0 >= b.u1 - e) return true;           // la caméra est côté u négatif
+  if (b.u0 >= a.u1 - e) return false;
+  if (a.v0 >= b.v1 - e) { if (b.v1 >= vCentre) return true; if (a.v0 <= vCentre) return false; }
+  if (b.v0 >= a.v1 - e) { if (a.v1 >= vCentre) return false; if (b.v0 <= vCentre) return true; }
+  if (a.h0 >= b.h1 - e) { if (camH >= a.h0) return false; if (camH <= b.h1) return true; }
+  if (b.h0 >= a.h1 - e) { if (camH >= b.h0) return true; if (camH <= a.h1) return false; }
+  return null;
+}
+function peindreGroupe(ctx, ops) {
+  const alpha0 = ctx.globalAlpha;
+  const jouer = (op) => { ctx.globalAlpha = op.a; op.f(); };
+  const sols = ops.filter((o) => o.sol), pleins = ops.filter((o) => !o.sol);
+  for (const o of sols) jouer(o);
+  const n = pleins.length;
+  const boites = pleins.map(boiteEcran);
+  const entrants = new Array(n).fill(0), suivants = pleins.map(() => []);
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) {
+      const A = boites[i], B = boites[j];
+      if (A.x1 <= B.x0 || B.x1 <= A.x0 || A.y1 <= B.y0 || B.y1 <= A.y0) continue;
+      const r = avant(pleins[i], pleins[j]);
+      if (r === true) { suivants[i].push(j); entrants[j] += 1; }
+      else if (r === false) { suivants[j].push(i); entrants[i] += 1; }
+    }
+  }
+  // Kahn : parmi les cubes libres, le plus au fond d'abord (puis l'ordre du code).
+  const cle = (i) => -(pleins[i].u0 + pleins[i].u1);
+  const fait = new Array(n).fill(false);
+  for (let k = 0; k < n; k++) {
+    let choix = -1;
+    for (let i = 0; i < n; i++) if (!fait[i] && entrants[i] === 0 && (choix < 0 || cle(i) < cle(choix))) choix = i;
+    if (choix < 0) for (let i = 0; i < n; i++) if (!fait[i] && (choix < 0 || cle(i) < cle(choix))) choix = i; // cycle : on tranche
+    fait[choix] = true;
+    for (const j of suivants[choix]) entrants[j] -= 1;
+    jouer(pleins[choix]);
+  }
+  ctx.globalAlpha = alpha0;
+}
+
 // Cube : de (u, v) à (u + du, v + dv), de `lift` à `lift + h`. Faces vues :
 // l'avant (u = u_min, toujours), le dessus (sous la caméra), et UN côté selon
 // que le cube est à gauche ou à droite du centre de l'écran.
 export function drawBox(ctx, u, v, du, dv, h, color, lift = 0) {
+  if (groupeOps) { pousser(ctx, { u0: u, u1: u + du, v0: v, v1: v + dv, h0: lift, h1: lift + h, f: () => boxNu(ctx, u, v, du, dv, h, color, lift) }); return; }
+  boxNu(ctx, u, v, du, dv, h, color, lift);
+}
+function boxNu(ctx, u, v, du, dv, h, color, lift) {
   const t = teintes(color, u);
   const h0 = lift, h1 = lift + h;
   const s = echelle(u), s2 = echelle(u + du);
@@ -195,11 +281,13 @@ export function drawBoxR(ctx, cu, cv, du, dv, h, color, lift = 0, angle = 0) {
 }
 
 export function drawFlat(ctx, u, v, du, dv, color, raw = false) {
+  if (groupeOps) { pousser(ctx, { sol: true, f: () => poly(ctx, [project(u, v), project(u, v + dv), project(u + du, v + dv), project(u + du, v)], raw ? color : teintes(color, u).plat) }); return; }
   poly(ctx, [project(u, v), project(u, v + dv), project(u + du, v + dv), project(u + du, v)], raw ? color : teintes(color, u).plat);
 }
 
 // Ombre au sol : une ellipse douce, légèrement à gauche (soleil à droite).
 export function drawShadow(ctx, u, v, ru, rv, alpha = 0.26) {
+  if (groupeOps) { pousser(ctx, { sol: true, f: () => drawShadow(ctx, u, v, ru, rv, alpha) }); return; }
   const a = project(u - ru, v - 0.1, 0), b = project(u + ru, v - 0.1, 0);
   const s = echelle(u);
   ctx.save();
@@ -213,6 +301,7 @@ export function drawShadow(ctx, u, v, ru, rv, alpha = 0.26) {
 
 // Disque DEBOUT face à la caméra (roue vue de profil), centré en (u, v, h).
 export function drawDisque(ctx, u, v, h, R, couleur) {
+  if (groupeOps) { pousser(ctx, { u0: u, u1: u + 0.002, v0: v - R, v1: v + R, h0: h - R, h1: h + R, f: () => drawDisque(ctx, u, v, h, R, couleur) }); return; }
   const p = project(u, v, h), s = echelle(u);
   ctx.fillStyle = teintes(couleur, u).avant;
   ctx.beginPath();
@@ -238,6 +327,8 @@ const DIRT = "#9a7a4e";
 const ROAD = "#55514d";
 const LINE = "#f2ead8";
 const MUD = "#5a3f22";
+let dessinVoiture = null; // (ctx, u, v) → voiture garée, fourni par main.js
+export function setDessinVoiture(f) { dessinVoiture = f; }
 let villeJoueur = null; // nom saisi à l'inscription : le joueur traverse SA ville
 export function setVille(nom) { villeJoueur = nom ? String(nom).toUpperCase().slice(0, 16) : null; }
 export function villeDuJoueur() { return villeJoueur; }
@@ -441,6 +532,17 @@ function shadeHex(hex, a) {
 // hauteurMaxPremierPlan() : rien ne cache jamais la route.
 // `clear` = rangée traversée par un tracteur ou une poule lancée : rien sur
 // leur chemin.
+// Masque posé par main.js (27 septembre 2026) : rangées où le mobilier de bord
+// de route doit s'effacer. Bit 1 = pas de lampadaire (un panneau est là : « il
+// y avait un panneau avec marqué Jules, il était caché derrière un lampadaire,
+// on le voit pas ») ; bit 2 = une halle est là (lampadaires et poteaux
+// passaient À TRAVERS son plancher et son toit).
+let masque = () => 0;
+export function setMasqueDecor(f) { masque = typeof f === "function" ? f : () => 0; }
+export const SANS_LAMPE = 1, DANS_HALLE = 2;
+function lampeIci(r) { return r % 6 === 3 && !(masque(r) & (SANS_LAMPE | DANS_HALLE)); }
+function poteauIci(r) { return r % 5 === 0 && !(masque(r) & DANS_HALLE) && !(masque(r + 5) & DANS_HALLE); }
+
 export function rowDecor(ctx, r, clear) {
   const out = [];
   const zone = zoneAt(r);
@@ -492,7 +594,7 @@ export function rowDecor(ctx, r, clear) {
   // Poteaux électriques (8 m, comme dans la vraie vie) et lampadaires (6,5 m) :
   // ils faisaient la taille du cycliste (20 septembre 2026, « je fais la même
   // taille qu'un lampadaire, il faudrait qu'ils soient plus grands »).
-  if (r % 5 === 0 && zone !== "foret") {
+  if (poteauIci(r) && zone !== "foret") {
     const u = ROAD_HALF + 1.55, v = r - 0.05;
     push(u, v, () => {
       drawBox(ctx, u, v, 0.28, 0.28, POTEAU_H, "#5c4a3a");
@@ -506,7 +608,7 @@ export function rowDecor(ctx, r, clear) {
       }
     });
   }
-  if (r % 6 === 3) {
+  if (lampeIci(r)) {
     const u = ROAD_HALF + 0.3, v = r - 0.1;
     push(u, v, () => {
       drawBox(ctx, u, v, 0.2, 0.2, LAMPE_H - 0.9, "#3a3a40");
@@ -672,18 +774,16 @@ function decorVillage(ctx, push, r, side, sway, sud) {
       push(pu, pv, () => personnage(ctx, pu, pv + Math.sin(decorT * 3 + i) * 0.15, 0, ["#e13e26", "#ffcf2e", "#3f63b4"][i], "#3a3e4e"));
     }
   }
-  // Voitures garées : même carrosserie crème que celles de la route.
-  if (pres && rz % 6 === 1) {
-    const cu = ROAD_HALF + 2.6, cv = r - 1.0;
-    push(cu, cv, () => {
-      drawShadow(ctx, cu + 0.8, cv + 1.6, 0.85, 1.6, 0.22);
-      for (const [lu, lv] of [[-0.05, 0.55], [-0.05, 2.35], [1.4, 0.55], [1.4, 2.35]]) drawBox(ctx, cu + lu, cv + lv, 0.38, 0.6, 0.58, "#1a1a1e");
-      drawBox(ctx, cu, cv, 1.6, 3.2, 0.64, "#e6e0d2", 0.3);
-      drawBox(ctx, cu + 0.16, cv + 0.9, 1.3, 1.5, 0.5, "#a8d8f0", 0.94);
-      drawBox(ctx, cu + 0.22, cv + 0.95, 1.16, 1.4, 0.09, "#c9c2b2", 1.44);
-    });
+  // Voitures garées : EXACTEMENT le modèle de la route (props.drawVoiture,
+  // injecté par main.js — scene.js ne peut pas importer props.js, qui
+  // l'importe). Le modèle simplifié d'ici avait des roues en cubes et une
+  // vitre qui flottait (27 septembre 2026 : « dans le biome aux maisons
+  // rouges, les voitures avaient un gros problème de modélisation »).
+  if (pres && rz % 6 === 1 && dessinVoiture) {
+    const cu = ROAD_HALF + 3.4, cv = r + 0.4;
+    push(cu, cv, () => dessinVoiture(ctx, cu, cv));
   }
-  if (pres && rz % 11 === 5) {
+  if (pres && rz % 11 === 5 && rz % 6 !== 1) {
     const su = ROAD_HALF + 1.6, sv = r - 0.3, k2 = r * 1.3;
     push(su, sv, () => { const roll = Math.sin(decorT * 2 + k2) * 0.4; drawBox(ctx, su, sv + roll, 0.4, 1.0, 0.1, "#e13e26", 0.16); personnage(ctx, su + 0.05, sv + 0.2 + roll, 0.26, "#ffcf2e", "#3a3e4e"); });
   }
@@ -697,60 +797,115 @@ function decorVillage(ctx, push, r, side, sway, sud) {
 // « Un bâtiment un peu comme des halles de marché typiques françaises, où il y
 // a une rampe [...] on est au premier étage des halles. » Une rampe de bois
 // monte depuis la route, un plancher file à HALLE_HAUT, une rampe redescend ;
-// au-dessus, la charpente et le toit de tuiles sur des piliers de pierre, tous
-// posés DERRIÈRE la route pour ne jamais cacher le joueur.
-export function drawHalle(ctx, rDebut, geo, rFrom = -Infinity, rTo = Infinity) {
+// au-dessus, la charpente et le toit de tuiles sur des piliers de pierre.
+//
+// ⚠️ DEUX COUCHES depuis le 27 septembre 2026 (« attention aux perspectives au
+// niveau des halles : il y a beaucoup de bugs de texture et de perspective
+// entre ce qui est devant et ce qui est derrière »). La halle était UN seul
+// objet peint derrière la route : le garde-corps et le flanc de la rampe, qui
+// sont DEVANT le cycliste, passaient derrière lui, et les lampadaires du
+// bas-côté traversaient le plancher. Désormais :
+//   « fond »  — piliers, bandes du départ, tablier de la rampe (la surface où
+//              l'on roule) : peints avant le cycliste ;
+//   « devant » — flanc de la rampe, plancher, poteaux, garde-corps, fermes,
+//              toit, enseigne : peints après lui.
+// Le toit est monté assez haut pour qu'un double saut depuis le plancher ne
+// le traverse jamais (tête à ~9,6 u au plus haut, sous-face à 10,05).
+export const HALLE_TOIT_AU_DESSUS = 5.4;
+export function drawHalle(ctx, rDebut, geo, rFrom = -Infinity, rTo = Infinity, couche = "fond") {
   const { haut, montee, plat, descente, total } = geo;
   const visible = (v0, v1) => v1 >= rFrom - 2 && v0 <= rTo + 2;
   const uG = -ROAD_HALF - 0.2, uD = ROAD_HALF + 0.2;
   const BOIS = "#7a5632", BOIS_CLAIR = "#a9855a", PIERRE = "#ded3c0", TUILE = "#b8402c", POUTRE = "#5c4326";
-  const TOIT = haut + 3.4;
-  // --- La RAMPE : un vrai plan incliné, pas un escalier (20 septembre 2026).
-  //     Le flanc côté caméra est un triangle, le tablier un quadrilatère
-  //     gauche : les deux se projettent exactement, donc la pente est lisse.
-  const rampe = (v0, v1, h0, h1) => {
-    if (!visible(Math.min(v0, v1), Math.max(v0, v1))) return;
-    const A = project(uG, v0, 0), B = project(uG, v1, 0);
-    const A2 = project(uG, v0, h0), B2 = project(uG, v1, h1);
-    poly(ctx, [A, B, B2, A2], teintes(BOIS, uG).avant);                 // flanc
-    poly(ctx, [A2, B2, project(uD, v1, h1), project(uD, v0, h0)], teintes(BOIS_CLAIR, 0).dessus); // tablier
-    // Nez de rive clair, pour que la pente se lise de loin.
-    poly(ctx, [A2, B2, project(uG - 0.1, v1, h1 - 0.12), project(uG - 0.1, v0, h0 - 0.12)], teintes("#c49a68", uG).plat);
-  };
-  rampe(rDebut, rDebut + montee, 0, haut);
-  rampe(rDebut + montee + plat, rDebut + montee + plat + descente, haut, 0);
-  if (visible(rDebut - 1.3, rDebut + 0.4)) {
-    drawBox(ctx, uG, rDebut - 0.55, uD - uG, 0.5, 0.14, "#e13e26", 0);
-    drawBox(ctx, uG, rDebut - 1.15, uD - uG, 0.5, 0.14, "#f7f2e6", 0);
+  const TOIT = haut + HALLE_TOIT_AU_DESSUS;
+  const v1 = rDebut + montee, v2 = rDebut + montee + plat, vFin = rDebut + total;
+  // Rampe : le tablier (fond) et le flanc côté caméra (devant) se projettent
+  // exactement, la pente est lisse.
+  const rampes = [[rDebut, v1, 0, haut], [v2, vFin, haut, 0]];
+  if (couche === "fond") {
+    if (visible(rDebut - 1.3, rDebut + 0.4)) {
+      drawBox(ctx, uG, rDebut - 0.55, uD - uG, 0.5, 0.02, "#e13e26", 0);
+      drawBox(ctx, uG, rDebut - 1.15, uD - uG, 0.5, 0.02, "#f7f2e6", 0);
+    }
+    // Piliers de pierre, DERRIÈRE la route : ils portent le toit.
+    for (let i = 0; i <= total; i += 6) {
+      const v = rDebut + i;
+      if (!visible(v, v + 0.8)) continue;
+      drawBox(ctx, ROAD_HALF + 0.5, v, 0.8, 0.8, TOIT, PIERRE);
+      drawBox(ctx, ROAD_HALF + 0.35, v - 0.1, 1.1, 1.0, 0.45, PIERRE, TOIT);
+    }
+    for (const [a, b, h0, h1] of rampes) {
+      if (!visible(Math.min(a, b), Math.max(a, b))) continue;
+      poly(ctx, [project(uG, a, h0), project(uG, b, h1), project(uD, b, h1), project(uD, a, h0)], teintes(BOIS_CLAIR, 0).dessus);
+      // Lattes en travers : c'est elles qui disent « on monte ».
+      ctx.strokeStyle = teintes(BOIS, 0).avant; ctx.lineWidth = 1;
+      ctx.beginPath();
+      for (let k = 1; k < Math.abs(b - a); k++) {
+        const v = a + k * Math.sign(b - a), hh = h0 + (h1 - h0) * (k / Math.abs(b - a));
+        const p = project(uG, v, hh), q = project(uD, v, hh);
+        ctx.moveTo(p.x, p.y); ctx.lineTo(q.x, q.y);
+      }
+      ctx.stroke();
+    }
+    return;
   }
-  // --- Le plancher du premier étage.
-  drawBox(ctx, uG, rDebut + montee, uD - uG, plat, 0.42, BOIS, haut - 0.42);
-  drawBox(ctx, uG, rDebut + montee, uD - uG, plat, 0.1, BOIS_CLAIR, haut);
-  for (let i = 0; i <= plat; i += 3) {
-    const v = rDebut + montee + i;
-    if (!visible(v, v + 0.2)) continue;
-    drawBox(ctx, uG - 0.16, v, 0.16, 0.18, 0.75, POUTRE, haut);
+  // --- Couche « devant ».
+  for (const [a, b, h0, h1] of rampes) {
+    if (!visible(Math.min(a, b), Math.max(a, b))) continue;
+    const A = project(uG, a, 0), B = project(uG, b, 0), A2 = project(uG, a, h0), B2 = project(uG, b, h1);
+    poly(ctx, [A, B, B2, A2], teintes(BOIS, uG).avant);
+    poly(ctx, [A2, B2, project(uG - 0.1, b, h1 - 0.12), project(uG - 0.1, a, h0 - 0.12)], teintes("#c49a68", uG).plat);
   }
-  drawBox(ctx, uG - 0.18, rDebut + montee, 0.18, plat, 0.13, POUTRE, haut + 0.62);
-  // --- Piliers de pierre et CHARPENTE PLEINE au-dessus de la tête.
+  // Le plancher, porté par des poteaux de bois côté caméra.
+  drawBox(ctx, uG, v1, uD - uG, plat, 0.42, BOIS, haut - 0.42);
+  for (let i = 0; i <= plat; i += 6) {
+    const v = v1 + Math.min(i, plat - 0.3);
+    if (visible(v, v + 0.3)) drawBox(ctx, uG + 0.05, v, 0.3, 0.3, haut - 0.42, POUTRE);
+  }
+  // Garde-corps : des montants et une lisse, ajourés (on voit le cycliste à travers).
+  for (let i = 0; i <= plat; i += 2) {
+    const v = v1 + i;
+    if (visible(v, v + 0.2)) drawBox(ctx, uG - 0.16, v, 0.12, 0.12, 0.8, POUTRE, haut);
+  }
+  drawBox(ctx, uG - 0.18, v1, 0.16, plat, 0.1, POUTRE, haut + 0.72);
+  // Charpente : les fermes en travers, puis le toit (masse, rive épaisse).
   for (let i = 0; i <= total; i += 6) {
     const v = rDebut + i;
-    if (!visible(v, v + 0.8)) continue;
-    drawBox(ctx, ROAD_HALF + 0.5, v, 0.8, 0.8, TOIT, PIERRE);
-    drawBox(ctx, ROAD_HALF + 0.35, v - 0.1, 1.1, 1.0, 0.45, PIERRE, TOIT);
-    drawBox(ctx, -ROAD_HALF - 0.5, v + 0.1, ROAD_HALF * 2 + 1.0, 0.45, 0.4, POUTRE, TOIT + 0.5);  // fermes
+    if (visible(v, v + 0.8)) drawBox(ctx, -ROAD_HALF - 0.4, v + 0.15, ROAD_HALF * 2 + 0.9, 0.4, 0.35, POUTRE, TOIT + 0.1);
   }
-  // Le toit est une masse, pas une tranche : sous-face sombre, tuiles dessus,
-  // et une rive épaisse côté caméra qui en donne l'épaisseur.
-  drawBox(ctx, -ROAD_HALF - 1.0, rDebut - 0.5, ROAD_HALF * 2 + 2.6, total + 1.0, 0.5, "#4a3a2c", TOIT + 0.45);
-  drawBox(ctx, -ROAD_HALF - 1.0, rDebut - 0.5, ROAD_HALF * 2 + 2.6, total + 1.0, 0.45, TUILE, TOIT + 0.95);
-  drawBox(ctx, -ROAD_HALF - 1.1, rDebut - 0.6, 0.35, total + 1.2, 0.75, "#8f3322", TOIT + 0.6);
+  // Le toit. La caméra est SOUS lui : on n'en voit que la sous-face et la
+  // rive. Une seule masse de tuiles (plus deux boîtes superposées qui se
+  // peignaient dans le mauvais ordre), une sous-face de voliges sombre juste
+  // dessous, et un débord côté caméra limité à 0,5 u (à 1 u, la rive mangeait
+  // le tiers haut de l'écran).
+  const uT = -ROAD_HALF - 0.5, lT = ROAD_HALF * 2 + 1.9;
+  drawBox(ctx, uT, rDebut - 0.5, lT, total + 1.0, 0.55, TUILE, TOIT + 0.5);
+  drawBox(ctx, uT + 0.02, rDebut - 0.45, lT - 0.04, total + 0.9, 0.05, "#4a3a2c", TOIT + 0.45);
+  // L'ENSEIGNE, suspendue sous la rive à l'entrée (remplace le bandeau
+  // « LES HALLES ! » qui s'affichait par-dessus le jeu).
+  const vE = rDebut + 3.2, lE = 6.2, hE = 1.15, basE = TOIT - 1.05;
+  if (visible(vE - lE / 2, vE + lE / 2)) {
+    const uE = uT - 0.05;
+    for (const dv of [-lE / 2 + 0.5, lE / 2 - 0.6]) drawBox(ctx, uE + 0.02, vE + dv, 0.06, 0.1, TOIT + 0.45 - basE - hE, "#3a3a40", basE + hE);
+    drawBox(ctx, uE, vE - lE / 2, 0.1, lE, hE, "#f7f2e6", basE);
+    const A = project(uE, vE - lE / 2, basE + hE), B = project(uE, vE + lE / 2, basE);
+    const m = (B.y - A.y) * 0.1;
+    ctx.strokeStyle = "#e13e26"; ctx.lineWidth = Math.max(1.5, m * 0.6);
+    ctx.strokeRect(A.x + m, A.y + m, B.x - A.x - 2 * m, B.y - A.y - 2 * m);
+    ctx.fillStyle = "#0d0d10";
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    let taille = (B.y - A.y) * 0.5;
+    ctx.font = `900 ${taille}px "Helvetica Neue", Helvetica, Arial, sans-serif`;
+    const txt = "HALLES DU MARCHÉ";
+    while (ctx.measureText(txt).width > (B.x - A.x) * 0.84 && taille > 5) { taille -= 1; ctx.font = `900 ${taille}px "Helvetica Neue", Helvetica, Arial, sans-serif`; }
+    ctx.fillText(txt, (A.x + B.x) / 2, (A.y + B.y) / 2 + 1);
+  }
 }
 
 // Lampadaires visibles (halos peints par-dessus la nuit, main.js).
 export function lampsIn(from, to) {
   const out = [];
-  for (let r = from; r <= to; r++) if (r % 6 === 3) out.push({ u: ROAD_HALF - 0.2, v: r, h: LAMPE_H - 0.2 });
+  for (let r = from; r <= to; r++) if (lampeIci(r)) out.push({ u: ROAD_HALF - 0.2, v: r, h: LAMPE_H - 0.2 });
   return out;
 }
 

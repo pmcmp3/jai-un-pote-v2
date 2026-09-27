@@ -41,7 +41,7 @@ En ligne : **https://pmcmp3.github.io/jai-un-pote-v2/** (dépôt `pmcmp3/jai-un-
   (revu le 20 septembre 2026), swipe bas = roue arrière, swipe latéral ignoré.
 - **D6** **Pièces sur deux hauteurs** : au sol, ou en l'air de part et d'autre d'un obstacle
   (elles dessinent le geste à faire).
-- **D7** Traversants (tracteur, poule lancée) : ils arrivent **du fond** et coupent la route ;
+- **D7** Traversants (tracteur ; la poule lancée du fond est devenue la poule JETÉE de face le 27 septembre 2026) : ils arrivent **du fond** et coupent la route ;
   armement sur le passage du joueur inchangé.
 
 ## Retours téléphone du 20 septembre 2026 (première vraie partie)
@@ -116,6 +116,37 @@ régionaux** : brique et ardoise au Nord (3e tranche), ocre et tuile romaine au 
 
 🗄️ **Ligue de test** : `supabase/ligue-test-v2.sql` + `supabase/MODE-D-EMPLOI-LIGUE-TEST.md`.
 Code `TESTV2`, qui est aussi `config.ligueBeta` (menu simplifié + bouton « Laisser un retour »).
+
+## Retours téléphone du 27 septembre 2026 (partie sur iPhone, captures à l'appui)
+
+- **Menu** : l'aperçu du cycliste était ÉCRASÉ par le CSS (canvas 220×200 affiché en 200×120) —
+  désormais 240×140 des deux côtés. Libellés Maillot / Chapeau / Engin AU-DESSUS de leurs
+  pastilles, plus d'air entre eux. Vrai **cadre de VTT** tracé en tubes (couleur du maillot).
+- **Décompte 3-2-1** : ombre portée franche + contour ; le bestiaire n'apparaît qu'APRÈS le
+  « GO ! » (les chiffres se peignaient sur sa carte).
+- **Tuto : le score ne bouge pas** (ni distance ni pièces).
+- **Poule jetée** (`poulejetee`, remplace `poulelancee`) : le fermier attend sur le bas-côté
+  du fond, FACE au joueur, `lanceur` rangées après la rangée de croisement, et jette la poule
+  qui court vers lui. Mécanique « contresens ». Plus aucun lanceur au fond du décor.
+- **Voiture en face** : 3,4 → 2,0 rangées/s, armée 5,5 s avant (alerte « ! » tant que la
+  VOITURE est hors écran), et **montable** comme la voiture garée (`toitSous(…, t)`).
+- **Pente** : le vélo piquait du nez à la montée (signe inversé) — corrigé, le cycliste part
+  en arrière en montant.
+- **Halles en deux couches** (`drawHalle(..., "fond" | "devant")`), toit remonté à
+  `HALLE_TOIT_AU_DESSUS` = 5,4 u (un double saut ne le traverse plus), enseigne
+  « HALLES DU MARCHÉ » suspendue à l'entrée (le bandeau « LES HALLES ! » est supprimé).
+  Plus de lampadaire, poteau ni panneau de village sur ou près d'une halle.
+- **Lampadaires** effacés à ±3 rangées d'un panneau (`scene.setMasqueDecor`).
+- **Modèles triés** : `scene.groupe()` peint les cubes d'un modèle dans l'ordre de la vraie
+  géométrie (phares vus à travers la carrosserie, tracteur incohérent). Voitures garées du
+  village = le même modèle que la route (`scene.setDessinVoiture`).
+- **Boîtes de collision** re-mesurées sur les dessins (`node outils/capture.mjs hitbox`) :
+  cochon, vache, chien, mouton, chat abaissés. Choc pendant le turbo lait : la bête est
+  renversée avec des étincelles (on croyait à un bug : « j'ai roulé sur une poule »).
+- **Nuit** : `nuitDebutS` 95 → 50. **Fin** : sticker rouge « TERMINÉ ! » + une ligne, plus de
+  voile blanc. **Bouton « Menu »** sur l'écran de fin (changer de ligue, de cycliste) ; JOUER
+  depuis ce menu passe par la même porte que REJOUER.
+- `VERSION_COURSE` 7, cache `jp2-v5`.
 
 ## Invariants de la v2 (mesurés, `outils/mesurer.mjs`)
 

@@ -66,7 +66,7 @@ plus haut ; et si on double-tape après, un double saut, comme dans tous les jeu
 
 | Geste | Apex | Ce que ça franchit |
 |---|---|---|
-| Tap court | ~1,3 | poule, chat, chien, mouton, botte, poule lancée |
+| Tap court | ~1,3 | poule, chat, chien, mouton, botte, poule jetée |
 | Appui **maintenu** (≤ 0,4 s) | ~2,5 | cochon, vache, tracteur |
 | **Re-tap en l'air** (+ salto) | ~3,7 | fermier, voiture |
 
@@ -154,14 +154,30 @@ de ligue, pas de classement, pas de fantôme, la ligue de démo pédale derrièr
 4. Coller l'URL REST et la clé anon dans `public/config.js`, `./deploy.sh`.
 ⚠️ Un projet gratuit se met en pause après 7 jours sans requête.
 
+## 5 bis. Pièges de rendu (27 septembre 2026)
+
+- **Un modèle = un `scene.groupe()`**. À l'intérieur, `drawBox`/`drawDisque`/`drawShadow`/
+  `drawFlat` ne peignent pas : ils empilent, puis le groupe trie (plan séparateur entre deux
+  cubes qui se recouvrent à l'écran, Kahn, repli sur la profondeur). Ne JAMAIS peindre en
+  direct (ctx.fillText, stroke) dans un groupe : ça passerait avant tout le reste. Les
+  groupes imbriqués se fondent dans le parent. Le cycliste (`voxrider`) n'est PAS groupé :
+  son ordre manuel et ses traits (roues, cadre) tiennent.
+- **Halles** : deux entrées dans la liste du peintre — « fond » (piliers, tablier de la rampe)
+  à la profondeur du bord arrière de la route, « devant » (flanc, plancher, poteaux,
+  garde-corps, fermes, toit, enseigne) à celle du bord avant. La caméra (3,6 u) est SOUS le
+  plancher (4,2 u) : on voit le dessous du plancher et du toit, jamais leur dessus.
+- **Masque du décor** (`scene.setMasqueDecor`, bits `SANS_LAMPE` / `DANS_HALLE`) : calculé
+  dans main.js (où vivent les panneaux), mis en cache par rangée, vidé par `preparerJoueur`.
+- `scene.js` ne peut pas importer `props.js` (cycle scene → props → rows → scene : `rows`
+  lit `ROAD_HALF` au chargement). D'où l'injection `setDessinVoiture`.
+
 ## 6. Reste à faire / points ouverts
 
 - Base Supabase v2 et sous-domaine : bloqués sur les deux actions de l'artiste ci-dessus.
-- **Demandé le 20 septembre 2026, PAS encore fait** : les **halles de marché** (un bâtiment avec
-  une rampe où l'on monte, et où l'on roule au premier étage en voyant à travers) — c'est une
-  mécanique de plateforme, donc un sol variable : gros morceau, à faire à part. Le système de
-  ligue et de points est volontairement remis à plus tard (« après, on réfléchira au système de
-  ligue »).
+- Le système de ligue et de points est volontairement remis à plus tard (« après, on
+  réfléchira au système de ligue »).
+- **Retours du 27 septembre 2026 traités** (voir `CLAUDE.md`). À re-juger sur téléphone :
+  la voiture en face (assez tôt ?), la poule jetée (lisible ?), le toit des halles.
 - **Test sur un vrai téléphone** : lisibilité de profil (cycliste ~50 px), 1,6 s de lecture à
   vitesse max, timing du salto (double tap) — rien de tout ça ne se juge en headless.
 - Le ciel occupe beaucoup de hauteur en portrait (inévitable avec une largeur fixe en unités).

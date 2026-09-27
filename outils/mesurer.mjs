@@ -6,7 +6,7 @@
 //      joueur immobile : touche TOUS les obstacles (la collision marche dans les deux sens).
 import { chargerConfig } from "./charger-config.mjs";
 const C = chargerConfig();
-const { Route, KINDS, armer, familleDe, montee, solAt, ecartMin: ecartMinTheorique } = await import("../src/rows.js");
+const { Route, KINDS, armer, delaiArmement, familleDe, montee, solAt, ecartMin: ecartMinTheorique } = await import("../src/rows.js");
 const { scoreParfait, recenser } = await import("../src/simulation.js");
 const { V_UNIT, targetSpeed, dureeCourse } = await import("../src/regles.js");
 
@@ -63,11 +63,11 @@ function course(seed, pilote) {
   for (let now = 0; now < T; now += dt) {
     speed += (targetSpeed(now) - speed) * Math.min(1, 3 * dt);
     prevV = v; v += speed * dt;
-    for (let r = Math.floor(v + 0.5); r <= Math.floor(v + 0.5) + Math.ceil(speed * 4) + 1; r++) {
+    for (let r = Math.floor(v + 0.5); r <= Math.floor(v + 0.5) + Math.ceil(speed * 5.5) + 1; r++) {
       const row = route.rowAt(r);
       if ((row.type !== "traverse" && row.type !== "contresens") || row.armed) continue;
       const tArr = now + (r - v) / speed;
-      if (tArr - now <= 4) armer(row, now, tArr);
+      if (tArr - now <= delaiArmement(row)) armer(row, now, tArr);
     }
     const sol = solAt(v);
     if (pilote && jumpY <= sol + 0.02 && !plan) {

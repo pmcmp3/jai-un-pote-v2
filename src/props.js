@@ -16,7 +16,7 @@
 // Le mouton fait un 360 sur lui-même (demandé) : vraie rotation 3D autour de
 // l'axe vertical, via scene.drawBoxR.
 
-import { drawBox, drawBoxR, drawShadow, drawFlat, drawDisque, getNight, project } from "./scene.js";
+import { drawBox, drawBoxR, drawShadow, drawFlat, drawDisque, getNight, project, groupe } from "./scene.js";
 import { KINDS } from "./rows.js";
 
 const WHITE = "#f4efe4", BLACK = "#1a1a1e", PINK = "#f0a0b0", ORANGE = "#e08a2a", VITRE = "#a8d8f0";
@@ -33,8 +33,7 @@ function corps(ctx, uC, r, K) {
 export function drawCrosser(ctx, kind, u, v, dir, t, alpha = 1) {
   const K = KINDS[kind];
   if (alpha < 1) { ctx.save(); ctx.globalAlpha = alpha; }
-  if (kind === "poulelancee") drawPouleVolante(ctx, u, v, dir, t);
-  else drawTracteur(ctx, K, u, v, dir, t);
+  groupe(ctx, () => drawTracteur(ctx, K, u, v, dir, t));
   if (alpha < 1) ctx.restore();
 }
 
@@ -85,6 +84,9 @@ function drawTracteur(ctx, K, u, v, dir, t) {
 // en face. `sens` = +1 si son capot pointe vers +v (elle s'éloigne), −1 si elle
 // vient vers le joueur.
 export function drawVoiture(ctx, K, uCenter, v, sens, t) {
+  groupe(ctx, () => voitureNue(ctx, K, uCenter, v, sens, t));
+}
+function voitureNue(ctx, K, uCenter, v, sens, t) {
   const L = K.long, Wd = K.larg, H = K.h;
   const x = uCenter - Wd / 2;
   const A = (a) => (sens > 0 ? v - L / 2 + a : v + L / 2 - a);
@@ -127,6 +129,9 @@ export function drawVoiture(ctx, K, uCenter, v, sens, t) {
 
 // Statique centré sur (uCenter, r). `t` anime les animaux sur place.
 export function drawStatic(ctx, kind, uCenter, r, t) {
+  groupe(ctx, () => staticNu(ctx, kind, uCenter, r, t));
+}
+function staticNu(ctx, kind, uCenter, r, t) {
   const K = KINDS[kind];
   // ⚠️ `r` peut être DÉCIMAL : drawStaticTombe recule la bête qui bascule.
   // Les couleurs se choisissent donc sur un index ENTIER. Sans ça,
@@ -213,33 +218,53 @@ export function drawStatic(ctx, kind, uCenter, r, t) {
   }
 }
 
-// Fermier posté sur le bas-côté du fond, qui LANCE des poules vers la caméra.
-export function drawLanceur(ctx, u, r, t, dir, arme) {
-  const bras = arme ? Math.max(0, 1 - ((t * 2) % 2)) : 0.5 + Math.sin(t * 3) * 0.2;
-  const x = u - 0.3, y = r - 0.3;
-  drawShadow(ctx, u, r, 0.35, 0.35, 0.2);
-  drawBox(ctx, x + 0.18, y + 0.12, 0.3, 0.26, 0.85, "#2f4f9a");
-  drawBox(ctx, x + 0.18, y + 0.5, 0.3, 0.26, 0.85, "#2f4f9a");
-  drawBox(ctx, x + 0.1, y + 0.06, 0.5, 0.48, 0.28, "#2f4f9a", 0.85);
-  drawBox(ctx, x + 0.06, y + 0.02, 0.58, 0.56, 0.35, "#b8402c", 1.13);
-  drawBox(ctx, x + 0.2, y + 0.16, 0.36, 0.4, 0.2, "#d69a68", 1.48);
-  drawBox(ctx, x + 0.12, y + 0.08, 0.5, 0.56, 0.06, "#e8c66a", 1.68);
-  drawBox(ctx, x + 0.24, y + 0.22, 0.32, 0.32, 0.11, "#e8c66a", 1.72);
-  const ax = dir > 0 ? x + 0.6 : x - 0.5;
-  drawBox(ctx, ax, y + 0.24, 0.5, 0.18, 0.18, "#d69a68", 1.2 + bras * 0.5);
-  if (!arme) drawBox(ctx, dir > 0 ? ax + 0.36 : ax - 0.14, y + 0.14, 0.32, 0.32, 0.32, WHITE, 1.32 + bras * 0.5);
+// --- La POULE JETÉE (27 septembre 2026) ---------------------------------------
+// Le fermier est planté sur le bas-côté du fond, juste derrière la route,
+// TOURNÉ VERS LE JOUEUR (vers −v, la gauche de l'écran). Il tient une poule
+// au-dessus de sa tête ; quand le joueur approche, il la jette et elle court
+// sur la route vers lui. Il est volontairement plus petit et plus loin de
+// l'asphalte que le fermier-obstacle, et il a les bras en l'air : on ne le
+// confond pas avec quelqu'un qui barre la route.
+export function drawLanceurFace(ctx, u, v, t, lance) {
+  groupe(ctx, () => {
+    // 0 → 1 pendant le lancer, puis bras baissés.
+    const k = lance === null ? 0 : Math.min(1, lance / 0.35);
+    const bras = lance === null ? 0.08 * Math.sin(t * 5) : k < 1 ? -0.5 * Math.sin(k * Math.PI) : -0.25;
+    drawShadow(ctx, u + 0.3, v, 0.35, 0.35, 0.2);
+    const x = u, y = v - 0.3;
+    drawBox(ctx, x + 0.14, y + 0.1, 0.22, 0.22, 0.8, "#2f4f9a");
+    drawBox(ctx, x + 0.14, y + 0.36, 0.22, 0.22, 0.8, "#2f4f9a");
+    drawBox(ctx, x + 0.08, y + 0.04, 0.36, 0.6, 0.26, "#2f4f9a", 0.8);
+    drawBox(ctx, x + 0.06, y + 0.02, 0.4, 0.64, 0.36, "#b8402c", 1.06);
+    drawBox(ctx, x + 0.12, y + 0.14, 0.28, 0.36, 0.28, "#d69a68", 1.42);
+    drawBox(ctx, x + 0.12, y + 0.06, 0.3, 0.06, 0.06, "#1a1a1e", 1.58);          // les yeux, côté joueur
+    drawBox(ctx, x + 0.02, y - 0.06, 0.48, 0.76, 0.05, "#e8c66a", 1.7);
+    drawBox(ctx, x + 0.12, y + 0.12, 0.28, 0.4, 0.12, "#e8c66a", 1.74);
+    // Les deux bras levés, qui tiennent la poule (ou qui viennent de la jeter).
+    for (const b of [0.0, 0.52]) drawBox(ctx, x + 0.16, y + b + bras * 0.4, 0.14, 0.14, 0.62, "#b8402c", 1.3 + (lance === null ? 0.1 : 0));
+    if (lance === null) poule(ctx, x + 0.26, y + 0.33, 2.0, t, -1);
+  });
 }
-
-function drawPouleVolante(ctx, u, v, dir, t) {
-  const flap = Math.abs(Math.sin(t * 22)) * 0.22;
-  const lift = 0.6 + Math.abs(Math.sin(t * 4)) * 0.25;
-  drawShadow(ctx, u, v, 0.3, 0.35, 0.2);
-  const x = u - 0.3, y = v - 0.24;
-  drawBox(ctx, x + 0.1, y + 0.1, 0.42, 0.36, 0.36, WHITE, lift);
-  drawBox(ctx, dir > 0 ? x + 0.46 : x - 0.08, y + 0.16, 0.22, 0.24, 0.26, WHITE, lift + 0.28);
-  drawBox(ctx, dir > 0 ? x + 0.64 : x - 0.14, y + 0.22, 0.12, 0.1, 0.08, ORANGE, lift + 0.38);
-  drawBox(ctx, x + 0.1, y - 0.18, 0.36, 0.16, 0.06, WHITE, lift + 0.34 + flap);
-  drawBox(ctx, x + 0.1, y + 0.48, 0.36, 0.16, 0.06, WHITE, lift + 0.34 + flap);
+// La poule qui court sur la route, vers le joueur (tête vers −v).
+export function drawPouleJetee(ctx, u, v, t) {
+  groupe(ctx, () => {
+    drawShadow(ctx, u, v, 0.28, 0.32, 0.22);
+    const saut = Math.abs(Math.sin(t * 14)) * 0.06;
+    poule(ctx, u, v, saut, t, -1);
+  });
+}
+// Poule en cubes, centrée en (u, v), posée à `lift`, tête du côté `sens`.
+function poule(ctx, u, v, lift, t, sens) {
+  const flap = Math.abs(Math.sin(t * 20)) * 0.14;
+  const x = u - 0.3, y = v - 0.32;
+  const tete = sens < 0 ? y - 0.02 : y + 0.42;
+  drawBox(ctx, x + 0.14, y + 0.14, 0.32, 0.36, 0.34, WHITE, lift + 0.16);
+  drawBox(ctx, x + 0.2, tete, 0.2, 0.22, 0.24, WHITE, lift + 0.42);
+  drawBox(ctx, x + 0.24, sens < 0 ? tete - 0.1 : tete + 0.22, 0.12, 0.1, 0.07, ORANGE, lift + 0.5);
+  drawBox(ctx, x + 0.24, tete + 0.06, 0.12, 0.1, 0.1, "#e13e26", lift + 0.66);
+  drawBox(ctx, x + 0.08, y + 0.2, 0.06, 0.24, 0.14, WHITE, lift + 0.3 + flap);
+  drawBox(ctx, x + 0.46, y + 0.2, 0.06, 0.24, 0.14, WHITE, lift + 0.3 + flap);
+  if (lift < 0.5) { drawBox(ctx, x + 0.22, y + 0.22, 0.06, 0.06, lift + 0.16, ORANGE); drawBox(ctx, x + 0.34, y + 0.34, 0.06, 0.06, lift + 0.16, ORANGE); }
 }
 
 // Un obstacle TOUCHÉ bascule (20 septembre 2026 : « quand on se prend un

@@ -154,13 +154,19 @@
     .champ-row input:focus { outline: none; border-bottom-color: var(--rouge); }
     #step2-back, #step3-links { margin-top: 10px; }
     #step3-links { display: flex; gap: 18px; }
-    #skin-canvas { display: block; width: 200px; height: 120px; margin: -10px 0 0; }
-    #skin-options { display: flex; flex-direction: column; gap: 5px; width: 250px; margin-bottom: 12px; }
-    .skin-row { display: flex; align-items: center; gap: 8px; }
-    .skin-label { width: 68px; flex: none; font: 700 10px var(--police); letter-spacing: 0.1em; text-transform: uppercase; color: rgba(0,0,0,0.55); }
-    .chips { display: flex; flex-wrap: wrap; gap: 5px; }
-    .chip { min-width: 20px; height: 20px; padding: 0 6px; border-radius: 3px; border: 1.5px solid rgba(0,0,0,0.25); background: #fff; font: 700 10px var(--police); letter-spacing: 0.06em; text-transform: uppercase; color: var(--noir); -webkit-tap-highlight-color: transparent; }
-    .chip.couleur { padding: 0; width: 20px; }
+    /* ⚠️ Le canvas fait 240×140 et s'affiche en 240×140 : il était dessiné en
+       220×200 et affiché en 200×120, donc écrasé de 34 % en hauteur (« mon
+       bonhomme, il est écrasé dans le menu de base », 27 septembre 2026). */
+    #skin-canvas { display: block; width: 240px; height: 140px; margin: -12px 0 4px; }
+    #skin-options { display: flex; flex-direction: column; gap: 14px; width: 256px; margin-bottom: 20px; }
+    /* Libellé AU-DESSUS de ses pastilles (27 septembre 2026 : « laisse plus de
+       place entre maillot, chapeau et engin ») : chaque réglage tient sur une
+       ligne et se lit comme un bloc. */
+    .skin-row { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+    .skin-label { flex: none; font: 700 10px var(--police); letter-spacing: 0.1em; text-transform: uppercase; color: rgba(0,0,0,0.55); }
+    .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .chip { min-width: 24px; height: 28px; padding: 0 8px; border-radius: 3px; border: 1.5px solid rgba(0,0,0,0.25); background: #fff; font: 700 10px var(--police); letter-spacing: 0.06em; text-transform: uppercase; color: var(--noir); -webkit-tap-highlight-color: transparent; }
+    .chip.couleur { padding: 0; width: 28px; }
     .chip.actif { border-color: var(--noir); box-shadow: 0 0 0 2px var(--jaune); }
     #sprint-button { margin-top: 8px; }
     #sprint-note { margin: 6px 0 0; font: 500 11px var(--police); color: rgba(0,0,0,0.55); text-align: center; }
@@ -245,6 +251,7 @@
     }
     #end-credit { margin: 10px 0 0; font: 500 10px/1.4 var(--police); color: rgba(0,0,0,0.45); text-align: center; text-wrap: balance; }
     #end-ecouter { margin-top: 2px; }
+    #end-links { display: flex; gap: 22px; margin-top: 4px; }
     #end-credit a { color: var(--rouge); font-weight: 900; text-decoration: none; }
     #end-actions { display: flex; flex-direction: column; align-items: center; gap: 10px; width: 100%; }
     #end-note { margin: 10px 0 0; font: 500 11px var(--police); color: rgba(0,0,0,0.55); text-align: center; }
@@ -404,7 +411,7 @@
       <div class="panel step" data-step="3">
         <div class="panel-header"><p class="step-eyebrow">Mon cycliste</p></div>
         <div class="panel-body">
-          <canvas id="skin-canvas" width="220" height="200" aria-label="Aperçu de ton cycliste"></canvas>
+          <canvas id="skin-canvas" width="240" height="140" aria-label="Aperçu de ton cycliste"></canvas>
           <div id="skin-options">
             <div class="skin-row"><span class="skin-label">Maillot</span><div class="chips" data-cle="c1"></div></div>
             <div class="skin-row"><span class="skin-label">Chapeau</span><div class="chips" data-cle="chapeau"></div></div>
@@ -446,7 +453,10 @@
                 <svg viewBox="0 0 24 24" width="13" height="13" focusable="false"><path d="M4 5h16a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H9l-4 3.5V16H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
                 <svg viewBox="0 0 24 24" width="13" height="13" focusable="false"><path d="M12 4c2.4 0 3.9 1.9 3.8 4.4l-.1 1.7c.4.2.9.3 1.4.2.4-.1.8.2.7.6-.1.5-.7.9-1.3 1.2.1.5.6.9 1.4 1.1.4.1.5.6.2.9-.3.3-.9.5-1.4.7-.1.3-.1.6-.3.9-.2.4-.7.4-1.2.3-.5-.1-1-.1-1.5.2-.5.4-1.1 1-1.7 1-.6 0-1.2-.6-1.7-1-.5-.3-1-.3-1.5-.2-.5.1-1 .1-1.2-.3-.2-.3-.2-.6-.3-.9-.5-.2-1.1-.4-1.4-.7-.3-.3-.2-.8.2-.9.8-.2 1.3-.6 1.4-1.1-.6-.3-1.2-.7-1.3-1.2-.1-.4.3-.7.7-.6.5.1 1-.1 1.4-.2l-.1-1.7C8.1 5.9 9.6 4 12 4z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/></svg>
               </span></span></button>
-            <a id="end-cta" class="link-minimal" href="#" role="button">Écouter l'album</a>
+            <div id="end-links">
+              <a id="end-cta" class="link-minimal" href="#" role="button">Écouter l'album</a>
+              <button id="end-menu" class="link-minimal" type="button">Menu</button>
+            </div>
           </div>
           <p id="end-credit"><a id="credit-insta" href="#" target="_blank" rel="noopener noreferrer">@pmc.mp3</a></p>
           <a id="insta-link" href="#" class="hidden" target="_blank" rel="noopener noreferrer">@pmc.mp3</a>

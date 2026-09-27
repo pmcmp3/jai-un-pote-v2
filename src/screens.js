@@ -705,7 +705,13 @@ function syncMuteIcon() {
 
 // --- Démarrage ---------------------------------------------------------------
 function startGame(opts = {}) {
-  if (deps.isGameStartRequested()) return;
+  // Après une course, JOUER (depuis le menu, atteint par « Menu » sur l'écran
+  // de fin) relance une course neuve — par la MÊME porte que REJOUER, sinon
+  // le détour par le menu la contournerait.
+  if (deps.isGameStartRequested()) {
+    exigerConversion({ action: "rejouer", onOk: () => { enregistrerProfil(); hideOverlay(); showPauseButton(); deps.restartGame(opts); }, onCancel: () => {} });
+    return;
+  }
   audio.unlock();
   audio.play();
   enregistrerProfil();
@@ -753,6 +759,14 @@ export function init(d) {
   // Entrée envoie, Maj+Entrée fait un retour à la ligne.
   retourInput.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); envoyerRetour(); } });
 
+  // Retour au menu depuis l'écran de fin (27 septembre 2026 : « à la fin, je
+  // peux pas revenir au menu principal pour changer de ligue »). On arrive
+  // sur « Mon cycliste », d'où « Ma ligue » et « Mon profil » sont à un tap.
+  $("end-menu").addEventListener("click", () => {
+    document.getElementById("game-canvas").classList.remove("game-over-bw");
+    setView("onboarding");
+    setStep(3);
+  });
   replayButton.addEventListener("click", () => {
     exigerConversion({ action: "rejouer", onOk: () => { hideOverlay(); showPauseButton(); deps.restartGame(); }, onCancel: () => {} });
   });

@@ -161,9 +161,14 @@ function jumpPhysics() {
 function multiplicateur() { return multRegle(friends.count(), game.turbo > 0); }
 // Hauteur du sol sous le joueur : la route (0), le plancher d'une halle, ou le
 // toit d'une voiture s'il arrive déjà au-dessus d'elle.
-function solSous(v, jumpY) { return Math.max(rows.solAt(v), rows.toitSous(rows.routeVivante(), v, jumpY)); }
+function solSous(v, jumpY) { return Math.max(rows.solAt(v), rows.toitSous(rows.routeVivante(), v, jumpY, clock.now())); }
 // Pente locale du sol, en radians : sert à incliner le vélo sur la rampe.
-function penteSol(v) { return Math.atan2(rows.solAt(v + 0.6) - rows.solAt(v - 0.6), 1.2); }
+// ⚠️ Signe NÉGATIF (27 septembre 2026) : sur le canvas un angle positif tourne
+// dans le sens horaire, donc le vélo piquait du nez en MONTANT (« quand on
+// monte, je penche vers l'avant, c'est trop bizarre, il faudrait que j'aie le
+// corps penché légèrement en arrière »). Nez en l'air à la montée, et tout le
+// cycliste tourne avec le vélo : le buste part en arrière.
+function penteSol(v) { return -Math.atan2(rows.solAt(v + 0.6) - rows.solAt(v - 0.6), 1.2); }
 function palierPrecedent() {
   const p = window.CONFIG.potesPaliers;
   if (game.cibleRachat !== null && game.cibleRachat !== undefined) return game.cibleRachat - (window.CONFIG.poteRachatPieces || 10);
@@ -291,6 +296,7 @@ let paletteJoueur = PALETTES.pmc;
 function preparerJoueur() {
   paletteJoueur = paletteDepuisSkin(screens.getSkin());
   scene.setVille(screens.getVille());
+  masqueCache.clear();
 }
 // Graine du sprint du dimanche : la même route pour tout le monde ce jour-là.
 function graineSprint() { let h = 0; for (const ch of net.jourSprint()) h = (h * 31 + ch.charCodeAt(0)) % 100000; return h; }
@@ -357,10 +363,10 @@ function resetRun() {
   scene.setNight(0);
 }
 
-function restartGame() {
+function restartGame(opts = {}) {
   screens.preparerLigue();
   preparerJoueur();
-  game.sprint = false; // REJOUER après un sprint = une vraie course
+  game.sprint = !!opts.sprint; // REJOUER après un sprint = une vraie course ; le menu peut relancer un sprint
   audio.restart();
   if (audio.isRunning()) {
     clock.setTimeSource(audio.now);
@@ -374,7 +380,8 @@ function restartGame() {
   ancrerDepartSurLaGrille();
   gameStarted = true;
   startRequested = true;
-  if (screens.getParties() < (window.CONFIG.tutoParties || 0)) tutoDemarrer(); else lancerBestiaire();
+  tuto.actif = false;
+  if (screens.getParties() < (window.CONFIG.tutoParties || 0) && !game.sprint) tutoDemarrer(); else lancerBestiaire();
   screens.compterPartie();
 }
 
@@ -457,6 +464,10 @@ function arriveePote(pote, direct) {
 }
 
 function gagnerPiece(u, v) {
+  // Pendant le tuto, rien ne compte (27 septembre 2026 : « il ne faut pas que
+  // le score augmente pendant qu'on est dans le tuto ») : la pièce valide
+  // l'étape, brille, sonne, et c'est tout.
+  if (tuto.actif) { semerSparkles(u, v); sfx.piece(); tutoEvenement("piece"); return; }
   const mult = multiplicateur();
   const m = window.CONFIG.pieceMetres * mult;
   game.points += 1;
@@ -501,10 +512,18 @@ function gagnerRouge(u, v) {
 // l'instant, le rendu la fait basculer pendant 1,6 s.
 const tombes = new Map();
 function marquerTombe(ev, now) { if (ev.r !== undefined && !KINDS_ROULANTS.has(ev.kind)) tombes.set(ev.r, now); }
-const KINDS_ROULANTS = new Set(["tracteur", "voiture", "contresens", "poulelancee"]);
+const KINDS_ROULANTS = new Set(["tracteur", "voiture", "contresens", "poulejetee"]);
 
 function toucherJoueur(ev) {
-  if (clock.now() < reviveShieldUntil || invincible || game.turbo > 0) return;
+  // Invulnérable (turbo lait, bouclier de reprise) : la bête est quand même
+  // renversée, avec une gerbe d'étincelles — sinon on croit à un bug de
+  // collision (27 septembre 2026 : « j'ai roulé sur une poule, j'ai pas eu
+  // de défaut »).
+  if (clock.now() < reviveShieldUntil || invincible || game.turbo > 0) {
+    marquerTombe(ev, clock.now());
+    semerSparkles(player.u, player.v, 10, "#ffffff");
+    return;
+  }
   marquerTombe(ev, clock.now());
   if (friends.count() > 0) {
     const perdus = friends.lose(ev.cout);
@@ -523,7 +542,9 @@ function toucherJoueur(ev) {
 }
 
 // --- Traversées armées sur le passage du joueur --------------------------------
-const ARM_AHEAD_S = 4.0; // 2,6 → 4,0 le 9 septembre 2026 : le tracteur part plus tôt, donc plus lentement (rows.js, vmax)
+// Chaque espèce a son délai (rows.delaiArmement) : 4 s pour le tracteur,
+// 5,5 s pour la voiture en face, le temps de vol pour la poule jetée.
+const ARM_AHEAD_S = 5.5; // le plus long des délais : borne du balayage
 function armerTraversees(now, vitesse) {
   const r0 = Math.floor(player.v + 0.5);
   const rMax = r0 + Math.ceil(vitesse * ARM_AHEAD_S) + 1;
@@ -531,7 +552,7 @@ function armerTraversees(now, vitesse) {
     const row = rows.rowAt(r);
     if ((row.type !== "traverse" && row.type !== "contresens") || row.armed) continue;
     const tArr = now + (r - player.v) / Math.max(0.5, vitesse);
-    if (tArr - now > ARM_AHEAD_S) continue;
+    if (tArr - now > rows.delaiArmement(row)) continue;
     rows.armer(row, now, tArr);
     if ((row.kind === "tracteur" || row.kind === "contresens") && !klaxonne.has(r)) { klaxonne.add(r); sfx.klaxon(); }
   }
@@ -574,7 +595,9 @@ function step(dt) {
   if (shake.time > 0) shake.time = Math.max(0, shake.time - dt);
   if (hintTimer > 0 && gameStarted) hintTimer -= dt;
   // Le bestiaire s'affiche au départ, ou juste après le tutoriel.
-  if (gameStarted && !game.ended && bestiaireT > 0 && clock.now() >= 0) bestiaireT -= dt;
+  // Le bestiaire attend la fin du « GO ! » : avant, les chiffres du décompte
+  // se peignaient PAR-DESSUS sa carte (capture du 27 septembre 2026).
+  if (gameStarted && !game.ended && bestiaireT > 0 && clock.now() >= COUNT_IN_GO_LINGER_S) bestiaireT -= dt;
 
   if (gameStarted) {
     const enDecompte = clock.now() < -COUNT_IN_BEATS * clock.beatPeriod;
@@ -646,7 +669,7 @@ function step(dt) {
   if (now >= 0) {
     const dv = vitesse * dt;
     player.v += dv;
-    game.metres += dv * window.CONFIG.metresParUnite * multiplicateur();
+    if (!tuto.actif) game.metres += dv * window.CONFIG.metresParUnite * multiplicateur();
   }
   player.pedal += vitesse * dt * 3.2;
   // Retombée / roulage sur la rampe de la halle, ou atterrissage sur le toit
@@ -656,9 +679,9 @@ function step(dt) {
     if (player.jumpVy < -0.5 && game.surHalle === false) sfx.saut();
     player.jumpY = solApres; player.jumpVy = 0; player.doubled = false; player.flip = 0; player.tHaut = 0;
   }
-  const surHalle = rows.solAt(player.v) > 0.05;
-  if (surHalle && !game.surHalle) afficherBanner("LES HALLES !", "ramasse tout là-haut", JAUNE, 1.6);
-  game.surHalle = surHalle;
+  // (Plus de bandeau « LES HALLES ! » : c'est l'enseigne peinte sur le toit
+  // qui annonce le bâtiment, 27 septembre 2026.)
+  game.surHalle = rows.solAt(player.v) > 0.05;
   if (now >= 0) fantome.enregistrer(now, player.u, player.v, player.jumpY);
   friends.recordPlayer(player.v, marque);
   friends.update(dt, player, phys);
@@ -717,12 +740,32 @@ function panneauVilleProche(r) {
   for (let d = -9; d <= 9; d++) if (scene.debutVillage(r + d)) return true;
   return false;
 }
+// Jamais de panneau sur une halle ni juste avant/après (27 septembre 2026 :
+// « il y a un panneau de ville qui était derrière les halles, ça n'a aucun sens »).
+function prochDeHalle(r, marge = 14) {
+  for (let d = -marge; d <= marge; d += 2) if (rows.halleA(r + d) !== null) return true;
+  return false;
+}
 function signAt(r) {
   const villages = window.CONFIG.villages || [];
   if (!villages.length || r % SIGN_EVERY !== 20) return null;
-  if (panneauVilleProche(r)) return null;
+  if (panneauVilleProche(r) || prochDeHalle(r)) return null;
   return villages[Math.floor(r / SIGN_EVERY) % villages.length];
 }
+function panneauVilleA(r) { return !!scene.villeDuJoueur() && scene.debutVillage(r - 1) && !prochDeHalle(r); }
+// Le mobilier s'efface autour des panneaux (bit 1) et sur les halles (bit 2).
+const masqueCache = new Map(); // fonction pure de r (et de la ville) : vidée par preparerJoueur
+scene.setMasqueDecor((r) => {
+  let m = masqueCache.get(r);
+  if (m !== undefined) return m;
+  m = 0;
+  for (let d = -3; d <= 3; d++) if (signAt(r + d) || panneauVilleA(r + d)) { m |= scene.SANS_LAMPE; break; }
+  if (prochDeHalle(r, 4)) m |= scene.DANS_HALLE;
+  if (masqueCache.size > 4000) masqueCache.clear();
+  masqueCache.set(r, m);
+  return m;
+});
+scene.setDessinVoiture((c, u, v) => props.drawVoiture(c, rows.KINDS.voiture, u, v, 1, 0));
 
 // Pièce, brique de lait ou pièce rouge, flottant à la hauteur `h` au-dessus
 // de la route (rangée r).
@@ -759,11 +802,17 @@ const PIECE_R = 0.3;
 function renderAlertes(now, vitesse) {
   if (!gameStarted || game.ended || now < 0) return;
   const devant = scene.unitesDevant();
-  const r0 = Math.floor(player.v + devant) + 1, r1 = Math.floor(player.v + vitesse * ARM_AHEAD_S) + 2;
+  const r0 = Math.floor(player.v) + 1, r1 = Math.floor(player.v + vitesse * ARM_AHEAD_S) + 2;
   for (let r = r0; r <= r1; r++) {
     const row = rows.rowAt(r);
     if ((row.type !== "traverse" && row.type !== "contresens") || !row.armed) continue;
-    const tRest = (r - player.v) / Math.max(0.5, vitesse);
+    // La poule jetée n'a pas d'alerte : on voit le fermier avant qu'il lance.
+    if (rows.KINDS[row.kind].lanceur) continue;
+    // Tracteur : tant que sa rangée n'est pas à l'écran. Voiture en face :
+    // tant que la VOITURE n'y est pas (elle part de bien plus loin que sa rangée).
+    const ou = row.type === "contresens" ? rows.contresensAt(r, row, now) : { v: r };
+    if (!ou || ou.v <= player.v + devant - 0.5) continue;
+    const tRest = row.type === "contresens" ? (ou.v - player.v) / Math.max(0.5, vitesse + row.vitesse) : (r - player.v) / Math.max(0.5, vitesse);
     const urgence = Math.max(0, Math.min(1, 1 - (tRest - 1) / 2.5));
     const pouls = 0.82 + 0.18 * Math.sin(now * 16);
     const taille = (26 + 16 * urgence) * pouls;
@@ -843,7 +892,9 @@ function render(alpha) {
     const d = rows.halleA(r);
     if (d === null || hallesVues.has(d)) continue;
     hallesVues.add(d);
-    items.push({ d: scene.depth(scene.ROAD_HALF + 0.5, d), draw: () => scene.drawHalle(ctx, d, GEO_HALLE, from, to) });
+    // Deux couches : le fond avant le cycliste, le devant après (scene.drawHalle).
+    items.push({ d: scene.depth(scene.ROAD_HALF + 0.5, d), draw: () => scene.drawHalle(ctx, d, GEO_HALLE, from, to, "fond") });
+    items.push({ d: scene.depth(-scene.ROAD_HALF - 0.3, d), draw: () => scene.drawHalle(ctx, d, GEO_HALLE, from, to, "devant") });
   }
   const vc = scene.getVCentre(), largeurRoute = scene.demiLargeurRoute() + 2;
   for (let r = from; r <= to; r++) {
@@ -853,23 +904,26 @@ function render(alpha) {
     const sg = signAt(r);
     if (sg) items.push({ d: scene.depth(scene.ROAD_HALF + 0.55, r), draw: () => scene.drawSign(ctx, r, sg) });
     // Entrée du biome village : le panneau porte la ville du joueur.
-    if (scene.villeDuJoueur() && scene.debutVillage(r)) items.push({ d: scene.depth(scene.ROAD_HALF + 0.55, r + 1), draw: () => scene.drawSign(ctx, r + 1, [scene.villeDuJoueur(), "chez toi"]) });
+    if (panneauVilleA(r + 1)) items.push({ d: scene.depth(scene.ROAD_HALF + 0.55, r + 1), draw: () => scene.drawSign(ctx, r + 1, [scene.villeDuJoueur(), "chez toi"]) });
     if (!row) continue;
     // La voiture en face : elle roule SUR la route, vers le joueur (20
     // septembre 2026 : « une voiture qui roule en sens inverse, pour que ce
     // soit vraiment difficile »).
     if (row.type === "contresens") {
       const t = gameStarted ? now : perfClock();
+      const K = rows.KINDS[row.kind];
       const inst = rows.contresensAt(r, row, t);
-      if (inst) items.push({ d: scene.depth(0, inst.v), draw: () => props.drawVoiture(ctx, inst.K, 0, inst.v, -1, t) });
+      if (K.lanceur) {
+        // Le fermier qui jette la poule : sur le bas-côté du fond, face au joueur.
+        const fu = scene.ROAD_HALF + 0.45, fv = r + K.lanceur;
+        const lance = row.armed ? Math.max(0, t - row.t0) : null;
+        items.push({ d: scene.depth(fu, fv), draw: () => props.drawLanceurFace(ctx, fu, fv, tAnim, lance) });
+        if (inst) items.push({ d: scene.depth(0, inst.v), draw: () => props.drawPouleJetee(ctx, 0, inst.v, t) });
+      } else if (inst) items.push({ d: scene.depth(0, inst.v), draw: () => props.drawVoiture(ctx, inst.K, 0, inst.v, -1, t) });
     }
     // Les traversants se voient de loin (ils arrivent du fond) : tout l'intervalle.
     if (row.type === "traverse") {
       const t = gameStarted ? now : perfClock();
-      if (row.kind === "poulelancee") {
-        const fu = scene.ROAD_HALF + 0.75;
-        items.push({ d: scene.depth(fu, r), draw: () => props.drawLanceur(ctx, fu, r, tAnim, row.dir, row.armed) });
-      }
       for (const inst of rows.crossersAt(r, row, t)) {
         items.push({ d: scene.depth(inst.u, r), draw: () => props.drawCrosser(ctx, inst.kind, inst.u, r, inst.dir, t, inst.alpha) });
       }
@@ -991,7 +1045,7 @@ function render(alpha) {
   if (gameStarted && !game.ended) {
     if (now < COUNT_IN_GO_LINGER_S) hud.renderCountIn(ctx, width, height, now, clock.beatPeriod, COUNT_IN_BEATS, COUNT_IN_GO_LINGER_S);
     hud.renderTuto(ctx, width, height, tutoVue());
-    if (!tuto.actif && bestiaireT > 0) {
+    if (!tuto.actif && bestiaireT > 0 && now >= COUNT_IN_GO_LINGER_S) {
       const ecoule = BESTIAIRE_S - bestiaireT;
       const parEtape = BESTIAIRE_S / BESTIAIRE.length;
       const idx = Math.min(BESTIAIRE.length - 1, Math.floor(ecoule / parEtape));
@@ -1000,7 +1054,7 @@ function render(alpha) {
     }
     if (now >= 0 && !banner && !tuto.actif) hud.renderHint(ctx, width, height, Math.min(1, hintTimer));
   }
-  if (game.finAge >= 0) hud.renderFin(ctx, width, height, game.finAge);
+  if (game.finAge >= 0) hud.renderFin(ctx, width, height, game.finAge, game.sprint ? "Fin du sprint" : "Tu es allé au bout du morceau");
 
   renderApercu(pedal);
   debugOverlay.renderStats(ctx, {
@@ -1017,11 +1071,12 @@ const skinCanvas = document.getElementById("skin-canvas");
 const skinCtx = skinCanvas ? skinCanvas.getContext("2d") : null;
 let apercuPedal = 0;
 function renderApercu(pedal) {
-  if (!skinCtx || gameStarted || !document.getElementById("overlay").classList.contains("visible") || screens.stepCourante() !== 3) return;
+  // Aussi APRÈS une course : le bouton « Menu » de l'écran de fin ramène ici.
+  if (!skinCtx || !document.getElementById("overlay").classList.contains("visible") || !document.getElementById("onboarding").classList.contains("active") || screens.stepCourante() !== 3) return;
   apercuPedal += 0.12;
   const P = paletteDepuisSkin(screens.getSkin());
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
-  const cw = 220, ch = 200;
+  const cw = 240, ch = 140;
   if (skinCanvas.width !== cw * dpr) { skinCanvas.width = cw * dpr; skinCanvas.height = ch * dpr; }
   skinCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
   skinCtx.clearRect(0, 0, cw, ch);
@@ -1031,7 +1086,7 @@ function renderApercu(pedal) {
   scene.setCamera(0);
   const a = scene.project(0, 0, 0);
   skinCtx.save();
-  skinCtx.translate(cw / 2 - a.x, ch * 0.78 - a.y);
+  skinCtx.translate(cw / 2 - a.x, ch * 0.88 - a.y);
   scene.drawFlat(skinCtx, -0.7, -1.4, 1.4, 2.8, "#565250");
   drawRider(skinCtx, 0, 0, 0, P, apercuPedal, 1, 0);
   skinCtx.restore();
@@ -1053,8 +1108,8 @@ function prechauffer() {
   let i = 0;
   const etapes = [
     () => { for (let r = 0; r < 400; r++) rows.rowAt(r); },
-    () => { for (const k of Object.keys(rows.KINDS)) if (!rows.KINDS[k].traverse) props.drawStatic(c, k, 0, 5, 0); },
-    () => { props.drawCrosser(c, "tracteur", 0, 5, 1, 0); props.drawCrosser(c, "poulelancee", 0, 5, 1, 0); props.drawLanceur(c, 0, 5, 0, 1, false); },
+    () => { for (const k of Object.keys(rows.KINDS)) if (!rows.KINDS[k].traverse && !rows.KINDS[k].contresens) props.drawStatic(c, k, 0, 5, 0); },
+    () => { props.drawCrosser(c, "tracteur", 0, 5, 1, 0); props.drawLanceurFace(c, 2, 5, 0, null); props.drawPouleJetee(c, 0, 5, 0); },
     () => { drawRider(c, 0, 0, 0, PALETTES.pmc, 0, 1, 0); drawRider(c, 0, 0, 0, PALETTES.soberland, 0, 1, 1); for (const P of PALETTES.potes) drawRider(c, 0, 0, 0, P, 0); },
     () => { c.translate(32, 32); drawCoin(c, 10, 0.3); drawCoin(c, 10, 0.3, true); c.setTransform(1, 0, 0, 1, 0, 0); scene.drawSign(c, 20, ["CYSOING", "59"]); },
     () => { for (let r = 0; r < 60; r++) scene.rowDecor(c, r, false).forEach((it) => it.draw()); },

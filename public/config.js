@@ -140,7 +140,7 @@ window.CONFIG = {
   piecesLogo: false,        // « mets juste des pièces jaunes pour l'instant, enlève les dessins »
   laitDureeS: 5,            // brique de lait : ×2 sur les mètres pendant 5 s
   laitVitesse: 1.2,         // et seulement +20 % de vitesse (« pas ×2, c'est n'importe quoi »)
-  nuitDebutS: 95,           // la nuit tombe à partir de cet instant du morceau (30 s de transition)
+  nuitDebutS: 50,           // la nuit tombe à partir de cet instant du morceau (30 s de transition) — 95 → 50 le 27 septembre 2026 (« le biome de nuit, il faudrait qu'il arrive beaucoup plus tôt dans la chanson »)
   tutoParties: 2,           // tutoriel sur les deux premières parties
 
   // === PANNEAUX DE VILLAGE (nom, département) ===

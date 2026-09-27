@@ -15,7 +15,7 @@
 // re-tap du salto part quand il reste le temps d'une montée avant la cible.
 // Jamais freiné par la boue, jamais un pote perdu. ~20 000 pas : quelques ms.
 
-import { Route, KINDS, CORPS_HAUT, familleDe, montee, solAt, armer } from "./rows.js";
+import { Route, KINDS, CORPS_HAUT, familleDe, montee, solAt, armer, delaiArmement } from "./rows.js";
 import { ROWS_AHEAD } from "./scene.js";
 import { V_UNIT, targetSpeed, multiplicateur, dureeCourse } from "./regles.js";
 
@@ -84,11 +84,11 @@ export function scoreParfait(seed, potesMax) {
     }
     if (jumpY <= sol) { jumpY = sol; vy = 0; doubled = false; tHaut = 0; plan = null; }
 
-    for (let r = Math.floor(v + 0.5); r <= Math.floor(v + 0.5) + Math.ceil(vitesse * 4) + 1; r++) {
+    for (let r = Math.floor(v + 0.5); r <= Math.floor(v + 0.5) + Math.ceil(vitesse * 5.5) + 1; r++) {
       const row = route.rowAt(r);
       if ((row.type !== "traverse" && row.type !== "contresens") || row.armed) continue;
       const tArr = now + (r - v) / Math.max(0.5, vitesse);
-      if (tArr - now <= 4) armer(row, now, tArr);
+      if (tArr - now <= delaiArmement(row)) armer(row, now, tArr);
     }
     for (const ev of route.checkMember("sim", prevV, v, jumpY, now)) {
       const mult = multiplicateur(potes, turbo > 0);

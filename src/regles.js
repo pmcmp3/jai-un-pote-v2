@@ -30,7 +30,7 @@ export function dureeCourse() {
 // les règles changent la route — les scores et fantômes d'une ligue sont
 // filtrés sur la graine, une nouvelle version repart donc sur un classement
 // vierge sans rien supprimer en base.
-export const VERSION_COURSE = 6; // 20 septembre 2026 (nuit) : saut plus sec, tailles recalées, plus de grosse pièce
+export const VERSION_COURSE = 7; // 27 septembre 2026 : poule jetée de face, voiture en face plus lente et montable
 export function graineDepuisTexte(txt) {
   let h = 7;
   for (const ch of String(txt)) h = (h * 31 + ch.charCodeAt(0)) % 100000;
