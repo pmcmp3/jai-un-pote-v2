@@ -139,7 +139,7 @@ const game = {
   graine: 0, ligueCourse: false, scoreMax: null, // course de LIGUE : graine partagée, score parfait
 };
 // Une seule voie : le joueur reste en u = 0 (u est gardé pour le fantôme).
-const player = { u: 0, prevU: 0, v: 0, prevV: 0, jumpY: 0, prevJumpY: 0, jumpVy: 0, pedal: 0, prevPedal: 0, doubled: false, flip: 0, prevFlip: 0, tHaut: 0, roue: 0, prevRoue: 0 };
+const player = { auSol: true, u: 0, prevU: 0, v: 0, prevV: 0, jumpY: 0, prevJumpY: 0, jumpVy: 0, pedal: 0, prevPedal: 0, doubled: false, flip: 0, prevFlip: 0, tHaut: 0, roue: 0, prevRoue: 0 };
 // Position du joueur à l'écran (fraction de la largeur), lissée : la caméra
 // prend de l'avance quand la vitesse monte (config.cameraJoueurX).
 let cameraX = null;
@@ -289,7 +289,9 @@ function pousserPopup(texte, couleur) {
   if (popups.length > 3) popups.shift();
 }
 let banner = null;
-function afficherBanner(titre, sous, couleur, duree = 2.4) { banner = { titre, sous, couleur, duree, timer: duree }; }
+// `etiquette` : le mot écrit dans l'onglet de couleur (28 septembre 2026 : « le truc
+// jaune [...] il sert à rien » — l'onglet était vide).
+function afficherBanner(titre, sous, couleur, duree = 2.4, etiquette = "") { banner = { titre, sous, couleur, duree, timer: duree, etiquette }; }
 const shake = { time: 0, duration: 0.5, amp: 6 };
 const rendusRates = new Set();   // une trace par message, pas une par image
 let damageFlash = 0;
@@ -418,7 +420,7 @@ function mourir() {
         consumeJumpPress();
         const retour = Math.min(2, friends.maxReached());
         for (let i = 0; i < retour; i++) friends.join(player);
-        afficherBanner(retour > 1 ? "TES POTES SONT REVENUS" : retour === 1 ? "TON POTE EST REVENU" : "C'EST REPARTI", null, JAUNE);
+        afficherBanner(retour > 1 ? "TES POTES SONT REVENUS" : retour === 1 ? "TON POTE EST REVENU" : "C'EST REPARTI", null, JAUNE, 2.4, "REPRISE");
         reviveShieldUntil = clock.now() + 2.5;
       },
       onDecline: () => { revivePaused = false; applyPauseState(); endGame("mort"); },
@@ -468,7 +470,7 @@ function arriveePote(pote, direct) {
   sfx.pote();
   vibrer(30);
   // Une seule ligne, courte (7 septembre 2026 : « trop d'infos au mètre carré »).
-  afficherBanner(`@${(pote.name || "pote").toUpperCase()} EST LÀ !`, null, JAUNE, 1.6);
+  afficherBanner(`@${(pote.name || "pote").toUpperCase()} EST LÀ !`, null, JAUNE, 1.6, "NOUVEAU POTE");
   audio.playComboJingle(Math.min(6, friends.count()));
 }
 
@@ -502,7 +504,7 @@ function gagnerLait(u, v) {
   sfx.lait();
   vibrer(40);
   semerSparkles(u, v, 16, "#ffffff");
-  afficherBanner("TURBO LAIT", "×2 sur tes points pendant 5 s", JAUNE, 1.6);
+  afficherBanner("TURBO LAIT", "×2 sur tes points pendant 5 s", JAUNE, 1.6, "BONUS");
   canvas.classList.add("turbo");
   // Pas d'obstacles pendant le turbo : la route devient sûre au-delà de
   // l'écran (les rangées déjà visibles sont couvertes par l'invulnérabilité).
@@ -684,11 +686,21 @@ function step(dt) {
   player.pedal += vitesse * dt * 3.2;
   // Retombée / roulage sur la rampe de la halle, ou atterrissage sur le toit
   // d'une voiture : le vélo colle au plancher trouvé sous lui.
-  const solApres = solSous(player.v, player.jumpY);
+  // ⚠️ Le toit se cherche avec la hauteur d'AVANT la chute de ce pas : en
+  // retombant à ~10 u/s, les roues passaient sous le toit en une seule image
+  // et la voiture n'était plus un plancher mais un mur (28 septembre 2026 :
+  // « je peux pas rouler sur les voitures arrêtées »).
+  const solApres = solSous(player.v, Math.max(player.jumpY, player.prevJumpY));
+  // Collage à la DESCENTE : au sol, on suit le plancher qui descend au lieu de
+  // décoller d'un cheveu à chaque image (le vélo tremblait et perdait son
+  // inclinaison une image sur deux — « glitchs bizarres dans la descente »).
+  // Une vraie marche (bout d'un toit de voiture, > 0,35 u) fait toujours tomber.
+  if (player.auSol && player.jumpVy <= 0 && player.jumpY > solApres && player.jumpY - solApres < 0.35) player.jumpY = solApres;
   if (player.jumpY <= solApres) {
     if (player.jumpVy < -0.5 && game.surHalle === false) sfx.saut();
     player.jumpY = solApres; player.jumpVy = 0; player.doubled = false; player.flip = 0; player.tHaut = 0;
   }
+  player.auSol = player.jumpY <= solApres + 0.001;
   // (Plus de bandeau « LES HALLES ! » : c'est l'enseigne peinte sur le toit
   // qui annonce le bâtiment, 27 septembre 2026.)
   game.surHalle = rows.solAt(player.v) > 0.05;
@@ -730,7 +742,7 @@ let invincible = false;
 let nuitDebut = null; // surcharge debug (CONFIG est gelé)
 window.addEventListener("keydown", (e) => {
   if (!debugOverlay.isEnabled() || !gameStarted || game.ended) return;
-  if (e.code === "KeyI") { invincible = !invincible; afficherBanner(invincible ? "INVINCIBLE" : "VULNÉRABLE", "debug", JAUNE, 1.2); }
+  if (e.code === "KeyI") { invincible = !invincible; afficherBanner(invincible ? "INVINCIBLE" : "VULNÉRABLE", "debug", JAUNE, 1.2, "DEBUG"); }
   if (e.code === "KeyP") arriveePote(friends.join(player), false);
   if (e.code === "KeyO") { friends.lose(1); pousserPopup("−1 POTE", ROUGE); }
   if (e.code === "KeyG") mourir();
@@ -950,7 +962,7 @@ function render(alpha) {
         : props.drawStatic(ctx, row.kind, 0, r, tAnim)) });
     }
   }
-  if (gameStarted) for (const dr of friends.drawables(ctx, pedal)) items.push({ d: scene.depth(dr.u, dr.v), draw: dr.draw });
+  if (gameStarted) for (const dr of friends.drawables(ctx, pedal, penteSol)) items.push({ d: scene.depth(dr.u, dr.v), draw: dr.draw });
   // Le fantôme du meilleur de la ligue : transparent, sans ombre, étiqueté.
   // Décalé vers le fond de la route (u + 0,7) : sur une seule voie, il serait
   // pile derrière le joueur.
@@ -1050,7 +1062,6 @@ function render(alpha) {
       mult: Math.round(multiplicateur() * 100) / 100, restant: plein ? 0 : Math.max(0, prochainPalier() - game.points), plein,
       restantS: game.ended ? 0 : tempsRestant(), turbo: game.turbo > 0, safeTop,
     });
-    hud.renderBanner(ctx, width, height, banner, safeTop);
     ctx.restore();
   }
   if (gameStarted && !game.ended) {
@@ -1064,6 +1075,15 @@ function render(alpha) {
       hud.renderBestiaire(ctx, width, height, Math.min(1, bestiaireT * 2, dansEtape * 4 + 0.15), bestiaire, safeTop, idx, Math.ceil(bestiaireT));
     }
     if (now >= 0 && !banner && !tuto.actif) hud.renderHint(ctx, width, height, Math.min(1, hintTimer));
+  }
+  // Le bandeau passe APRÈS le bestiaire, et SOUS sa carte quand elle est là :
+  // il se peignait derrière elle (le « turbo lait » invisible, 28 septembre 2026).
+  if (gameStarted && hudAlpha > 0.001 && banner) {
+    const bestiaireVu = !tuto.actif && bestiaireT > 0 && now >= COUNT_IN_GO_LINGER_S && !game.ended;
+    ctx.save();
+    ctx.globalAlpha = hudAlpha;
+    hud.renderBanner(ctx, width, height, banner, safeTop, bestiaireVu ? Math.max(safeTop + 104, height * 0.15) + 166 : null);
+    ctx.restore();
   }
   if (game.finAge >= 0) hud.renderFin(ctx, width, height, game.finAge, game.sprint ? "Fin du sprint" : "Tu es allé au bout du morceau");
 

@@ -114,7 +114,10 @@ export function join(player) {
   const v = vDuSlot(player.v, slot);
   const pote = {
     slot, palette, name,
-    u: 3.4, v: v - 2.2, prevV: v - 2.2, u0: 3.4, dv0: -2.2,
+    // Il arrive PAR LA ROUTE, de derrière (28 septembre 2026) : en arrivant
+    // du champ du fond, il passait derrière les panneaux et les lampadaires
+    // du bas-côté (« regarde les textures qui se passent devant »).
+    u: U_MEUTE[slot % U_MEUTE.length], v: v - 4.5, prevV: v - 4.5, u0: U_MEUTE[slot % U_MEUTE.length], dv0: -4.5,
     arrive: 0, leave: null, pedal: Math.random() * 6, phase: Math.random() * 6,
     jumpY: 0, jumpVy: 0, doubled: false, flip: 0, lastMark: player.v,
   };
@@ -168,7 +171,10 @@ export function update(dt, player, phys) {
       p.jumpY += p.jumpVy * dt;
     }
     // Comme le joueur, le pote colle au plancher de la halle (rows.solAt).
+    // Collage à la descente, comme le joueur (main.js).
+    if (p.auSol && p.jumpVy <= 0 && p.jumpY > sol && p.jumpY - sol < 0.35) p.jumpY = sol;
     if (p.jumpY <= sol) { p.jumpY = sol; p.jumpVy = 0; p.doubled = false; p.flip = 0; p.tenue = 0; }
+    p.auSol = p.jumpY <= sol + 0.001;
     if (p.flip > 0) p.flip = Math.min(Math.PI * 2, p.flip + dt * (Math.PI * 2 / 0.5));
   }
   potes = potes.filter((p) => !p.leave || p.leave.t < 1);
@@ -178,21 +184,21 @@ export function members() {
   return alive().filter((p) => p.arrive >= 1).map((p) => ({ id: `p${p.slot}`, u: p.u, v: p.v, prevV: p.prevV, jumpY: p.jumpY, pote: p }));
 }
 
-export function drawables(ctx, pedalPhase) {
+export function drawables(ctx, pedalPhase, penteAt = null) {
   const out = [];
   for (const p of potes) {
     let u = p.u, v = p.v, y = p.jumpY, alpha = 1;
     if (p.leave) {
       // Il décroche : il ralentit, part dans le champ du fond, s'efface.
       const t = p.leave.t;
-      v -= t * t * 3.5;
-      u += t * 2.2;
+      v -= t * t * 4.5;   // il se laisse distancer sur la route (plus de détour par le champ du fond)
       y += Math.sin(Math.min(1, t) * Math.PI) * 1.2;
       alpha = 1 - t;
     }
     out.push({
       u, v, draw: () => {
-        drawRider(ctx, u, v, y, p.palette, pedalPhase + p.pedal, alpha, p.flip);
+        // Incliné dans la pente de la halle, comme le joueur.
+        drawRider(ctx, u, v, y, p.palette, pedalPhase + p.pedal, alpha, p.flip, true, 0, p.auSol && penteAt ? penteAt(v) : 0);
         // Le prénom s'affiche 3 s à l'arrivée du pote, puis s'efface : dans
         // une meute serrée, cinq étiquettes permanentes se marchaient dessus.
         const vu = p.arrive >= 1 ? Math.max(0, Math.min(1, (3.6 - p.age) / 0.6)) : 0;

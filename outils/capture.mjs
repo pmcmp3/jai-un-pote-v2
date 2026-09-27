@@ -91,6 +91,9 @@ const SCENES = {
     await attendre(500); await photo("19b-halle-rampe");
     await course((d) => { window.__pote.player.v = d + 14; }, d);
     await attendre(900); await photo("20-halle-dessus");
+    for (let i = 0; i < 4; i++) await page.keyboard.press("KeyP");
+    await course((d) => { const p = window.__pote; p.player.v = d + 33.5; p.player.jumpY = p.rows.solAt(p.player.v); }, d);
+    await attendre(1300); await photo("20b-halle-descente");
     await page.keyboard.press("KeyD");
   },
   // Choc : la bête percutée bascule (20 septembre 2026).
@@ -106,7 +109,7 @@ const SCENES = {
     await course(() => { const p = window.__pote; let r = Math.ceil(p.player.v); while (Math.floor(r / 55) % 6 !== 3) r++; p.player.v = r + 20; });
     await attendre(900); await photo("08-village");
   },
-  turbo: async () => { await page.keyboard.press("KeyL"); await attendre(600); await photo("09-turbo"); await attendre(5000); },
+  turbo: async () => { await page.keyboard.press("KeyL"); await attendre(300); await photo("09-turbo"); await attendre(5000); },
   nuit: async () => { await page.keyboard.press("KeyN"); await attendre(1500); await photo("10-nuit"); },
   // Le roller (20 septembre 2026) : on l'équipe depuis le menu.
   roller: async () => {
@@ -286,6 +289,33 @@ const SCENES = {
     }
     console.log("  → galerie : outils/sorties/g*.png");
     await course(() => document.getElementById("galerie").remove());
+  },
+  // Atterrir sur le toit d'une voiture garée (28 septembre 2026) : on lâche le
+  // cycliste au-dessus du toit en pleine chute, il doit s'y poser, pas passer au travers.
+  toit: async () => {
+    const r = await course(() => { const p = window.__pote; for (let r = Math.ceil(p.player.v) + 14; r < 3000; r++) { const row = p.rows.rowAt(r); if (row.type === "statique" && row.kind === "voiture") return r; } return 0; });
+    const res = await course(async (r) => {
+      const p = window.__pote;
+      p.player.v = r - 1.6; p.player.prevV = p.player.v; p.player.jumpY = 2.6; p.player.prevJumpY = 2.6; p.player.jumpVy = -9; p.player.auSol = false;
+      const hs = [];
+      for (let i = 0; i < 12; i++) { await new Promise((ok) => setTimeout(ok, 40)); hs.push(p.player.jumpY.toFixed(2)); }
+      return { hs, pertes: p.game.sansFaute };
+    }, r);
+    console.log("  hauteurs après la chute :", res.hs.join(" "), "· sans faute :", res.pertes);
+    await photo("32-toit");
+  },
+  // La descente de la halle : le cycliste doit coller au plancher (plus de
+  // décollage d'un cheveu une image sur deux).
+  descente: async () => {
+    const res = await course(async () => {
+      const p = window.__pote;
+      let d = 0; for (let r = 40; r < 1200; r++) if (p.rows.halleA(r) !== null) { d = p.rows.halleA(r); break; }
+      p.player.v = d + 7 + 26 - 2; p.player.jumpY = p.rows.solAt(p.player.v); p.player.prevJumpY = p.player.jumpY; p.player.jumpVy = 0; p.player.auSol = true;
+      let air = 0, n = 0;
+      await new Promise((ok) => { const f = () => { n++; if (p.player.jumpY - p.rows.solAt(p.player.v) > 0.01) air++; if (p.player.v < d + 42) requestAnimationFrame(f); else ok(); }; requestAnimationFrame(f); });
+      return { air, n };
+    });
+    console.log(`  descente : ${res.air} images en l'air sur ${res.n}`);
   },
   menus: async () => {
     // ⚠️ Pas de touche D ici : overlay masqué = touches de debug coupées (G, I…).

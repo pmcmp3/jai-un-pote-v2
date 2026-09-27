@@ -169,6 +169,22 @@ Code `TESTV2`, qui est aussi `config.ligueBeta` (menu simplifié + bouton « Lai
   CLAUDE.md du premier jeu interdit (clause Spotify « compensation … or otherwise »).
   Non modifiée ici sans son accord.
 
+## Retours du 28 septembre 2026, soir (captures iPhone)
+
+- **Toit des voitures garées** : on ne s'y posait jamais — en retombant, les roues passaient
+  sous le toit en UNE image, qui devenait un mur. `solSous` cherche désormais le toit avec
+  `max(jumpY, prevJumpY)`. Vérifié : `capture.mjs toit` → 1,49 u stable.
+- **Descente des halles** : le vélo décollait d'un cheveu à chaque image (inclinaison qui
+  clignote). Collage au sol (`player.auSol`, idem potes) tant que la marche fait < 0,35 u.
+  Vérifié : `capture.mjs descente` → 0 image en l'air. Les potes s'inclinent aussi.
+- **Bandeaux** (turbo lait, nouveau pote, reprise) : l'onglet jaune était VIDE, et le bandeau
+  se peignait derrière la carte du bestiaire. Onglet légendé (« BONUS », « NOUVEAU POTE »,
+  « REPRISE »), bandeau peint après le bestiaire et sous sa carte.
+- **Potes** : ils arrivent et repartent PAR LA ROUTE (ils passaient par le champ du fond,
+  donc derrière les panneaux et les lampadaires).
+- Vitres des voitures teintées (claires, on croyait voir à travers), ardoise des maisons du
+  Nord qui ne traverse plus le pignon.
+
 ## Invariants de la v2 (mesurés, `outils/mesurer.mjs`)
 
 - L'écart entre deux obstacles vient de la PHYSIQUE du saut (`ecartMin` : retombée du premier +

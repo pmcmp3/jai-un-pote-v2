@@ -719,7 +719,7 @@ function maisonNue(ctx, u, v, prof, larg, etages, P, k, balcon) {
     const marches = 4, hm = 0.62, retrait = larg / (2 * marches + 1);
     for (let e = 0; e < marches; e++) {
       const l = larg - 2 * e * retrait, vv = v + e * retrait;
-      drawBox(ctx, u + 0.25, vv - 0.12, prof - 0.5, l + 0.24, hm, toit, h + e * hm);      // ardoise, derrière
+      drawBox(ctx, u + 0.32, vv - 0.12, prof - 0.6, l + 0.24, hm, toit, h + e * hm);      // ardoise, derrière le pignon (sans le traverser)
       drawBox(ctx, u, vv, 0.3, l, hm, mur, h + e * hm);                                  // brique du pignon
       drawBox(ctx, u - 0.02, vv - 0.02, 0.34, l + 0.04, 0.08, P.encadrement, h + (e + 1) * hm - 0.08);
     }

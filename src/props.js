@@ -109,7 +109,7 @@ function voitureNue(ctx, K, uCenter, v, sens, t) {
   }
   bloc(0.0, L, 0.0, Wd, 0.62, 0.3, CAISSE);                      // caisse
   bloc(0.35, L - 0.7, -0.012, 0.02, 0.05, 0.62, LIGNE);          // ligne de caisse, côté caméra
-  bloc(0.75, L - 1.5, 0.1, Wd - 0.2, 0.42, 0.92, "#a8d8f0");     // habitacle vitré
+  bloc(0.75, L - 1.5, 0.1, Wd - 0.2, 0.42, 0.92, "#5f7f9c");     // habitacle vitré, teinté : clair, on croyait voir À TRAVERS la voiture
   for (const a of [0.72, L / 2 - 0.07, L - 0.86]) bloc(a, 0.14, 0.08, Wd - 0.16, 0.42, 0.92, CAISSE); // montants
   bloc(0.68, L - 1.36, 0.06, Wd - 0.12, H - 1.34, 1.34, TOIT);   // toit plat
   bloc(-0.05, 0.1, 0.12, Wd - 0.24, 0.12, 0.34, GRIS);           // pare-chocs

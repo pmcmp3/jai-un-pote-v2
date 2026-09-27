@@ -197,7 +197,7 @@ export function renderHint(ctx, width, height, alpha) {
 
 // Bandeau ponctuel (« +1 POTE », « −2 POTES », « SOBERLAND EST LÀ ! ») :
 // même vocabulaire que le bandeau de palier du premier jeu.
-export function renderBanner(ctx, width, height, banner, safeTop = 0) {
+export function renderBanner(ctx, width, height, banner, safeTop = 0, yForce = null) {
   if (!banner || banner.timer <= 0) return;
   const age = banner.duree - banner.timer;
   ctx.save();
@@ -207,7 +207,7 @@ export function renderBanner(ctx, width, height, banner, safeTop = 0) {
   while (ctx.measureText(banner.titre).width > maxW - 44 && ft > 12) { ft -= 1; ctx.font = `900 ${ft}px ${POLICE_TITRE}`; }
   const w = Math.max(170, Math.min(maxW, ctx.measureText(banner.titre).width + 46));
   const h = banner.sous ? 56 : 40;
-  const y = safeTop + 150;
+  const y = yForce !== null ? yForce : safeTop + 150;
   const tPop = Math.min(1, age / 0.3);
   const scale = 0.85 + 0.15 * tPop + 0.05 * Math.sin(tPop * Math.PI);
   ctx.translate(width / 2, y + h / 2);
@@ -224,7 +224,8 @@ export function renderBanner(ctx, width, height, banner, safeTop = 0) {
   ctx.strokeStyle = NOIR; ctx.lineWidth = 1.5;
   roundRect(ctx, x, y, w, h, 3); ctx.stroke();
   // L'onglet de couleur, posé de travers à cheval sur le bord haut.
-  const tw = Math.min(w - 30, 92), th = 15;
+  ctx.font = `800 9px ${POLICE}`;
+  const tw = Math.min(w - 30, Math.max(60, ctx.measureText(banner.etiquette || "").width + 22)), th = 15;
   ctx.save();
   ctx.translate(x + 18 + tw / 2, y);
   ctx.rotate(-0.035);
@@ -232,6 +233,12 @@ export function renderBanner(ctx, width, height, banner, safeTop = 0) {
   ctx.fillRect(-tw / 2, -th / 2, tw, th);
   ctx.strokeStyle = NOIR; ctx.lineWidth = 1.2;
   ctx.strokeRect(-tw / 2, -th / 2, tw, th);
+  if (banner.etiquette) {
+    ctx.fillStyle = banner.couleur === ROUGE ? BLANC : NOIR;
+    ctx.font = `800 9px ${POLICE}`;
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText(banner.etiquette, 0, 0.5);
+  }
   ctx.restore();
   ctx.textAlign = "center";
   ctx.textBaseline = "top";
