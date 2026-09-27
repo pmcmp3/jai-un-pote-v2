@@ -302,7 +302,8 @@ function gateTextes(action, niveau) {
   const continuer = action === "continuer";
   const presave = niveau === "presave";
   return {
-    eyebrow: "",
+    // Sticker rouge, comme toutes les cartes (28 septembre 2026, cohérence des menus).
+    eyebrow: presave ? "L'album est sorti" : "Dernière étape",
     titre: presave
       ? (continuer ? "Ajoute l'album à ta bibliothèque pour continuer la partie" : "Ajoute l'album à ta bibliothèque pour rejouer")
       : (continuer ? "Abonne-toi à PMC pour continuer la partie" : "Abonne-toi à PMC pour rejouer"),

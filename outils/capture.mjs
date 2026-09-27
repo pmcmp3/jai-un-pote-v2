@@ -35,18 +35,22 @@ const page = await contexte.newPage();
 const erreurs = [];
 page.on("pageerror", (e) => erreurs.push(e.stack || e.message));
 page.on("console", (m) => { if (m.type() === "error") erreurs.push(m.text()); });
-await page.addInitScript((parties) => {
+await page.addInitScript(([parties, neuf]) => {
   localStorage.setItem("jp2Pseudo", "pmc");
   localStorage.setItem("jp2Parties", parties);
-  localStorage.setItem("jp2MorceauOuvert", "1");
-  localStorage.setItem("jp2PmcSuivi", "1");
-}, process.env.PARTIES || "5");
+  if (!neuf) { localStorage.setItem("jp2MorceauOuvert", "1"); localStorage.setItem("jp2PmcSuivi", "1"); }
+}, [process.env.PARTIES || "5", process.env.NEUF === "1"]);
 await page.goto(url);
 const attendre = (ms) => page.waitForTimeout(ms);
 const photo = async (nom) => { await page.screenshot({ path: `${sorties}${nom}.png` }); console.log("  →", `outils/sorties/${nom}.png`); };
 
 await attendre(1800);
 await photo(petit ? "00-menu-petit" : "00-menu");
+if (demandes.includes("menus")) {
+  await page.click("#step3-profil"); await attendre(500); await photo("40-menu-profil");
+  await page.click("#step1-next"); await attendre(500); await photo("41-menu-ligue");
+  await page.click("#step2-next"); await attendre(500);
+}
 await page.waitForFunction(() => !document.getElementById("play-button").disabled, null, { timeout: 15000 });
 await page.click("#play-button");
 await page.waitForFunction(() => window.__pote && window.__pote.estDemarre(), null, { timeout: 8000 });
@@ -212,6 +216,85 @@ const SCENES = {
       return out;
     });
     console.log(t.join("\n"));
+  },
+  // GALERIE des modèles 3D (28 septembre 2026, « refais une repasse de tous
+  // les éléments 3D qui ont trop de soucis ») : chaque modèle dessiné par le
+  // vrai moteur, en grand, à gauche / au centre / à droite de la caméra (les
+  // faces vues changent selon le côté), plus le décor des biomes.
+  galerie: async () => {
+    const planches = [
+      ["poule", "chat", "chien"], ["mouton", "botte", "cochon"], ["vache", "fermier", "voiture"],
+      ["tracteur"], ["tracteurProche"], ["contresens"], ["poulejetee"], ["riders"],
+      ["decor:ble:10"], ["decor:village:135"], ["decor:villageSud:355"], ["decor:foret:230"], ["halle"],
+    ];
+    for (let i = 0; i < planches.length; i++) {
+      const noms = planches[i];
+      await course(async (noms) => {
+        const scene = await import("/src/scene.js"), props = await import("/src/props.js"), rows = await import("/src/rows.js");
+        const { drawRider } = await import("/src/voxrider.js");
+        const { PALETTES } = await import("/src/rider.js");
+        let cv = document.getElementById("galerie");
+        if (!cv) { cv = document.createElement("canvas"); cv.id = "galerie"; cv.style.cssText = "position:fixed;left:0;top:0;width:375px;height:300px;z-index:999;background:#fff"; document.body.appendChild(cv); }
+        const W = 750, H = 600;
+        cv.width = W * 2; cv.height = H * 2;
+        const c = cv.getContext("2d");
+        c.setTransform(2, 0, 0, 2, 0, 0);
+        c.scale(0.5, 0.5); // 750×600 logiques dans 375×300 CSS
+        c.setTransform(1, 0, 0, 1, 0, 0);
+        scene.setViewport(W * 2, H * 2);
+        scene.setJoueurX(0.5);
+        const nom = noms[0];
+        const decor = nom.startsWith("decor:") ? nom.split(":") : null;
+        scene.setCamera(decor ? Number(decor[2]) : nom === "halle" ? 20 : 0);
+        scene.setDecorTime(1);
+        // Zoom ×ZOOM autour du bord de la route (les modèles font ~50 px sinon).
+        const ZOOM = decor || nom === "halle" ? 1 : 2.2;
+        const o = scene.project(0, scene.getVCentre(), 1.2);
+        c.translate(W, H * 1.15); c.scale(ZOOM, ZOOM); c.translate(-o.x, -o.y);
+        scene.renderGround(c, null);
+        const items = [];
+        const vc = scene.getVCentre();
+        if (decor) {
+          const { from, to } = scene.rowRange();
+          for (let r = from; r <= to; r++) for (const it of scene.rowDecor(c, r, false)) items.push(it);
+        } else if (nom === "halle") {
+          const geo = { haut: rows.HALLE_HAUT, montee: 7, plat: 26, descente: 7, total: rows.HALLE_ROWS };
+          items.push({ d: scene.depth(1.7, 10), draw: () => scene.drawHalle(c, 10, geo, -99, 99, "fond") });
+          items.push({ d: scene.depth(-1.5, 10), draw: () => scene.drawHalle(c, 10, geo, -99, 99, "devant") });
+          items.push({ d: scene.depth(0, 20), draw: () => drawRider(c, 0, 20, rows.HALLE_HAUT, PALETTES.pmc, 1, 1, 0) });
+        } else {
+          const pos = [-2.6, 0, 2.6];
+          noms.forEach((n, k) => {
+            for (const dv of noms.length === 1 ? pos : [pos[k]]) {
+              const v = vc + dv;
+              const K = rows.KINDS[n];
+              if (n === "tracteur") items.push({ d: scene.depth(3, v), draw: () => props.drawCrosser(c, "tracteur", 3, v, -1, 1) });
+              else if (n === "tracteurProche") items.push({ d: scene.depth(0, v), draw: () => props.drawCrosser(c, "tracteur", 0, v, -1, 1) });
+              else if (n === "contresens") items.push({ d: scene.depth(0, v), draw: () => props.drawVoiture(c, K, 0, v, -1, 1) });
+              else if (n === "poulejetee") { items.push({ d: scene.depth(0, v), draw: () => props.drawPouleJetee(c, 0, v, 1) }); items.push({ d: scene.depth(1.65, v + 1.2), draw: () => props.drawLanceurFace(c, 1.65, v + 1.2, 1, dv < 0 ? null : 0.2) }); }
+              else if (n === "riders") { const P = [PALETTES.pmc, { ...PALETTES.pmc, velo: "grandbi" }, { ...PALETTES.pmc, velo: "roller" }][pos.indexOf(dv)]; items.push({ d: scene.depth(0, v), draw: () => drawRider(c, 0, v, 0, P, 1, 1, 0) }); }
+              else items.push({ d: scene.depth(0, v), draw: () => props.drawStatic(c, n, 0, v, 1) });
+            }
+          });
+        }
+        items.sort((a, b) => b.d - a.d);
+        for (const it of items) it.draw();
+        scene.setViewport(innerWidth, innerHeight);
+      }, noms);
+      const el = await page.$("#galerie");
+      await el.screenshot({ path: `${sorties}g${String(i).padStart(2, "0")}-${noms.join("-").replace(/:/g, "_")}.png` });
+    }
+    console.log("  → galerie : outils/sorties/g*.png");
+    await course(() => document.getElementById("galerie").remove());
+  },
+  menus: async () => {
+    // ⚠️ Pas de touche D ici : overlay masqué = touches de debug coupées (G, I…).
+    await attendre(1200);
+    await page.click("#pause-button"); await attendre(500); await photo("42-pause");
+    await page.click("#resume-button"); await attendre(3000);
+    await page.keyboard.press("KeyI");
+    await page.keyboard.press("KeyG"); await attendre(900); await photo("43-mort");
+    await page.click("#revive-cta"); await attendre(700); await photo("44-porte");
   },
   // Sans l'overlay de debug (touche D), pour juger l'image telle que le joueur la voit.
   propre: async () => { await page.keyboard.press("KeyD"); await attendre(400); await photo("11-propre"); await page.keyboard.press("KeyD"); },

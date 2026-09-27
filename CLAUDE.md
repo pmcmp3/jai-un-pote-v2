@@ -148,6 +148,27 @@ Code `TESTV2`, qui est aussi `config.ligueBeta` (menu simplifié + bouton « Lai
   depuis ce menu passe par la même porte que REJOUER.
 - `VERSION_COURSE` 7, cache `jp2-v5`.
 
+## Retours du 28 septembre 2026 (« cohérence dans les menus », « le tuto sans difficulté », « repasse des éléments 3D »)
+
+- **Menus** : UNE grammaire partout — carte blanche, bord noir, sticker rouge de travers.
+  Ajoutée là où elle manquait : carte de mort (« Tombé ! »), tiroir album (« L'album est
+  sorti » / « Dernière étape »), carte du TUTO (qui était la dernière sombre et
+  translucide, désormais identique au bestiaire, onglet jaune « BIEN ! »). Icône de volume
+  en SVG (plus d'emoji).
+- **Tuto sans difficulté** : rien ne fait mal pendant le tuto, aucune traversée n'est armée,
+  et la route reste sûre pendant tout le bestiaire qui le suit + 3 s.
+- **3D** : voiture refaite (habitacle vitré à montants, toit plat clair, pare-chocs gris fins ;
+  plus de bandes noires ni de galerie), taches de la vache plaquées, maisons du Nord refaites
+  (pignon à redents CENTRÉ face à la rue, ardoise derrière), maisons groupées/triées, pas
+  d'ombre au sol quand on roule sur une halle ou un toit.
+- **Galerie** : `node outils/capture.mjs galerie` dessine chaque modèle en grand, à gauche /
+  au centre / à droite de la caméra, plus le décor des biomes (`outils/sorties/g*.png`).
+  À relancer après toute retouche d'un modèle.
+- ⚠️ **À trancher par l'artiste** : le titre du tiroir dit encore « Ajoute l'album à ta
+  bibliothèque pour continuer la partie » — c'est précisément la formulation que le
+  CLAUDE.md du premier jeu interdit (clause Spotify « compensation … or otherwise »).
+  Non modifiée ici sans son accord.
+
 ## Invariants de la v2 (mesurés, `outils/mesurer.mjs`)
 
 - L'écart entre deux obstacles vient de la PHYSIQUE du saut (`ecartMin` : retombée du premier +

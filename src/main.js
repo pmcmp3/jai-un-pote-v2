@@ -222,7 +222,16 @@ function tutoStep(dt, now) {   // eslint-disable-line no-shadow
     tuto.timer += dt;
     if (tuto.timer > 25) { tuto.index += 1; tuto.timer = 0; }
   }
-  if (tuto.index >= TUTO_ETAPES.length) { tuto.actif = false; lancerBestiaire(); }
+  if (tuto.index >= TUTO_ETAPES.length) {
+    tuto.actif = false;
+    lancerBestiaire();
+    // Le tuto doit rester SANS DIFFICULTÉ jusqu'au bout (28 septembre 2026) :
+    // la route reste sûre pendant tout le bestiaire qui le suit, plus 3 s, au
+    // lieu de voir les obstacles débouler à pleine vitesse dès la dernière
+    // consigne validée.
+    const r0 = Math.floor(player.v + 0.5) + 1;
+    rows.ouvrirFenetreSure(r0, r0 + Math.ceil(speed * (BESTIAIRE_S + 3)));
+  }
 }
 function tutoVue() {
   if (!tuto.actif) return null;
@@ -515,6 +524,7 @@ function marquerTombe(ev, now) { if (ev.r !== undefined && !KINDS_ROULANTS.has(e
 const KINDS_ROULANTS = new Set(["tracteur", "voiture", "contresens", "poulejetee"]);
 
 function toucherJoueur(ev) {
+  if (tuto.actif) return; // rien ne fait mal pendant le tuto
   // Invulnérable (turbo lait, bouclier de reprise) : la bête est quand même
   // renversée, avec une gerbe d'étincelles — sinon on croit à un bug de
   // collision (27 septembre 2026 : « j'ai roulé sur une poule, j'ai pas eu
@@ -688,7 +698,7 @@ function step(dt) {
 
   // --- Traversées : armées pour croiser le joueur ---
   if (tuto.actif) rows.ouvrirFenetreSure(Math.floor(player.v + 0.5) + 1, Math.floor(player.v + 0.5) + scene.ROWS_AHEAD + 2);
-  if (now >= 0) armerTraversees(now, vitesse);
+  if (now >= 0 && !tuto.actif) armerTraversees(now, vitesse);
 
   // --- Collisions et pièces ---
   if (now >= 0) {
@@ -960,7 +970,8 @@ function render(alpha) {
   } });
   for (const g of ghosts) items.push({ d: scene.depth(g.u + 0.01, g.v), draw: () => drawRider(ctx, g.u, g.v, g.h, paletteJoueur, pedal, 0.22 * (1 - g.age / 0.35), g.flip, false) });
   items.push({ d: scene.depth(u, v), draw: () => {
-    drawRider(ctx, u, v, jy, paletteJoueur, pedal, 1, flip, true, player.prevRoue + (player.roue - player.prevRoue) * alpha,
+    // Pas d'ombre sur la route quand on roule sur une halle ou un toit de voiture.
+    drawRider(ctx, u, v, jy, paletteJoueur, pedal, 1, flip, solSous(v, jy) < 0.05, player.prevRoue + (player.roue - player.prevRoue) * alpha,
       player.jumpY <= rows.solAt(player.v) + 0.02 ? penteSol(v) : 0);
     // Chevron « c'est toi » au-dessus de la tête : dans la meute, le joueur
     // se perdait parmi ses potes (même maillot possible).

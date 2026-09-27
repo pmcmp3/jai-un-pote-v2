@@ -87,41 +87,39 @@ export function drawVoiture(ctx, K, uCenter, v, sens, t) {
   groupe(ctx, () => voitureNue(ctx, K, uCenter, v, sens, t));
 }
 function voitureNue(ctx, K, uCenter, v, sens, t) {
+  // Refaite le 28 septembre 2026 (« refais une repasse de tous les éléments
+  // 3D qui ont trop de soucis ») : plus de passages de roue ni de pare-chocs
+  // noirs sur toute la largeur (vus de biais, ils faisaient de grandes bandes
+  // noires en travers de la caisse), plus de galerie de toit. Une caisse, un
+  // habitacle VITRÉ avec trois montants, un toit plat clair (on s'y pose),
+  // des pare-chocs gris fins, des feux aux quatre coins.
   const L = K.long, Wd = K.larg, H = K.h;
   const x = uCenter - Wd / 2;
   const A = (a) => (sens > 0 ? v - L / 2 + a : v + L / 2 - a);
   const bloc = (a, da, b, db, h, hh, col) => drawBox(ctx, x + b, sens > 0 ? A(a) : A(a) - da, db, da, h, col, hh);
-  // UNE seule teinte : la petite voiture crème de village. Les quatre couleurs
-  // tirées au hasard ne voulaient rien dire et changeaient à chaque partie.
-  const CAISSE = "#e6e0d2", BAS = "#cfc7b6", TOIT = "#c9c2b2";
+  const CAISSE = "#e6e0d2", TOIT = "#d3cab8", GRIS = "#8a8a92", LIGNE = "#bdb4a0";
+  const nuit = getNight() > 0.2;
   drawShadow(ctx, uCenter, v, Wd / 2, L / 2, 0.26);
-  const rRoue = 0.33;
-  for (const a of [0.72, L - 0.72]) {
-    for (const uu of [x - 0.05, x + Wd - 0.26]) {
-      drawDisque(ctx, uu, A(a), rRoue, rRoue, BLACK);
-      drawDisque(ctx, uu - 0.02, A(a), rRoue, rRoue * 0.45, "#8a8d98");
+  const rRoue = 0.34;
+  for (const a of [0.62, L - 0.62]) {
+    for (const uu of [x + Wd - 0.3, x - 0.03]) {
+      drawDisque(ctx, uu, A(a), rRoue, rRoue, "#1a1a1e");
+      drawDisque(ctx, uu - 0.002, A(a), rRoue, rRoue * 0.5, "#9a9da8");
     }
-    bloc(a - 0.42, 0.84, 0.02, Wd - 0.04, 0.16, 0.5, "#2b2b31");   // passage de roue
   }
-  // Caisse : bas de caisse, ceinture, cabine, toit PLAT (on s'y pose).
-  bloc(0.06, L - 0.12, 0.03, Wd - 0.06, 0.34, 0.3, BAS);
-  bloc(0.0, L, 0.0, Wd, 0.3, 0.64, CAISSE);
-  bloc(0.85, L - 1.7, 0.1, Wd - 0.2, 0.42, 0.94, CAISSE);
-  bloc(0.95, L - 1.9, 0.06, Wd - 0.12, 0.3, 0.98, VITRE);
-  bloc(0.85, L - 1.7, 0.08, Wd - 0.16, 0.09, H - 0.09, TOIT);
-  // Galerie de toit : elle DIT que le toit est une surface, pas une bosse.
-  for (const a of [1.15, L - 1.15]) bloc(a, 0.08, 0.14, Wd - 0.28, 0.1, H, "#5c5348");
-  bloc(1.15, L - 2.3, 0.16, 0.1, 0.06, H + 0.04, "#5c5348");
-  bloc(1.15, L - 2.3, Wd - 0.26, 0.1, 0.06, H + 0.04, "#5c5348");
-  // Pare-chocs et feux : blancs devant, rouges derrière.
-  bloc(0.0, 0.12, 0.04, Wd - 0.08, 0.2, 0.46, "#2b2b31");
-  bloc(L - 0.12, 0.12, 0.04, Wd - 0.08, 0.2, 0.46, "#2b2b31");
-  for (const b of [0.1, Wd - 0.38]) {
-    bloc(L - 0.09, 0.1, b, 0.28, 0.16, 0.74, getNight() > 0.2 ? "#fff6c8" : "#f0ead2");
-    bloc(0.0, 0.1, b, 0.28, 0.15, 0.76, "#c8301c");
+  bloc(0.0, L, 0.0, Wd, 0.62, 0.3, CAISSE);                      // caisse
+  bloc(0.35, L - 0.7, -0.012, 0.02, 0.05, 0.62, LIGNE);          // ligne de caisse, côté caméra
+  bloc(0.75, L - 1.5, 0.1, Wd - 0.2, 0.42, 0.92, "#a8d8f0");     // habitacle vitré
+  for (const a of [0.72, L / 2 - 0.07, L - 0.86]) bloc(a, 0.14, 0.08, Wd - 0.16, 0.42, 0.92, CAISSE); // montants
+  bloc(0.68, L - 1.36, 0.06, Wd - 0.12, H - 1.34, 1.34, TOIT);   // toit plat
+  bloc(-0.05, 0.1, 0.12, Wd - 0.24, 0.12, 0.34, GRIS);           // pare-chocs
+  bloc(L - 0.05, 0.1, 0.12, Wd - 0.24, 0.12, 0.34, GRIS);
+  for (const b of [0.06, Wd - 0.34]) {
+    bloc(L - 0.03, 0.05, b, 0.28, 0.14, 0.68, nuit ? "#fff6c8" : "#f4eed6");   // phares
+    bloc(-0.02, 0.05, b, 0.28, 0.12, 0.7, "#c8301c");                          // feux arrière
   }
   if (sens < 0) {
-    ctx.save(); ctx.globalAlpha *= getNight() > 0.2 ? 0.55 : 0.22;
+    ctx.save(); ctx.globalAlpha *= nuit ? 0.55 : 0.22;
     drawFlat(ctx, x - 0.1, v - L / 2 - 4.2, Wd + 0.2, 4.2, "#fff2b0", true);
     ctx.restore();
   }
@@ -168,9 +166,11 @@ function staticNu(ctx, kind, uCenter, r, t) {
   } else if (kind === "vache") {
     for (const [la, lb] of [[0.1, 0.1], [0.1, 0.66], [0.62, 0.1], [0.62, 0.66]]) B(la, lb, 0.09, 0.18, 0.34, WHITE);
     B(0.04 + wob, 0.04, 0.68, 0.9, 0.42, WHITE, 0.34);
-    B(0.2 + wob, 0.0, 0.16, 0.34, 0.14, BLACK, 0.62);
-    B(0.5 + wob, 0.02, 0.13, 0.3, 0.14, BLACK, 0.5);
-    B(0.22 + wob, 0.18, 0.18, 0.38, 0.13, BLACK, 0.76);
+    // Taches PLAQUÉES sur le flanc côté caméra et sur le dos (elles flottaient
+    // en blocs au-dessus du dos, 28 septembre 2026).
+    B(0.14 + wob, 0.02, 0.2, 0.03, 0.22, BLACK, 0.42);
+    B(0.44 + wob, 0.02, 0.16, 0.03, 0.18, BLACK, 0.52);
+    B(0.22 + wob, 0.3, 0.2, 0.36, 0.02, BLACK, 0.76);
     B(0.74 + wob, 0.2, 0.2, 0.6, 0.26, WHITE, 0.46);
     B(0.94 + wob, 0.3, 0.08, 0.38, 0.1, PINK, 0.48);
     B(0.78 + wob, 0.12, 0.06, 0.1, 0.1, "#c8b89a", 0.7);

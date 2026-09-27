@@ -686,9 +686,12 @@ function personnage(ctx, u, v, lift, haut, bas) {
 // Deux bourgs, deux régions. NORD : brique rouge, ardoise sombre, pignon à
 // redents, encadrements blancs. SUD : enduit ocre, tuile romaine, volets,
 // toits à faible pente. Même grammaire de cubes, deux palettes et deux toits.
-const PALETTE_NORD = { murs: ["#a8503a", "#96452f", "#b35c44", "#8f4433"], toits: ["#3f4750", "#343b44", "#4a525c", "#2e343c"], encadrement: "#f2ede2", pente: 0.9 };
+const PALETTE_NORD = { murs: ["#a8503a", "#96452f", "#b35c44", "#8f4433"], toits: ["#5b6571", "#525b66", "#626c78", "#4d5661"], encadrement: "#f2ede2", pente: 0.9 };
 const PALETTE_SUD  = { murs: ["#ead9b6", "#dfc79c", "#f0e2c4", "#d9bf94"], toits: ["#c9743a", "#b8632e", "#d68448", "#a85526"], encadrement: "#8fa86a", pente: 0.45 };
 function maisonRegion(ctx, u, v, prof, larg, etages, P, k, balcon) {
+  groupe(ctx, () => maisonNue(ctx, u, v, prof, larg, etages, P, k, balcon));
+}
+function maisonNue(ctx, u, v, prof, larg, etages, P, k, balcon) {
   const h = ETAGE_H * etages;
   const mur = P.murs[k % 4], toit = P.toits[(k + 1) % 4];
   drawBox(ctx, u, v, prof, larg, h, mur);
@@ -707,11 +710,20 @@ function maisonRegion(ctx, u, v, prof, larg, etages, P, k, balcon) {
     drawBox(ctx, u - 0.82, v + 0.2, 0.08, larg - 0.4, 0.95, "#6b4b2e", ETAGE_H + 0.14);
   }
   if (P.pente > 0.7) {
-    // NORD : toit d'ardoise haut et pointu, pignon à redents côté rue.
-    drawBox(ctx, u - 0.2, v - 0.2, prof + 0.4, larg + 0.4, 0.3, toit, h);
-    drawBox(ctx, u + 0.22, v - 0.2, prof - 0.44, larg + 0.4, 1.0, toit, h + 0.3);
-    drawBox(ctx, u + 0.55, v - 0.2, prof - 1.1, larg + 0.4, 0.9, toit, h + 1.3);
-    for (let e = 0; e < 3; e++) drawBox(ctx, u - 0.16, v - 0.16 + e * 0.18, 0.18, larg * 0.5 - e * 0.5, 0.75 * (e + 1), mur, h);
+    // NORD (refait le 28 septembre 2026) : pignon à redents CENTRÉ sur la
+    // façade, face à la rue, et le toit d'ardoise derrière lui, faîtage
+    // perpendiculaire à la route. L'ancien toit en marches parallèles à la
+    // route passait AU-DESSUS de la caméra : on n'en voyait que des dessous
+    // sombres qui flottaient, et le « pignon » était un escalier collé à
+    // gauche de la maison.
+    const marches = 4, hm = 0.62, retrait = larg / (2 * marches + 1);
+    for (let e = 0; e < marches; e++) {
+      const l = larg - 2 * e * retrait, vv = v + e * retrait;
+      drawBox(ctx, u + 0.25, vv - 0.12, prof - 0.5, l + 0.24, hm, toit, h + e * hm);      // ardoise, derrière
+      drawBox(ctx, u, vv, 0.3, l, hm, mur, h + e * hm);                                  // brique du pignon
+      drawBox(ctx, u - 0.02, vv - 0.02, 0.34, l + 0.04, 0.08, P.encadrement, h + (e + 1) * hm - 0.08);
+    }
+    drawBox(ctx, u - 0.03, v + larg / 2 - 0.3, 0.05, 0.6, 0.7, "#3a3a40", h + 0.7);      // lucarne
   } else {
     // SUD : toit de tuiles bas, large débord, génoise sous l'avant-toit.
     drawBox(ctx, u - 0.55, v - 0.55, prof + 1.1, larg + 1.1, 0.22, "#c9a678", h);

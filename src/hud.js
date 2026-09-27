@@ -330,30 +330,44 @@ export function renderBestiaire(ctx, width, height, alpha, groupes, safeTop = 0,
 }
 
 // Tutoriel du tout début : une consigne à la fois, en gros, jusqu'au geste.
+// Même carte que le reste du jeu depuis le 28 septembre 2026 (« je veux une
+// cohérence dans les menus ») : blanche à bord noir, onglet rouge de travers
+// (jaune quand l'étape est réussie), titre en serif noire — c'était le seul
+// panneau encore sombre et translucide.
 export function renderTuto(ctx, width, height, tuto) {
   if (!tuto) return;
   ctx.save();
-  const w = Math.min(width - 32, 340), h = tuto.sous ? 96 : 74;
+  const w = Math.min(width - 32, 330), h = tuto.sous ? 92 : 70;
   const x = width / 2 - w / 2, y = height * 0.3;
   ctx.globalAlpha = tuto.alpha;
-  ctx.fillStyle = PANNEAU;
-  roundRect(ctx, x, y, w, h, 4);
-  ctx.fill();
-  ctx.fillStyle = tuto.ok ? JAUNE : BLANC;
-  roundRect(ctx, x, y, w, 3, 1);
-  ctx.fill();
+  ctx.fillStyle = "rgba(0,0,0,0.18)";
+  roundRect(ctx, x + 2, y + 4, w, h, 3); ctx.fill();
+  ctx.fillStyle = "#ffffff";
+  roundRect(ctx, x, y, w, h, 3); ctx.fill();
+  ctx.strokeStyle = NOIR; ctx.lineWidth = 1.5;
+  roundRect(ctx, x, y, w, h, 3); ctx.stroke();
+  const onglet = tuto.ok ? "BIEN !" : `TUTO ${tuto.index}/${tuto.total}`;
+  ctx.save();
+  ctx.translate(x + 16 + 50, y);
+  ctx.rotate(-0.035);
+  ctx.fillStyle = tuto.ok ? JAUNE : ROUGE;
+  ctx.fillRect(-50, -8, 100, 16);
+  ctx.strokeStyle = NOIR; ctx.lineWidth = 1.2;
+  ctx.strokeRect(-50, -8, 100, 16);
+  ctx.fillStyle = tuto.ok ? NOIR : BLANC;
+  ctx.font = `800 9px ${POLICE}`;
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.fillText(onglet, 0, 0.5);
+  ctx.restore();
   ctx.textAlign = "center"; ctx.textBaseline = "top";
-  ctx.font = `700 10px ${POLICE}`;
-  ctx.fillStyle = "rgba(255,255,255,0.6)";
-  ctx.fillText(tuto.ok ? "BIEN !" : `TUTO ${tuto.index}/${tuto.total}`, width / 2, y + 12);
-  let t = 26; ctx.font = `900 ${t}px ${POLICE_TITRE}`;
-  while (ctx.measureText(tuto.titre).width > w - 24 && t > 14) { t -= 1; ctx.font = `900 ${t}px ${POLICE_TITRE}`; }
-  ctx.fillStyle = tuto.ok ? JAUNE : BLANC;
-  ctx.fillText(tuto.titre, width / 2, y + 26);
+  let t = 24; ctx.font = `900 ${t}px ${POLICE_TITRE}`;
+  while (ctx.measureText(tuto.titre).width > w - 28 && t > 14) { t -= 1; ctx.font = `900 ${t}px ${POLICE_TITRE}`; }
+  ctx.fillStyle = NOIR;
+  ctx.fillText(tuto.titre, width / 2, y + 22);
   if (tuto.sous) {
-    fitFont(ctx, "500", 13, tuto.sous, w - 24, 9);
-    ctx.fillStyle = "rgba(255,255,255,0.85)";
-    ctx.fillText(tuto.sous, width / 2, y + 60);
+    fitFont(ctx, "500", 12, tuto.sous, w - 28, 9);
+    ctx.fillStyle = "rgba(13,13,16,0.6)";
+    ctx.fillText(tuto.sous, width / 2, y + 58);
   }
   ctx.restore();
 }
