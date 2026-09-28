@@ -37,6 +37,7 @@ page.on("pageerror", (e) => erreurs.push(e.stack || e.message));
 page.on("console", (m) => { if (m.type() === "error") erreurs.push(m.text()); });
 await page.addInitScript(([parties, neuf, genre]) => {
   if (genre) localStorage.setItem("jp2Skin", JSON.stringify({ genre }));
+  localStorage.setItem("jp2-appris", '["tap","haut","double"]'); // pas de conseil hors des scènes qui le testent
   localStorage.setItem("jp2Pseudo", "pmc");
   localStorage.setItem("jp2Parties", parties);
   if (!neuf) { localStorage.setItem("jp2MorceauOuvert", "1"); localStorage.setItem("jp2PmcSuivi", "1"); }
@@ -140,6 +141,48 @@ const SCENES = {
     console.log(`  CPU ×4 : travail par image ${travail.moy.toFixed(1)} ms en moyenne, ${travail.p95.toFixed(1)} ms au 95e centile (intervalle ${ms.moyenne.toFixed(1)} ms, plafonné par le headless)`);
   },
   // Tutoriel (lancer avec PARTIES=0) : consigne 1, un tap, consigne 2.
+  // Auto-audit du tuto contextuel : chaque famille, bon geste, sans toucher de pote.
+  audit: async () => {
+    await page.keyboard.press("KeyI"); // vulnérable : l'obstacle expliqué ne doit PAS coûter de pote
+    for (let i = 0; i < 3; i++) await page.keyboard.press("KeyP");
+    await attendre(600);
+    const res = [];
+    for (const fam of ["tap", "haut", "double"]) {
+      await course((f) => { const tous = ["tap", "haut", "double"]; localStorage.setItem("jp2-appris", JSON.stringify(tous.filter((x) => x !== f))); }, fam);
+      const cible = await course((f) => { const p = window.__pote; for (let r = Math.ceil(p.player.v) + 30; r < 4000; r++) { const row = p.rows.rowAt(r); if (row.type !== "safe" && p.rows.familleDe(row.kind) === f) return { r, kind: row.kind, type: row.type }; } return null; }, fam);
+      if (!cible) { res.push({ fam, erreur: "aucun obstacle" }); continue; }
+      await course((r) => { const p = window.__pote.player; p.v = r - 18; p.prevV = p.v; }, cible.r);
+      const avant = await course(() => window.__pote.friends.count());
+      let c = null;
+      for (let k = 0; k < 90; k++) { await attendre(100); c = await course(() => window.__pote.conseil()); if (c.phase === "attente" && c.ralenti < 0.1) break; }
+      const declenche = c.phase === "attente";
+      const figeV1 = await course(() => window.__pote.player.v); await attendre(800); const figeV2 = await course(() => window.__pote.player.v);
+      if (fam === "tap") await page.keyboard.press("Space");
+      else if (fam === "haut") { await page.keyboard.down("Space"); await attendre(1500); await page.keyboard.up("Space"); }
+      else { await page.keyboard.press("Space"); await attendre(600); await page.keyboard.press("Space"); }
+      const apres = await course(() => window.__pote.conseil());
+      await attendre(2500);
+      const fin = await course((r) => ({ v: window.__pote.player.v, potes: window.__pote.friends.count(), appris: localStorage.getItem("jp2-appris"), c: window.__pote.conseil() }), cible.r);
+      res.push({ chocs: await course(() => window.__pote.chocs()) });
+      res.push({ fam, kind: cible.kind, type: cible.type, declenche, avanceEnRalenti: +(figeV2 - figeV1).toFixed(2), phaseApresGeste: apres.phase, depasse: fin.v > cible.r, potesAvant: avant, potesApres: fin.potes, appris: fin.appris.includes(fam), ralentiFin: +fin.c.ralenti.toFixed(2) });
+    }
+    console.log("AUDIT", JSON.stringify(res, null, 1));
+    // Pause pendant un ralenti, puis reprise.
+    await course(() => localStorage.setItem("jp2-appris", "[]"));
+    const r = await course(() => { const p = window.__pote; for (let r = Math.ceil(p.player.v) + 30; r < 4000; r++) if (p.rows.rowAt(r).type === "statique") return r; return 0; });
+    await course((r) => { const p = window.__pote.player; p.v = r - 18; p.prevV = p.v; }, r);
+    for (let k = 0; k < 40; k++) { await attendre(100); if ((await course(() => window.__pote.conseil())).phase === "attente") break; }
+    await page.keyboard.press("Escape"); await attendre(700); await photo("60-pause-ralenti");
+    await page.keyboard.press("Escape"); await attendre(700);
+    console.log("PAUSE→REPRISE", JSON.stringify(await course(() => window.__pote.conseil())));
+    await photo("61-reprise-ralenti");
+    // Perf par saison (l'hiver a 70 flocons).
+    for (let i = 0; i < 4; i++) {
+      await page.keyboard.press("KeyS"); await attendre(400);
+      const t = await course(async () => { const t = []; for (let i = 0; i < 60; i++) { await new Promise((ok) => requestAnimationFrame(ok)); t.push(window.__pote.frameMs()); } t.sort((a, b) => a - b); return +t[Math.floor(t.length * 0.95)].toFixed(2); });
+      console.log("PERF saison", i, "p95 ms", t);
+    }
+  },
   // Saisons forcées (touche S) : printemps, été, automne, hiver.
   saisons: async () => {
     for (const nom of ["printemps", "ete", "automne", "hiver"]) { await page.keyboard.press("KeyS"); await attendre(900); await photo(`50-saison-${nom}`); }

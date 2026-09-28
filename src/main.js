@@ -215,6 +215,10 @@ const RALENTI_MIN = 0.06;
 const conseil = { r: null, famille: null, phase: null, alpha: 0, ok: 0 };
 let ralenti = 1, retardMonde = 0;
 function tMonde() { return clock.now() - retardMonde; }
+// Mort / fin pendant un conseil : on le coupe sans toucher au retard du monde
+// (le remettre à zéro ferait sauter les tracteurs en place). Sinon le morceau
+// restait étouffé jusque sur l'écran de fin.
+function conseilCouper() { conseil.r = null; conseil.phase = null; conseil.alpha = 0; conseil.ok = 0; audio.setRalenti(false); }
 function conseilReset() { conseil.r = null; conseil.famille = null; conseil.phase = null; conseil.alpha = 0; conseil.ok = 0; ralenti = 1; retardMonde = 0; audio.setRalenti(false); }
 // Temps avant que l'obstacle de la rangée r croise le joueur (s), ou null.
 function tempsAvant(r, row, tm, vitesse) {
@@ -246,7 +250,6 @@ function conseilGeste(ev) {
   if (conseil.r === null || conseil.phase === "fini") return;
   const f = conseil.famille;
   if (ev === "jump") conseil.phase = f === "tap" ? "fini" : "enl_air";
-  else if (ev === "haut" && f === "haut") conseil.phase = "fini";
   else if (ev === "salto" && f === "double") conseil.phase = "fini";
   if (conseil.phase === "fini") { conseil.ok = 0.9; audio.setRalenti(false); sfx.piece(); }
 }
@@ -255,7 +258,15 @@ function conseilStep(dt, tm, vitesse) {
   let cible = 1;
   if (conseil.r !== null) {
     if (conseil.phase === "attente") cible = RALENTI_MIN;
-    else if (conseil.phase === "enl_air") cible = 0.3;
+    else if (conseil.phase === "enl_air") {
+      cible = 0.3;
+      // Appui long : le ralenti tient jusqu'à la pleine hauteur (ou jusqu'au
+      // doigt levé) — sinon il repartait au premier dixième d'appui et un
+      // appui un peu court retombait sur la bête.
+      if (conseil.famille === "haut" && (player.tHaut >= window.CONFIG.sautTenueMaxS * 0.9 || !isHolding())) {
+        conseil.phase = "fini"; conseil.ok = 0.9; audio.setRalenti(false); sfx.piece();
+      }
+    }
     // Obstacle dépassé : famille apprise (même raté — il n'a pas fait mal).
     if (player.v > conseil.r + 1.5) {
       if (conseil.phase === "fini") apprendre(conseil.famille);
@@ -265,7 +276,7 @@ function conseilStep(dt, tm, vitesse) {
   if (conseil.ok > 0) conseil.ok -= dt;
   const vis = conseil.r !== null && conseil.phase !== "fini";
   conseil.alpha = Math.max(0, Math.min(1, conseil.alpha + (vis || conseil.ok > 0 ? dt * 6 : -dt * 4)));
-  ralenti += (cible - ralenti) * Math.min(1, dt * (cible < ralenti ? 14 : 5));
+  ralenti += (cible - ralenti) * Math.min(1, dt * (cible < ralenti ? 14 : 8));
 }
 function conseilVue() {
   if (conseil.alpha <= 0 || !conseil.famille) return null;
@@ -389,6 +400,7 @@ function restartGame(opts = {}) {
 
 // --- Mort / fin ------------------------------------------------------------------
 function mourir() {
+  conseilCouper();
   game.sansFaute = false;
   triggerShake(10, 0.6);
   damageFlash = 1;
@@ -425,6 +437,7 @@ function mourir() {
 // Fin du morceau : « TERMINÉ ! », le joueur continue de rouler 1,5 s en roue
 // libre, puis l'écran de fin.
 function terminer() {
+  conseilCouper();
   game.ended = true;
   game.endReason = "fin";
   game.finAge = 0;
@@ -439,6 +452,7 @@ function terminer() {
 }
 
 function endGame(reason) {
+  conseilCouper();
   game.ended = true;
   game.endReason = reason;
   canvas.classList.add("game-over-bw");
@@ -511,7 +525,9 @@ const tombes = new Map();
 function marquerTombe(ev, now) { if (ev.r !== undefined && !KINDS_ROULANTS.has(ev.kind)) tombes.set(ev.r, now); }
 const KINDS_ROULANTS = new Set(["tracteur", "voiture", "contresens", "poulejetee"]);
 
+const chocs = []; // debug : les derniers chocs (auto-audit)
 function toucherJoueur(ev) {
+  chocs.push({ r: ev.r, kind: ev.kind, conseil: conseil.r }); if (chocs.length > 20) chocs.shift();
   if (conseil.r !== null && ev.r === conseil.r) return; // l'obstacle expliqué ne fait pas mal
   // Invulnérable (turbo lait, bouclier de reprise) : la bête est quand même
   // renversée, avec une gerbe d'étincelles — sinon on croit à un bug de
@@ -689,7 +705,7 @@ function step(dt) {
   // (Plus de bandeau « LES HALLES ! » : c'est l'enseigne peinte sur le toit
   // qui annonce le bâtiment, 27 septembre 2026.)
   game.surHalle = rows.solAt(player.v) > 0.05;
-  if (now >= 0) fantome.enregistrer(now, player.u, player.v, player.jumpY);
+  if (now >= 0) fantome.enregistrer(tm, player.u, player.v, player.jumpY);
   friends.recordPlayer(player.v, marque);
   friends.update(dt, player, phys);
 
@@ -966,7 +982,7 @@ function render(alpha) {
   // Le fantôme du meilleur de la ligue : transparent, sans ombre, étiqueté.
   // Décalé vers le fond de la route (u + 0,7) : sur une seule voie, il serait
   // pile derrière le joueur.
-  const gp = gameStarted && ghost && ghost.graine === game.graine ? fantome.positionA(ghost.trace, now) : null;
+  const gp = gameStarted && ghost && ghost.graine === game.graine ? fantome.positionA(ghost.trace, tm) : null;
   if (gp) items.push({ d: scene.depth(gp.u + 0.7, gp.v), draw: () => {
     drawRider(ctx, gp.u + 0.7, gp.v, gp.h, ghost.palette, pedal, 0.38 * gp.alpha, 0, false);
     const g = scene.project(gp.u + 0.7, gp.v, gp.h + RIDER_HEIGHT + 0.15);
@@ -1194,6 +1210,7 @@ if (debugOverlay.isEnabled()) {
     frameMs: () => perf.frameMs,
     tombes: () => tombes.size,
     conseil: () => ({ ...conseil, ralenti }),
+    chocs: () => chocs.slice(),
   };
 }
 requestAnimationFrame(frame);

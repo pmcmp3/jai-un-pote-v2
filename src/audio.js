@@ -777,6 +777,8 @@ const beatPeriod = 60 / window.CONFIG.bpm;
 
 function rampFilter(target) {
   if (!lowpass) return;
+  // Un ralenti en cours survit à une pause : on rouvre sur SON filtre.
+  if (ralentiOn && target === FILTRE_OUVERT_HZ) target = 650;
   const t = audioCtx.currentTime;
   lowpass.frequency.cancelScheduledValues(t);
   lowpass.frequency.setValueAtTime(lowpass.frequency.value, t);
@@ -796,7 +798,9 @@ function rampFocus(target) {
 
 // Ralenti du tuto contextuel (main.js) : le morceau passe dans un passe-bas le
 // temps de la consigne — on entend que le temps s'est arrêté, la musique non.
+let ralentiOn = false;
 export function setRalenti(on) {
+  ralentiOn = !!on;
   if (!audioCtx || !lowpass || mode !== "running") return;
   const t = audioCtx.currentTime;
   lowpass.frequency.cancelScheduledValues(t);

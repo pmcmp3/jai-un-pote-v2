@@ -204,6 +204,14 @@ Code `TESTV2`, qui est aussi `config.ligueBeta` (menu simplifié + bouton « Lai
   dessins de `rowDecor` et de `renderGround` hors route) : hiver = sol et dessus
   enneigés + flocons, automne = feuillage roux + feuilles, printemps = arbres en
   fleurs + pétales. Debug : touche **S** ; capture : `node outils/capture.mjs saisons`.
+- **Auto-audit** : `node outils/capture.mjs audit` joue les trois familles du tuto
+  contextuel (bon geste, obstacle expliqué jamais compté — `__pote.chocs()`
+  marque `conseil` sur le choc ignoré), une pause pendant le ralenti, et la perf
+  par saison (p95 ≈ 3 ms). Pièges corrigés par l'audit : l'appui long relâchait
+  le ralenti au premier dixième d'appui (le ralenti tient désormais jusqu'à la
+  pleine hauteur ou au doigt levé) ; mort/fin pendant un conseil laissaient le
+  morceau étouffé (`conseilCouper`) ; le fantôme lisait l'horloge du morceau
+  (désormais `tMonde()`, enregistrement ET relecture).
 - **Homme / femme** : premier réglage du menu « Mon cycliste » (`skin.genre`) ;
   femme = cheveux longs + queue de cheval, jamais de barbe.
 - **Décor allégé** : un élément semé par rangée côté route, rien au fond hors
