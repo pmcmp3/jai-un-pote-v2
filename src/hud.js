@@ -353,7 +353,7 @@ export function renderTuto(ctx, width, height, tuto) {
   roundRect(ctx, x, y, w, h, 3); ctx.fill();
   ctx.strokeStyle = NOIR; ctx.lineWidth = 1.5;
   roundRect(ctx, x, y, w, h, 3); ctx.stroke();
-  const onglet = tuto.ok ? "BIEN !" : `TUTO ${tuto.index}/${tuto.total}`;
+  const onglet = tuto.onglet || (tuto.ok ? "BIEN !" : `TUTO ${tuto.index}/${tuto.total}`);
   ctx.save();
   ctx.translate(x + 16 + 50, y);
   ctx.rotate(-0.035);

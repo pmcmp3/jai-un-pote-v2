@@ -185,6 +185,30 @@ Code `TESTV2`, qui est aussi `config.ligueBeta` (menu simplifié + bouton « Lai
 - Vitres des voitures teintées (claires, on croyait voir à travers), ardoise des maisons du
   Nord qui ne traverse plus le pignon.
 
+## Retours du 28 septembre 2026, nuit (« saisons avec neige », « enlève le tuto », « homme ou femme », « simplifie »)
+
+- ⚠️ **Plus de tuto au départ ni de bestiaire.** À la place, un **tuto CONTEXTUEL au
+  ralenti** (`CONSEILS`/`conseilStep`, main.js) : la première fois qu'une FAMILLE
+  d'obstacle arrive (tap / appui long / double), le monde passe à ×0,06 pile au
+  moment du saut, la consigne s'affiche (carte `hud.renderTuto`, onglet « À TOI »),
+  le morceau passe dans un passe-bas (`audio.setRalenti`), et le temps ne repart
+  que sur le bon geste. L'obstacle expliqué ne fait jamais mal. Famille apprise
+  une fois franchie → `localStorage["jp2-appris"]` (effacé par `?neuf`/`?zero`).
+- ⚠️ **Deux horloges** : `clock.now()` = le morceau (fin de course, nuit, soleil) ;
+  `tMonde()` = le monde (traversées, voitures en face, toits, bêtes tombées), qui
+  prend du retard pendant le ralenti (`retardMonde`). Tout ce qui BOUGE sur la
+  route doit lire `tMonde()`, sinon il file à pleine vitesse pendant le ralenti.
+- **Saisons** (scene.js, `setSaison`/`renderMeteo`) : le morceau est coupé en 4
+  saisons dans l'ordre du calendrier, la première tirée par la graine, fondu de
+  4 s. Elles ne repeignent QUE le décor et le sol (`modeSaison`, posé autour des
+  dessins de `rowDecor` et de `renderGround` hors route) : hiver = sol et dessus
+  enneigés + flocons, automne = feuillage roux + feuilles, printemps = arbres en
+  fleurs + pétales. Debug : touche **S** ; capture : `node outils/capture.mjs saisons`.
+- **Homme / femme** : premier réglage du menu « Mon cycliste » (`skin.genre`) ;
+  femme = cheveux longs + queue de cheval, jamais de barbe.
+- **Décor allégé** : un élément semé par rangée côté route, rien au fond hors
+  arbres, poteaux électriques retirés, une seule touffe au premier plan.
+
 ## Invariants de la v2 (mesurés, `outils/mesurer.mjs`)
 
 - L'écart entre deux obstacles vient de la PHYSIQUE du saut (`ecartMin` : retombée du premier +

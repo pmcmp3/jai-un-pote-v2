@@ -152,6 +152,12 @@ export function drawRider(ctx, u, v, lift, P, pedal, alpha = 1, flip = 0, ombre 
   drawBox(ctx, hx - 0.02, hy - 0.02, 0.34, 0.34, 0.14, P.hair, hTete + 0.29);
   drawBox(ctx, hx - 0.02, hy + 0.2, 0.04, 0.06, 0.06, "#1a1a1e", hTete + 0.15); // œil
   if (P.beard) drawBox(ctx, hx, hy + 0.22, 0.3, 0.1, 0.12, P.hair, hTete);
+  if (P.genre === "femme") {
+    // Cheveux longs dans le dos + queue de cheval qui flotte derrière.
+    drawBox(ctx, hx - 0.02, hy - 0.06, 0.34, 0.14, 0.34, P.hair, hTete - 0.04);
+    drawBox(ctx, hx + 0.06, hy - 0.24, 0.16, 0.2, 0.14, P.hair, hTete + 0.12 + sway * 0.5);
+    drawBox(ctx, hx + 0.08, hy - 0.36, 0.12, 0.14, 0.1, P.hair, hTete + 0.06 + sway);
+  }
   const hat = P.hat !== undefined ? P.hat : (P.cap ? "casquette" : null);
   const hatColor = P.hatColor || P.cap;
   if (hat === "casquette") {

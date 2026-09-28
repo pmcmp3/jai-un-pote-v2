@@ -161,7 +161,7 @@ function jumpPhysics() {
 function multiplicateur() { return multRegle(friends.count(), game.turbo > 0); }
 // Hauteur du sol sous le joueur : la route (0), le plancher d'une halle, ou le
 // toit d'une voiture s'il arrive déjà au-dessus d'elle.
-function solSous(v, jumpY) { return Math.max(rows.solAt(v), rows.toitSous(rows.routeVivante(), v, jumpY, clock.now())); }
+function solSous(v, jumpY) { return Math.max(rows.solAt(v), rows.toitSous(rows.routeVivante(), v, jumpY, tMonde())); }
 // Pente locale du sol, en radians : sert à incliner le vélo sur la rampe.
 // ⚠️ Signe NÉGATIF (27 septembre 2026) : sur le canvas un angle positif tourne
 // dans le sens horaire, donc le vélo piquait du nez en MONTANT (« quand on
@@ -193,92 +193,86 @@ function semerSparkles(u, v, n = 9, couleur = null) {
 }
 const ghosts = []; // traînée du salto
 
-// --- Tutoriel ------------------------------------------------------------------
-// Sur les `config.tutoParties` premières parties : consignes une à une au
-// tout début, chacune validée par le geste (ou passée après 5 s). Pendant le
-// tuto la vitesse est bridée et la route reste sans danger (rows.GRACE).
-const TUTO_ETAPES = [
-  { titre: "TAP = SAUTER", sous: "les poules, les chats, les moutons se sautent", test: (ev) => ev === "jump" },
-  { titre: "RESTE APPUYÉ = PLUS HAUT", sous: "les vaches, les cochons, les fermiers", test: (ev) => ev === "haut" },
-  { titre: "RE-TAP EN L'AIR = DOUBLE SAUT", sous: "tout ce qui roule se passe en double saut", test: (ev) => ev === "salto" },
-  { titre: "LES PIÈCES APPELLENT TES POTES", sous: "elles dessinent le saut à faire", test: (ev) => ev === "piece" },
-];
-const tuto = { actif: false, index: 0, ok: 0, timer: 0, alpha: 0 };
-function tutoDemarrer() { tuto.actif = true; tuto.index = 0; tuto.ok = 0; tuto.timer = 0; tuto.alpha = 0; }
-function tutoEvenement(ev) {
-  if (!tuto.actif || tuto.ok > 0) return;
-  if (TUTO_ETAPES[tuto.index].test(ev)) { tuto.ok = 0.8; sfx.piece(); }
+// --- Tuto CONTEXTUEL au ralenti (28 septembre 2026) -------------------------------
+// « Enlève le tuto, mets pause quand les gens arrivent devant une situation, ils
+// ont le tuto qui correspond, genre tout passe en méga ralenti. » Plus de
+// consignes au départ ni de bestiaire : la PREMIÈRE fois qu'une famille
+// d'obstacle arrive (tap / appui long / double tap), le monde passe au ralenti
+// pile au moment où il faut sauter, la consigne s'affiche, et le temps ne
+// repart que sur le bon geste. L'obstacle expliqué ne fait jamais mal.
+// Une famille est apprise pour de bon dès qu'elle a été franchie (localStorage).
+const CONSEILS = {
+  tap:    { titre: "TAPE !", sous: "un petit saut pour les petites bêtes" },
+  haut:   { titre: "RESTE APPUYÉ !", sous: "plus tu tiens, plus tu sautes haut" },
+  double: { titre: "TAPE… PUIS RE-TAPE !", sous: "double saut pour tout ce qui roule" },
+};
+const CLE_APPRIS = "jp2-appris";
+function appris() { try { return new Set(JSON.parse(localStorage.getItem(CLE_APPRIS) || "[]")); } catch (e) { return new Set(); } }
+function apprendre(f) { const a = appris(); a.add(f); try { localStorage.setItem(CLE_APPRIS, JSON.stringify([...a])); } catch (e) { /* navigation privée */ } }
+// ralenti : facteur de temps du MONDE (1 = normal). La musique, elle, continue :
+// seule l'horloge du monde (`tMonde`) prend du retard sur celle du morceau.
+const RALENTI_MIN = 0.06;
+const conseil = { r: null, famille: null, phase: null, alpha: 0, ok: 0 };
+let ralenti = 1, retardMonde = 0;
+function tMonde() { return clock.now() - retardMonde; }
+function conseilReset() { conseil.r = null; conseil.famille = null; conseil.phase = null; conseil.alpha = 0; conseil.ok = 0; ralenti = 1; retardMonde = 0; audio.setRalenti(false); }
+// Temps avant que l'obstacle de la rangée r croise le joueur (s), ou null.
+function tempsAvant(r, row, tm, vitesse) {
+  if (row.type === "statique") return (r - player.v) / Math.max(0.5, vitesse);
+  if (!row.armed) return null;
+  if (row.type === "contresens") { const o = rows.contresensAt(r, row, tm); return o ? (o.v - player.v) / Math.max(0.5, vitesse + row.vitesse) : null; }
+  return (r - player.v) / Math.max(0.5, vitesse);
 }
-function tutoStep(dt, now) {   // eslint-disable-line no-shadow
-  if (!tuto.actif) return;
-  if (now < 0) return;
-  tuto.alpha = Math.min(1, tuto.alpha + dt * 3);
-  if (tuto.ok > 0) {
-    tuto.ok -= dt;
-    if (tuto.ok <= 0) { tuto.ok = 0; tuto.index += 1; tuto.timer = 0; }
-  } else {
-    // Une étape n'avance QUE sur le geste (8 septembre 2026 : « étape par
-    // étape, pour que les gens puissent bien jouer »). Garde-fou : 25 s.
-    tuto.timer += dt;
-    if (tuto.timer > 25) { tuto.index += 1; tuto.timer = 0; }
+function conseilCherche(tm, vitesse) {
+  if (conseil.r !== null || game.sprint) return;
+  const deja = appris();
+  if (deja.size >= 3) return;
+  const r0 = Math.floor(player.v) + 1;
+  for (let r = r0; r <= r0 + 14; r++) {
+    const row = rows.rowAt(r);
+    if (row.type !== "statique" && row.type !== "traverse" && row.type !== "contresens") continue;
+    const f = rows.familleDe(row.kind);
+    if (deja.has(f)) continue;
+    const t = tempsAvant(r, row, tm, vitesse);
+    // Moment du geste : on décolle ~ le temps de monter à l'apex avant l'obstacle.
+    if (t !== null && t > 0 && t <= rows.montee(f) + 0.12) {
+      conseil.r = r; conseil.famille = f; conseil.phase = "attente"; conseil.ok = 0;
+      audio.setRalenti(true);
+    }
+    return; // seul l'obstacle le plus proche compte
   }
-  if (tuto.index >= TUTO_ETAPES.length) {
-    tuto.actif = false;
-    lancerBestiaire();
-    // Le tuto doit rester SANS DIFFICULTÉ jusqu'au bout (28 septembre 2026) :
-    // la route reste sûre pendant tout le bestiaire qui le suit, plus 3 s, au
-    // lieu de voir les obstacles débouler à pleine vitesse dès la dernière
-    // consigne validée.
-    const r0 = Math.floor(player.v + 0.5) + 1;
-    rows.ouvrirFenetreSure(r0, r0 + Math.ceil(speed * (BESTIAIRE_S + 3)));
+}
+function conseilGeste(ev) {
+  if (conseil.r === null || conseil.phase === "fini") return;
+  const f = conseil.famille;
+  if (ev === "jump") conseil.phase = f === "tap" ? "fini" : "enl_air";
+  else if (ev === "haut" && f === "haut") conseil.phase = "fini";
+  else if (ev === "salto" && f === "double") conseil.phase = "fini";
+  if (conseil.phase === "fini") { conseil.ok = 0.9; audio.setRalenti(false); sfx.piece(); }
+}
+function conseilStep(dt, tm, vitesse) {
+  conseilCherche(tm, vitesse);
+  let cible = 1;
+  if (conseil.r !== null) {
+    if (conseil.phase === "attente") cible = RALENTI_MIN;
+    else if (conseil.phase === "enl_air") cible = 0.3;
+    // Obstacle dépassé : famille apprise (même raté — il n'a pas fait mal).
+    if (player.v > conseil.r + 1.5) {
+      if (conseil.phase === "fini") apprendre(conseil.famille);
+      conseil.r = null; conseil.phase = null; audio.setRalenti(false);
+    }
   }
+  if (conseil.ok > 0) conseil.ok -= dt;
+  const vis = conseil.r !== null && conseil.phase !== "fini";
+  conseil.alpha = Math.max(0, Math.min(1, conseil.alpha + (vis || conseil.ok > 0 ? dt * 6 : -dt * 4)));
+  ralenti += (cible - ralenti) * Math.min(1, dt * (cible < ralenti ? 14 : 5));
 }
-function tutoVue() {
-  if (!tuto.actif) return null;
-  const e = TUTO_ETAPES[tuto.index];
-  return { titre: e.titre, sous: e.sous, index: tuto.index + 1, total: TUTO_ETAPES.length, ok: tuto.ok > 0, alpha: tuto.alpha };
-}
-
-// --- Bestiaire du début de course ------------------------------------------------
-// Trois familles, deux vignettes chacune, dessinées UNE fois par le moteur
-// (comme l'aperçu du cycliste) puis affichées au-dessus de la route pendant
-// les premières secondes, quand la route est encore vide.
-const BESTIAIRE = [
-  { geste: "TAP", texte: "les petits animaux", kinds: ["poule", "chien", "mouton"] },
-  { geste: "RESTE APPUYÉ", texte: "les gros et les fermiers", kinds: ["cochon", "vache", "fermier"] },
-  { geste: "DOUBLE TAP", texte: "tout ce qui roule", kinds: ["voiture", "tracteur"] },
-];
-// 10 s au total, UNE famille à la fois (20 septembre 2026 : « le menu du début,
-// laisse un décompte de 10, c'est très bien, mais fais une étape par une
-// étape »). Le décompte s'affiche, le joueur roule sur une route encore vide.
-const BESTIAIRE_S = 10;
-let bestiaire = null, bestiaireT = 0;
-function prechaufferBestiaire() {
-  const VW = 700;
-  bestiaire = BESTIAIRE.map((g) => {
-    const images = g.kinds.map((kind) => {
-      const K = rows.KINDS[kind];
-      const cv = document.createElement("canvas");
-      const dpr = 2, larg = Math.round(46 + K.long * 26), haut = 108;
-      cv.width = larg * dpr; cv.height = haut * dpr;
-      const c2 = cv.getContext("2d");
-      c2.setTransform(dpr, 0, 0, dpr, 0, 0);
-      scene.setViewport(VW, VW);
-      scene.setJoueurX(0.5);
-      scene.setCamera(0);
-      const a = scene.project(0, 0, 0);
-      c2.save();
-      c2.translate(larg / 2 - a.x, haut - 14 - a.y);
-      try {
-        if (K.traverse) props.drawCrosser(c2, kind, 0, 0, -1, 0.3, 1);
-        else props.drawStatic(c2, kind, 0, 0, 0.3);
-      } catch (e) { /* une vignette ratée ne doit rien casser */ }
-      c2.restore();
-      return cv;
-    });
-    return { geste: g.geste, texte: g.texte, images };
-  });
-  scene.setViewport(width, height);
+function conseilVue() {
+  if (conseil.alpha <= 0 || !conseil.famille) return null;
+  const c = CONSEILS[conseil.famille];
+  const fini = conseil.phase === "fini" || conseil.r === null;
+  const titre = conseil.phase === "enl_air" ? (conseil.famille === "haut" ? "TIENS… TIENS !" : "RE-TAPE EN L'AIR !") : c.titre;
+  return { titre: fini ? "BIEN !" : titre, sous: fini ? null : c.sous, onglet: fini ? "BIEN !" : "À TOI", ok: fini, alpha: conseil.alpha };
 }
 
 // --- Effets ------------------------------------------------------------------
@@ -350,12 +344,10 @@ function requestGameStart(opts = {}) {
   semerCourse();
   preparerJoueur();
   if (screens.getParties() === 0) net.evenement("premiere_course", { pseudo: screens.getPseudo(), source: screens.getSource(), ligue: screens.getLigue() ? screens.getLigue().code : null });
-  if (screens.getParties() < (window.CONFIG.tutoParties || 0) && !game.sprint) tutoDemarrer(); else lancerBestiaire();
+  conseilReset();
   screens.compterPartie();
 }
 function isGameStartRequested() { return startRequested; }
-
-function lancerBestiaire(duree = BESTIAIRE_S) { bestiaireT = duree; }
 
 function resetRun() {
   game.metres = 0; game.points = 0; game.potesGagnes = 0; game.etoiles = 0;
@@ -391,8 +383,7 @@ function restartGame(opts = {}) {
   ancrerDepartSurLaGrille();
   gameStarted = true;
   startRequested = true;
-  tuto.actif = false;
-  if (screens.getParties() < (window.CONFIG.tutoParties || 0) && !game.sprint) tutoDemarrer(); else lancerBestiaire();
+  conseilReset();
   screens.compterPartie();
 }
 
@@ -475,10 +466,6 @@ function arriveePote(pote, direct) {
 }
 
 function gagnerPiece(u, v) {
-  // Pendant le tuto, rien ne compte (27 septembre 2026 : « il ne faut pas que
-  // le score augmente pendant qu'on est dans le tuto ») : la pièce valide
-  // l'étape, brille, sonne, et c'est tout.
-  if (tuto.actif) { semerSparkles(u, v); sfx.piece(); tutoEvenement("piece"); return; }
   const mult = multiplicateur();
   const m = window.CONFIG.pieceMetres * mult;
   game.points += 1;
@@ -486,7 +473,6 @@ function gagnerPiece(u, v) {
   game.etoiles += 1;
   semerSparkles(u, v);
   sfx.piece();
-  tutoEvenement("piece");
   while (game.potesGagnes < window.CONFIG.potesPaliers.length && game.points >= window.CONFIG.potesPaliers[game.potesGagnes]) {
     game.potesGagnes += 1;
     arriveePote(friends.join(player), false);
@@ -526,17 +512,17 @@ function marquerTombe(ev, now) { if (ev.r !== undefined && !KINDS_ROULANTS.has(e
 const KINDS_ROULANTS = new Set(["tracteur", "voiture", "contresens", "poulejetee"]);
 
 function toucherJoueur(ev) {
-  if (tuto.actif) return; // rien ne fait mal pendant le tuto
+  if (conseil.r !== null && ev.r === conseil.r) return; // l'obstacle expliqué ne fait pas mal
   // Invulnérable (turbo lait, bouclier de reprise) : la bête est quand même
   // renversée, avec une gerbe d'étincelles — sinon on croit à un bug de
   // collision (27 septembre 2026 : « j'ai roulé sur une poule, j'ai pas eu
   // de défaut »).
   if (clock.now() < reviveShieldUntil || invincible || game.turbo > 0) {
-    marquerTombe(ev, clock.now());
+    marquerTombe(ev, tMonde());
     semerSparkles(player.u, player.v, 10, "#ffffff");
     return;
   }
-  marquerTombe(ev, clock.now());
+  marquerTombe(ev, tMonde());
   if (friends.count() > 0) {
     const perdus = friends.lose(ev.cout);
     game.sansFaute = false;
@@ -606,10 +592,6 @@ function step(dt) {
   if (damageFlash > 0) damageFlash = Math.max(0, damageFlash - dt);
   if (shake.time > 0) shake.time = Math.max(0, shake.time - dt);
   if (hintTimer > 0 && gameStarted) hintTimer -= dt;
-  // Le bestiaire s'affiche au départ, ou juste après le tutoriel.
-  // Le bestiaire attend la fin du « GO ! » : avant, les chiffres du décompte
-  // se peignaient PAR-DESSUS sa carte (capture du 27 septembre 2026).
-  if (gameStarted && !game.ended && bestiaireT > 0 && clock.now() >= COUNT_IN_GO_LINGER_S) bestiaireT -= dt;
 
   if (gameStarted) {
     const enDecompte = clock.now() < -COUNT_IN_BEATS * clock.beatPeriod;
@@ -630,7 +612,10 @@ function step(dt) {
 
   const now = clock.now();
   const phys = jumpPhysics();
-  tutoStep(dt, now);
+  // Ralenti du tuto contextuel : le monde avance à `ralenti`, la musique non.
+  const dtReel = dt;
+  if (now >= 0) { conseilStep(dtReel, tMonde(), speed); dt = dtReel * ralenti; retardMonde += dtReel - dt; }
+  const tm = tMonde();
 
   // --- Nuit : tombe à partir de nuitDebutS, 30 s de transition ---
   const nd = nuitDebut !== null ? nuitDebut : window.CONFIG.nuitDebutS;
@@ -647,12 +632,12 @@ function step(dt) {
   const tap = consumeJumpPress();
   if (tap && player.jumpY <= solIci + 0.02) {
     player.jumpVy = phys.vJump; player.jumpY = solIci + 0.001; player.doubled = false; player.tHaut = 0; player.tenueMarquee = false;
-    marque = "saut"; sfx.saut(); tutoEvenement("jump");
+    marque = "saut"; sfx.saut(); conseilGeste("jump");
   } else if (tap && player.jumpY > solIci && !player.doubled) {
     player.jumpVy = phys.vDouble; player.doubled = true; player.flip = 0.001; player.tHaut = phys.tenueMax;
     marque = "double"; sfx.salto(); vibrer(25);
     semerSparkles(player.u, player.v, 12);
-    tutoEvenement("salto");
+    conseilGeste("salto");
   }
   if (player.jumpY > solIci) {
     // Tant que le doigt reste appuyé et qu'on monte, la pesanteur est réduite.
@@ -660,7 +645,7 @@ function step(dt) {
     if (tenu) player.tHaut += dt;
     player.jumpVy -= (tenu ? phys.gTenu : phys.g) * dt;
     player.jumpY += player.jumpVy * dt;
-    if (player.tHaut > 0.12 && !player.tenueMarquee) { player.tenueMarquee = true; friends.marquerTenue(); tutoEvenement("haut"); }
+    if (player.tHaut > 0.12 && !player.tenueMarquee) { player.tenueMarquee = true; friends.marquerTenue(); conseilGeste("haut"); }
   }
   if (player.flip > 0) {
     player.flip = Math.min(Math.PI * 2, player.flip + dt * (Math.PI * 2 / 0.55));
@@ -677,11 +662,11 @@ function step(dt) {
 
   // --- Avance ---
   speed += (targetSpeed(now) - speed) * Math.min(1, 3 * dt);
-  const vitesse = speed * (game.turbo > 0 ? (window.CONFIG.laitVitesse || 1.2) : 1) * (tuto.actif ? 0.55 : 1);
+  const vitesse = speed * (game.turbo > 0 ? (window.CONFIG.laitVitesse || 1.2) : 1);
   if (now >= 0) {
     const dv = vitesse * dt;
     player.v += dv;
-    if (!tuto.actif) game.metres += dv * window.CONFIG.metresParUnite * multiplicateur();
+    game.metres += dv * window.CONFIG.metresParUnite * multiplicateur();
   }
   player.pedal += vitesse * dt * 3.2;
   // Retombée / roulage sur la rampe de la halle, ou atterrissage sur le toit
@@ -709,19 +694,18 @@ function step(dt) {
   friends.update(dt, player, phys);
 
   // --- Traversées : armées pour croiser le joueur ---
-  if (tuto.actif) rows.ouvrirFenetreSure(Math.floor(player.v + 0.5) + 1, Math.floor(player.v + 0.5) + scene.ROWS_AHEAD + 2);
-  if (now >= 0 && !tuto.actif) armerTraversees(now, vitesse);
+  if (now >= 0) armerTraversees(tm, vitesse);
 
   // --- Collisions et pièces ---
   if (now >= 0) {
-    for (const ev of rows.checkMember("j", player.prevV, player.v, player.jumpY, now)) {
+    for (const ev of rows.checkMember("j", player.prevV, player.v, player.jumpY, tm)) {
       if (ev.type === "piece") gagnerPiece(player.u, player.v);
       else if (ev.type === "lait") gagnerLait(player.u, player.v);
       else if (ev.type === "rouge") gagnerRouge(player.u, player.v);
       else { toucherJoueur(ev); if (game.ended || revivePaused) break; }
     }
     for (const m of friends.members()) {
-      for (const ev of rows.checkMember(m.id, m.prevV, m.v, m.jumpY, now)) {
+      for (const ev of rows.checkMember(m.id, m.prevV, m.v, m.jumpY, tm)) {
         if (ev.type === "piece") gagnerPiece(m.u, m.v);
         else if (ev.type === "lait") gagnerLait(m.u, m.v);
         else if (ev.type === "rouge") gagnerRouge(m.u, m.v);
@@ -749,6 +733,7 @@ window.addEventListener("keydown", (e) => {
   if (e.code === "KeyL") gagnerLait(player.u, player.v);
   if (e.code === "KeyN") { nuitDebut = clock.now() - 30; }
   if (e.code === "KeyF") terminer();
+  if (e.code === "KeyS") { saisonForcee = saisonForcee === null ? 0 : (saisonForcee + 1) % 4; afficherBanner(scene.SAISONS[saisonForcee].toUpperCase(), "debug", JAUNE, 1.2, "SAISON"); }
 });
 
 // --- Rendu ---------------------------------------------------------------------
@@ -874,6 +859,19 @@ function renderAlertes(now, vitesse) {
   }
 }
 
+// Saisons : quatre tranches égales du morceau, dans l'ordre du calendrier, la
+// première tirée par la graine de la course (la même route de ligue a donc la
+// même météo pour tous). Fondu de 4 s d'une saison à l'autre.
+let saisonForcee = null; // debug : touche S
+function poserSaison(t) {
+  if (saisonForcee !== null) { scene.setSaison(saisonForcee, saisonForcee, 0); return; }
+  const duree = Math.max(20, (window.CONFIG.dureeMorceau || 170) / 4);
+  const depart = ((game.graine || 0) % 4 + 4) % 4;
+  const k = Math.max(0, Math.floor(t / duree));
+  const dans = t - k * duree;
+  const a = (depart + k) % 4, b = (depart + k + 1) % 4;
+  scene.setSaison(a, b, Math.max(0, (dans - (duree - 4)) / 4));
+}
 function render(alpha) {
   // ⚠️ On repart d'une matrice propre à chaque image. Un seul `ctx.save()` non
   // rendu — une exception au milieu d'une rotation, par exemple — laissait
@@ -881,6 +879,7 @@ function render(alpha) {
   ctx.setTransform(dprCourant, 0, 0, dprCourant, 0, 0);
   ctx.globalAlpha = 1;
   const now = clock.now();
+  const tm = tMonde();   // horloge du monde (ralentie pendant un conseil)
   const u = player.prevU + (player.u - player.prevU) * alpha;
   const v = player.prevV + (player.v - player.prevV) * alpha;
   const jy = player.prevJumpY + (player.jumpY - player.prevJumpY) * alpha;
@@ -903,6 +902,7 @@ function render(alpha) {
     ctx.translate((Math.random() - 0.5) * shake.amp * k, (Math.random() - 0.5) * shake.amp * k);
   }
 
+  poserSaison(gameStarted ? now : 0);
   scene.renderGround(ctx, null);   // plus de boue depuis le 20 septembre 2026
 
   const items = [];
@@ -932,7 +932,7 @@ function render(alpha) {
     // septembre 2026 : « une voiture qui roule en sens inverse, pour que ce
     // soit vraiment difficile »).
     if (row.type === "contresens") {
-      const t = gameStarted ? now : perfClock();
+      const t = gameStarted ? tm : perfClock();
       const K = rows.KINDS[row.kind];
       const inst = rows.contresensAt(r, row, t);
       if (K.lanceur) {
@@ -945,7 +945,7 @@ function render(alpha) {
     }
     // Les traversants se voient de loin (ils arrivent du fond) : tout l'intervalle.
     if (row.type === "traverse") {
-      const t = gameStarted ? now : perfClock();
+      const t = gameStarted ? tm : perfClock();
       for (const inst of rows.crossersAt(r, row, t)) {
         items.push({ d: scene.depth(inst.u, r), draw: () => props.drawCrosser(ctx, inst.kind, inst.u, r, inst.dir, t, inst.alpha) });
       }
@@ -958,7 +958,7 @@ function render(alpha) {
     if (row.type === "statique") {
       const tombe = tombes.get(r);
       items.push({ d: scene.depth(0, r), draw: () => (tombe !== undefined
-        ? props.drawStaticTombe(ctx, row.kind, 0, r, tAnim, Math.max(0, now - tombe))
+        ? props.drawStaticTombe(ctx, row.kind, 0, r, tAnim, Math.max(0, tm - tombe))
         : props.drawStatic(ctx, row.kind, 0, r, tAnim)) });
     }
   }
@@ -1026,7 +1026,8 @@ function render(alpha) {
     }
   }
   scene.renderHaze(ctx);
-  renderAlertes(now, speed);
+  scene.renderMeteo(ctx, tAnim);
+  renderAlertes(tm, speed);
   hud.renderTurbo(ctx, width, height, tAnim, Math.min(1, game.turbo * 2));
 
   if (damageFlash > 0) {
@@ -1066,23 +1067,13 @@ function render(alpha) {
   }
   if (gameStarted && !game.ended) {
     if (now < COUNT_IN_GO_LINGER_S) hud.renderCountIn(ctx, width, height, now, clock.beatPeriod, COUNT_IN_BEATS, COUNT_IN_GO_LINGER_S);
-    hud.renderTuto(ctx, width, height, tutoVue());
-    if (!tuto.actif && bestiaireT > 0 && now >= COUNT_IN_GO_LINGER_S) {
-      const ecoule = BESTIAIRE_S - bestiaireT;
-      const parEtape = BESTIAIRE_S / BESTIAIRE.length;
-      const idx = Math.min(BESTIAIRE.length - 1, Math.floor(ecoule / parEtape));
-      const dansEtape = ecoule - idx * parEtape;
-      hud.renderBestiaire(ctx, width, height, Math.min(1, bestiaireT * 2, dansEtape * 4 + 0.15), bestiaire, safeTop, idx, Math.ceil(bestiaireT));
-    }
-    if (now >= 0 && !banner && !tuto.actif) hud.renderHint(ctx, width, height, Math.min(1, hintTimer));
+    hud.renderTuto(ctx, width, height, conseilVue());
+    if (now >= 0 && !banner && !conseilVue()) hud.renderHint(ctx, width, height, Math.min(1, hintTimer));
   }
-  // Le bandeau passe APRÈS le bestiaire, et SOUS sa carte quand elle est là :
-  // il se peignait derrière elle (le « turbo lait » invisible, 28 septembre 2026).
   if (gameStarted && hudAlpha > 0.001 && banner) {
-    const bestiaireVu = !tuto.actif && bestiaireT > 0 && now >= COUNT_IN_GO_LINGER_S && !game.ended;
     ctx.save();
     ctx.globalAlpha = hudAlpha;
-    hud.renderBanner(ctx, width, height, banner, safeTop, bestiaireVu ? Math.max(safeTop + 104, height * 0.15) + 166 : null);
+    hud.renderBanner(ctx, width, height, banner, safeTop, null);
     ctx.restore();
   }
   if (game.finAge >= 0) hud.renderFin(ctx, width, height, game.finAge, game.sprint ? "Fin du sprint" : "Tu es allé au bout du morceau");
@@ -1144,7 +1135,6 @@ function prechauffer() {
     () => { drawRider(c, 0, 0, 0, PALETTES.pmc, 0, 1, 0); drawRider(c, 0, 0, 0, PALETTES.soberland, 0, 1, 1); for (const P of PALETTES.potes) drawRider(c, 0, 0, 0, P, 0); },
     () => { c.translate(32, 32); drawCoin(c, 10, 0.3); drawCoin(c, 10, 0.3, true); c.setTransform(1, 0, 0, 1, 0, 0); scene.drawSign(c, 20, ["CYSOING", "59"]); },
     () => { for (let r = 0; r < 60; r++) scene.rowDecor(c, r, false).forEach((it) => it.draw()); },
-    () => prechaufferBestiaire(),
   ];
   const suite = () => {
     try { etapes[i](); } catch (e) { /* le préchauffage ne doit jamais bloquer */ }
@@ -1203,6 +1193,7 @@ if (debugOverlay.isEnabled()) {
     fps: () => perf.fps,
     frameMs: () => perf.frameMs,
     tombes: () => tombes.size,
+    conseil: () => ({ ...conseil, ralenti }),
   };
 }
 requestAnimationFrame(frame);

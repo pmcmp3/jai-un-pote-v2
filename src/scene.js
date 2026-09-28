@@ -108,20 +108,99 @@ function melange(a, b, t) { return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1
 function teintes(color, u) {
   const kb = Math.max(0, Math.min(9, Math.round((u - 2.5) / 1.8)));
   const kn = Math.round(night * 10);
-  const cle = `${color}|${kb}|${kn}`;
+  const cle = `${color}|${kb}|${kn}|${modeSaison ? saisonCle : ""}`;
   let t = cache.get(cle);
   if (t) return t;
   let [r, g, b] = parseColor(color);
+  let neigeDessus = 0;
+  if (modeSaison) { [r, g, b] = saisonner([r, g, b], color); neigeDessus = modeSaison === "objet" ? poidsHiver() * 0.85 : 0; }
   if (kn > 0) { const a = 8 * kn; r -= a; g -= a * 0.95; b -= a * 0.5; }
   const hz = melange(HORIZON_JOUR, HORIZON_NUIT, kn / 10);
   const f = kb * 0.07;
   r += (hz[0] - r) * f; g += (hz[1] - g) * f; b += (hz[2] - b) * f;
-  t = { plat: rgb(r, g, b), avant: rgb(r - 6, g - 6, b - 6), dessus: rgb(r + 26, g + 26, b + 22), lumiere: rgb(r + 6, g + 6, b + 4), ombre: rgb(r - 30, g - 30, b - 26) };
+  const neige = melange(melange([236, 241, 246], [120, 130, 170], kn / 10), hz, f);
+  const dessus = melange([r + 26, g + 26, b + 22], neige, neigeDessus);
+  t = { plat: rgb(r, g, b), avant: rgb(r - 6, g - 6, b - 6), dessus: rgb(dessus[0], dessus[1], dessus[2]), lumiere: rgb(r + 6, g + 6, b + 4), ombre: rgb(r - 30, g - 30, b - 26) };
   if (cache.size > 6000) cache.clear();
   cache.set(cle, t);
   return t;
 }
 export function teinte(color, u = 0) { return teintes(color, u).plat; }
+
+// --- Saisons (28 septembre 2026 : « fais les saisons avec neige, faut plein de
+// variations ») ------------------------------------------------------------------
+// Quatre saisons se succèdent pendant le morceau (main.js pose la saison et le
+// fondu). Elles ne repeignent QUE le décor et le sol — jamais la route, les
+// bêtes ni les cyclistes : `modeSaison` est levé autour de leurs dessins.
+//   hiver     : sol et toits enneigés, feuillage sombre, flocons ;
+//   automne   : feuillage roux, herbe sèche, feuilles qui tombent ;
+//   printemps : vert tendre, arbres en fleurs, pétales ;
+//   été       : les couleurs d'origine.
+export const SAISONS = ["printemps", "ete", "automne", "hiver"];
+let saisonA = 1, saisonB = 1, saisonT = 0, saisonCle = "1-1-0";
+let modeSaison = null; // null | "sol" | "objet"
+export function setSaison(a, b, t) {
+  const q = Math.round(Math.max(0, Math.min(1, t)) * 6) / 6;
+  saisonA = a; saisonB = b; saisonT = q; saisonCle = `${a}-${b}-${q}`;
+}
+export function saisonCourante() { return SAISONS[saisonT < 0.5 ? saisonA : saisonB]; }
+function poids(nom) { const i = SAISONS.indexOf(nom); return (saisonA === i ? 1 - saisonT : 0) + (saisonB === i ? saisonT : 0); }
+function poidsHiver() { return poids("hiver"); }
+const ROUX = [[200, 112, 42], [181, 70, 42], [217, 161, 58], [168, 96, 40]];
+function estVegetal(c) { return c[1] > c[0] + 4 && c[1] > c[2] + 8; }
+function saisonnerUne(nom, c, cle) {
+  if (nom === "hiver") {
+    if (modeSaison === "sol") return melange(c, [232, 238, 244], 0.86);
+    // Feuillage givré, cultures (blé, tournesol) blanchies par le gel.
+    if (estVegetal(c)) return melange(c, [168, 184, 182], 0.62);
+    if (c[0] > 150 && c[0] > c[1] && c[1] > c[2] + 20) return melange(c, [226, 220, 204], 0.6);
+    return c;
+  }
+  if (nom === "automne") {
+    if (!estVegetal(c)) return c;
+    if (modeSaison === "sol") return melange(c, [170, 140, 70], 0.5);
+    let h = 0; for (let i = 0; i < cle.length; i++) h = (h * 31 + cle.charCodeAt(i)) % 997;
+    return melange(c, ROUX[h % ROUX.length], 0.72);
+  }
+  if (nom === "printemps") return estVegetal(c) ? melange(c, [134, 198, 83], 0.35) : c;
+  return c;
+}
+function saisonner(c, cle) {
+  const a = saisonnerUne(SAISONS[saisonA], c, cle);
+  if (saisonT <= 0 || saisonB === saisonA) return a;
+  return melange(a, saisonnerUne(SAISONS[saisonB], c, cle), saisonT);
+}
+// Sert à main.js pour le sol des halles, etc. : tout ce qui est décor.
+export function avecSaison(mode, fn) { const m = modeSaison; modeSaison = mode; try { fn(); } finally { modeSaison = m; } }
+
+// Météo : flocons, feuilles ou pétales en surimpression, en parallaxe avec la
+// caméra. Poids de la saison = densité (le fondu les fait venir doucement).
+export function renderMeteo(ctx, t) {
+  const kinds = [["hiver", 70], ["automne", 26], ["printemps", 22]];
+  ctx.save();
+  for (const [nom, n0] of kinds) {
+    const w = poids(nom);
+    if (w < 0.05) continue;
+    const n = Math.round(n0 * w);
+    for (let i = 0; i < n; i++) {
+      const a = hash(i * 7.3 + nom.length), b = hash(i * 3.9 + 11), c = hash(i * 1.7 + 5);
+      const chute = nom === "hiver" ? 38 + c * 40 : 30 + c * 25;
+      const y = ((b * (H + 40) + t * chute) % (H + 40)) - 20;
+      const x = (((a * (W + 60) - camV * K * (0.35 + c * 0.5) + Math.sin(t * 1.3 + i) * 14) % (W + 60)) + (W + 60)) % (W + 60) - 30;
+      if (nom === "hiver") {
+        ctx.fillStyle = `rgba(255,255,255,${0.55 + 0.4 * c})`;
+        const r = 1.2 + c * 2.2;
+        ctx.fillRect(x, y, r, r);
+      } else {
+        ctx.fillStyle = nom === "automne" ? ["#c8702a", "#b5462a", "#d9a13a"][i % 3] : ["#f4bccb", "#ffffff", "#f7d3dc"][i % 3];
+        ctx.save(); ctx.translate(x, y); ctx.rotate(t * (1 + c) + i);
+        ctx.fillRect(-2.5, -1.5, 5, 3);
+        ctx.restore();
+      }
+    }
+  }
+  ctx.restore();
+}
 
 function poly(ctx, pts, color) {
   ctx.fillStyle = color;
@@ -439,7 +518,9 @@ function nuages(ctx) {
 
 export function renderGround(ctx, boueAt) {
   // Ciel.
-  const haut = melange(CIEL_HAUT, CIEL_HAUT_NUIT, night), bas = melange(CIEL_BAS, CIEL_BAS_NUIT, night);
+  const hiv = poidsHiver() * 0.45, aut = poids("automne") * 0.25;
+  const haut = melange(melange(melange(CIEL_HAUT, [176, 188, 204], hiv), [214, 170, 120], aut), CIEL_HAUT_NUIT, night);
+  const bas = melange(melange(melange(CIEL_BAS, [226, 230, 236], hiv), [240, 196, 150], aut), CIEL_BAS_NUIT, night);
   const g = ctx.createLinearGradient(0, 0, 0, horizonY);
   g.addColorStop(0, rgbA(haut));
   g.addColorStop(0.6, rgbA(melange(haut, bas, 0.55)));
@@ -470,6 +551,7 @@ export function renderGround(ctx, boueAt) {
     astre(Math.max(0, heure - 0.55), `rgba(250,244,220,${a})`, K * 0.7, 0);
   }
   nuages(ctx);
+  modeSaison = "sol";
   // Montagnes au loin (les villages du jeu sont en Isère : les Alpes en toile
   // de fond), neige sur les crêtes ; puis collines vertes, dans la brume.
   montagnes(ctx, 320);
@@ -491,10 +573,12 @@ export function renderGround(ctx, boueAt) {
   // La route : asphalte et lignes de rive en tirets (repère de vitesse). Plus
   // de flaques de boue depuis le 20 septembre 2026 (« enlève les trucs de
   // terre par terre, les gens comprennent pas, je pense »).
+  modeSaison = null;
   bande(ctx, -ROAD_HALF, ROAD_HALF, (r) => teintes(r % 2 ? ROAD : shadeHex(ROAD, 3), 0).plat);
   const rive = (r) => (r % 3 === 0 ? teintes(ROAD, 0).plat : teintes(LINE, 0).plat);
   bande(ctx, ROAD_HALF - 0.2, ROAD_HALF - 0.12, rive);
   bande(ctx, -ROAD_HALF + 0.12, -ROAD_HALF + 0.2, rive);
+  modeSaison = "sol";
   bande(ctx, -ROAD_HALF - 0.22, -ROAD_HALF, () => teintes(DIRT, 0).plat);
   bande(ctx, -ROAD_HALF - 1.3, -ROAD_HALF - 0.22, (r) => teintes(HERBE[zoneAt(r)], 0).plat);
   // Champ du premier plan, jusqu'au bas de l'écran : des sillons parallèles
@@ -505,6 +589,7 @@ export function renderGround(ctx, boueAt) {
     const u1 = Math.max(uFin, u - 0.6), kk = k;
     bande(ctx, u1, u, (r) => { const soil = SOIL[zoneAt(r)]; return teintes(kk % 2 ? shadeHex(soil, -16) : shadeHex(soil, 4), 0).plat; });
   }
+  modeSaison = null;
 }
 
 // Brume chaude du soleil par-dessus la scène (très légère).
@@ -546,12 +631,15 @@ function poteauIci(r) { return r % 5 === 0 && !(masque(r) & DANS_HALLE) && !(mas
 export function rowDecor(ctx, r, clear) {
   const out = [];
   const zone = zoneAt(r);
-  const push = (u, v, draw) => out.push({ d: depth(u, v), draw });
+  const push = (u, v, draw) => out.push({ d: depth(u, v), draw: () => avecSaison("objet", draw) });
   const sway = (k) => Math.sin(decorT * 1.6 + k) * 0.05;
   if (!clear) {
     for (const side of [1, -1]) {
       const base = side > 0 ? ROAD_HALF + 1.2 : ROAD_HALF + 6.0;
-      const n = zone === "foret" || zone === "prairie" ? 2 : estVillage(zone) ? 0 : 3;
+      // Décor ALLÉGÉ (28 septembre 2026 : « simplifie les décors et la
+      // complexité des choses ») : un seul élément semé par rangée, et
+      // seulement juste derrière la route — le fond ne garde que ses arbres.
+      const n = estVillage(zone) || side < 0 ? 0 : hash(r * 7 + 3) < 0.6 ? 1 : 0;
       if (estVillage(zone)) decorVillage(ctx, push, r, side, sway, zone === "villageSud");
       for (let i = 0; i < n; i++) {
         const a = hash(r * 31 + i * 7 + side * 101);
@@ -594,7 +682,7 @@ export function rowDecor(ctx, r, clear) {
   // Poteaux électriques (8 m, comme dans la vraie vie) et lampadaires (6,5 m) :
   // ils faisaient la taille du cycliste (20 septembre 2026, « je fais la même
   // taille qu'un lampadaire, il faudrait qu'ils soient plus grands »).
-  if (poteauIci(r) && zone !== "foret") {
+  if (false && poteauIci(r) && zone !== "foret") { // poteaux et fils retirés (décor allégé)
     const u = ROAD_HALF + 1.55, v = r - 0.05;
     push(u, v, () => {
       drawBox(ctx, u, v, 0.28, 0.28, POTEAU_H, "#5c4a3a");
@@ -622,7 +710,7 @@ export function rowDecor(ctx, r, clear) {
   }
   // Premier plan : herbes, fleurs, épis, clôture — jamais plus haut que la route.
   const pres = hash(r * 57 + 3);
-  for (let i = 0; i < 2; i++) {
+  for (let i = 0; i < 1; i++) {
     const a = hash(r * 23 + i * 11 + 5), b = hash(r * 29 + i * 3 + 9);
     const u = -(ROAD_HALF + 1.4 + a * 3.6), v = r - 0.5 + b;
     const s = echelle(u);
@@ -661,8 +749,11 @@ export function rowDecor(ctx, r, clear) {
 // 9 m, pas 2). Le tronc porte deux étages de feuillage.
 function arbre(ctx, u, v, h, sw) {
   drawBox(ctx, u + 0.3, v + 0.3, 0.45, 0.45, h * 0.42, "#5c4a3a");
-  drawBox(ctx, u - 0.7, v - 0.7 + sw * 0.5, 2.4, 2.4, h * 0.42, "#2f6a2a", h * 0.34);
-  drawBox(ctx, u - 0.2, v - 0.2 + sw, 1.5, 1.5, h * 0.34, "#3a7a33", h * 0.72);
+  // Printemps : un arbre sur deux en fleurs (rose, jamais « végétal », donc
+  // la saison ne le repeint pas).
+  const fleurs = poids("printemps") > 0.5 && hash(Math.round(u * 10) + Math.round(v * 3)) < 0.5;
+  drawBox(ctx, u - 0.7, v - 0.7 + sw * 0.5, 2.4, 2.4, h * 0.42, fleurs ? "#e9a9bb" : "#2f6a2a", h * 0.34);
+  drawBox(ctx, u - 0.2, v - 0.2 + sw, 1.5, 1.5, h * 0.34, fleurs ? "#f6cdd8" : "#3a7a33", h * 0.72);
 }
 
 // --- Le village : tout derrière la route, portes et fenêtres sur la façade

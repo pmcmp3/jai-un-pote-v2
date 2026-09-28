@@ -93,6 +93,7 @@ try {
     localStorage.removeItem(CLE_MORCEAU_OUVERT);
     localStorage.removeItem(CLE_PMC_SUIVI);
     localStorage.removeItem(CLE_PLATEFORME);
+    localStorage.removeItem("jp2-appris"); // le tuto contextuel se rejoue
     const url = new URL(location.href); url.searchParams.delete("neuf"); history.replaceState(null, "", url.toString());
   }
 } catch (e) { /* rien */ }
@@ -129,7 +130,7 @@ function construireSkinUi() {
   // T-shirt, on ne choisit pas le short ») : trois réglages au lieu de six —
   // le short et les chaussures se déduisent du maillot. Sur un petit iPhone,
   // la carte tenait à peine à l'écran.
-  const listes = { c1: COULEURS, chapeau: CHAPEAUX.map((c) => [c, c]), velo: [["VTT", "vtt"], ["Grand Bi", "grandbi"], ["Roller", "roller"]] };
+  const listes = { genre: [["Homme", "homme"], ["Femme", "femme"]], c1: COULEURS, chapeau: CHAPEAUX.map((c) => [c, c]), velo: [["VTT", "vtt"], ["Grand Bi", "grandbi"], ["Roller", "roller"]] };
   document.querySelectorAll("#skin-options .chips").forEach((box) => {
     const cle = box.dataset.cle;
     box.textContent = "";

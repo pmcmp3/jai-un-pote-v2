@@ -794,6 +794,16 @@ function rampFocus(target) {
   focusGain.gain.linearRampToValueAtTime(target, t + pauseFade());
 }
 
+// Ralenti du tuto contextuel (main.js) : le morceau passe dans un passe-bas le
+// temps de la consigne — on entend que le temps s'est arrêté, la musique non.
+export function setRalenti(on) {
+  if (!audioCtx || !lowpass || mode !== "running") return;
+  const t = audioCtx.currentTime;
+  lowpass.frequency.cancelScheduledValues(t);
+  lowpass.frequency.setValueAtTime(lowpass.frequency.value, t);
+  lowpass.frequency.exponentialRampToValueAtTime(on ? 650 : FILTRE_OUVERT_HZ, t + (on ? 0.2 : 0.35));
+}
+
 export function setPlaybackMode(next) {
   if (next === mode) return;
   const precedent = mode;

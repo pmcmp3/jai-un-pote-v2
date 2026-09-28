@@ -35,11 +35,12 @@ const page = await contexte.newPage();
 const erreurs = [];
 page.on("pageerror", (e) => erreurs.push(e.stack || e.message));
 page.on("console", (m) => { if (m.type() === "error") erreurs.push(m.text()); });
-await page.addInitScript(([parties, neuf]) => {
+await page.addInitScript(([parties, neuf, genre]) => {
+  if (genre) localStorage.setItem("jp2Skin", JSON.stringify({ genre }));
   localStorage.setItem("jp2Pseudo", "pmc");
   localStorage.setItem("jp2Parties", parties);
   if (!neuf) { localStorage.setItem("jp2MorceauOuvert", "1"); localStorage.setItem("jp2PmcSuivi", "1"); }
-}, [process.env.PARTIES || "5", process.env.NEUF === "1"]);
+}, [process.env.PARTIES || "5", process.env.NEUF === "1", process.env.GENRE || ""]);
 await page.goto(url);
 const attendre = (ms) => page.waitForTimeout(ms);
 const photo = async (nom) => { await page.screenshot({ path: `${sorties}${nom}.png` }); console.log("  →", `outils/sorties/${nom}.png`); };
@@ -139,11 +140,18 @@ const SCENES = {
     console.log(`  CPU ×4 : travail par image ${travail.moy.toFixed(1)} ms en moyenne, ${travail.p95.toFixed(1)} ms au 95e centile (intervalle ${ms.moyenne.toFixed(1)} ms, plafonné par le headless)`);
   },
   // Tutoriel (lancer avec PARTIES=0) : consigne 1, un tap, consigne 2.
-  tuto: async () => {
-    await page.keyboard.press("KeyD"); // overlay masqué pour la lisibilité
-    await attendre(5200); await photo("12-tuto-1");
-    await page.touchscreen.tap(200, 500); await attendre(1400); await photo("13-tuto-2");
-    await page.keyboard.press("KeyD");
+  // Saisons forcées (touche S) : printemps, été, automne, hiver.
+  saisons: async () => {
+    for (const nom of ["printemps", "ete", "automne", "hiver"]) { await page.keyboard.press("KeyS"); await attendre(900); await photo(`50-saison-${nom}`); }
+  },
+  // Tuto contextuel : familles oubliées, on se pose avant le premier obstacle.
+  conseil: async () => {
+    await course(() => localStorage.removeItem("jp2-appris"));
+    const r = await course(() => { const p = window.__pote; for (let r = Math.ceil(p.player.v) + 20; r < 2000; r++) if (p.rows.rowAt(r).type === "statique") return r; return 0; });
+    await course((r) => { window.__pote.player.v = r - 12; }, r);
+    await attendre(1500); console.log("  conseil", JSON.stringify(await course(() => window.__pote.conseil()))); await photo("51-conseil");
+    await page.touchscreen.tap(200, 500); await attendre(300); console.log("  après tap", JSON.stringify(await course(() => window.__pote.conseil())));
+    await attendre(900); await photo("52-conseil-apres");
   },
   // Mort (touche G) : le panneau de seconde chance, puis l'écran de fin.
   fin: async () => {
