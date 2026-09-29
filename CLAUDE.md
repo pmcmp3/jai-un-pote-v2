@@ -217,6 +217,28 @@ Code `TESTV2`, qui est aussi `config.ligueBeta` (menu simplifié + bouton « Lai
 - **Décor allégé** : un élément semé par rangée côté route, rien au fond hors
   arbres, poteaux électriques retirés, une seule touffe au premier plan.
 
+## Retours du 29 septembre 2026 (boost de ligue, lien ?9, poules, décor)
+
+- ⚠️ **BOOST DE LIGUE** (idée du manager de Bluefit : « pour faire le meilleur
+  score, les fans sont obligés de faire jouer leurs potes ») : chaque AUTRE
+  membre de ta ligue qui a fait une course d'au moins `boostLigueDureeS` (30 s)
+  te donne +`boostLigueParPote` (10 %) sur TOUS tes points, jusqu'à
+  `boostLigueMaxPotes` (20 → ×3). `net.potesActifs` (colonne `duree_s` de
+  `ligue_scores`, ajoutée à `schema-v2.sql`), `screens.getBoost`, appliqué dans
+  `multiplicateur()` (main.js) et au score parfait affiché. Sticker jaune sous
+  JOUER (tap = partager le lien de ligue), bandeau « BOOST ×N » au GO, ligne
+  sur l'écran de fin. Pas en sprint (même règle pour tous). `LIGUE_MAX` 6 → 21.
+  ⚠️ **Inerte tant que la base Supabase v2 n'existe pas** (`apiBase` vide) :
+  l'interface du boost est alors masquée.
+- **Lien `?9`** (script en tête d'`index.html`) : tout paramètre NUMÉRIQUE
+  (`?9`, `?10`…) vide les caches, désinscrit le service worker, remet le tuto
+  au ralenti à zéro, puis recharge l'URL propre (`?ligue=` conservé).
+- **Fantôme retiré de l'écran** (la trace est toujours enregistrée et envoyée).
+- **Poules ×1,4 et rousses** (contraste sur la neige) — toujours « tap »
+  (`node outils/familles.mjs`). `VERSION_COURSE` 8.
+- **Arrière-plan encore allégé** : arbres espacés (1/5 près, 1/3 au fond),
+  lampadaires 1/12, plus de clôture au premier plan. Ombre du HUD 25 → 50 %.
+
 ## Invariants de la v2 (mesurés, `outils/mesurer.mjs`)
 
 - L'écart entre deux obstacles vient de la PHYSIQUE du saut (`ecartMin` : retombée du premier +

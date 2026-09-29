@@ -158,7 +158,8 @@ function jumpPhysics() {
   const C = window.CONFIG;
   return { vJump: C.sautVitesse, vDouble: C.sautVitesseDouble, g: C.sautGravite, gTenu: C.sautGraviteTenue, tenueMax: C.sautTenueMaxS, sol: rows.solAt };
 }
-function multiplicateur() { return multRegle(friends.count(), game.turbo > 0); }
+// Boost de ligue (screens.getBoost, posé au départ) : multiplie TOUT.
+function multiplicateur() { return multRegle(friends.count(), game.turbo > 0) * (game.boost || 1); }
 // Hauteur du sol sous le joueur : la route (0), le plancher d'une halle, ou le
 // toit d'une voiture s'il arrive déjà au-dessus d'elle.
 function solSous(v, jumpY) { return Math.max(rows.solAt(v), rows.toitSous(rows.routeVivante(), v, jumpY, tMonde())); }
@@ -329,10 +330,12 @@ function semerCourse() {
   rows.reset();
   game.graine = seed;
   game.ligueCourse = !!l && !game.sprint;
-  game.scoreMax = game.ligueCourse ? scoreParfait(seed, friends.max()).score : null;
+  game.boost = game.sprint ? 1 : screens.getBoost().mult; game.boostAnnonce = false; // sprint : même règle pour tous
+  game.scoreMax = game.ligueCourse ? Math.round(scoreParfait(seed, friends.max()).score * game.boost) : null;
   fantome.demarrerEnregistrement();
   ghost = null;
-  if (game.ligueCourse) chargerFantome(l, seed);
+  // Fantôme retiré de l'écran (29 septembre 2026 : « le cycliste fantôme, pour
+  // l'instant, tu l'enlèves ») — la trace part toujours, pour pouvoir le rebrancher.
 }
 let ghost = null; // { graine, pseudo, palette, trace } — le meilleur de la ligue
 async function chargerFantome(l, seed) {
@@ -466,7 +469,7 @@ function endGame(reason) {
 
 // Ce que la fin de course envoie à la ligue : graine (le classement d'une
 // ligue ne compare que les courses de la même route) et trace du fantôme.
-function bilanCourse() { return { graine: game.graine, trace: fantome.encoder(), scoreMax: game.scoreMax }; }
+function bilanCourse() { return { graine: game.graine, trace: fantome.encoder(), scoreMax: game.scoreMax, duree: Math.max(0, clock.now()) }; }
 
 function triggerShake(amp, duration) { shake.amp = amp; shake.duration = duration; shake.time = duration; }
 
@@ -633,6 +636,12 @@ function step(dt) {
   if (now >= 0) { conseilStep(dtReel, tMonde(), speed); dt = dtReel * ralenti; retardMonde += dtReel - dt; }
   const tm = tMonde();
 
+  // Le boost de ligue s'annonce au « GO ».
+  if (!game.boostAnnonce && now >= COUNT_IN_GO_LINGER_S) {
+    game.boostAnnonce = true;
+    const b = screens.getBoost();
+    if (game.boost > 1) afficherBanner(`BOOST ×${String(game.boost).replace(".", ",")}`, `${b.potes.length} pote${b.potes.length > 1 ? "s ont" : " a"} joué dans ta ligue`, JAUNE, 2.4, "TES POTES");
+  }
   // --- Nuit : tombe à partir de nuitDebutS, 30 s de transition ---
   const nd = nuitDebut !== null ? nuitDebut : window.CONFIG.nuitDebutS;
   if (nd !== undefined) scene.setNight(Math.max(0, Math.min(1, (now - nd) / 30)));

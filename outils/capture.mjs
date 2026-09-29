@@ -183,6 +183,14 @@ const SCENES = {
       console.log("PERF saison", i, "p95 ms", t);
     }
   },
+  // Sans l'overlay debug, en hiver puis en été, devant une poule.
+  propreSaison: async () => {
+    const r = await course(() => { const p = window.__pote; for (let r = Math.ceil(p.player.v) + 20; r < 3000; r++) if (p.rows.rowAt(r).kind === "poule") return r; return 0; });
+    await course((r) => { const p = window.__pote.player; p.v = r - 6; p.prevV = p.v; }, r);
+    await page.keyboard.press("KeyS"); await page.keyboard.press("KeyS"); await page.keyboard.press("KeyS"); await page.keyboard.press("KeyS");
+    await page.keyboard.press("KeyD"); await attendre(500); await photo("70-hiver-poule");
+    await page.keyboard.press("KeyD"); await page.keyboard.press("KeyS"); await page.keyboard.press("KeyS"); await page.keyboard.press("KeyD"); await attendre(400); await photo("71-ete");
+  },
   // Saisons forcées (touche S) : printemps, été, automne, hiver.
   saisons: async () => {
     for (const nom of ["printemps", "ete", "automne", "hiver"]) { await page.keyboard.press("KeyS"); await attendre(900); await photo(`50-saison-${nom}`); }

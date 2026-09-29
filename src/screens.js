@@ -406,6 +406,36 @@ let ligue = null;           // { code, membres: [] }
 let ligueInvitation = null; // code reçu par l'URL, en attente d'un pseudo
 
 export function getLigue() { return ligue; }
+// Boost de ligue : { potes: [pseudos], mult }.
+let boost = { potes: [], mult: 1 };
+export function getBoost() { return boost; }
+function calculerBoost(potes) {
+  const C = window.CONFIG;
+  const n = Math.min(potes.length, C.boostLigueMaxPotes || 20);
+  boost = { potes, mult: Math.round((1 + n * (C.boostLigueParPote || 0.1)) * 100) / 100 };
+  afficherBoost();
+}
+function afficherBoost() {
+  const el = $("boost-ligue");
+  if (!el) return;
+  // Sans base Supabase, pas de ligue : le boost ne peut compter personne.
+  el.classList.toggle("hidden", !net.estConfigure() || enBeta());
+  const C = window.CONFIG, pct = Math.round((C.boostLigueParPote || 0.1) * 100);
+  const n = boost.potes.length;
+  el.innerHTML = "";
+  const titre = document.createElement("b");
+  titre.textContent = n ? `BOOST ×${String(boost.mult).replace(".", ",")}` : "BOOST ×1";
+  const txt = document.createElement("span");
+  txt.textContent = n
+    ? ` · ${n} pote${n > 1 ? "s ont" : " a"} joué dans ta ligue. Chaque nouveau : +${pct} %`
+    : ` · chaque pote qui joue ${C.boostLigueDureeS || 30} s dans ta ligue = +${pct} % sur tes points`;
+  el.append(titre, txt);
+}
+async function rafraichirBoost() {
+  if (!ligue || ligue.enAttente || !net.estConfigure()) { calculerBoost([]); return; }
+  const p = await net.potesActifs(ligue.code, getPseudo());
+  if (p) calculerBoost(p);
+}
 
 function ligueMessage(txt) { ligueMsg.textContent = txt || ""; ligueMsg.classList.toggle("hidden", !txt); }
 function afficherLigue() {
@@ -446,7 +476,7 @@ async function rejoindre(code, creer = false) {
     return false;
   }
   ligue = { code, membres: r.membres };
-  memoriserLigue(); appliquerNomsLigue(); afficherLigue(); appliquerModeBeta(); ligueMessage("");
+  memoriserLigue(); appliquerNomsLigue(); afficherLigue(); appliquerModeBeta(); ligueMessage(""); rafraichirBoost();
   if (invitation) net.evenement("invitation_acceptee", { pseudo, ligue: code, source: getSource() });
   return true;
 }
@@ -469,6 +499,7 @@ export async function preparerLigue() {
   const membres = await net.membres(ligue.code);
   if (membres) { ligue.membres = membres; memoriserLigue(); }
   appliquerNomsLigue(); afficherLigue();
+  await rafraichirBoost();
 }
 // Fin de course : envoi du score, puis classement de la ligue sur la carte.
 // `bilan` = { graine, trace, scoreMax } (main.js) : la graine de la route et
@@ -485,7 +516,7 @@ export async function finLigue(metres, potes, mode = "course", bilan = {}) {
     const meilleur = avant && avant.length ? Math.max(...avant.map((r) => Number(r.metres) || 0)) : 0;
     if (Math.floor(metres) > meilleur) trace = bilan.trace;
   }
-  await net.envoyerScore(code, getPseudo(), metres, potes, mode, { graine: bilan.graine, trace });
+  await net.envoyerScore(code, getPseudo(), metres, potes, mode, { graine: bilan.graine, trace, duree: bilan.duree });
   const endRelais = $("end-relais");
   if (mode === "sprint") {
     // Classement du sprint du jour, toutes ligues confondues.
@@ -520,7 +551,6 @@ export async function finLigue(metres, potes, mode = "course", bilan = {}) {
     const rang = document.createElement("span"); rang.className = "rang"; rang.textContent = `${i + 1}`;
     const nom = document.createElement("span"); nom.className = "nom"; nom.textContent = `@${r.pseudo}`;
     // Le premier est le fantôme que tout le monde voit rouler sur la route.
-    if (i === 0) { const f = document.createElement("span"); f.className = "fantome"; f.textContent = "· fantôme"; nom.appendChild(f); }
     const m = document.createElement("span"); m.className = "m"; m.textContent = pts(r.metres);
     li.append(rang, nom, m);
     endLigueListe.appendChild(li);
@@ -528,6 +558,10 @@ export async function finLigue(metres, potes, mode = "course", bilan = {}) {
   endLigue.classList.remove("hidden");
 }
 function initLigue() {
+  afficherBoost();
+  rafraichirBoost();
+  const b = $("boost-ligue");
+  if (b) b.addEventListener("click", () => { if (ligue) partagerLigue(`Viens jouer 30 s dans ma ligue « J'ai un pote » (code ${ligue.code}) : ça me booste mes points !`); else if (!enBeta()) setStep(2); });
   try { const j = lsGet(CLE_LIGUE); if (j) ligue = JSON.parse(j); } catch (e) { ligue = null; }
   try {
     const code = new URLSearchParams(location.search).get("ligue");
@@ -596,8 +630,12 @@ export function showEndScreen({ metres, potesMax, record, fin, sprint, scoreMax 
   // savoir à quelle distance du maximum on est (« si le score maximal c'est
   // 100 000 et que le premier fait 88 000… »).
   const endMax = $("end-max");
-  endMax.classList.toggle("hidden", !scoreMax);
-  if (scoreMax) endMax.innerHTML = `Score parfait sur cette course : <b>${pts(scoreMax)}</b> · tu es à ${Math.min(100, Math.round(100 * metres / scoreMax))} %`;
+  const pct = Math.round((window.CONFIG.boostLigueParPote || 0.1) * 100);
+  const ligneBoost = sprint || !net.estConfigure() ? "" : boost.potes.length
+    ? `Boost de ligue <b>×${String(boost.mult).replace(".", ",")}</b> (${boost.potes.length} pote${boost.potes.length > 1 ? "s" : ""}) · invite-en d'autres : +${pct} % chacun`
+    : `Fais jouer tes potes 30 s dans ta ligue : <b>+${pct} %</b> de points par pote`;
+  endMax.classList.toggle("hidden", !scoreMax && !ligneBoost);
+  endMax.innerHTML = [scoreMax ? `Score parfait sur cette course : <b>${pts(scoreMax)}</b> · tu es à ${Math.min(100, Math.round(100 * metres / scoreMax))} %` : "", ligneBoost].filter(Boolean).join("<br>");
   // Le but : arriver au bout du morceau avec un max de potes.
   const potesTxt = potesMax === 0 ? "0 pote" : `${potesMax} pote${potesMax > 1 ? "s" : ""}`;
   // Aller au bout du morceau, c'est la victoire : on le dit (20 septembre

@@ -518,7 +518,7 @@ function nuages(ctx) {
 
 export function renderGround(ctx, boueAt) {
   // Ciel.
-  const hiv = poidsHiver() * 0.45, aut = poids("automne") * 0.25;
+  const hiv = poidsHiver() * 0.3, aut = poids("automne") * 0.25;
   const haut = melange(melange(melange(CIEL_HAUT, [176, 188, 204], hiv), [214, 170, 120], aut), CIEL_HAUT_NUIT, night);
   const bas = melange(melange(melange(CIEL_BAS, [226, 230, 236], hiv), [240, 196, 150], aut), CIEL_BAS_NUIT, night);
   const g = ctx.createLinearGradient(0, 0, 0, horizonY);
@@ -625,7 +625,7 @@ function shadeHex(hex, a) {
 let masque = () => 0;
 export function setMasqueDecor(f) { masque = typeof f === "function" ? f : () => 0; }
 export const SANS_LAMPE = 1, DANS_HALLE = 2;
-function lampeIci(r) { return r % 6 === 3 && !(masque(r) & (SANS_LAMPE | DANS_HALLE)); }
+function lampeIci(r) { return r % 12 === 3 && !(masque(r) & (SANS_LAMPE | DANS_HALLE)); }
 function poteauIci(r) { return r % 5 === 0 && !(masque(r) & DANS_HALLE) && !(masque(r + 5) & DANS_HALLE); }
 
 export function rowDecor(ctx, r, clear) {
@@ -639,7 +639,9 @@ export function rowDecor(ctx, r, clear) {
       // Décor ALLÉGÉ (28 septembre 2026 : « simplifie les décors et la
       // complexité des choses ») : un seul élément semé par rangée, et
       // seulement juste derrière la route — le fond ne garde que ses arbres.
-      const n = estVillage(zone) || side < 0 ? 0 : hash(r * 7 + 3) < 0.6 ? 1 : 0;
+      // 29 septembre 2026 (« trop d'éléments à l'arrière-plan ») : encore
+      // divisé par deux.
+      const n = estVillage(zone) || side < 0 ? 0 : hash(r * 7 + 3) < 0.3 ? 1 : 0;
       if (estVillage(zone)) decorVillage(ctx, push, r, side, sway, zone === "villageSud");
       for (let i = 0; i < n; i++) {
         const a = hash(r * 31 + i * 7 + side * 101);
@@ -662,8 +664,10 @@ export function rowDecor(ctx, r, clear) {
           push(u, v, () => arbre(ctx, u, v, h, sway(k)));
         }
       }
-      // Rangée d'arbres, une rangée sur deux.
-      if ((r + (side > 0 ? 1 : 0)) % 2 === 0 && !estVillage(zone)) {
+      // Arbres ESPACÉS (29 septembre 2026 : l'ancien « une rangée sur deux »
+      // faisait un mur de forêt derrière la route) : un tous les 5 près de
+      // la route, un tous les 3 au fond.
+      if ((side > 0 ? r % 5 === 0 : r % 3 === 1) && !estVillage(zone)) {
         const a = hash(r * 13 + side * 7);
         const u = (side > 0 ? ROAD_HALF + 6.6 : ROAD_HALF + 11.2) + a * 0.8, v = r - 0.4, k = r * 2.3 + side * 5;
         push(u, v, () => arbre(ctx, u, v, 5.5 + a * 3.0, sway(k) * 1.4));
@@ -672,7 +676,7 @@ export function rowDecor(ctx, r, clear) {
     // (Plus de bottes de foin sur le bas-côté : de profil, elles se
     // confondaient avec la botte-obstacle posée sur la route.) Des buissons
     // bas, ronds et verts, à la place.
-    if (hash(r * 41 + 1) < 0.14 && zone !== "foret" && !estVillage(zone)) {
+    if (hash(r * 41 + 1) < 0.05 && zone !== "foret" && !estVillage(zone)) {
       const u = ROAD_HALF + 1.3, v = r - 0.25;
       push(u, v, () => { drawBox(ctx, u, v, 0.6, 0.7, 0.35, "#4f7f35"); drawBox(ctx, u + 0.1, v + 0.1, 0.4, 0.5, 0.18, "#5f9440", 0.35); });
     }
@@ -732,7 +736,7 @@ export function rowDecor(ctx, r, clear) {
   }
   // Clôture de bois du premier plan : un piquet toutes les deux rangées,
   // une lisse qui court jusqu'au suivant.
-  if (r % 2 === 0 && !estVillage(zone)) {
+  if (false && r % 2 === 0 && !estVillage(zone)) { // clôture du premier plan retirée (29 septembre 2026)
     const u = -(ROAD_HALF + 3.4), v = r;
     const h = Math.min(0.62, hauteurMaxPremierPlan(u) - 0.04);
     if (h > 0.2) {

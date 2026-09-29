@@ -87,6 +87,14 @@ window.CONFIG = {
   // est plus long à gagner que le précédent). Le premier arrive vite (8
   // pièces) pour que le principe se comprenne dans les dix premières secondes.
   potesMax: 5,              // sans ligue : la ligue de démo (5 membres)
+  // BOOST DE LIGUE (29 septembre 2026, idée du manager de Bluefit : « pour
+  // faire le meilleur score, les fans sont obligés de faire jouer leurs potes »).
+  // Chaque AUTRE membre de ta ligue qui a joué au moins `boostLigueDureeS`
+  // secondes te donne +`boostLigueParPote` sur tous tes points, jusqu'à
+  // `boostLigueMaxPotes` potes (×3 à 20). Un fan doit donc recruter.
+  boostLigueParPote: 0.10,
+  boostLigueMaxPotes: 20,
+  boostLigueDureeS: 30,
   // Peloton (9 septembre 2026 : « il faut que les potes soient un peu plus
   // éloignés de toi, parce que c'est trop difficile sinon ») : le premier
   // pote roule `potesRecul` rangées derrière le joueur, puis `potesEcart`

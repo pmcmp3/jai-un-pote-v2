@@ -86,6 +86,9 @@ create table if not exists public.ligue_scores (
 alter table public.ligue_scores add column if not exists mode text not null default 'course';
 alter table public.ligue_scores add column if not exists graine integer;
 alter table public.ligue_scores add column if not exists trace text;
+-- Boost de ligue (29 septembre 2026) : durée de la course, en secondes.
+alter table public.ligue_scores add column if not exists duree_s integer;
+create index if not exists ligue_scores_boost_idx on public.ligue_scores (code, duree_s);
 alter table public.ligue_scores enable row level security;
 drop policy if exists "Lecture publique des scores de ligue" on public.ligue_scores;
 create policy "Lecture publique des scores de ligue" on public.ligue_scores for select to anon using (true);

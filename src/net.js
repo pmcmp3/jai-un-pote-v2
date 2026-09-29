@@ -45,7 +45,7 @@ export async function creerLigue(code, pseudo, skin = null) {
   return rejoindreLigue(code, pseudo, skin);
 }
 
-export const LIGUE_MAX = 6; // « limiter une ligue à 6 personnes pour l'instant »
+export const LIGUE_MAX = 21; // toi + 20 potes (boost de ligue, 29 septembre 2026) — 6 avant
 // La bêta fermée (16 septembre 2026) a son propre plafond, porté par la
 // colonne `ligues.plafond` (supabase-migration-beta.sql). Repli sur 6 si la
 // migration n'est pas passée.
@@ -96,10 +96,19 @@ export function debutSemaine(d = new Date()) {
 export async function envoyerScore(code, pseudo, metres, potes, mode = "course", extra = null) {
   const base = { code, pseudo, metres: Math.floor(metres), potes, mode };
   if (extra && extra.graine !== undefined && extra.graine !== null) {
-    const ok = await post("ligue_scores", { ...base, graine: extra.graine, trace: extra.trace || null });
+    const ok = await post("ligue_scores", { ...base, graine: extra.graine, trace: extra.trace || null, duree_s: Math.floor(extra.duree || 0) });
     if (ok) return true;
   }
   return post("ligue_scores", base);
+}
+
+// Boost de ligue : les AUTRES membres qui ont fait au moins une course de
+// `boostLigueDureeS` secondes dans cette ligue (null = pas de réseau).
+export async function potesActifs(code, moi) {
+  const min = window.CONFIG.boostLigueDureeS || 30;
+  const rows = await get("ligue_scores", `?code=eq.${encodeURIComponent(code)}&duree_s=gte.${min}&select=pseudo&limit=2000`);
+  if (!rows) return null;
+  return [...new Set(rows.map((r) => r.pseudo))].filter((p) => p !== moi);
 }
 
 // Le FANTÔME de la ligue : la meilleure course (avec trace) sur CETTE route.

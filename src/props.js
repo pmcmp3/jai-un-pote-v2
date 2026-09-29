@@ -19,6 +19,7 @@
 import { drawBox, drawBoxR, drawShadow, drawFlat, drawDisque, getNight, project, groupe } from "./scene.js";
 import { KINDS } from "./rows.js";
 
+const ROUSSE = "#b8612c", ROUSSE_AILE = "#8a4420";
 const WHITE = "#f4efe4", BLACK = "#1a1a1e", PINK = "#f0a0b0", ORANGE = "#e08a2a", VITRE = "#a8d8f0";
 
 // Repère « corps » d'un animal posé en (uC, r), en FRACTIONS de sa boîte :
@@ -142,9 +143,11 @@ function staticNu(ctx, kind, uCenter, r, t) {
   if (kind !== "mouton") drawShadow(ctx, uCenter, r, K.larg / 2, K.long / 2, 0.22);
   if (kind === "poule") {
     const bob = Math.abs(Math.sin(t * 6 + r)) * 0.08;
-    B(0.12 + wob, 0.12, 0.5, 0.62, 0.42, WHITE, 0.2 + bob);
-    B(0.56 + wob, 0.2, 0.26, 0.42, 0.3, WHITE, 0.58 + bob);
-    B(0.8 + wob, 0.3, 0.16, 0.2, 0.09, ORANGE, 0.68 + bob);
+    B(0.12 + wob, 0.12, 0.5, 0.62, 0.42, ROUSSE, 0.2 + bob);
+    B(0.2 + wob, 0.04, 0.3, 0.1, 0.22, ROUSSE_AILE, 0.3 + bob);             // l'aile, côté caméra
+    B(0.56 + wob, 0.2, 0.26, 0.42, 0.3, ROUSSE, 0.58 + bob);
+    B(0.8 + wob, 0.3, 0.16, 0.2, 0.09, "#f2c02c", 0.68 + bob);
+    B(0.66 + wob, 0.18, 0.06, 0.06, 0.08, BLACK, 0.72 + bob);               // l'œil
     B(0.62 + wob, 0.26, 0.14, 0.24, 0.12, "#e13e26", 0.86 + bob);
     B(0.22, 0.24, 0.1, 0.12, 0.2, ORANGE);
     B(0.44, 0.5, 0.1, 0.12, 0.2, ORANGE);
@@ -255,16 +258,18 @@ export function drawPouleJetee(ctx, u, v, t) {
 }
 // Poule en cubes, centrée en (u, v), posée à `lift`, tête du côté `sens`.
 function poule(ctx, u, v, lift, t, sens) {
-  const flap = Math.abs(Math.sin(t * 20)) * 0.14;
-  const x = u - 0.3, y = v - 0.32;
-  const tete = sens < 0 ? y - 0.02 : y + 0.42;
-  drawBox(ctx, x + 0.14, y + 0.14, 0.32, 0.36, 0.34, WHITE, lift + 0.16);
-  drawBox(ctx, x + 0.2, tete, 0.2, 0.22, 0.24, WHITE, lift + 0.42);
-  drawBox(ctx, x + 0.24, sens < 0 ? tete - 0.1 : tete + 0.22, 0.12, 0.1, 0.07, ORANGE, lift + 0.5);
-  drawBox(ctx, x + 0.24, tete + 0.06, 0.12, 0.1, 0.1, "#e13e26", lift + 0.66);
-  drawBox(ctx, x + 0.08, y + 0.2, 0.06, 0.24, 0.14, WHITE, lift + 0.3 + flap);
-  drawBox(ctx, x + 0.46, y + 0.2, 0.06, 0.24, 0.14, WHITE, lift + 0.3 + flap);
-  if (lift < 0.5) { drawBox(ctx, x + 0.22, y + 0.22, 0.06, 0.06, lift + 0.16, ORANGE); drawBox(ctx, x + 0.34, y + 0.34, 0.06, 0.06, lift + 0.16, ORANGE); }
+  const S = 1.4; // même agrandissement que la poule posée (rows.KINDS)
+  const flap = Math.abs(Math.sin(t * 20)) * 0.14 * S;
+  const x = u - 0.3 * S, y = v - 0.32 * S;
+  const tete = sens < 0 ? y - 0.02 * S : y + 0.42 * S;
+  const b = (du, dv, a, bb, h, c, l) => drawBox(ctx, x + du * S, dv, a * S, bb * S, h * S, c, l);
+  b(0.14, y + 0.14 * S, 0.32, 0.36, 0.34, ROUSSE, lift + 0.16 * S);
+  b(0.2, tete, 0.2, 0.22, 0.24, ROUSSE, lift + 0.42 * S);
+  b(0.24, sens < 0 ? tete - 0.1 * S : tete + 0.22 * S, 0.12, 0.1, 0.07, "#f2c02c", lift + 0.5 * S);
+  b(0.24, tete + 0.06 * S, 0.12, 0.1, 0.1, "#e13e26", lift + 0.66 * S);
+  b(0.08, y + 0.2 * S, 0.06, 0.24, 0.14, ROUSSE_AILE, lift + 0.3 * S + flap);
+  b(0.46, y + 0.2 * S, 0.06, 0.24, 0.14, ROUSSE_AILE, lift + 0.3 * S + flap);
+  if (lift < 0.5) { b(0.22, y + 0.22 * S, 0.06, 0.06, (lift + 0.16 * S) / S, ORANGE, 0); b(0.34, y + 0.34 * S, 0.06, 0.06, (lift + 0.16 * S) / S, ORANGE, 0); }
 }
 
 // Un obstacle TOUCHÉ bascule (20 septembre 2026 : « quand on se prend un

@@ -51,7 +51,9 @@ export function renderHud(ctx, width, height, hud) {
   // haut, c'est super, mais enlève le contour noir — laisse le texte blanc,
   // avec une ombre portée à 25 % d'opacité, ça fera très bien le taf »).
   ctx.textBaseline = "top";
-  ctx.shadowColor = "rgba(0,0,0,0.25)";
+  // Ombre remontée à 50 % le 29 septembre 2026 (« attention aux contrastes ») :
+  // sur le ciel d'hiver et la neige, 25 % ne détachait plus le blanc.
+  ctx.shadowColor = "rgba(0,0,0,0.5)";
   ctx.shadowOffsetY = 2;
   const ecrire = (txt, x, y, taille = 0) => { ctx.shadowBlur = Math.max(3, taille * 0.12); ctx.fillText(txt, x, y); };
 
@@ -99,12 +101,12 @@ export function renderHud(ctx, width, height, hud) {
     ctx.fillStyle = "#4a3305";
     ctx.textAlign = "center";
     ctx.fillText(txt, cx, top + PAD + taille * 0.9 + 22);
-    ctx.shadowColor = "rgba(0,0,0,0.25)"; ctx.shadowOffsetY = 2;
+    ctx.shadowColor = "rgba(0,0,0,0.5)"; ctx.shadowOffsetY = 2;
   }
 
   // Droite : cases, compte, jauge. Les aplats ne portent pas l'ombre du texte.
   const sansOmbre = () => { ctx.shadowBlur = 0; ctx.shadowColor = "transparent"; };
-  const avecOmbre = () => { ctx.shadowColor = "rgba(0,0,0,0.25)"; ctx.shadowOffsetY = 2; };
+  const avecOmbre = () => { ctx.shadowColor = "rgba(0,0,0,0.5)"; ctx.shadowOffsetY = 2; };
   const ry = top + PAD + 2;
   sansOmbre();
   for (let i = 0; i < total; i++) {

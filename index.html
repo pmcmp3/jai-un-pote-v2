@@ -1,6 +1,28 @@
 <!doctype html>
 <html lang="fr">
 <head>
+  <script>
+    // Lien « ?9 » (29 septembre 2026 : « un truc 9 qui fait que n'importe qui
+    // qui clique sur le lien, ça vide le cache ») : tout paramètre fait d'un
+    // NOMBRE (?9, ?10…) vide le cache du service worker, le désinscrit, remet
+    // le tuto au ralenti à zéro, puis recharge la page propre (les autres
+    // paramètres, ?ligue=… compris, sont gardés).
+    (function () {
+      try {
+        var u = new URL(location.href), num = null;
+        u.searchParams.forEach(function (v, k) { if (/^\d+$/.test(k)) num = k; });
+        if (num === null) return;
+        u.searchParams.delete(num);
+        try { localStorage.removeItem("jp2-appris"); } catch (e) {}
+        var fini = function () { location.replace(u.toString()); };
+        var etapes = [];
+        if (window.caches) etapes.push(caches.keys().then(function (ks) { return Promise.all(ks.map(function (k) { return caches.delete(k); })); }));
+        if (navigator.serviceWorker) etapes.push(navigator.serviceWorker.getRegistrations().then(function (rs) { return Promise.all(rs.map(function (r) { return r.unregister(); })); }));
+        Promise.all(etapes).then(fini, fini);
+        setTimeout(fini, 2500);
+      } catch (e) {}
+    })();
+  </script>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover" />
   <meta name="mobile-web-app-capable" content="yes" />
@@ -169,6 +191,9 @@
     .chip.couleur { padding: 0; width: 28px; }
     .chip.actif { border-color: var(--noir); box-shadow: 0 0 0 2px var(--jaune); }
     #sprint-button { margin-top: 8px; }
+    /* Boost de ligue (29 septembre 2026) : sticker jaune sous JOUER. */
+    #boost-ligue { margin-top: 10px; width: 100%; padding: 8px 10px; border: 1.5px solid var(--noir); border-radius: 3px; background: #ffcf2e; color: var(--noir); font: 500 11px/1.35 var(--police); text-align: left; -webkit-tap-highlight-color: transparent; }
+    #boost-ligue b { font-weight: 900; letter-spacing: 0.06em; }
     #sprint-note { margin: 6px 0 0; font: 500 11px var(--police); color: rgba(0,0,0,0.55); text-align: center; }
     #end-max { margin: 4px 0 0; font: 500 12px/1.4 var(--police); color: rgba(0,0,0,0.65); text-align: center; }
     #end-max b { color: var(--rouge); font-weight: 900; }
@@ -425,6 +450,7 @@
             <span id="loading-label">0 %</span>
           </div>
           <button id="play-button" class="btn btn-primary" type="button" disabled>Jouer</button>
+          <button id="boost-ligue" type="button"></button>
           <button id="sprint-button" class="btn btn-secondary hidden beta-off" type="button">Sprint du dimanche · 60 s</button>
           <p id="sprint-note" class="hidden"></p>
           <div id="step3-links"><button id="step3-ligue" type="button" class="link-minimal beta-off">Ma ligue</button><button id="step3-profil" type="button" class="link-minimal">Mon profil</button></div>

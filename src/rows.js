@@ -72,9 +72,11 @@ export const KINDS = {
   // que la rangée de croisement, tourné vers le joueur ; quand le joueur
   // approche, il jette la poule, qui court sur la route vers lui. Mécanique
   // d'une voiture en face (type « contresens »), en tout petit : un tap.
-  poulejetee:  { contresens: true, cout: 1, vitesse: 4.5, lanceur: 3.5, long: 0.65, larg: 0.6, h: 0.76, nom: "une poule jetée" },
+  poulejetee:  { contresens: true, cout: 1, vitesse: 4.5, lanceur: 3.5, long: 0.9, larg: 0.84, h: 0.9, nom: "une poule jetée" },
   // Posés sur la route.
-  poule:   { cout: 1, long: 0.65, larg: 0.60, h: 0.70, nom: "une poule" },
+  // ×1,4 le 29 septembre 2026 (« les poules doivent être beaucoup plus
+  // grosses, on les voit pas assez ») — et rousses, pour trancher sur la neige.
+  poule:   { cout: 1, long: 0.9, larg: 0.84, h: 0.9, nom: "une poule" },
   chat:    { cout: 1, long: 0.80, larg: 0.60, h: 0.74, nom: "un chat" },
   chien:   { cout: 1, long: 0.80, larg: 0.55, h: 0.70, nom: "un chien" },
   mouton:  { cout: 1, long: 0.80, larg: 0.80, h: 0.72, nom: "un mouton" },
