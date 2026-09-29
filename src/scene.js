@@ -107,7 +107,8 @@ function melange(a, b, t) { return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1
 // tourné vers la droite, où est le soleil), `ombre` (côté gauche).
 function teintes(color, u) {
   const kb = Math.max(0, Math.min(9, Math.round((u - 2.5) / 1.8)));
-  const kn = Math.round(night * 10);
+  // Acteurs éclairés (main.js) : la nuit ne les assombrit qu'au quart.
+  const kn = Math.round(night * (eclaireActif ? 2.5 : 10));
   const cle = `${color}|${kb}|${kn}|${modeSaison ? saisonCle : ""}`;
   let t = cache.get(cle);
   if (t) return t;
@@ -126,6 +127,8 @@ function teintes(color, u) {
   return t;
 }
 export function teinte(color, u = 0) { return teintes(color, u).plat; }
+let eclaireActif = false;
+export function eclaire(fn) { const e = eclaireActif; eclaireActif = true; try { fn(); } finally { eclaireActif = e; } }
 
 // --- Saisons (28 septembre 2026 : « fais les saisons avec neige, faut plein de
 // variations ») ------------------------------------------------------------------
@@ -831,15 +834,17 @@ function decorVillage(ctx, push, r, side, sway, sud) {
   const pres = side > 0;
   const P = sud ? PALETTE_SUD : PALETTE_NORD;
   const k = r * 7 + (pres ? 0 : 3);
-  if (rz % 6 === (pres ? 4 : 1) && rz !== 27 && rz !== 12) {
+  // UNE MAISON SUR DEUX, une voiture sur deux, moins d'habitants (29 septembre
+  // 2026 : « il y a beaucoup trop de choses [...] mets une maison sur deux »).
+  if (rz % 12 === (pres ? 4 : 1) && rz !== 27 && rz !== 12) {
     const u = pres ? ROAD_HALF + 2.2 : ROAD_HALF + 8.0, v = r - 1.2;
     push(u, v, () => maisonRegion(ctx, u, v, 4.0, 3.2, 1, P, k, null));
   }
-  if (rz % 4 === (pres ? 2 : 0)) {
+  if (rz % 8 === (pres ? 2 : 0)) {
     const u = pres ? ROAD_HALF + 15.0 : ROAD_HALF + 21.0, v = r - 1.8;
     push(u, v, () => maisonRegion(ctx, u, v, 5.0, 4.6, 2, P, k + 3, null));
   }
-  if (rz % 7 === (pres ? 0 : 3)) {
+  if (rz % 14 === (pres ? 0 : 3)) {
     const u = pres ? ROAD_HALF + 6.2 : ROAD_HALF + 11.5, v = r - 1.5;
     const hab = ["#e13e26", "#ffcf2e", "#3f63b4", "#2f7a46"][k % 4];
     push(u, v, () => maisonRegion(ctx, u, v, 4.4, 4.0, 2, P, k + 2, hab));
@@ -876,7 +881,7 @@ function decorVillage(ctx, push, r, side, sway, sud) {
         drawBox(ctx, u - 0.09, v + 1.0 + i * 1.7, 0.05, 1.1, 1.3, "#a8d8f0", 1.1);
       }
     });
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 1; i++) {
       const pu = ROAD_HALF + 1.7 + (i % 2) * 0.8, pv = r - 2.2 + i * 1.4;
       push(pu, pv, () => personnage(ctx, pu, pv + Math.sin(decorT * 3 + i) * 0.15, 0, ["#e13e26", "#ffcf2e", "#3f63b4"][i], "#3a3e4e"));
     }
@@ -886,15 +891,15 @@ function decorVillage(ctx, push, r, side, sway, sud) {
   // l'importe). Le modèle simplifié d'ici avait des roues en cubes et une
   // vitre qui flottait (27 septembre 2026 : « dans le biome aux maisons
   // rouges, les voitures avaient un gros problème de modélisation »).
-  if (pres && rz % 6 === 1 && dessinVoiture) {
+  if (pres && rz % 12 === 1 && dessinVoiture) {
     const cu = ROAD_HALF + 3.4, cv = r + 0.4;
     push(cu, cv, () => dessinVoiture(ctx, cu, cv));
   }
-  if (pres && rz % 11 === 5 && rz % 6 !== 1) {
+  if (false && pres && rz % 11 === 5) { // skateur retiré
     const su = ROAD_HALF + 1.6, sv = r - 0.3, k2 = r * 1.3;
     push(su, sv, () => { const roll = Math.sin(decorT * 2 + k2) * 0.4; drawBox(ctx, su, sv + roll, 0.4, 1.0, 0.1, "#e13e26", 0.16); personnage(ctx, su + 0.05, sv + 0.2 + roll, 0.26, "#ffcf2e", "#3a3e4e"); });
   }
-  if (!pres && rz % 9 === 6) {
+  if (!pres && rz % 18 === 6) {
     const pu = ROAD_HALF + 2.0, pv = r - 0.4;
     push(pu, pv, () => personnage(ctx, pu, pv + sway(r) * 4, 0, ["#e13e26", "#3f63b4", "#2f7a46"][k % 3], "#3a3e4e"));
   }

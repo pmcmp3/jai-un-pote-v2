@@ -177,6 +177,17 @@ export function renderCountIn(ctx, width, height, t, beatPeriod, beats, linger) 
   ctx.fillStyle = t < 0 ? BLANC : JAUNE;
   ctx.fillText(texte, 0, 0);
   ctx.restore();
+  // « Il faut mettre au début qu'il faut jouer avec du son » (29 septembre 2026).
+  const msg = "MONTE LE SON : LES KLAXONS T'ANNONCENT LES VOITURES";
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  fitFont(ctx, "800", 11, msg, width - 60, 8);
+  const w = ctx.measureText(msg).width + 20, y = Math.max(height * 0.3, 190) + 72;
+  ctx.translate(width / 2, y); ctx.rotate(-0.02);
+  ctx.fillStyle = NOIR; ctx.fillRect(-w / 2, -12, w, 24);
+  ctx.fillStyle = BLANC; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.fillText(msg, 0, 1);
+  ctx.restore();
 }
 
 // Rappel des commandes, en bas, pendant les premières secondes de course.
@@ -347,7 +358,7 @@ export function renderTuto(ctx, width, height, tuto) {
   if (!tuto) return;
   ctx.save();
   const w = Math.min(width - 32, 330), h = tuto.sous ? 92 : 70;
-  const x = width / 2 - w / 2, y = height * 0.3;
+  const x = width / 2 - w / 2, y = tuto.y !== undefined ? tuto.y : height * 0.3; // en HAUT, sous le score (29 septembre 2026)
   ctx.globalAlpha = tuto.alpha;
   ctx.fillStyle = "rgba(0,0,0,0.18)";
   roundRect(ctx, x + 2, y + 4, w, h, 3); ctx.fill();

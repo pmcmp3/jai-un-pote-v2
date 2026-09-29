@@ -94,6 +94,7 @@ try {
     localStorage.removeItem(CLE_PMC_SUIVI);
     localStorage.removeItem(CLE_PLATEFORME);
     localStorage.removeItem("jp2-appris"); // le tuto contextuel se rejoue
+    localStorage.removeItem("jp2-conseils-vus");
     const url = new URL(location.href); url.searchParams.delete("neuf"); history.replaceState(null, "", url.toString());
   }
 } catch (e) { /* rien */ }
@@ -406,6 +407,27 @@ let ligue = null;           // { code, membres: [] }
 let ligueInvitation = null; // code reçu par l'URL, en attente d'un pseudo
 
 export function getLigue() { return ligue; }
+// --- LIGUE DÉMO (29 septembre 2026 : « copie-moi le lien avec ma ligue, pour
+// que ce soit une ligue fake ») -------------------------------------------------
+// `?demo` dans l'URL : une ligue locale, sans réseau, pour montrer le système
+// — 6 potes ont « joué », boost ×1,6 actif, classement de fin où l'on se
+// compare à eux. Rien n'est envoyé nulle part. Mémorisé (jp2Demo) jusqu'à `?zero`.
+const DEMO = { code: "DEMO", noms: ["lea", "marius", "ines", "hugo", "nita", "oscar"] };
+let demo = false;
+try {
+  if (new URLSearchParams(location.search).has("demo")) { localStorage.setItem("jp2Demo", "1"); const u = new URL(location.href); u.searchParams.delete("demo"); history.replaceState(null, "", u.toString()); }
+  demo = localStorage.getItem("jp2Demo") === "1";
+} catch (e) { demo = false; }
+export function estDemo() { return demo; }
+// Classement fake : les potes démo s'étagent SOUS une course terminée (on veut
+// voir « tu es premier »), au-dessus d'une course écourtée.
+function classementDemo(metres, fin) {
+  const base = fin ? metres : Math.max(metres * 1.6, 900);
+  const f = [0.93, 0.81, 0.7, 0.58, 0.44, 0.31];
+  const rows = DEMO.noms.map((n, i) => ({ pseudo: n, metres: Math.round(base * f[i]) }));
+  rows.push({ pseudo: getPseudo() || "toi", metres: Math.floor(metres) });
+  return rows.sort((a, b) => b.metres - a.metres);
+}
 // Boost de ligue : { potes: [pseudos], mult }.
 let boost = { potes: [], mult: 1 };
 export function getBoost() { return boost; }
@@ -418,20 +440,24 @@ function calculerBoost(potes) {
 function afficherBoost() {
   const el = $("boost-ligue");
   if (!el) return;
-  // Sans base Supabase, pas de ligue : le boost ne peut compter personne.
-  el.classList.toggle("hidden", !net.estConfigure() || enBeta());
+  // Sans base Supabase, pas de ligue : le boost ne peut compter personne
+  // (sauf en ligue démo).
+  el.classList.toggle("hidden", (!net.estConfigure() && !demo) || enBeta());
   const C = window.CONFIG, pct = Math.round((C.boostLigueParPote || 0.1) * 100);
   const n = boost.potes.length;
+  // Explication en deux lignes (« il faut que j'arrive à trouver un moyen
+  // d'expliquer assez simplement comment ça fonctionne ») : le chiffre, puis la règle.
   el.innerHTML = "";
   const titre = document.createElement("b");
-  titre.textContent = n ? `BOOST ×${String(boost.mult).replace(".", ",")}` : "BOOST ×1";
-  const txt = document.createElement("span");
-  txt.textContent = n
-    ? ` · ${n} pote${n > 1 ? "s ont" : " a"} joué dans ta ligue. Chaque nouveau : +${pct} %`
-    : ` · chaque pote qui joue ${C.boostLigueDureeS || 30} s dans ta ligue = +${pct} % sur tes points`;
-  el.append(titre, txt);
+  titre.textContent = `TES POINTS ×${String(boost.mult).replace(".", ",")}`;
+  const ligne1 = document.createElement("span");
+  ligne1.textContent = n ? ` · ${n} pote${n > 1 ? "s ont" : " a"} joué` : "";
+  const regle = document.createElement("small");
+  regle.textContent = `1 pote qui joue ${C.boostLigueDureeS || 30} s = +${pct} % pour toi · Inviter →`;
+  el.append(titre, ligne1, regle);
 }
 async function rafraichirBoost() {
+  if (demo) { calculerBoost(DEMO.noms.slice()); return; }
   if (!ligue || ligue.enAttente || !net.estConfigure()) { calculerBoost([]); return; }
   const p = await net.potesActifs(ligue.code, getPseudo());
   if (p) calculerBoost(p);
@@ -494,6 +520,7 @@ async function partagerLigue(texte) {
 // Rafraîchit les membres au démarrage d'une course (les potes qui ont
 // rejoint depuis apparaissent).
 export async function preparerLigue() {
+  if (demo) { appliquerNomsLigue(); await rafraichirBoost(); return; }
   if (ligue && ligue.enAttente) { await rejoindre(ligue.code); ligueInvitation = null; }
   if (!ligue) { friends.setNomsLigue(null); return; }
   const membres = await net.membres(ligue.code);
@@ -510,6 +537,7 @@ export async function finLigue(metres, potes, mode = "course", bilan = {}) {
   if (mode === "sprint") lsSet(CLE_SPRINT, net.jourSprint());
   const code = ligue ? ligue.code : (window.CONFIG.ligueDemo || "PMCMP");
   if (!ligue && mode !== "sprint") return;
+  if (demo && mode !== "sprint") { afficherClassement(DEMO.code, classementDemo(metres, bilan.fin), "Ligue démo"); return; }
   let trace = null;
   if (mode !== "sprint" && bilan.trace) {
     const avant = await net.classement(ligue.code, bilan.graine);
@@ -542,15 +570,23 @@ export async function finLigue(metres, potes, mode = "course", bilan = {}) {
   const objectif = window.CONFIG.relaisDistance || 30000;
   endRelais.classList.remove("hidden");
   endRelais.textContent = `Relais : ${Number(relais.metres).toLocaleString("fr-FR")} / ${objectif.toLocaleString("fr-FR")} pts`;
-  endLigueCode.textContent = ligue.code;
+  afficherClassement(ligue.code, rows);
+}
+// Classement de la ligue sur l'écran de fin, avec le rang du joueur en tête
+// de carte (« il faut un système de classement à la fin qui dit que je suis
+// premier, je peux inviter des potes »).
+function afficherClassement(code, rows, titre = null) {
+  endLigueCode.textContent = titre || code;
   endLigueListe.textContent = "";
-  const moi = getPseudo();
-  rows.slice(0, enBeta() ? 12 : 6).forEach((r, i) => {
+  const moi = getPseudo() || "toi";
+  const rang = rows.findIndex((r) => r.pseudo === moi) + 1;
+  const annonce = $("end-rang");
+  if (annonce) { annonce.textContent = rang === 1 ? "Tu es 1er de ta ligue !" : rang > 0 ? `Tu es ${rang}e de ta ligue` : ""; annonce.classList.toggle("hidden", !rang); }
+  rows.slice(0, enBeta() ? 12 : 7).forEach((r, i) => {
     const li = document.createElement("li");
     if (r.pseudo === moi) li.className = "moi";
     const rang = document.createElement("span"); rang.className = "rang"; rang.textContent = `${i + 1}`;
     const nom = document.createElement("span"); nom.className = "nom"; nom.textContent = `@${r.pseudo}`;
-    // Le premier est le fantôme que tout le monde voit rouler sur la route.
     const m = document.createElement("span"); m.className = "m"; m.textContent = pts(r.metres);
     li.append(rang, nom, m);
     endLigueListe.appendChild(li);
@@ -561,8 +597,9 @@ function initLigue() {
   afficherBoost();
   rafraichirBoost();
   const b = $("boost-ligue");
-  if (b) b.addEventListener("click", () => { if (ligue) partagerLigue(`Viens jouer 30 s dans ma ligue « J'ai un pote » (code ${ligue.code}) : ça me booste mes points !`); else if (!enBeta()) setStep(2); });
+  if (b) b.addEventListener("click", () => { if (ligue || demo) partagerLigue(`Viens jouer 30 s dans ma ligue « J'ai un pote » (code ${ligue.code}) : ça me booste mes points !`); else if (!enBeta()) setStep(2); });
   try { const j = lsGet(CLE_LIGUE); if (j) ligue = JSON.parse(j); } catch (e) { ligue = null; }
+  if (demo) ligue = { code: DEMO.code, membres: DEMO.noms.map((nom) => ({ nom, skin: null })), demo: true };
   try {
     const code = new URLSearchParams(location.search).get("ligue");
     // Le lien d'invitation suffit : la personne fait déjà partie de la ligue,
@@ -631,7 +668,7 @@ export function showEndScreen({ metres, potesMax, record, fin, sprint, scoreMax 
   // 100 000 et que le premier fait 88 000… »).
   const endMax = $("end-max");
   const pct = Math.round((window.CONFIG.boostLigueParPote || 0.1) * 100);
-  const ligneBoost = sprint || !net.estConfigure() ? "" : boost.potes.length
+  const ligneBoost = sprint || (!net.estConfigure() && !demo) ? "" : boost.potes.length
     ? `Boost de ligue <b>×${String(boost.mult).replace(".", ",")}</b> (${boost.potes.length} pote${boost.potes.length > 1 ? "s" : ""}) · invite-en d'autres : +${pct} % chacun`
     : `Fais jouer tes potes 30 s dans ta ligue : <b>+${pct} %</b> de points par pote`;
   endMax.classList.toggle("hidden", !scoreMax && !ligneBoost);

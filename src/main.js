@@ -207,20 +207,30 @@ const CONSEILS = {
   haut:   { titre: "RESTE APPUYÉ !", sous: "plus tu tiens, plus tu sautes haut" },
   double: { titre: "TAPE… PUIS RE-TAPE !", sous: "double saut pour tout ce qui roule" },
 };
-const CLE_APPRIS = "jp2-appris";
-function appris() { try { return new Set(JSON.parse(localStorage.getItem(CLE_APPRIS) || "[]")); } catch (e) { return new Set(); } }
-function apprendre(f) { const a = appris(); a.add(f); try { localStorage.setItem(CLE_APPRIS, JSON.stringify([...a])); } catch (e) { /* navigation privée */ } }
+const CLE_APPRIS = "jp2-appris", CLE_VUS = "jp2-conseils-vus";
+function lireJson(k, def) { try { return JSON.parse(localStorage.getItem(k) || "null") || def; } catch (e) { return def; } }
+function ecrireJson(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* navigation privée */ } }
+function appris() { return new Set(lireJson(CLE_APPRIS, [])); }
+function apprendre(f) { const a = appris(); a.add(f); ecrireJson(CLE_APPRIS, [...a]); }
 // ralenti : facteur de temps du MONDE (1 = normal). La musique, elle, continue :
 // seule l'horloge du monde (`tMonde`) prend du retard sur celle du morceau.
-const RALENTI_MIN = 0.06;
-const conseil = { r: null, famille: null, phase: null, alpha: 0, ok: 0 };
+// Deuxième version (29 septembre 2026, joué en direct : « le ralenti devrait
+// arriver bien avant la bête, genre une seconde avant le choc, pour me laisser
+// le temps de me poser » ; « j'ai trois fois le même truc de ralenti ») :
+//   approche  : ~1 s avant le bon moment, le monde glisse vers ×0,25 ; un tap
+//               donné là est GARDÉ et part pile au bon moment ;
+//   attente   : au bon moment, s'il n'a rien fait, gel à ×0,06 ;
+//   enl_air   : appui long / double saut, ×0,3 le temps du deuxième geste ;
+//   fini      : réussite → le temps repart d'un coup (« ça doit s'accélérer
+//               quand la personne réussit »).
+// Une famille est APPRISE dès que l'obstacle est franchi sans le toucher (quel
+// que soit le geste), et jamais montrée plus de deux fois.
+const RALENTI_MIN = 0.015, RALENTI_APPROCHE = 0.25, APPROCHE_S = 1.0;
+const conseil = { r: null, famille: null, phase: null, alpha: 0, ok: 0, tampon: false, touche: false };
 let ralenti = 1, retardMonde = 0;
 function tMonde() { return clock.now() - retardMonde; }
-// Mort / fin pendant un conseil : on le coupe sans toucher au retard du monde
-// (le remettre à zéro ferait sauter les tracteurs en place). Sinon le morceau
-// restait étouffé jusque sur l'écran de fin.
-function conseilCouper() { conseil.r = null; conseil.phase = null; conseil.alpha = 0; conseil.ok = 0; audio.setRalenti(false); }
-function conseilReset() { conseil.r = null; conseil.famille = null; conseil.phase = null; conseil.alpha = 0; conseil.ok = 0; ralenti = 1; retardMonde = 0; audio.setRalenti(false); }
+function conseilCouper() { conseil.r = null; conseil.phase = null; conseil.alpha = 0; conseil.ok = 0; conseil.tampon = false; audio.setRalenti(false); }
+function conseilReset() { conseilCouper(); ralenti = 1; retardMonde = 0; }
 // Temps avant que l'obstacle de la rangée r croise le joueur (s), ou null.
 function tempsAvant(r, row, tm, vitesse) {
   if (row.type === "statique") return (r - player.v) / Math.max(0.5, vitesse);
@@ -228,63 +238,85 @@ function tempsAvant(r, row, tm, vitesse) {
   if (row.type === "contresens") { const o = rows.contresensAt(r, row, tm); return o ? (o.v - player.v) / Math.max(0.5, vitesse + row.vitesse) : null; }
   return (r - player.v) / Math.max(0.5, vitesse);
 }
+function momentIdeal(f) { return rows.montee(f) + 0.03; } // le moment du joueur idéal (outils/mesurer.mjs), un poil avant
 function conseilCherche(tm, vitesse) {
-  if (conseil.r !== null || game.sprint) return;
+  if (conseil.r !== null || game.sprint || !player.auSol) return;
   const deja = appris();
   if (deja.size >= 3) return;
+  const vus = lireJson(CLE_VUS, {});
   const r0 = Math.floor(player.v) + 1;
-  for (let r = r0; r <= r0 + 14; r++) {
+  for (let r = r0; r <= r0 + 30; r++) {
     const row = rows.rowAt(r);
     if (row.type !== "statique" && row.type !== "traverse" && row.type !== "contresens") continue;
     const f = rows.familleDe(row.kind);
-    if (deja.has(f)) continue;
+    if (deja.has(f) || (vus[f] || 0) >= 2) continue;
     const t = tempsAvant(r, row, tm, vitesse);
-    // Moment du geste : on décolle ~ le temps de monter à l'apex avant l'obstacle.
-    if (t !== null && t > 0 && t <= rows.montee(f) + 0.12) {
-      conseil.r = r; conseil.famille = f; conseil.phase = "attente"; conseil.ok = 0;
+    if (t !== null && t > momentIdeal(f) && t <= momentIdeal(f) + APPROCHE_S) {
+      conseil.r = r; conseil.famille = f; conseil.phase = "approche"; conseil.ok = 0; conseil.tampon = false; conseil.touche = false;
+      vus[f] = (vus[f] || 0) + 1; ecrireJson(CLE_VUS, vus);
       audio.setRalenti(true);
     }
     return; // seul l'obstacle le plus proche compte
   }
 }
+// Filtre du tap pendant un conseil : gardé en approche, relâché au bon moment.
+function conseilTap(tap, tm, vitesse) {
+  if (conseil.r === null) return tap;
+  if (conseil.phase === "approche") {
+    if (tap && player.auSol) conseil.tampon = true;
+    const t = tempsAvant(conseil.r, rows.rowAt(conseil.r), tm, vitesse);
+    if (t !== null && t <= momentIdeal(conseil.famille)) {
+      conseil.phase = "attente";
+      if (conseil.tampon) { conseil.tampon = false; return true; }
+    }
+    return conseil.phase === "approche" ? false : tap;
+  }
+  // Double saut : un re-tap AVANT le sommet est gardé et part au sommet (un
+  // re-tap trop tôt donnait un double saut trop bas pour le tracteur).
+  if (conseil.phase === "enl_air" && conseil.famille === "double") {
+    if (tap && player.jumpVy > APEX_VY) { conseil.tampon = true; return false; }
+    if (conseil.tampon && player.jumpVy <= APEX_VY) { conseil.tampon = false; return true; }
+  }
+  return tap;
+}
+const APEX_VY = 0; // au sommet du premier saut, comme le joueur idéal (rows.arcs)
+function conseilReussi() { if (conseil.phase === "fini") return; conseil.phase = "fini"; conseil.ok = 0.9; audio.setRalenti(false); sfx.piece(); }
 function conseilGeste(ev) {
   if (conseil.r === null || conseil.phase === "fini") return;
   const f = conseil.famille;
-  if (ev === "jump") conseil.phase = f === "tap" ? "fini" : "enl_air";
-  else if (ev === "salto" && f === "double") conseil.phase = "fini";
-  if (conseil.phase === "fini") { conseil.ok = 0.9; audio.setRalenti(false); sfx.piece(); }
+  if (ev === "jump") { if (f === "tap") conseilReussi(); else { conseil.phase = "enl_air"; conseil.tampon = false; } }
+  else if (ev === "salto") conseilReussi(); // un double saut passe tout
 }
 function conseilStep(dt, tm, vitesse) {
   conseilCherche(tm, vitesse);
   let cible = 1;
   if (conseil.r !== null) {
-    if (conseil.phase === "attente") cible = RALENTI_MIN;
+    if (conseil.phase === "approche") cible = RALENTI_APPROCHE;
+    else if (conseil.phase === "attente") cible = RALENTI_MIN;
     else if (conseil.phase === "enl_air") {
-      cible = 0.3;
-      // Appui long : le ralenti tient jusqu'à la pleine hauteur (ou jusqu'au
-      // doigt levé) — sinon il repartait au premier dixième d'appui et un
-      // appui un peu court retombait sur la bête.
-      if (conseil.famille === "haut" && (player.tHaut >= window.CONFIG.sautTenueMaxS * 0.9 || !isHolding())) {
-        conseil.phase = "fini"; conseil.ok = 0.9; audio.setRalenti(false); sfx.piece();
-      }
+      // Double : ralenti jusqu'au sommet, puis gel en attendant le re-tap.
+      cible = conseil.famille === "double" && player.jumpVy <= APEX_VY ? RALENTI_MIN : 0.3;
+      // Appui long : le ralenti tient jusqu'à la pleine hauteur (ou au doigt levé).
+      if (conseil.famille === "haut" && (player.tHaut >= window.CONFIG.sautTenueMaxS * 0.9 || !isHolding())) conseilReussi();
     }
-    // Obstacle dépassé : famille apprise (même raté — il n'a pas fait mal).
+    // Obstacle dépassé : appris s'il n'a pas été touché (quel que soit le geste).
     if (player.v > conseil.r + 1.5) {
-      if (conseil.phase === "fini") apprendre(conseil.famille);
-      conseil.r = null; conseil.phase = null; audio.setRalenti(false);
+      if (!conseil.touche) { apprendre(conseil.famille); if (conseil.phase !== "fini") { conseil.ok = 0.9; sfx.piece(); } }
+      conseil.r = null; conseil.phase = conseil.touche ? null : "fini"; audio.setRalenti(false);
     }
   }
   if (conseil.ok > 0) conseil.ok -= dt;
   const vis = conseil.r !== null && conseil.phase !== "fini";
   conseil.alpha = Math.max(0, Math.min(1, conseil.alpha + (vis || conseil.ok > 0 ? dt * 6 : -dt * 4)));
-  ralenti += (cible - ralenti) * Math.min(1, dt * (cible < ralenti ? 14 : 8));
+  // Freinage doux, reprise FRANCHE sur une réussite.
+  ralenti += (cible - ralenti) * Math.min(1, dt * (cible < ralenti ? 6 : 20));
 }
 function conseilVue() {
   if (conseil.alpha <= 0 || !conseil.famille) return null;
   const c = CONSEILS[conseil.famille];
   const fini = conseil.phase === "fini" || conseil.r === null;
   const titre = conseil.phase === "enl_air" ? (conseil.famille === "haut" ? "TIENS… TIENS !" : "RE-TAPE EN L'AIR !") : c.titre;
-  return { titre: fini ? "BIEN !" : titre, sous: fini ? null : c.sous, onglet: fini ? "BIEN !" : "À TOI", ok: fini, alpha: conseil.alpha };
+  return { titre: fini ? "BIEN !" : titre, sous: fini ? null : c.sous, onglet: fini ? "BIEN !" : "À TOI", ok: fini, alpha: conseil.alpha, y: safeTop + 96 };
 }
 
 // --- Effets ------------------------------------------------------------------
@@ -469,7 +501,7 @@ function endGame(reason) {
 
 // Ce que la fin de course envoie à la ligue : graine (le classement d'une
 // ligue ne compare que les courses de la même route) et trace du fantôme.
-function bilanCourse() { return { graine: game.graine, trace: fantome.encoder(), scoreMax: game.scoreMax, duree: Math.max(0, clock.now()) }; }
+function bilanCourse() { return { graine: game.graine, trace: fantome.encoder(), scoreMax: game.scoreMax, duree: Math.max(0, clock.now()), fin: game.endReason === "fin" }; }
 
 function triggerShake(amp, duration) { shake.amp = amp; shake.duration = duration; shake.time = duration; }
 
@@ -531,7 +563,7 @@ const KINDS_ROULANTS = new Set(["tracteur", "voiture", "contresens", "poulejetee
 const chocs = []; // debug : les derniers chocs (auto-audit)
 function toucherJoueur(ev) {
   chocs.push({ r: ev.r, kind: ev.kind, conseil: conseil.r }); if (chocs.length > 20) chocs.shift();
-  if (conseil.r !== null && ev.r === conseil.r) return; // l'obstacle expliqué ne fait pas mal
+  if (conseil.r !== null && ev.r === conseil.r) { conseil.touche = true; return; } // l'obstacle expliqué ne fait pas mal
   // Invulnérable (turbo lait, bouclier de reprise) : la bête est quand même
   // renversée, avec une gerbe d'étincelles — sinon on croit à un bug de
   // collision (27 septembre 2026 : « j'ai roulé sur une poule, j'ai pas eu
@@ -654,7 +686,7 @@ function step(dt) {
   // hauteur du sol SOUS le joueur, jamais à zéro.
   let marque = null; // « saut » ou « double » : la meute le refera au même endroit
   const solIci = solSous(player.v, player.jumpY);
-  const tap = consumeJumpPress();
+  const tap = conseilTap(consumeJumpPress(), tm, speed);
   if (tap && player.jumpY <= solIci + 0.02) {
     player.jumpVy = phys.vJump; player.jumpY = solIci + 0.001; player.doubled = false; player.tHaut = 0; player.tenueMarquee = false;
     marque = "saut"; sfx.saut(); conseilGeste("jump");
@@ -666,7 +698,10 @@ function step(dt) {
   }
   if (player.jumpY > solIci) {
     // Tant que le doigt reste appuyé et qu'on monte, la pesanteur est réduite.
-    const tenu = isHolding() && player.jumpVy > 0 && player.tHaut < phys.tenueMax;
+    // Pendant un conseil « appui long » ou « double », la tenue est offerte :
+    // le tuto doit réussir dès que le joueur a fait le bon geste, même un peu court.
+    const aide = conseil.r !== null && conseil.famille !== "tap" && (conseil.phase === "enl_air" || conseil.phase === "fini");
+    const tenu = (isHolding() || aide) && player.jumpVy > 0 && player.tHaut < phys.tenueMax;
     if (tenu) player.tHaut += dt;
     player.jumpVy -= (tenu ? phys.gTenu : phys.g) * dt;
     player.jumpY += player.jumpVy * dt;
@@ -884,14 +919,13 @@ function renderAlertes(now, vitesse) {
   }
 }
 
-// Saisons : quatre tranches égales du morceau, dans l'ordre du calendrier, la
-// première tirée par la graine de la course (la même route de ligue a donc la
-// même météo pour tous). Fondu de 4 s d'une saison à l'autre.
+// Saisons : quatre tranches égales du morceau, dans l'ordre du calendrier,
+// automne → hiver → printemps → été. Fondu de 4 s d'une saison à l'autre.
 let saisonForcee = null; // debug : touche S
 function poserSaison(t) {
   if (saisonForcee !== null) { scene.setSaison(saisonForcee, saisonForcee, 0); return; }
   const duree = Math.max(20, (window.CONFIG.dureeMorceau || 170) / 4);
-  const depart = ((game.graine || 0) % 4 + 4) % 4;
+  const depart = 2; // toujours l'AUTOMNE au départ (29 septembre 2026 : « ça serait bien que ça commence dans le biome automne »)
   const k = Math.max(0, Math.floor(t / duree));
   const dans = t - k * duree;
   const a = (depart + k) % 4, b = (depart + k + 1) % 4;
@@ -940,16 +974,16 @@ function render(alpha) {
     if (d === null || hallesVues.has(d)) continue;
     hallesVues.add(d);
     // Deux couches : le fond avant le cycliste, le devant après (scene.drawHalle).
-    items.push({ d: scene.depth(scene.ROAD_HALF + 0.5, d), draw: () => scene.drawHalle(ctx, d, GEO_HALLE, from, to, "fond") });
-    items.push({ d: scene.depth(-scene.ROAD_HALF - 0.3, d), draw: () => scene.drawHalle(ctx, d, GEO_HALLE, from, to, "devant") });
+    items.push({ decor: true, d: scene.depth(scene.ROAD_HALF + 0.5, d), draw: () => scene.drawHalle(ctx, d, GEO_HALLE, from, to, "fond") });
+    items.push({ decor: true, d: scene.depth(-scene.ROAD_HALF - 0.3, d), draw: () => scene.drawHalle(ctx, d, GEO_HALLE, from, to, "devant") });
   }
   const vc = scene.getVCentre(), largeurRoute = scene.demiLargeurRoute() + 2;
   for (let r = from; r <= to; r++) {
     const row = r >= 0 ? rows.rowAt(r) : null;
     const clear = row && row.type === "traverse";
-    for (const it of scene.rowDecor(ctx, r, clear)) items.push(it);
+    for (const it of scene.rowDecor(ctx, r, clear)) { it.decor = true; items.push(it); }
     const sg = signAt(r);
-    if (sg) items.push({ d: scene.depth(scene.ROAD_HALF + 0.55, r), draw: () => scene.drawSign(ctx, r, sg) });
+    if (sg) items.push({ decor: true, d: scene.depth(scene.ROAD_HALF + 0.55, r), draw: () => scene.drawSign(ctx, r, sg) });
     // Entrée du biome village : le panneau porte la ville du joueur.
     if (panneauVilleA(r + 1)) items.push({ d: scene.depth(scene.ROAD_HALF + 0.55, r + 1), draw: () => scene.drawSign(ctx, r + 1, [scene.villeDuJoueur(), "chez toi"]) });
     if (!row) continue;
@@ -1025,7 +1059,10 @@ function render(alpha) {
   items.sort((a, b) => b.d - a.d);
   for (const it of items) {
     // Un objet qui plante ne doit emporter ni l'image ni l'état du canvas.
-    try { it.draw(); } catch (e) { if (!rendusRates.has(String(e))) { rendusRates.add(String(e)); console.error("rendu d'objet :", e); } ctx.setTransform(dprCourant, 0, 0, dprCourant, 0, 0); ctx.globalAlpha = 1; }
+    // Tout ce qui n'est pas décor reste ÉCLAIRÉ la nuit (29 septembre 2026 :
+    // « quand on est en nuit, à l'automne, on ne voit pas les personnages qui
+    // sont sur la route [...] je suis mort parce que j'ai pris une poule »).
+    try { if (it.decor) it.draw(); else scene.eclaire(it.draw); } catch (e) { if (!rendusRates.has(String(e))) { rendusRates.add(String(e)); console.error("rendu d'objet :", e); } ctx.setTransform(dprCourant, 0, 0, dprCourant, 0, 0); ctx.globalAlpha = 1; }
   }
 
   for (const sp of sparkles) {
@@ -1093,7 +1130,6 @@ function render(alpha) {
   if (gameStarted && !game.ended) {
     if (now < COUNT_IN_GO_LINGER_S) hud.renderCountIn(ctx, width, height, now, clock.beatPeriod, COUNT_IN_BEATS, COUNT_IN_GO_LINGER_S);
     hud.renderTuto(ctx, width, height, conseilVue());
-    if (now >= 0 && !banner && !conseilVue()) hud.renderHint(ctx, width, height, Math.min(1, hintTimer));
   }
   if (gameStarted && hudAlpha > 0.001 && banner) {
     ctx.save();

@@ -79,11 +79,13 @@ export const KINDS = {
   poule:   { cout: 1, long: 0.9, larg: 0.84, h: 0.9, nom: "une poule" },
   chat:    { cout: 1, long: 0.80, larg: 0.60, h: 0.74, nom: "un chat" },
   chien:   { cout: 1, long: 0.80, larg: 0.55, h: 0.70, nom: "un chien" },
-  mouton:  { cout: 1, long: 0.80, larg: 0.80, h: 0.72, nom: "un mouton" },
+  // Taille DOUBLÉE le 29 septembre 2026 (« des énormes moutons [...] il faut
+  // que tu doubles leur taille ») : un gros mouton laineux, appui long.
+  mouton:  { cout: 1, long: 1.5, larg: 1.3, h: 1.35, nom: "un mouton" },
   botte:   { cout: 1, long: 0.85, larg: 0.85, h: 0.75, nom: "une botte de foin" },
   cochon:  { cout: 2, long: 1.30, larg: 0.85, h: 0.92, nom: "un cochon" },
   vache:   { cout: 2, long: 1.60, larg: 1.00, h: 1.22, nom: "une vache" },
-  fermier: { cout: 2, long: 0.70, larg: 0.60, h: 1.85, nom: "un fermier" },
+  fermier: { cout: 2, long: 0.85, larg: 0.75, h: 2.2, nom: "un fermier" }, // plus grand le 29 septembre 2026
   // ⚠️ MONTABLE (20 septembre 2026, soir : « ça serait normal qu'on puisse
   // monter sur le toit d'une voiture ») : son toit devient un plancher dès
   // qu'on arrive au-dessus. Raccourcie de 3,9 à 3,0 le même jour, avec le
@@ -298,9 +300,10 @@ const PAQUETS = [
   // Départ : que des petits sauts.
   ["poule", "poule", "poule", "chat", "chat", "chien", "chien", "mouton", "mouton", "botte", "botte", "poulejetee"],
   // Ensuite : les gros animaux (appui maintenu) et les premiers véhicules.
-  ["poule", "poule", "chat", "chien", "mouton", "botte", "poulejetee", "cochon", "cochon", "vache", "tracteur", "voiture"],
+  // + voitures EN FACE (29 septembre 2026 : « les voitures qui arrivent dans ta tête, faut en mettre beaucoup plus »).
+  ["poule", "poule", "chat", "chien", "mouton", "botte", "poulejetee", "cochon", "cochon", "vache", "tracteur", "voiture", "contresens", "contresens"],
   // Fin : fermiers, voitures, et la voiture qui arrive en face.
-  ["poule", "chat", "mouton", "botte", "poulejetee", "cochon", "vache", "tracteur", "tracteur", "fermier", "voiture", "contresens"],
+  ["poule", "chat", "mouton", "botte", "poulejetee", "cochon", "vache", "tracteur", "tracteur", "fermier", "voiture", "contresens", "contresens", "contresens"],
 ];
 function paquetPour(d) { return PAQUETS[d < 2 ? 0 : d < 4 ? 1 : 2]; }
 function estDouble(kind) { return familleDe(kind) === "double"; }
@@ -326,7 +329,7 @@ export class Route {
   dansFenetre(r) { return this.fenetreSure !== null && r >= this.fenetreSure[0] && r <= this.fenetreSure[1]; }
   // Rangée sûre (départ, turbo lait, tuto) : une ligne de pièces au sol — à la
   // hauteur du PLANCHER, qui n'est pas 0 sur une halle.
-  rangeeSure(r) { return { type: "safe", coins: r % 3 === 1 ? [solAt(r) + PIECE_SOL] : [], boue: null }; }
+  rangeeSure(r) { return { type: "safe", coins: r % 6 === 1 ? [solAt(r) + PIECE_SOL] : [], boue: null }; }
   ouvrirFenetreSure(from, to) {
     this.fenetreSure = [from, to];
     for (let r = from; r <= to; r++) this.cache.set(r, this.rangeeSure(r));
@@ -459,6 +462,12 @@ export class Route {
         libre = 0;
       }
     }
+    // 4 bis. UNE PIÈCE SUR DEUX (29 septembre 2026 : « les pièces, il y en a
+    // beaucoup trop, divise une sur deux ») : les arcs gardent leur forme,
+    // simplement plus espacés. Les paliers de potes (config) ont été divisés
+    // par deux en même temps.
+    let nPiece = 0;
+    for (let p = 0; p < BLOC; p++) { const row = rowsBloc[p]; if (row.coins.length) { if (nPiece % 2 === 1) row.coins = []; nPiece += 1; } }
     // 5. Lait et grosse pièce sur leurs rangées réservées, sinon au plus près.
     // Le lait et la grosse pièce se posent sur une rangée LIBRE et à l'écart :
     // jamais sur un arc (ça y ferait un trou) ni collée à un obstacle (elle

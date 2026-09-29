@@ -192,9 +192,10 @@ function staticNu(ctx, kind, uCenter, r, t) {
     B(0.78, -0.06, 0.3, 0.12, 0.07, "#8a8d98", 0.9);
   } else if (kind === "botte") {
     B(0, 0, 1, 1, 1, "#d0a84a");
-    B(0, 0, 1, 1, 0.05, "#a8862f", 0.35);
-    B(0, 0, 1, 1, 0.05, "#a8862f", 0.72);
-    B(-0.02, 0.2, 1.04, 0.6, 0.04, "#8a6a2a", 0.2);
+    // Liens de ficelle en SAILLIE (29 septembre 2026 : « on voit les trois
+    // couches en 3D ») : à ras des faces, ils se battaient avec elles.
+    B(-0.03, -0.03, 1.06, 1.06, 0.06, "#a8862f", 0.33);
+    B(-0.03, -0.03, 1.06, 1.06, 0.06, "#a8862f", 0.7);
   } else if (kind === "voiture") {
     drawVoiture(ctx, K, uCenter, r, 1, t);
   } else if (kind === "chat") {

@@ -42,8 +42,10 @@ function cadre(ctx, um, y, L, lift, pedal, P) {
   const selle = pt(0.4, 0.84), douille = pt(0.86, 0.8), douilleBas = pt(0.83, 0.58);
   const e = echelle(um);
   const tubes = [[moyeuAr, pedalier], [moyeuAr, selle], [pedalier, selle], [selle, douille], [pedalier, douilleBas], [douilleBas, douille], [douilleBas, moyeuAv]];
-  ctx.lineCap = "round"; ctx.lineJoin = "round";
-  for (const [larg, coul] of [[0.11, "#141418"], [0.065, P.top1 || FRAME]]) {
+  // Tubes « pixel » (29 septembre 2026 : « donner au cadre une dimension un
+  // peu pixel ») : bouts carrés, angles vifs, un peu plus épais.
+  ctx.lineCap = "square"; ctx.lineJoin = "miter";
+  for (const [larg, coul] of [[0.14, "#141418"], [0.085, P.top1 || FRAME]]) {
     ctx.strokeStyle = coul; ctx.lineWidth = Math.max(1.5, larg * e);
     ctx.beginPath();
     for (const [a, b] of tubes) { ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); }
@@ -97,20 +99,36 @@ export function drawRider(ctx, u, v, lift, P, pedal, alpha = 1, flip = 0, ombre 
   // que les jambes du personnage ne sont pas attachées »), seul le pied monte
   // et descend avec le pédalage.
   const bassin = liftSelle + 0.88;
-  const hL = liftSelle + 0.08 + 0.12 * (1 + c) / 2, hR = liftSelle + 0.08 + 0.12 * (1 - c) / 2;
+  // Pieds SUR les pédales (29 septembre 2026 : « on a l'impression qu'il pédale
+  // à côté de ses pédales ») : chaque semelle suit exactement le bout de sa
+  // manivelle — même centre, même rayon, même angle que cadre(). Au Grand Bi,
+  // les pédales sont sur le moyeu de la grande roue. En rollers, les patins
+  // glissent d'avant en arrière et le pied de retour décolle un peu.
+  // (vF, hF) = avant-bas de la chaussure.
+  const pied = (sens) => {
+    if (roller) {
+      const k = Math.sin(pedal) * sens;
+      return { v: y + 0.34 + 0.26 * k, h: lift + 0.16 + Math.max(0, -Math.cos(pedal) * sens) * 0.07 };
+    }
+    const cv = grandBi ? y + L - 0.475 : y + 0.5, ch = grandBi ? lift + 0.475 : lift + 0.24, R = grandBi ? 0.14 : 0.16;
+    const a = pedal + (sens > 0 ? 0 : Math.PI);
+    return { v: cv + Math.cos(a) * R - 0.11, h: ch - Math.sin(a) * R + 0.02 };
+  };
+  const pL = pied(1), pR = pied(-1);
+  const hL = pL.h + 0.1, hR = pR.h + 0.1;
   const legL = Math.max(0.2, bassin - hL), legR = Math.max(0.2, bassin - hR);
   const sway = 0.03 * s;
   const tx = x - 0.06 + sway, ty = y + 0.36;
   // 1) Côté FOND : jambe droite, chaussure, bras droit.
-  drawBox(ctx, x + W - 0.12, y + 0.42 - 0.06 * s, 0.14, 0.2, legR, P.pants, hR);
-  drawBox(ctx, x + W - 0.13, y + 0.44 - 0.06 * s, 0.17, 0.22, 0.12, P.shoe, hR - 0.1);
+  drawBox(ctx, x + W - 0.12, pR.v + 0.01, 0.14, 0.2, legR, P.pants, hR);
+  drawBox(ctx, x + W - 0.13, pR.v, 0.17, 0.22, 0.12, P.shoe, pR.h);
   drawBox(ctx, tx + W + 0.1, ty + 0.3, 0.12, 0.42, 0.1, P.top2, liftSelle + 1.05);
   // 2) Le véhicule.
   if (roller) {
     // Rollers : deux patins à quatre roulettes, pas de vélo.
-    for (const [ux, vy0, hh] of [[x - 0.02, y + 0.42 - 0.06 * s, hR], [x + W - 0.13, y + 0.44 - 0.06 * s, hL]]) {
-      drawBox(ctx, ux, vy0 - 0.05, 0.16, 0.5, 0.06, "#33333b", Math.max(0, hh - 0.16));
-      for (let i = 0; i < 4; i++) drawDisque(ctx, ux - 0.01, vy0 + 0.02 + i * 0.13, Math.max(0.06, hh - 0.2), 0.07, "#f2ede2");
+    for (const [ux, p] of [[x + W - 0.13, pR], [x - 0.04, pL]]) {
+      drawBox(ctx, ux, p.v - 0.1, 0.16, 0.42, 0.06, "#33333b", Math.max(0, p.h - 0.06));
+      for (let i = 0; i < 4; i++) drawDisque(ctx, ux - 0.01, p.v - 0.06 + i * 0.11, Math.max(0.06, p.h - 0.1), 0.06, "#f2ede2");
     }
   } else if (grandBi) {
     roue2(ctx, um, y + L - 0.475, lift + 0.475, 0.475, v / 0.475);
@@ -142,8 +160,8 @@ export function drawRider(ctx, u, v, lift, P, pedal, alpha = 1, flip = 0, ombre 
     drawBox(ctx, tx, ty + 0.12, W + 0.12, 0.34, 0.17, P.top1, hautTorse + 0.34);
   }
   // 4) Côté CAMÉRA : jambe gauche, chaussure, bras gauche.
-  drawBox(ctx, x - 0.02, y + 0.42 + 0.06 * s, 0.14, 0.2, legL, P.pants, hL);
-  drawBox(ctx, x - 0.04, y + 0.44 + 0.06 * s, 0.17, 0.22, 0.12, P.shoe, hL - 0.1);
+  drawBox(ctx, x - 0.02, pL.v + 0.01, 0.14, 0.2, legL, P.pants, hL);
+  drawBox(ctx, x - 0.04, pL.v, 0.17, 0.22, 0.12, P.shoe, pL.h);
   drawBox(ctx, tx - 0.1, ty + 0.3, 0.12, 0.42, 0.1, P.top2, liftSelle + 1.05);
   // 5) Tête, cheveux, chapeau.
   const hx = x + W / 2 - 0.15 + sway, hy = y + 0.5;

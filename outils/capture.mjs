@@ -26,7 +26,7 @@ const serveur = surBuild
   : await createServer({ root: racine, logLevel: "error", server: { port: 5199, strictPort: false } });
 if (!surBuild) await serveur.listen();
 const port = surBuild ? new URL(serveur.resolvedUrls.local[0]).port : serveur.config.server.port;
-const url = `http://localhost:${port}/?debug`;
+const url = `http://localhost:${port}/?debug${process.env.DEMO ? "&demo" : ""}`;
 const navigateur = await chromium.launch({ channel: "chrome", headless: true, args: ["--autoplay-policy=no-user-gesture-required"] });
 // ECRAN=petit : iPhone SE / 8 (375×667), le pire cas pour le menu.
 const petit = process.env.ECRAN === "petit";
@@ -154,7 +154,7 @@ const SCENES = {
       await course((r) => { const p = window.__pote.player; p.v = r - 18; p.prevV = p.v; }, cible.r);
       const avant = await course(() => window.__pote.friends.count());
       let c = null;
-      for (let k = 0; k < 90; k++) { await attendre(100); c = await course(() => window.__pote.conseil()); if (c.phase === "attente" && c.ralenti < 0.1) break; }
+      for (let k = 0; k < 90; k++) { await attendre(100); c = await course(() => window.__pote.conseil()); if (c.phase === "attente" && c.ralenti < 0.05) break; }
       const declenche = c.phase === "attente";
       const figeV1 = await course(() => window.__pote.player.v); await attendre(800); const figeV2 = await course(() => window.__pote.player.v);
       if (fam === "tap") await page.keyboard.press("Space");
@@ -190,6 +190,18 @@ const SCENES = {
     await page.keyboard.press("KeyS"); await page.keyboard.press("KeyS"); await page.keyboard.press("KeyS"); await page.keyboard.press("KeyS");
     await page.keyboard.press("KeyD"); await attendre(500); await photo("70-hiver-poule");
     await page.keyboard.press("KeyD"); await page.keyboard.press("KeyS"); await page.keyboard.press("KeyS"); await page.keyboard.press("KeyD"); await attendre(400); await photo("71-ete");
+  },
+  // Gros moutons et fermier, puis la nuit (acteurs éclairés).
+  betes: async () => {
+    for (const k of ["mouton", "fermier", "botte"]) {
+      const r = await course((k) => { const p = window.__pote; for (let r = Math.ceil(p.player.v) + 10; r < 4000; r++) if (p.rows.rowAt(r).kind === k) return r; return 0; }, k);
+      await course((r) => { const p = window.__pote.player; p.v = r - 5; p.prevV = p.v; }, r);
+      await page.keyboard.press("KeyD"); await attendre(250); await photo(`80-${k}`); await page.keyboard.press("KeyD");
+    }
+    await page.keyboard.press("KeyN"); await attendre(1600);
+    const r = await course(() => { const p = window.__pote; for (let r = Math.ceil(p.player.v) + 10; r < 4000; r++) if (p.rows.rowAt(r).type === "statique") return r; return 0; });
+    await course((r) => { const p = window.__pote.player; p.v = r - 5; p.prevV = p.v; }, r);
+    await page.keyboard.press("KeyD"); await attendre(250); await photo("81-nuit-bete"); await page.keyboard.press("KeyD");
   },
   // Saisons forcées (touche S) : printemps, été, automne, hiver.
   saisons: async () => {

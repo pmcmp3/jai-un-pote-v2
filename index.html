@@ -13,7 +13,7 @@
         u.searchParams.forEach(function (v, k) { if (/^\d+$/.test(k)) num = k; });
         if (num === null) return;
         u.searchParams.delete(num);
-        try { localStorage.removeItem("jp2-appris"); } catch (e) {}
+        try { localStorage.removeItem("jp2-appris"); localStorage.removeItem("jp2-conseils-vus"); } catch (e) {}
         var fini = function () { location.replace(u.toString()); };
         var etapes = [];
         if (window.caches) etapes.push(caches.keys().then(function (ks) { return Promise.all(ks.map(function (k) { return caches.delete(k); })); }));
@@ -109,6 +109,7 @@
     @keyframes view-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     #onboarding.active { width: 100%; flex: none; }
     #onboarding .panel { margin: 0 auto; }
+    #onboarding .panel-body { padding: 26px 18px 14px; }
 
     /* --- Carte + sticker ------------------------------------------------ */
     .panel {
@@ -179,21 +180,25 @@
     /* ⚠️ Le canvas fait 240×140 et s'affiche en 240×140 : il était dessiné en
        220×200 et affiché en 200×120, donc écrasé de 34 % en hauteur (« mon
        bonhomme, il est écrasé dans le menu de base », 27 septembre 2026). */
-    #skin-canvas { display: block; width: 240px; height: 140px; margin: -12px 0 4px; }
-    #skin-options { display: flex; flex-direction: column; gap: 14px; width: 256px; margin-bottom: 20px; }
+    /* Menu COMPACT (29 septembre 2026 : « c'est trop grand, j'ai besoin de
+       scroller pour voir que l'album est sorti ») : aperçu réduit, écarts serrés. */
+    #skin-canvas { display: block; width: 178px; height: 104px; margin: -14px 0 2px; }
+    #skin-options { display: flex; flex-direction: column; gap: 8px; width: 256px; margin-bottom: 12px; }
     /* Libellé AU-DESSUS de ses pastilles (27 septembre 2026 : « laisse plus de
        place entre maillot, chapeau et engin ») : chaque réglage tient sur une
        ligne et se lit comme un bloc. */
-    .skin-row { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+    .skin-row { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
     .skin-label { flex: none; font: 700 10px var(--police); letter-spacing: 0.1em; text-transform: uppercase; color: rgba(0,0,0,0.55); }
     .chips { display: flex; flex-wrap: wrap; gap: 6px; }
-    .chip { min-width: 24px; height: 28px; padding: 0 8px; border-radius: 3px; border: 1.5px solid rgba(0,0,0,0.25); background: #fff; font: 700 10px var(--police); letter-spacing: 0.06em; text-transform: uppercase; color: var(--noir); -webkit-tap-highlight-color: transparent; }
-    .chip.couleur { padding: 0; width: 28px; }
+    .chip { min-width: 24px; height: 26px; padding: 0 6px; border-radius: 3px; border: 1.5px solid rgba(0,0,0,0.25); background: #fff; font: 700 10px var(--police); letter-spacing: 0.06em; text-transform: uppercase; color: var(--noir); -webkit-tap-highlight-color: transparent; }
+    .chip.couleur { padding: 0; width: 26px; }
     .chip.actif { border-color: var(--noir); box-shadow: 0 0 0 2px var(--jaune); }
     #sprint-button { margin-top: 8px; }
     /* Boost de ligue (29 septembre 2026) : sticker jaune sous JOUER. */
-    #boost-ligue { margin-top: 10px; width: 100%; padding: 8px 10px; border: 1.5px solid var(--noir); border-radius: 3px; background: #ffcf2e; color: var(--noir); font: 500 11px/1.35 var(--police); text-align: left; -webkit-tap-highlight-color: transparent; }
+    #boost-ligue { margin-top: 8px; width: 100%; padding: 8px 10px; border: 1.5px solid var(--noir); border-radius: 3px; background: #ffcf2e; color: var(--noir); font: 500 11px/1.35 var(--police); text-align: left; -webkit-tap-highlight-color: transparent; }
     #boost-ligue b { font-weight: 900; letter-spacing: 0.06em; }
+    #boost-ligue small { display: block; margin-top: 3px; font: 600 10.5px/1.35 var(--police); color: rgba(0,0,0,0.7); }
+    #end-rang { margin: 0; padding: 4px 10px; background: #ffcf2e; border: 1.5px solid var(--noir); transform: rotate(-1.5deg); font: 900 13px var(--police); letter-spacing: 0.08em; text-transform: uppercase; color: var(--noir); }
     #sprint-note { margin: 6px 0 0; font: 500 11px var(--police); color: rgba(0,0,0,0.55); text-align: center; }
     #end-max { margin: 4px 0 0; font: 500 12px/1.4 var(--police); color: rgba(0,0,0,0.65); text-align: center; }
     #end-max b { color: var(--rouge); font-weight: 900; }
@@ -250,8 +255,8 @@
     #end-ligue .btn { width: 100%; padding: 8px 10px; min-height: 40px; font-size: 12px; }
 
     #cta-link {
-      position: relative; margin: 18px auto 0; flex: none;
-      display: flex; align-items: center; justify-content: center; gap: 8px; width: 240px; box-sizing: border-box; padding: 13px 22px;
+      position: relative; margin: 10px auto 0; flex: none;
+      display: flex; align-items: center; justify-content: center; gap: 8px; width: 240px; box-sizing: border-box; padding: 11px 22px;
       border: 1.5px solid var(--noir); border-radius: var(--rayon); background: var(--blanc); color: var(--noir);
       font: 700 13px var(--police); letter-spacing: 0.12em; text-transform: uppercase; text-decoration: none; white-space: nowrap;
       touch-action: manipulation; -webkit-tap-highlight-color: transparent;
@@ -469,6 +474,7 @@
             <p id="end-max" class="hidden"></p>
           </div>
           <div id="end-ligue" class="hidden">
+            <p id="end-rang" class="hidden"></p>
             <p id="end-ligue-titre">Ligue <b id="end-ligue-code">—</b></p>
             <ol id="end-ligue-liste"></ol>
             <p id="end-relais" class="hidden"></p>

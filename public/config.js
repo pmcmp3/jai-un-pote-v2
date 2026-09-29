@@ -104,11 +104,11 @@ window.CONFIG = {
   // sortait de l'écran dès le 2e pote.
   potesRecul: 1.0,
   potesEcart: 0.5,
-  potesPaliers: [5, 14, 28, 46, 68],   // re-étalés le 20 septembre 2026 : les 5 potes arrivaient tous avant 25 s
+  potesPaliers: [3, 7, 14, 23, 34],    // divisés par deux le 29 septembre 2026, avec les pièces (une sur deux)   // re-étalés le 20 septembre 2026 : les 5 potes arrivaient tous avant 25 s
   // Après le dernier palier, un pote PERDU se rachète pour ce nombre de
   // pièces (20 septembre 2026 : « j'ai perdu tous mes potes et j'arrive pas
   // à les regagner »).
-  poteRachatPieces: 10,
+  poteRachatPieces: 5,
   // Prénoms des potes, dans l'ordre d'arrivée (Soberland en premier, verrouillé).
   // Sans ligue, le peloton c'est la LIGUE DE DÉMO (7 septembre 2026) : Paul et
   // ses quatre potes, avec leurs skins. Dans une ligue, ce sont les membres.

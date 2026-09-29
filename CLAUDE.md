@@ -239,6 +239,32 @@ Code `TESTV2`, qui est aussi `config.ligueBeta` (menu simplifié + bouton « Lai
 - **Arrière-plan encore allégé** : arbres espacés (1/5 près, 1/3 au fond),
   lampadaires 1/12, plus de clôture au premier plan. Ombre du HUD 25 → 50 %.
 
+## Retours du 29 septembre 2026, soir (partie jouée en direct, commande vocale)
+
+- **Ligue DÉMO** : `?demo` (mémorisé, `jp2Demo`, effacé par `?zero`) → ligue
+  locale « DEMO », 6 potes fictifs qui ont « joué », boost ×1,6 actif, classement
+  de fin fictif (les potes s'étagent SOUS une course terminée : on voit « Tu es
+  1er de ta ligue ! »). Rien ne part sur le réseau. Lien à montrer : `?9&demo`.
+- **Tuto au ralenti, deuxième version** (`conseilTap`/`conseilStep`) : approche
+  ~1 s avant le bon moment (monde ×0,25), un tap donné pendant l'approche est
+  GARDÉ et part pile au bon moment, gel ×0,06 s'il n'a rien fait ; reprise
+  franche sur réussite. Appris dès que l'obstacle est franchi sans contact,
+  jamais montré plus de 2 fois (`jp2-conseils-vus`). Carte en HAUT, sous le
+  score. Bug corrigé : un tap juste avant le déclenchement faisait un double
+  saut qui ne validait rien → le même conseil revenait 3-4 fois.
+- **Pieds sur les pédales** (voxrider `pied()`), Grand Bi sur le moyeu avant,
+  rollers qui glissent en foulée. Cadre en tubes « pixel » (bouts carrés).
+- Départ toujours en **automne**. Sticker « MONTE LE SON » sous le décompte.
+- **Une pièce sur deux** (rows.js, 4 bis) et paliers de potes ÷2
+  (`[3, 7, 14, 23, 34]`, rachat 5). **Moutons ×2** (appui long désormais),
+  **fermier plus grand**, **plus de voitures en face** (PAQUETS).
+  `VERSION_COURSE` 9.
+- **Village ÷2** (maisons, voitures garées, habitants ; skateur retiré).
+  Botte de foin : liens en saillie (ils se battaient avec les faces).
+- **Acteurs éclairés la nuit** (`scene.eclaire`) : tout ce qui n'est pas décor
+  n'est assombri qu'au quart — on voyait plus les bêtes la nuit en automne.
+- Classement de fin : sticker « Tu es 1er de ta ligue ! » (`#end-rang`).
+
 ## Invariants de la v2 (mesurés, `outils/mesurer.mjs`)
 
 - L'écart entre deux obstacles vient de la PHYSIQUE du saut (`ecartMin` : retombée du premier +
