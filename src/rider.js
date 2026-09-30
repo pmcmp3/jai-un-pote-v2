@@ -181,7 +181,9 @@ export function paletteDepuisSkin(skin, base = PALETTES.pmc) {
     pants: s.short, pantsLo: s.short, shoe: s.chaussures,
     cap: s.chapeau === "casquette" ? s.c1 : null,
     hat: s.chapeau === "aucun" ? null : s.chapeau,
-    hatColor: s.chapeau === "paille" ? "#e8c66a" : s.chapeau === "bob" ? s.c2 : s.c1,
+    // Le bob suit le MAILLOT (1er octobre 2026 : « tu peux pas changer la couleur
+    // du bob ») — il prenait c2, la couleur secondaire, presque toujours crème.
+    hatColor: s.chapeau === "paille" ? "#e8c66a" : s.c1,
     velo: s.velo === "roller" ? "enfant" : s.velo, // l'ancien roller devient le vélo enfant
     // Homme / femme (28 septembre 2026 : « au début faut choisir entre homme et
     // femme ») : cheveux longs attachés, pas de barbe.

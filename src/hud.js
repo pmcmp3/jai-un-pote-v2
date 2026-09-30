@@ -140,6 +140,32 @@ export function renderHud(ctx, width, height, hud) {
   ctx.restore();
 }
 
+// Doigt qui tape, au départ des premières parties, jusqu'au premier saut
+// (1er octobre 2026 : « il faut mettre un logo, un GIF de quelqu'un qui tape,
+// pour dire qu'il faut taper sur l'écran, il n'y a pas besoin de slider »).
+export function renderTapHint(ctx, width, height, t, alpha) {
+  if (alpha <= 0.01) return;
+  const ph = (t % 0.9) / 0.9;
+  const x = width / 2, y = height * 0.62;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  if (ph > 0.45) {
+    const k = (ph - 0.45) / 0.55;
+    ctx.strokeStyle = `rgba(225,62,38,${1 - k})`; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(x, y, 10 + k * 34, 0, Math.PI * 2); ctx.stroke();
+  }
+  const dy = ph < 0.45 ? 14 * (1 - ph / 0.45) : 0;
+  ctx.font = "44px sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "top";
+  ctx.fillText("👆", x + 4, y - 6 + dy);
+  const msg = "TAPE L'ÉCRAN POUR SAUTER · PAS BESOIN DE GLISSER";
+  fitFont(ctx, "800", 11, msg, width - 50, 8);
+  const w = ctx.measureText(msg).width + 20;
+  ctx.fillStyle = NOIR; ctx.fillRect(x - w / 2, y + 56, w, 24);
+  ctx.fillStyle = BLANC; ctx.textBaseline = "middle";
+  ctx.fillText(msg, x, y + 69);
+  ctx.restore();
+}
+
 // Décompte « 3, 2, 1, GO » calé sur les temps (voir main.js).
 export function renderCountIn(ctx, width, height, t, beatPeriod, beats, linger) {
   let texte, age;

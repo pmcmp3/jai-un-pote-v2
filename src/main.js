@@ -132,7 +132,7 @@ function applyPauseState() {
 document.addEventListener("visibilitychange", () => { hiddenPaused = document.hidden; applyPauseState(); });
 
 // --- État de partie ------------------------------------------------------------
-const game = {
+const game = { arriveeR: null,
   metres: 0, points: 0, potesGagnes: 0, etoiles: 0,
   ended: false, endReason: null, reviveOffered: false, sansFaute: true, startedAt: 0,
   turbo: 0, finAge: -1, sprint: false, cibleRachat: null, surHalle: false,
@@ -375,7 +375,8 @@ function semerCourse() {
   rows.reset();
   game.graine = seed;
   game.ligueCourse = !!l && !game.sprint;
-  game.boost = game.sprint ? 1 : screens.getBoost().mult; game.boostAnnonce = false; // sprint : même règle pour tous
+  game.boost = game.sprint ? 1 : screens.getBoost().mult; game.boostAnnonce = false;
+  game.tapHint = !game.sprint && screens.getParties() < 3; // sprint : même règle pour tous
   game.scoreMax = game.ligueCourse ? Math.round(scoreParfait(seed, friends.max()).score * game.boost) : null;
   fantome.demarrerEnregistrement();
   ghost = null;
@@ -411,7 +412,7 @@ function isGameStartRequested() { return startRequested; }
 function resetRun() {
   game.metres = 0; game.points = 0; game.potesGagnes = 0; game.etoiles = 0;
   game.ended = false; game.endReason = null; game.reviveOffered = false; game.sansFaute = true;
-  game.turbo = 0; game.finAge = -1; game.surHalle = false; tombes.clear();
+  game.turbo = 0; game.finAge = -1; game.arriveeR = null; game.surHalle = false; tombes.clear();
   game.startedAt = perfClock();
   player.u = 0; player.prevU = 0; player.v = 0; player.prevV = 0; cameraX = null;
   player.jumpY = 0; player.prevJumpY = 0; player.jumpVy = 0; player.doubled = false; player.flip = 0; player.prevFlip = 0; player.tHaut = 0; player.roue = 0; player.prevRoue = 0;
@@ -685,7 +686,7 @@ function step(dt) {
   if (!game.boostAnnonce && now >= COUNT_IN_GO_LINGER_S) {
     game.boostAnnonce = true;
     const b = screens.getBoost();
-    if (game.boost > 1) afficherBanner(`BOOST ×${String(game.boost).replace(".", ",")}`, `${b.potes.length} pote${b.potes.length > 1 ? "s ont" : " a"} joué dans ta ligue`, JAUNE, 2.4, "TES POTES");
+    if (game.boost > 1) afficherBanner(`+${Math.round((game.boost - 1) * 100)} % DE POINTS`, `grâce à tes ${b.potes.length} pote${b.potes.length > 1 ? "s" : ""}`, JAUNE, 2.4, "TES POTES");
   }
   // --- Nuit : tombe à partir de nuitDebutS, 30 s de transition ---
   const nd = nuitDebut !== null ? nuitDebut : window.CONFIG.nuitDebutS;
@@ -702,7 +703,7 @@ function step(dt) {
   const tap = conseilTap(consumeJumpPress(), tm, speed);
   if (tap && player.jumpY <= solIci + 0.02) {
     player.jumpVy = phys.vJump; player.jumpY = solIci + 0.001; player.doubled = false; player.tHaut = 0; player.tenueMarquee = false;
-    marque = "saut"; sfx.saut(); conseilGeste("jump");
+    marque = "saut"; sfx.saut(); conseilGeste("jump"); game.tapHint = false;
   } else if (tap && player.jumpY > solIci && !player.doubled) {
     player.jumpVy = phys.vDouble; player.doubled = true; player.flip = 0.001; player.tHaut = phys.tenueMax;
     marque = "double"; sfx.salto(); vibrer(25);
@@ -786,6 +787,16 @@ function step(dt) {
     }
   }
 
+  // --- Ligne d'ARRIVÉE (1er octobre 2026 : « essaye de modéliser une ligne
+  // d'arrivée ») : 8 s avant la fin du morceau, on la pose là où le joueur
+  // sera quand la musique s'arrêtera (vitesse prévue intégrée). La franchir
+  // termine la course, comme la fin du morceau.
+  if (now >= 0 && !game.sprint && game.arriveeR === null && tempsRestant() <= 8) {
+    let d = 0;
+    for (let t = 0; t < tempsRestant(); t += 0.05) d += targetSpeed(now + t) * 0.05;
+    game.arriveeR = player.v + d;
+  }
+  if (game.arriveeR !== null && player.v >= game.arriveeR && !game.ended) { terminer(); return; }
   // --- Fin du morceau = fin de la course ---
   if (now >= 0 && !game.ended && tempsRestant() <= 0) { terminer(); return; }
 
@@ -1045,6 +1056,25 @@ function render(alpha) {
         : props.drawStatic(ctx, row.kind, 0, r, tAnim)) });
     }
   }
+  if (game.arriveeR !== null && Math.abs(game.arriveeR - vc) < largeurRoute + 6) {
+    const ra = game.arriveeR, RH = scene.ROAD_HALF;
+    // Damier au sol, puis l'arche : poteau du fond, poteau de devant, bandeau.
+    items.push({ decor: true, d: scene.depth(RH + 0.6, ra), draw: () => {
+      const n = 6, du = (2 * RH) / n;
+      for (let i = 0; i < n; i++) for (let j = 0; j < 2; j++) scene.drawFlat(ctx, -RH + i * du, ra - 0.5 + j * 0.5, du, 0.5, (i + j) % 2 ? "#0d0d10" : "#f4efe4");
+      scene.drawBox(ctx, RH + 0.3, ra - 0.15, 0.3, 0.3, 4.6, "#e13e26");
+    } });
+    items.push({ d: scene.depth(-RH - 0.6, ra), draw: () => {
+      scene.drawBox(ctx, -RH - 0.6, ra - 0.15, 0.3, 0.3, 4.6, "#e13e26");
+      scene.drawBox(ctx, -RH - 0.6, ra - 0.3, 2 * RH + 1.5, 0.6, 0.9, "#e13e26", 4.6);
+      const p = scene.project(-RH - 0.6, ra, 5.05);
+      ctx.save();
+      ctx.fillStyle = "#ffffff"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.font = `900 ${Math.round(scene.scale() * 0.62)}px "Helvetica Neue", Helvetica, Arial, sans-serif`;
+      ctx.fillText("ARRIVÉE", p.x, p.y);
+      ctx.restore();
+    } });
+  }
   if (gameStarted) for (const dr of friends.drawables(ctx, pedal, penteSol)) items.push({ d: scene.depth(dr.u, dr.v), draw: dr.draw });
   // Le fantôme du meilleur de la ligue : transparent, sans ombre, étiqueté.
   // Décalé vers le fond de la route (u + 0,7) : sur une seule voie, il serait
@@ -1155,6 +1185,8 @@ function render(alpha) {
     if (now < COUNT_IN_GO_LINGER_S) hud.renderCountIn(ctx, width, height, now, clock.beatPeriod, COUNT_IN_BEATS, COUNT_IN_GO_LINGER_S);
     hud.renderTuto(ctx, width, height, conseilVue());
   }
+  // Le doigt qui tape : 3 premières parties, jusqu'au premier saut.
+  if (gameStarted && !game.ended && game.tapHint && now > -1) hud.renderTapHint(ctx, width, height, tAnim, Math.min(1, now + 1));
   if (gameStarted && hudAlpha > 0.001 && banner) {
     ctx.save();
     ctx.globalAlpha = hudAlpha;

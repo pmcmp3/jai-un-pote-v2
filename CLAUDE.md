@@ -319,6 +319,23 @@ Code `TESTV2`, qui est aussi `config.ligueBeta` (menu simplifié + bouton « Lai
 - **Explication au lancement** : 9,2 s en deux temps (« Tes potes = tes points »,
   puis « Ton boost de départ » + tag « Tu peux aller jusqu'à ×3 ! »).
 
+## Retours du 1er octobre 2026 (test avec une joueuse)
+
+- **Explication au lancement en 3 étapes** (`EXPL_ETAPES`, screens.js) :
+  1) « Tape l'écran pour sauter » + doigt animé, « pas besoin de glisser » ;
+  2) « Une partie = un morceau », ligne d'arrivée ; 3) « Joue avec tes potes »,
+  +10 % par pote, compteur en POURCENTAGE (« 1,6 » se lisait « 1,6 % »). Un tap
+  = étape suivante ; après la 3e, la course part seule.
+- **Doigt qui tape en course** (`hud.renderTapHint`) : 3 premières parties,
+  jusqu'au premier saut.
+- **Ligne d'ARRIVÉE** (main.js, `game.arriveeR`) : posée 8 s avant la fin du
+  morceau là où le joueur sera (vitesse prévue intégrée) ; damier + arche rouge.
+  La franchir termine la course.
+- **Double saut plus haut** (`sautVitesseDouble` 13,6 → 17) et **pesanteurs −10 %**
+  (54 / 26) : un double saut « spammé » passe maintenant un tracteur.
+  `VERSION_COURSE` 12.
+- Le **bob** prend la couleur du maillot. Boost affiché en « +60 % », plus en « ×1,6 ».
+
 ## Invariants de la v2 (mesurés, `outils/mesurer.mjs`)
 
 - L'écart entre deux obstacles vient de la PHYSIQUE du saut (`ecartMin` : retombée du premier +

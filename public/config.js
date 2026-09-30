@@ -74,9 +74,13 @@ window.CONFIG = {
   // 4,20), c'est le TEMPS qui est comprimé d'un tiers : vitesse initiale et
   // pesanteur montent ensemble.
   sautVitesse: 17.4,        // vitesse verticale au départ du saut (u/s)
-  sautVitesseDouble: 13.6,  // impulsion du second saut, en l'air
-  sautGravite: 60,          // pesanteur normale
-  sautGraviteTenue: 29,     // pesanteur tant qu'on monte ET qu'on reste appuyé
+  // 1er octobre 2026 (test avec une joueuse : « quand une personne spamme et
+  // fait un double saut et qu'il y a un tracteur, le double saut ne fait pas
+  // sauter assez haut [...] la gravité, un poil moins agressive, genre 10 % ») :
+  // double 13,6 → 17, pesanteurs −10 %.
+  sautVitesseDouble: 17,    // impulsion du second saut, en l'air
+  sautGravite: 54,          // pesanteur normale
+  sautGraviteTenue: 26,     // pesanteur tant qu'on monte ET qu'on reste appuyé
   sautTenueMaxS: 0.28,      // au-delà, l'appui ne fait plus monter
 
   // === GRILLE ===

@@ -198,7 +198,17 @@
     #explication { position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; padding: 24px; background: rgba(13,13,16,0.55); }
     #explication.hidden { display: none; }
     #expl-carte { position: relative; width: min(300px, 100%); box-sizing: border-box; padding: 30px 20px 16px; background: #fff; border: 1.5px solid var(--noir); border-radius: var(--rayon); text-align: center; animation: expl-in 0.35s ease-out both; }
-    #expl-titre { margin: 4px 0 12px; font: 900 28px/1 var(--titre); color: var(--noir); }
+    .expl-etape { display: none; }
+    .expl-etape.on { display: block; animation: expl-in 0.3s ease-out both; }
+    .expl-titre { margin: 4px 0 12px; font: 900 27px/1.05 var(--titre); color: var(--noir); }
+    .expl-texte { margin: 0 0 12px; font: 500 13.5px/1.45 var(--police); color: var(--noir); }
+    #expl-main { position: relative; width: 96px; height: 96px; margin: 0 auto 10px; }
+    #expl-main .doigt { position: absolute; left: 30px; top: 18px; font-size: 44px; line-height: 1; animation: expl-tape 0.9s ease-in-out infinite; }
+    #expl-main .onde { position: absolute; left: 30px; top: 6px; width: 36px; height: 36px; border: 3px solid var(--rouge); border-radius: 50%; animation: expl-onde 0.9s ease-out infinite; }
+    @keyframes expl-tape { 0%, 100% { transform: translateY(14px); } 45% { transform: translateY(0); } 55% { transform: translateY(0) scale(0.92); } }
+    @keyframes expl-onde { 0%, 45% { transform: scale(0.2); opacity: 0; } 55% { opacity: 1; } 100% { transform: scale(1.6); opacity: 0; } }
+    #expl-arrivee { height: 64px; margin: 0 auto 12px; width: 220px; background: repeating-conic-gradient(#0d0d10 0 25%, #f4efe4 0 50%) 0 0 / 16px 16px; border: 1.5px solid var(--noir); display: flex; align-items: center; justify-content: center; }
+    #expl-arrivee span { padding: 5px 12px; background: var(--rouge); color: #fff; font: 900 16px var(--police); letter-spacing: 0.14em; }
     #expl-potes { display: flex; justify-content: center; gap: 6px; height: 34px; }
     #expl-potes span { width: 30px; height: 30px; border: 1.5px solid var(--noir); border-radius: 3px; background: #2f7a46; opacity: 0; transform: scale(0.3); }
     #expl-potes span:nth-child(2) { background: #e13e26; } #expl-potes span:nth-child(3) { background: #3f63b4; }
@@ -206,10 +216,7 @@
     #expl-potes span.on { opacity: 1; transform: scale(1); transition: transform 0.25s cubic-bezier(.3,1.6,.5,1), opacity 0.15s; }
     #expl-mult { margin: 10px 0 8px; font: 900 44px/1 var(--titre); color: var(--rouge); }
     #expl-mult.pop { animation: expl-pop 0.25s ease-out; }
-    #expl-texte { margin: 0; font: 500 13px/1.4 var(--police); color: var(--noir); }
-    #expl-texte2 { margin: 4px 0 12px; font: 500 12px/1.4 var(--police); color: rgba(0,0,0,0.6); }
-    #expl-tag { display: inline-block; margin: 0 0 12px; padding: 7px 12px; background: #ffcf2e; border: 1.5px solid var(--noir); transform: rotate(6deg); font: 900 13px var(--police); letter-spacing: 0.06em; text-transform: uppercase; color: var(--noir); animation: expl-pop 0.3s ease-out; }
-    #expl-tag.hidden { display: none; }
+    #expl-tag { display: inline-block; margin: 0 0 10px; padding: 7px 12px; background: #ffcf2e; border: 1.5px solid var(--noir); transform: rotate(6deg); font: 900 13px var(--police); letter-spacing: 0.06em; text-transform: uppercase; color: var(--noir); animation: expl-pop 0.3s ease-out; }
     #expl-barre { height: 4px; background: rgba(0,0,0,0.12); overflow: hidden; }
     #expl-barre i { display: block; height: 100%; width: 0; background: var(--rouge); }
     #expl-passer { margin: 8px 0 0; font: 700 10px var(--police); letter-spacing: 0.12em; text-transform: uppercase; color: rgba(0,0,0,0.45); }
@@ -532,15 +539,26 @@
        concept, et après bam, lancement de partie »). -->
   <div id="explication" class="hidden" aria-live="polite">
     <div id="expl-carte">
-      <div class="panel-header"><p class="step-eyebrow">Comment gagner</p></div>
-      <p id="expl-titre">Tes potes = tes points</p>
-      <div id="expl-potes"><span></span><span></span><span></span><span></span><span></span><span></span></div>
-      <p id="expl-mult">×1,0</p>
-      <p id="expl-tag" class="hidden">Tu peux aller jusqu'à ×3 !</p>
-      <p id="expl-texte">Chaque pote qui joue 30 s dans ta ligue&nbsp;: <b>+10&nbsp;%</b> sur tous tes points.</p>
-      <p id="expl-texte2">Invite-les à la fin de ta partie.</p>
+      <div class="panel-header"><p class="step-eyebrow" id="expl-eyebrow">Comment jouer · 1/3</p></div>
+      <div class="expl-etape" data-e="1">
+        <p class="expl-titre">Tape l'écran pour sauter</p>
+        <div id="expl-main"><span class="onde"></span><span class="doigt">👆</span></div>
+        <p class="expl-texte"><b>Pas besoin de glisser.</b> Un tap = un saut. Re-tape en l'air = double saut.</p>
+      </div>
+      <div class="expl-etape" data-e="2">
+        <p class="expl-titre">Une partie = un morceau</p>
+        <div id="expl-arrivee"><span>ARRIVÉE</span></div>
+        <p class="expl-texte">La course dure le temps de la musique. <b>Tiens jusqu'à la ligne d'arrivée.</b></p>
+      </div>
+      <div class="expl-etape" data-e="3">
+        <p class="expl-titre">Joue avec tes potes</p>
+        <div id="expl-potes"><span></span><span></span><span></span><span></span><span></span><span></span></div>
+        <p id="expl-mult">+0 %</p>
+        <p id="expl-tag">Jusqu'à +200 % !</p>
+        <p class="expl-texte">Crée ta ligue, invite tes potes&nbsp;: vous avez votre classement. <b>Chaque pote qui joue te donne +10&nbsp;% de points.</b></p>
+      </div>
       <div id="expl-barre"><i></i></div>
-      <p id="expl-passer">Touche pour jouer</p>
+      <p id="expl-passer">Touche pour continuer</p>
     </div>
   </div>
   <div id="retour-sheet" aria-hidden="true">

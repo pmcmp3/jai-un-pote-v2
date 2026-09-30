@@ -56,7 +56,7 @@ if (demandes.includes("menus")) {
 }
 await page.waitForFunction(() => !document.getElementById("play-button").disabled, null, { timeout: 15000 });
 await page.click("#play-button");
-if (process.env.EXPL) { await attendre(3500); await photo("05-explication"); await attendre(3500); await photo("05b-explication"); }
+if (process.env.EXPL) { await attendre(2200); await photo("05-explication"); await attendre(4000); await photo("05b-explication"); await attendre(4800); await photo("05c-explication"); }
 await page.waitForFunction(() => window.__pote && window.__pote.estDemarre(), null, { timeout: 8000 });
 await page.keyboard.press("KeyI"); // invincible : la course va au bout des captures
 const course = (expr, arg) => page.evaluate(expr, arg);
@@ -245,6 +245,13 @@ const SCENES = {
     }, r);
     const t = await trace;
     console.log("TOIT", JSON.stringify(t.filter((x, i) => i % 4 === 0)), JSON.stringify(await course(() => window.__pote.chocs())));
+  },
+  // Ligne d'arrivée posée devant le joueur (debug), pour la voir.
+  arrivee: async () => {
+    await page.keyboard.press("KeyI");
+    await attendre(1500); await photo("06-tape");
+    await course(() => { const p = window.__pote; p.game.arriveeR = p.player.v + 6; });
+    await page.keyboard.press("KeyD"); await attendre(150); await photo("90-arrivee"); await page.keyboard.press("KeyD");
   },
   // Saisons forcées (touche S) : printemps, été, automne, hiver.
   saisons: async () => {

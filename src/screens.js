@@ -451,7 +451,8 @@ function afficherBoost() {
   // d'expliquer assez simplement comment ça fonctionne ») : le chiffre, puis la règle.
   el.innerHTML = "";
   const titre = document.createElement("b");
-  titre.textContent = `TES POINTS ×${String(boost.mult).replace(".", ",")}`;
+  // En POURCENTAGE (« les 1,6 %, faut faire des phrases plus simples »).
+  titre.textContent = `TES POINTS +${Math.round((boost.mult - 1) * 100)} %`;
   const ligne1 = document.createElement("span");
   ligne1.textContent = n ? ` · ${n} pote${n > 1 ? "s ont" : " a"} joué` : "";
   const regle = document.createElement("small");
@@ -671,7 +672,7 @@ export function showEndScreen({ metres, potesMax, record, fin, sprint, scoreMax 
   const endMax = $("end-max");
   const pct = Math.round((window.CONFIG.boostLigueParPote || 0.1) * 100);
   const ligneBoost = sprint || (!net.estConfigure() && !demo) ? "" : boost.potes.length
-    ? `Boost <b>×${String(boost.mult).replace(".", ",")}</b> · +${pct} % par pote invité qui joue`
+    ? `Tes potes te donnent <b>+${Math.round((boost.mult - 1) * 100)} %</b> · +${pct} % par nouveau pote`
     : `<b>+${pct} %</b> de points par pote invité qui joue`;
   // (30 septembre 2026 : « à la place du score parfait, dis : Tu peux encore
   // faire un meilleur score ».)
@@ -790,55 +791,52 @@ function syncMuteIcon() {
 }
 
 // --- Démarrage ---------------------------------------------------------------
-// Animation d'explication du boost, ~4,5 s, puis la course part toute seule
-// (un tap l'abrège). Montrée sur les 3 premières parties, et toujours en ligue
-// démo (c'est elle qu'on montre aux gens). Le contexte audio est débloqué
-// AVANT, dans le geste du JOUER : la musique pourra partir sans nouveau tap.
-// 9,2 s en deux temps (30 septembre 2026 : « il faut que ça prenne 2 fois le
-// temps, faut bien prendre le temps d'éduquer les gens au jeu au début ») :
-// 1) chaque pote qui joue = +10 % ; 2) c'est ton BOOST DE DÉPART, jusqu'à ×3.
-const EXPL_S = 9.2;
+// Explication au lancement, en TROIS temps (1er octobre 2026, test avec une
+// joueuse : elle glissait au lieu de taper, lisait « 1,6 % », ne savait pas que
+// la partie dure le morceau) : 1) tape l'écran, pas besoin de glisser ;
+// 2) une partie = un morceau, jusqu'à la ligne d'arrivée ; 3) joue avec tes
+// potes, +10 % par pote. Un tap passe à l'étape suivante ; après la
+// troisième, la course part toute seule. Le contexte audio est débloqué AVANT,
+// dans le geste du JOUER. 3 premières parties + toujours en ligue démo.
+const EXPL_ETAPES = [4.2, 3.8, 5.4];
 function montrerExplication(ensuite) {
   const box = $("explication");
   if (!box || (!demo && getParties() >= 3) || enBeta()) { ensuite(); return; }
+  const etapes = [...box.querySelectorAll(".expl-etape")];
   const potes = [...box.querySelectorAll("#expl-potes span")];
-  const mult = $("expl-mult"), barre = box.querySelector("#expl-barre i");
-  potes.forEach((p) => p.classList.remove("on"));
-  mult.textContent = "×1,0";
-  const titre = $("expl-titre"), texte = $("expl-texte"), texte2 = $("expl-texte2"), tag = $("expl-tag");
-  titre.textContent = "Tes potes = tes points";
-  texte.innerHTML = "Chaque pote qui joue 30 s dans ta ligue te donne <b>+10&nbsp;%</b>.";
-  texte2.textContent = "";
-  tag.classList.add("hidden");
-  barre.style.transition = "none"; barre.style.width = "0";
-  box.classList.remove("hidden");
-  requestAnimationFrame(() => { barre.style.transition = `width ${EXPL_S}s linear`; barre.style.width = "100%"; });
-  const minuteurs = potes.map((p, i) => setTimeout(() => {
-    p.classList.add("on");
-    mult.textContent = `×${(1 + (i + 1) * 0.1).toFixed(1).replace(".", ",")}`;
-    mult.classList.remove("pop"); void mult.offsetWidth; mult.classList.add("pop");
-    try { sfx.piece(); } catch (e) { /* pas de son, tant pis */ }
-  }, 700 + i * 600));
-  minuteurs.push(setTimeout(() => {
-    titre.textContent = "Ton boost de départ";
-    texte.innerHTML = "Plus tu as de potes, plus tu démarres fort&nbsp;: <b>tous tes points</b> sont multipliés.";
-    texte2.textContent = "Invite-les à la fin de ta partie.";
-    tag.classList.remove("hidden");
-  }, 4800));
-  let fini = false;
-  const finir = () => {
-    if (fini) return; fini = true;
-    minuteurs.forEach(clearTimeout); clearTimeout(fin);
-    box.classList.add("hidden");
-    ensuite();
+  const mult = $("expl-mult"), barre = box.querySelector("#expl-barre i"), eyebrow = $("expl-eyebrow");
+  let minuteurs = [], idx = -1, fini = false;
+  const vider = () => { minuteurs.forEach(clearTimeout); minuteurs = []; };
+  const finir = () => { if (fini) return; fini = true; vider(); box.classList.add("hidden"); ensuite(); };
+  const etape = (i) => {
+    vider();
+    if (i >= etapes.length) { finir(); return; }
+    idx = i;
+    etapes.forEach((e, k) => e.classList.toggle("on", k === i));
+    eyebrow.textContent = `Comment jouer · ${i + 1}/${etapes.length}`;
+    $("expl-passer").textContent = i < etapes.length - 1 ? "Touche pour continuer" : "Touche pour jouer";
+    barre.style.transition = "none"; barre.style.width = "0";
+    requestAnimationFrame(() => requestAnimationFrame(() => { barre.style.transition = `width ${EXPL_ETAPES[i]}s linear`; barre.style.width = "100%"; }));
+    if (i === 2) {
+      potes.forEach((p) => p.classList.remove("on"));
+      mult.textContent = "+0 %";
+      potes.forEach((p, k) => minuteurs.push(setTimeout(() => {
+        p.classList.add("on");
+        mult.textContent = `+${(k + 1) * 10} %`;
+        mult.classList.remove("pop"); void mult.offsetWidth; mult.classList.add("pop");
+        try { sfx.piece(); } catch (e) { /* pas de son, tant pis */ }
+      }, 500 + k * 550)));
+    }
+    minuteurs.push(setTimeout(() => etape(i + 1), EXPL_ETAPES[i] * 1000));
   };
-  const fin = setTimeout(finir, EXPL_S * 1000);
   if (!box.dataset.branche) {
     box.dataset.branche = "1";
-    // Le tap qui abrège ne doit pas devenir un saut au départ (input.js écoute window).
+    // Le tap qui fait avancer ne doit pas devenir un saut (input.js écoute window).
     ["touchstart", "mousedown", "touchend", "mouseup"].forEach((t) => box.addEventListener(t, (e) => e.stopPropagation()));
   }
-  box.onpointerdown = (e) => { e.stopPropagation(); finir(); };
+  box.onpointerdown = (e) => { e.stopPropagation(); etape(idx + 1); };
+  box.classList.remove("hidden");
+  etape(0);
 }
 function startGame(opts = {}) {
   // Après une course, JOUER (depuis le menu, atteint par « Menu » sur l'écran
