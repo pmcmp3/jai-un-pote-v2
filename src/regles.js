@@ -7,7 +7,7 @@ export const V_UNIT = 2.6;          // rangées/s par unité de « vitesse » de
 // 70 → 88 s le 20 septembre 2026 (« la vitesse au tout début est très bien,
 // faut vraiment que ce soit progressif et que plus on avance, plus ce soit
 // compliqué ») : le plafond est atteint vers 2 min au lieu de 1 min 30.
-export const V_DOUBLING_S = 88;
+export const V_DOUBLING_S = 50; // 88 → 50 le 30 septembre 2026 : vitesseMax atteinte vers 30 s
 export const LEAD_IN = 3.3;         // décompte avant le GO (ancré sur la grille du morceau)
 
 export function targetSpeed(t) {
@@ -35,7 +35,7 @@ export function dureeCourse() {
 // les règles changent la route — les scores et fantômes d'une ligue sont
 // filtrés sur la graine, une nouvelle version repart donc sur un classement
 // vierge sans rien supprimer en base.
-export const VERSION_COURSE = 10; // 30 septembre 2026 : costard, plus de poule jetée, seconde accélération — // 29 septembre 2026 (2) : pièces ÷2, moutons ×2, plus de voitures en face — // 29 septembre 2026 : poules ×1,4 — // 27 septembre 2026 : poule jetée de face, voiture en face plus lente et montable
+export const VERSION_COURSE = 11; // 30 septembre 2026 (2) : difficulté avancée — // 30 septembre 2026 : costard, plus de poule jetée, seconde accélération — // 29 septembre 2026 (2) : pièces ÷2, moutons ×2, plus de voitures en face — // 29 septembre 2026 : poules ×1,4 — // 27 septembre 2026 : poule jetée de face, voiture en face plus lente et montable
 export function graineDepuisTexte(txt) {
   let h = 7;
   for (const ch of String(txt)) h = (h * 31 + ch.charCodeAt(0)) % 100000;

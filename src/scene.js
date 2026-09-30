@@ -108,7 +108,7 @@ function melange(a, b, t) { return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1
 function teintes(color, u) {
   const kb = Math.max(0, Math.min(9, Math.round((u - 2.5) / 1.8)));
   // Acteurs éclairés (main.js) : la nuit ne les assombrit qu'au quart.
-  const kn = Math.round(night * (eclaireActif ? 2.5 : 10));
+  const kn = eclaireActif ? 0 : Math.round(night * 10); // acteurs en pleine lumière la nuit
   const cle = `${color}|${kb}|${kn}|${modeSaison ? saisonCle : ""}`;
   let t = cache.get(cle);
   if (t) return t;

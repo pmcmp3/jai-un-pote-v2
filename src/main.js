@@ -225,11 +225,11 @@ function apprendre(f) { const a = appris(); a.add(f); ecrireJson(CLE_APPRIS, [..
 //               quand la personne réussit »).
 // Une famille est APPRISE dès que l'obstacle est franchi sans le toucher (quel
 // que soit le geste), et jamais montrée plus de deux fois.
-const RALENTI_MIN = 0.015, RALENTI_APPROCHE = 0.25, APPROCHE_S = 1.0;
+const RALENTI_MIN = 0.015, RALENTI_APPROCHE = 0.25, APPROCHE_S = 0.7;
 const conseil = { r: null, famille: null, phase: null, alpha: 0, ok: 0, tampon: false, touche: false };
 let ralenti = 1, retardMonde = 0;
 function tMonde() { return clock.now() - retardMonde; }
-function conseilCouper() { conseil.r = null; conseil.phase = null; conseil.alpha = 0; conseil.ok = 0; conseil.tampon = false; audio.setRalenti(false); }
+function conseilCouper() { conseil.autoDouble = false; conseil.r = null; conseil.phase = null; conseil.alpha = 0; conseil.ok = 0; conseil.tampon = false; audio.setRalenti(false); }
 function conseilReset() { conseilCouper(); ralenti = 1; retardMonde = 0; }
 // Temps avant que l'obstacle de la rangée r croise le joueur (s), ou null.
 function tempsAvant(r, row, tm, vitesse) {
@@ -252,7 +252,7 @@ function conseilCherche(tm, vitesse) {
     if (deja.has(f) || (vus[f] || 0) >= 1) continue; // UNE seule fois (30 septembre 2026 : « faut pas 2 fois le même tuto »)
     const t = tempsAvant(r, row, tm, vitesse);
     if (t !== null && t > momentIdeal(f) && t <= momentIdeal(f) + APPROCHE_S) {
-      conseil.r = r; conseil.famille = f; conseil.phase = "approche"; conseil.ok = 0; conseil.tampon = false; conseil.touche = false;
+      conseil.r = r; conseil.famille = f; conseil.phase = "approche"; conseil.ok = 0; conseil.tampon = false; conseil.touche = false; conseil.autoDouble = false;
       vus[f] = (vus[f] || 0) + 1; ecrireJson(CLE_VUS, vus);
       audio.setRalenti(true);
     }
@@ -263,14 +263,22 @@ function conseilCherche(tm, vitesse) {
 function conseilTap(tap, tm, vitesse) {
   if (conseil.r === null) return tap;
   if (conseil.phase === "approche") {
-    if (tap && player.auSol) conseil.tampon = true;
     const t = tempsAvant(conseil.r, rows.rowAt(conseil.r), tm, vitesse);
-    if (t !== null && t <= momentIdeal(conseil.famille)) {
+    // Tap pendant l'approche : on saute TOUT DE SUITE (30 septembre 2026 :
+    // « il y a une latence entre le moment où tu appuies et le moment où
+    // l'action se réalise, c'est très frustrant ») — l'ancien tap gardé
+    // partait plus tard. Pour que ça passe quand même, le saut est prolongé :
+    // tenue offerte, et double saut automatique au sommet si le tap était tôt.
+    if (tap && player.auSol) {
+      const avance = t !== null ? t - momentIdeal(conseil.famille) : 0;
+      conseil.autoDouble = conseil.famille !== "double" && avance > 0.12;
       conseil.phase = "attente";
-      if (conseil.tampon) { conseil.tampon = false; return true; }
+      return true;
     }
-    return conseil.phase === "approche" ? false : tap;
+    if (t !== null && t <= momentIdeal(conseil.famille)) conseil.phase = "attente";
+    return false;
   }
+  if (conseil.autoDouble && !player.doubled && player.jumpY > 0.05 && player.jumpVy <= 0) { conseil.autoDouble = false; return true; }
   // Double saut : un re-tap AVANT le sommet est gardé et part au sommet (un
   // re-tap trop tôt donnait un double saut trop bas pour le tracteur).
   if (conseil.phase === "enl_air" && conseil.famille === "double") {
@@ -280,11 +288,13 @@ function conseilTap(tap, tm, vitesse) {
   return tap;
 }
 const APEX_VY = 0; // au sommet du premier saut, comme le joueur idéal (rows.arcs)
-function conseilReussi() { if (conseil.phase === "fini") return; conseil.phase = "fini"; conseil.ok = 0.9; audio.setRalenti(false); sfx.piece(); }
+function conseilReussi() { if (conseil.phase === "fini") return; conseil.phase = "fini"; ralenti = Math.max(ralenti, 0.6); conseil.ok = 0.9; audio.setRalenti(false); sfx.piece(); }
 function conseilGeste(ev) {
   if (conseil.r === null || conseil.phase === "fini") return;
   const f = conseil.famille;
-  if (ev === "jump") { if (f === "tap") conseilReussi(); else { conseil.phase = "enl_air"; conseil.tampon = false; } }
+  // Tap et appui long : réussis dès le décollage (la tenue est offerte). Le
+  // double attend encore son re-tap, au sommet.
+  if (ev === "jump") { if (f !== "double") conseilReussi(); else { conseil.phase = "enl_air"; conseil.tampon = false; } }
   else if (ev === "salto") conseilReussi(); // un double saut passe tout
 }
 function conseilStep(dt, tm, vitesse) {
@@ -298,7 +308,7 @@ function conseilStep(dt, tm, vitesse) {
     else if (conseil.phase === "attente") cible = RALENTI_MIN;
     else if (conseil.phase === "enl_air") {
       // Double : ralenti jusqu'au sommet, puis gel en attendant le re-tap.
-      cible = conseil.famille === "double" && player.jumpVy <= APEX_VY ? RALENTI_MIN : 0.3;
+      cible = conseil.famille === "double" && player.jumpVy <= APEX_VY ? RALENTI_MIN : 1;
       // Appui long : le ralenti tient jusqu'à la pleine hauteur (ou au doigt levé).
       if (conseil.famille === "haut" && (player.tHaut >= window.CONFIG.sautTenueMaxS * 0.9 || !isHolding())) conseilReussi();
     }
@@ -703,7 +713,7 @@ function step(dt) {
     // Tant que le doigt reste appuyé et qu'on monte, la pesanteur est réduite.
     // Pendant un conseil « appui long » ou « double », la tenue est offerte :
     // le tuto doit réussir dès que le joueur a fait le bon geste, même un peu court.
-    const aide = conseil.r !== null && conseil.famille !== "tap" && (conseil.phase === "enl_air" || conseil.phase === "fini" || conseil.phase === "attente");
+    const aide = conseil.r !== null && (conseil.famille !== "tap" || conseil.autoDouble) && (conseil.phase === "enl_air" || conseil.phase === "fini" || conseil.phase === "attente");
     const tenu = (isHolding() || aide) && player.jumpVy > 0 && player.tHaut < phys.tenueMax;
     if (tenu) player.tHaut += dt;
     player.jumpVy -= (tenu ? phys.gTenu : phys.g) * dt;
@@ -966,6 +976,17 @@ function render(alpha) {
 
   poserSaison(gameStarted ? now : 0);
   scene.renderGround(ctx, null);   // plus de boue depuis le 20 septembre 2026
+  // Phare du vélo la nuit : un faisceau chaud sur la route, devant le joueur.
+  const nuitF = scene.getNight();
+  if (gameStarted && nuitF > 0.25) {
+    const a = scene.project(0, v + 1, 0), b = scene.project(0, v + 9, 0);
+    const g = ctx.createRadialGradient(a.x, a.y, 4, a.x, a.y, Math.max(40, b.x - a.x));
+    g.addColorStop(0, `rgba(255,236,170,${0.42 * nuitF})`);
+    g.addColorStop(1, "rgba(255,236,170,0)");
+    ctx.save(); ctx.globalCompositeOperation = "lighter"; ctx.fillStyle = g;
+    ctx.beginPath(); ctx.ellipse((a.x + b.x) / 2, a.y, (b.x - a.x) / 2 + 20, scene.scale() * 1.1, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
 
   const items = [];
   const { from, to } = scene.rowRange();

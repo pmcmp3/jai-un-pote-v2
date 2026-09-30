@@ -133,6 +133,7 @@ export function lose(n) {
   return perdus;
 }
 
+let roueT = 0;
 export function update(dt, player, phys) {
   const vivants = alive().sort((a, b) => a.slot - b.slot);
   vivants.forEach((p, i) => { p.slot = i; });
@@ -148,6 +149,11 @@ export function update(dt, player, phys) {
       const e = 1 - Math.pow(1 - p.arrive, 3);
       p.u = p.u0 + (cibleU - p.u0) * e;
       p.v = cibleV + p.dv0 * (1 - e);
+      // Il roule SUR la rampe pendant son arrivée aussi (30 septembre 2026 :
+      // un pote arrivé dans les halles roulait sous le plancher, puis sautait
+      // d'un coup dessus).
+      const solA = phys.sol ? phys.sol(p.v) : 0;
+      p.jumpY = solA; p.jumpVy = 0; p.auSol = true;
       continue;
     }
     p.u += (cibleU - p.u) * Math.min(1, 4 * dt);
@@ -176,6 +182,15 @@ export function update(dt, player, phys) {
     if (p.jumpY <= sol) { p.jumpY = sol; p.jumpVy = 0; p.doubled = false; p.flip = 0; p.tenue = 0; }
     p.auSol = p.jumpY <= sol + 0.001;
     if (p.flip > 0) p.flip = Math.min(Math.PI * 2, p.flip + dt * (Math.PI * 2 / 0.5));
+    if (p.roue > 0) { p.roue += dt / 0.9; if (p.roue >= 1 || !p.auSol) p.roue = 0; }
+  }
+  // Toutes les ~15 s, un pote au hasard fait une roue arrière, pour rien
+  // (30 septembre 2026 : « ça peut être trop bien »).
+  roueT += dt;
+  if (roueT >= 15) {
+    roueT = 0;
+    const libres = potes.filter((p) => !p.leave && p.arrive >= 1 && p.auSol && !(p.roue > 0));
+    if (libres.length) libres[Math.floor(Math.random() * libres.length)].roue = 0.001;
   }
   potes = potes.filter((p) => !p.leave || p.leave.t < 1);
 }
@@ -198,7 +213,7 @@ export function drawables(ctx, pedalPhase, penteAt = null) {
     out.push({
       u, v, draw: () => {
         // Incliné dans la pente de la halle, comme le joueur.
-        drawRider(ctx, u, v, y, p.palette, pedalPhase + p.pedal, alpha, p.flip, true, 0, p.auSol && penteAt ? penteAt(v) : 0);
+        drawRider(ctx, u, v, y, p.palette, pedalPhase + p.pedal, alpha, p.flip, true, p.roue || 0, p.auSol && penteAt ? penteAt(v) : 0);
         // Le prénom s'affiche 3 s à l'arrivée du pote, puis s'efface : dans
         // une meute serrée, cinq étiquettes permanentes se marchaient dessus.
         const vu = p.arrive >= 1 ? Math.max(0, Math.min(1, (3.6 - p.age) / 0.6)) : 0;
@@ -208,7 +223,7 @@ export function drawables(ctx, pedalPhase, penteAt = null) {
           ctx.globalAlpha *= vu;
           ctx.font = `800 12px "Helvetica Neue", Helvetica, Arial, sans-serif`;
           ctx.textAlign = "center"; ctx.textBaseline = "bottom";
-          ctx.shadowColor = "rgba(0,0,0,0.25)"; ctx.shadowBlur = 3; ctx.shadowOffsetY = 2;
+          ctx.shadowColor = "transparent";
           ctx.fillStyle = "#fff";
           ctx.fillText(p.name.toUpperCase(), g.x, g.y);
           ctx.restore();

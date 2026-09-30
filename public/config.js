@@ -42,8 +42,11 @@ window.CONFIG = {
   // 1 minute 25, il faut que ça s'accélère, parce que là on s'ennuie trop
   // vite ») : sur les `accelDernieresS` dernières secondes, la vitesse repart
   // de vitesseMax vers vitesseFinale, atteinte ~15 s avant la fin.
-  vitesseFinale: 3.4,
-  accelDernieresS: 85,          // 3,6 → 2,6 le 7 septembre 2026 (« quand ça va vite, ça va vraiment trop vite »)
+  // 30 septembre 2026 (« la difficulté que j'ai à 30 s de la fin, je l'attends
+  // pour le milieu de la course ») : la 2e accélération démarre vers 50 s et
+  // monte jusqu'à 4,0.
+  vitesseFinale: 4.0,
+  accelDernieresS: 120,          // 3,6 → 2,6 le 7 septembre 2026 (« quand ça va vite, ça va vraiment trop vite »)
 
   // === VUE DE PROFIL (v2, 19 septembre 2026) ===
   // « Une seule voie, en 2D, exactement comme Jetpack Joyride ou Zombie

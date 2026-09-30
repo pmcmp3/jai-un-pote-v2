@@ -192,7 +192,7 @@
     .chips { display: flex; flex-wrap: wrap; gap: 6px; }
     .chip { min-width: 24px; height: 26px; padding: 0 6px; border-radius: 3px; border: 1.5px solid rgba(0,0,0,0.25); background: #fff; font: 700 10px var(--police); letter-spacing: 0.06em; text-transform: uppercase; color: var(--noir); -webkit-tap-highlight-color: transparent; }
     .chip.couleur { padding: 0; width: 26px; }
-    .chip.actif { border-color: var(--noir); box-shadow: 0 0 0 2px var(--jaune); }
+    .chip.actif { border-color: var(--noir); box-shadow: 0 0 0 2px #ffcf2e; }
     #sprint-button { margin-top: 8px; }
     /* Boost de ligue (29 septembre 2026) : sticker jaune sous JOUER. */
     #explication { position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; padding: 24px; background: rgba(13,13,16,0.55); }
@@ -208,6 +208,8 @@
     #expl-mult.pop { animation: expl-pop 0.25s ease-out; }
     #expl-texte { margin: 0; font: 500 13px/1.4 var(--police); color: var(--noir); }
     #expl-texte2 { margin: 4px 0 12px; font: 500 12px/1.4 var(--police); color: rgba(0,0,0,0.6); }
+    #expl-tag { display: inline-block; margin: 0 0 12px; padding: 7px 12px; background: #ffcf2e; border: 1.5px solid var(--noir); transform: rotate(6deg); font: 900 13px var(--police); letter-spacing: 0.06em; text-transform: uppercase; color: var(--noir); animation: expl-pop 0.3s ease-out; }
+    #expl-tag.hidden { display: none; }
     #expl-barre { height: 4px; background: rgba(0,0,0,0.12); overflow: hidden; }
     #expl-barre i { display: block; height: 100%; width: 0; background: var(--rouge); }
     #expl-passer { margin: 8px 0 0; font: 700 10px var(--police); letter-spacing: 0.12em; text-transform: uppercase; color: rgba(0,0,0,0.45); }
@@ -295,7 +297,6 @@
       position: absolute; top: 22px; right: -16px; margin: 0; padding: 6px 10px;
       transform: rotate(8deg); background: var(--rouge); color: var(--blanc); border-radius: 2px;
       font: 900 10.5px var(--police); letter-spacing: 0.12em; text-transform: uppercase; white-space: nowrap;
-      box-shadow: 0 2px 0 rgba(0,0,0,0.25);
     }
     #end-credit { margin: 10px 0 0; font: 500 10px/1.4 var(--police); color: rgba(0,0,0,0.45); text-align: center; text-wrap: balance; }
     #end-ecouter { margin-top: 2px; }
@@ -535,6 +536,7 @@
       <p id="expl-titre">Tes potes = tes points</p>
       <div id="expl-potes"><span></span><span></span><span></span><span></span><span></span><span></span></div>
       <p id="expl-mult">×1,0</p>
+      <p id="expl-tag" class="hidden">Tu peux aller jusqu'à ×3 !</p>
       <p id="expl-texte">Chaque pote qui joue 30 s dans ta ligue&nbsp;: <b>+10&nbsp;%</b> sur tous tes points.</p>
       <p id="expl-texte2">Invite-les à la fin de ta partie.</p>
       <div id="expl-barre"><i></i></div>

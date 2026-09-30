@@ -220,7 +220,10 @@ function staticNu(ctx, kind, uCenter, r, t) {
     // Plus de gris : il se perdait sur l'asphalte (« les chats gris, on ne les
     // voit pas assez »). Noir, blanc ou roux foncé, et une tache de contraste.
     const noir = ri % 3 === 0;
-    const col = noir ? "#1a1a1e" : ri % 3 === 1 ? "#f4efe4" : "#6b3a20";
+    // Plus de chat NOIR (30 septembre 2026 : « quand il y a un chat et qu'on est
+    // dans le biome de la nuit, on ne se rend pas du tout compte qu'il y a un
+    // chat ») : roux vif, blanc, ou tigré orange.
+    const col = noir ? "#e0701e" : ri % 3 === 1 ? "#f4efe4" : "#c85a1a";
     const tache = noir ? "#f4efe4" : "#1a1a1e";
     for (const [la, lb] of [[0.14, 0.08], [0.14, 0.64], [0.62, 0.08], [0.62, 0.64]]) B(la, lb, 0.1, 0.18, 0.3, col);
     B(0.06 + wob * 0.5, 0.06, 0.62, 0.78, 0.36, col, 0.3);

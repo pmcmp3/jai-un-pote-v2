@@ -231,8 +231,6 @@ export function renderBanner(ctx, width, height, banner, safeTop = 0, yForce = n
   // Carte BLANCHE à bord noir, comme les panneaux du jeu et l'e-card de l'EP
   // (20 septembre 2026 : « quand il y a Hugo affiché, pas un panneau avec un
   // fond gris — que ce soit à la DA du jeu, là ça va pas du tout »).
-  ctx.fillStyle = "rgba(0,0,0,0.18)";
-  roundRect(ctx, x + 2, y + 4, w, h, 3); ctx.fill();
   ctx.fillStyle = "#ffffff";
   roundRect(ctx, x, y, w, h, 3); ctx.fill();
   ctx.strokeStyle = NOIR; ctx.lineWidth = 1.5;
@@ -300,8 +298,6 @@ export function renderBestiaire(ctx, width, height, alpha, groupes, safeTop = 0,
   ctx.save();
   ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
   // Même carte blanche à bord noir que le reste du jeu.
-  ctx.fillStyle = "rgba(0,0,0,0.18)";
-  roundRect(ctx, x + 2, y + 4, w, h, 3); ctx.fill();
   ctx.fillStyle = "#ffffff";
   roundRect(ctx, x, y, w, h, 3); ctx.fill();
   ctx.strokeStyle = NOIR; ctx.lineWidth = 1.5;
@@ -361,8 +357,6 @@ export function renderTuto(ctx, width, height, tuto) {
   const w = Math.min(width - 32, 330), h = tuto.sous ? 92 : 70;
   const x = width / 2 - w / 2, y = tuto.y !== undefined ? tuto.y : height * 0.3; // en HAUT, sous le score (29 septembre 2026)
   ctx.globalAlpha = tuto.alpha;
-  ctx.fillStyle = "rgba(0,0,0,0.18)";
-  roundRect(ctx, x + 2, y + 4, w, h, 3); ctx.fill();
   ctx.fillStyle = "#ffffff";
   roundRect(ctx, x, y, w, h, 3); ctx.fill();
   ctx.strokeStyle = NOIR; ctx.lineWidth = 1.5;

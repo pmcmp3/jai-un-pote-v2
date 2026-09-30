@@ -288,6 +288,37 @@ Code `TESTV2`, qui est aussi `config.ligueBeta` (menu simplifié + bouton « Lai
   entre obstacles est calculé sur `vitesseFinale`. `VERSION_COURSE` 10.
 - Voitures garées du village décalées (rz % 24 = 20) : elles chevauchaient une maison.
 
+## Retours du 30 septembre 2026, soir (difficulté, latence du tuto, halles, toits)
+
+- ⚠️ **DIFFICULTÉ AVANCÉE** (« au bout de 40 secondes, ça doit devenir
+  difficile » ; « la difficulté à 30 s de la fin, je l'attends pour le milieu ») :
+  `V_DOUBLING_S` 88 → 50 (vitesseMax vers 30 s), 2e accélération de ~50 s à la
+  fin vers `vitesseFinale` 4,0 (`accelDernieresS` 120), paquets avancés
+  (`paquetPour` : 12 / 12 / le dur), `RAMP_ROWS` 380, `MOU` 5 → 0, une voiture
+  dès le premier paquet (tuto du double saut tôt). ⚠️ `ecartMin(a, b, v)` prend
+  désormais la vitesse LOCALE (`vitesseAuRang`) : l'écart calculé à la vitesse
+  maxi de fin espaçait tout le début. ~100 obstacles par course (81 avant), joueur
+  idéal toujours à 0 choc. (L'avertissement « paires plus serrées que la
+  physique » de mesurer.mjs compare encore au pire cas : il est attendu.)
+  `VERSION_COURSE` 11.
+- **Tuto sans latence** : un tap pendant l'approche fait sauter TOUT DE SUITE ;
+  le saut est prolongé (tenue offerte, double saut automatique au sommet si le
+  tap était tôt de plus de 0,12 s) pour passer quand même. Tap et appui long
+  sont réussis au décollage ; seul le double gèle encore au sommet pour le re-tap.
+- **Toits de voiture** : le toit porte sur toute la zone de choc (il s'arrêtait
+  une demi-roue avant, l'atterrissage comptait comme un choc). Test :
+  `capture.mjs toitVoiture`.
+- **Halles** : un pote en cours d'arrivée suit le plancher (il roulait dessous).
+- Roue arrière d'un pote au hasard toutes les 15 s (friends.js).
+- **Nuit** : acteurs en pleine lumière (`eclaire` → kn 0), phare du vélo sur la
+  route, plus de chat noir. Plus AUCUNE ombre portée (cartes du HUD, étiquettes
+  des potes, CSS).
+- **Fin** : plus de tag « Terminé », « Nouveau record · N potes maximum »,
+  « Tu peux encore faire un meilleur score. » à la place du score parfait ; tient
+  sur iPhone 16 (`ECRAN=i16`).
+- **Explication au lancement** : 9,2 s en deux temps (« Tes potes = tes points »,
+  puis « Ton boost de départ » + tag « Tu peux aller jusqu'à ×3 ! »).
+
 ## Invariants de la v2 (mesurés, `outils/mesurer.mjs`)
 
 - L'écart entre deux obstacles vient de la PHYSIQUE du saut (`ecartMin` : retombée du premier +

@@ -214,8 +214,10 @@ for (const k of Object.keys(KINDS)) {
 // Écart minimal entre deux obstacles : le temps de retomber du premier plus
 // celui de prendre son élan pour le second, converti en rangées à vitesse
 // maximale, plus les deux demi-longueurs.
-export function ecartMin(a, b) {
-  const v = vMaxRangees();
+// `v` (rangées/s) : la vitesse LÀ où les deux obstacles se suivent (1er
+// octobre... 30 septembre 2026 : l'écart calculé à la vitesse maximale de fin
+// espaçait tout le début de course — « c'est trop facile »). Sans `v`, le pire cas.
+export function ecartMin(a, b, v = vMaxRangees()) {
   const t = retombee(familleDe(a)) + montee(familleDe(b));
   return Math.ceil(t * v + demiLongueurRoute(a) + demiLongueurRoute(b)) + 1;
 }
@@ -232,10 +234,10 @@ export const PIECE_SOL = CORPS_CENTRE;      // 0,85 : ramassée en roulant
 export const H_LAIT = PIECE_SOL, H_ROUGE = PIECE_SOL;
 
 export const GRACE_ROWS = 40;    // ~9 s sans rien au départ
-const RAMP_ROWS = 1000;
+const RAMP_ROWS = 380;   // 1000 → 380 le 30 septembre 2026 : le mou entre obstacles fond en ~40 s
 // Marge ALÉATOIRE ajoutée à l'écart minimal, en rangées : large au début, plus
 // serrée à la fin.
-const MOU_DEBUT = 8, MOU_FIN = 1;
+const MOU_DEBUT = 5, MOU_FIN = 0;
 export const BLOC = 24;
 // UN SEUL espacement dans tout le jeu : une pièce toutes les deux rangées,
 // sur l'arc comme au sol (20 septembre 2026 : « les tailles et l'espacement
@@ -292,7 +294,11 @@ export function toitSous(route, v, jumpY, t = 0) {
     const K = KINDS[row.kind];
     if (!K.montable) continue;
     const centre = row.type === "statique" ? r : (row.armed ? r + row.v0 - row.vitesse * (t - row.t0) : null);
-    if (centre === null || Math.abs(v - centre) >= K.long / 2 + VELO_DEMI * 0.5) continue;
+    // Le toit porte sur TOUTE la zone de choc (30 septembre 2026 : « quand
+    // j'atterris sur une voiture, j'ai un problème ») : il s'arrêtait une
+    // demi-roue avant elle, le vélo retombait à l'arrière du toit ENCORE dans
+    // la voiture, et l'atterrissage comptait comme un choc.
+    if (centre === null || Math.abs(v - centre) >= K.long / 2 + VELO_DEMI) continue;
     const toit = K.h + MARGE_H;
     if (jumpY >= toit - 0.02) return toit;
   }
@@ -304,14 +310,17 @@ const PAQUETS = [
   // Départ : que des petits sauts.
   // (Plus de fermier qui jette une poule, 30 septembre 2026 : « tu me vires ça ».)
   // ⚠️ Chaque paquet compte EXACTEMENT 12 espèces (especeDanger : i % 12).
-  ["poule", "poule", "poule", "chat", "chat", "chat", "chien", "chien", "mouton", "mouton", "botte", "botte"],
+  // Une VOITURE dès le premier paquet : le tuto du double saut doit venir tôt.
+  ["poule", "poule", "voiture", "chat", "chat", "chien", "chien", "mouton", "mouton", "botte", "botte", "voiture"],
   // Ensuite : les gros animaux (appui maintenu) et les premiers véhicules.
   // + voitures EN FACE (29 septembre 2026 : « les voitures qui arrivent dans ta tête, faut en mettre beaucoup plus »).
   ["poule", "chien", "mouton", "botte", "costard", "fermier", "cochon", "vache", "tracteur", "voiture", "contresens", "contresens"],
   // Fin : fermiers, voitures, et la voiture qui arrive en face.
   ["poule", "mouton", "botte", "costard", "costard", "vache", "tracteur", "fermier", "voiture", "contresens", "contresens", "contresens"],
 ];
-function paquetPour(d) { return PAQUETS[d < 2 ? 0 : d < 4 ? 1 : 2]; }
+// Paquets avancés (30 septembre 2026 : « au bout de 40 secondes, ça doit devenir
+// difficile ») : 12 obstacles de départ, 12 intermédiaires, puis le dur.
+function paquetPour(d) { return PAQUETS[d < 1 ? 0 : d < 2 ? 1 : 2]; }
 function estDouble(kind) { return familleDe(kind) === "double"; }
 
 // --- La route ----------------------------------------------------------------------
@@ -378,7 +387,7 @@ export class Route {
       const kind = this.especeDanger(i);
       const t = Math.min(1, Math.max(0, this.chaine.r / RAMP_ROWS));
       const mou = Math.round(MOU_DEBUT + (MOU_FIN - MOU_DEBUT) * t);
-      const base = this.chaine.kind ? ecartMin(this.chaine.kind, kind) : 6;
+      const base = this.chaine.kind ? ecartMin(this.chaine.kind, kind, Math.min(vMaxRangees(), vitesseAuRang(this.chaine.r + 20) * 1.08)) : 6;
       let r = this.chaine.r + base + Math.floor(this.hash(i * 37 + 11) * (mou + 1));
       let garde = 0;
       while (garde++ < 400 && (estReservee(r) || estReservee(r - 1) || estReservee(r + 1) || dansHalle(r) || dansHalle(r - 4) || dansHalle(r + 4))) r += 1;

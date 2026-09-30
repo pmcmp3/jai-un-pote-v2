@@ -30,7 +30,8 @@ const url = `http://localhost:${port}/?debug${process.env.DEMO ? "&demo" : ""}`;
 const navigateur = await chromium.launch({ channel: "chrome", headless: true, args: ["--autoplay-policy=no-user-gesture-required"] });
 // ECRAN=petit : iPhone SE / 8 (375×667), le pire cas pour le menu.
 const petit = process.env.ECRAN === "petit";
-const contexte = await navigateur.newContext({ viewport: { width: 375, height: petit ? 667 : 812 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+const i16 = process.env.ECRAN === "i16";
+const contexte = await navigateur.newContext({ viewport: { width: i16 ? 393 : 375, height: petit ? 667 : i16 ? 852 : 812 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
 const page = await contexte.newPage();
 const erreurs = [];
 page.on("pageerror", (e) => erreurs.push(e.stack || e.message));
@@ -55,7 +56,7 @@ if (demandes.includes("menus")) {
 }
 await page.waitForFunction(() => !document.getElementById("play-button").disabled, null, { timeout: 15000 });
 await page.click("#play-button");
-if (process.env.EXPL) { await attendre(2600); await photo("05-explication"); }
+if (process.env.EXPL) { await attendre(3500); await photo("05-explication"); await attendre(3500); await photo("05b-explication"); }
 await page.waitForFunction(() => window.__pote && window.__pote.estDemarre(), null, { timeout: 8000 });
 await page.keyboard.press("KeyI"); // invincible : la course va au bout des captures
 const course = (expr, arg) => page.evaluate(expr, arg);
@@ -219,6 +220,31 @@ const SCENES = {
     console.log("TRACE", JSON.stringify((await trace).filter((x, i) => i % 3 === 0)));
     await attendre(2000);
     console.log("TAPTOT", JSON.stringify({ avant: c.ralenti.toFixed(2), apres250ms: apres.ralenti.toFixed(2), chocs: await course(() => window.__pote.chocs()), appris: await course(() => localStorage.getItem("jp2-appris")) }));
+  },
+  // Fin du morceau avec un record et 5 potes (touche F).
+  finRecord: async () => {
+    for (let i = 0; i < 5; i++) await page.keyboard.press("KeyP");
+    await attendre(3000); await page.keyboard.press("KeyF"); await attendre(3000); await photo("16-fin-record");
+  },
+  // Rouler sur une voiture garée : double saut, atterrir sur le toit, rouler.
+  toitVoiture: async () => {
+    await page.keyboard.press("KeyI");
+    for (let i = 0; i < 3; i++) await page.keyboard.press("KeyP");
+    const r = await course(() => { const p = window.__pote; for (let r = Math.ceil(p.player.v) + 25; r < 4000; r++) if (p.rows.rowAt(r).kind === "voiture") return r; return 0; });
+    await course((r) => { const p = window.__pote.player; p.v = r - 7; p.prevV = p.v; localStorage.setItem("jp2-appris", '["tap","haut","double"]'); }, r);
+    const trace = course(async (r) => {
+      const out = []; let saute = false, lache = 0;
+      for (let i = 0; i < 200; i++) {
+        await new Promise((ok) => requestAnimationFrame(ok));
+        const p = window.__pote.player;
+        if (!saute && r - p.v < 2.4) { saute = true; window.dispatchEvent(new KeyboardEvent("keydown", { code: "Space" })); lache = i + 20; }
+        if (saute && i === lache) window.dispatchEvent(new KeyboardEvent("keyup", { code: "Space" }));
+        if (Math.abs(p.v - r) < 2.5) out.push([+(p.v - r).toFixed(2), +p.jumpY.toFixed(2)]);
+      }
+      return out;
+    }, r);
+    const t = await trace;
+    console.log("TOIT", JSON.stringify(t.filter((x, i) => i % 4 === 0)), JSON.stringify(await course(() => window.__pote.chocs())));
   },
   // Saisons forcées (touche S) : printemps, été, automne, hiver.
   saisons: async () => {

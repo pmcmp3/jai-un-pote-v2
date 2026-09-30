@@ -427,7 +427,8 @@ function classementDemo(metres, fin) {
   const f = [0.93, 0.81, 0.7, 0.58, 0.44, 0.31];
   const rows = DEMO.noms.map((n, i) => ({ pseudo: n, metres: Math.round(base * f[i]) }));
   rows.push({ pseudo: getPseudo() || "toi", metres: Math.floor(metres) });
-  return rows.sort((a, b) => b.metres - a.metres);
+  const moi = getPseudo() || "toi";
+  return rows.sort((a, b) => b.metres - a.metres || (a.pseudo === moi ? -1 : b.pseudo === moi ? 1 : 0));
 }
 // Boost de ligue : { potes: [pseudos], mult }.
 let boost = { potes: [], mult: 1 };
@@ -670,17 +671,24 @@ export function showEndScreen({ metres, potesMax, record, fin, sprint, scoreMax 
   const endMax = $("end-max");
   const pct = Math.round((window.CONFIG.boostLigueParPote || 0.1) * 100);
   const ligneBoost = sprint || (!net.estConfigure() && !demo) ? "" : boost.potes.length
-    ? `Boost de ligue <b>×${String(boost.mult).replace(".", ",")}</b> (${boost.potes.length} pote${boost.potes.length > 1 ? "s" : ""}) · invite-en d'autres : +${pct} % chacun`
-    : `Fais jouer tes potes 30 s dans ta ligue : <b>+${pct} %</b> de points par pote`;
-  endMax.classList.toggle("hidden", !scoreMax && !ligneBoost);
-  endMax.innerHTML = [scoreMax ? `Score parfait sur cette course : <b>${pts(scoreMax)}</b> · tu es à ${Math.min(100, Math.round(100 * metres / scoreMax))} %` : "", ligneBoost].filter(Boolean).join("<br>");
+    ? `Boost <b>×${String(boost.mult).replace(".", ",")}</b> · +${pct} % par pote invité qui joue`
+    : `<b>+${pct} %</b> de points par pote invité qui joue`;
+  // (30 septembre 2026 : « à la place du score parfait, dis : Tu peux encore
+  // faire un meilleur score ».)
+  const mieux = scoreMax && metres < scoreMax ? "Tu peux encore faire un meilleur score." : "";
+  endMax.classList.toggle("hidden", !mieux && !ligneBoost);
+  endMax.innerHTML = [mieux, ligneBoost].filter(Boolean).join("<br>");
   // Le but : arriver au bout du morceau avec un max de potes.
   const potesTxt = potesMax === 0 ? "0 pote" : `${potesMax} pote${potesMax > 1 ? "s" : ""}`;
   // Aller au bout du morceau, c'est la victoire : on le dit (20 septembre
   // 2026 : « bravo d'avoir joué avec tes potes, tu peux écouter le morceau »).
-  endSub.textContent = fin ? `Bravo, tu es allé au bout du morceau avec ${potesTxt}` : `Tombé avant la fin · ${potesTxt}`;
-  endBest.classList.toggle("hidden", !record);
-  $("end-eyebrow").textContent = sprint ? "Sprint du dimanche" : fin ? "Terminé !" : "Ta course";
+  // 30 septembre 2026 : « enlève le bravo, tu es allé au bout du morceau avec
+  // 5 potes. Faut mettre : nouveau record, 5 potes maximum. Tu enlèves le tag
+  // terminé » — et le sticker record fait doublon avec la ligne (place gagnée
+  // pour l'iPhone 16).
+  endSub.textContent = record ? `Nouveau record · ${potesTxt} maximum` : fin ? `${potesTxt} maximum` : `Tombé avant la fin · ${potesTxt}`;
+  endBest.classList.add("hidden");
+  $("end-eyebrow").textContent = sprint ? "Sprint du dimanche" : "Ta course";
   if (sprint) endSub.textContent = `Sprint · ${potesTxt}`;
   setTimeout(() => { setView("end"); showOverlay(); }, fin ? 1500 : 600);
 }
@@ -786,7 +794,10 @@ function syncMuteIcon() {
 // (un tap l'abrège). Montrée sur les 3 premières parties, et toujours en ligue
 // démo (c'est elle qu'on montre aux gens). Le contexte audio est débloqué
 // AVANT, dans le geste du JOUER : la musique pourra partir sans nouveau tap.
-const EXPL_S = 4.6;
+// 9,2 s en deux temps (30 septembre 2026 : « il faut que ça prenne 2 fois le
+// temps, faut bien prendre le temps d'éduquer les gens au jeu au début ») :
+// 1) chaque pote qui joue = +10 % ; 2) c'est ton BOOST DE DÉPART, jusqu'à ×3.
+const EXPL_S = 9.2;
 function montrerExplication(ensuite) {
   const box = $("explication");
   if (!box || (!demo && getParties() >= 3) || enBeta()) { ensuite(); return; }
@@ -794,6 +805,11 @@ function montrerExplication(ensuite) {
   const mult = $("expl-mult"), barre = box.querySelector("#expl-barre i");
   potes.forEach((p) => p.classList.remove("on"));
   mult.textContent = "×1,0";
+  const titre = $("expl-titre"), texte = $("expl-texte"), texte2 = $("expl-texte2"), tag = $("expl-tag");
+  titre.textContent = "Tes potes = tes points";
+  texte.innerHTML = "Chaque pote qui joue 30 s dans ta ligue te donne <b>+10&nbsp;%</b>.";
+  texte2.textContent = "";
+  tag.classList.add("hidden");
   barre.style.transition = "none"; barre.style.width = "0";
   box.classList.remove("hidden");
   requestAnimationFrame(() => { barre.style.transition = `width ${EXPL_S}s linear`; barre.style.width = "100%"; });
@@ -802,7 +818,13 @@ function montrerExplication(ensuite) {
     mult.textContent = `×${(1 + (i + 1) * 0.1).toFixed(1).replace(".", ",")}`;
     mult.classList.remove("pop"); void mult.offsetWidth; mult.classList.add("pop");
     try { sfx.piece(); } catch (e) { /* pas de son, tant pis */ }
-  }, 700 + i * 450));
+  }, 700 + i * 600));
+  minuteurs.push(setTimeout(() => {
+    titre.textContent = "Ton boost de départ";
+    texte.innerHTML = "Plus tu as de potes, plus tu démarres fort&nbsp;: <b>tous tes points</b> sont multipliés.";
+    texte2.textContent = "Invite-les à la fin de ta partie.";
+    tag.classList.remove("hidden");
+  }, 4800));
   let fini = false;
   const finir = () => {
     if (fini) return; fini = true;
