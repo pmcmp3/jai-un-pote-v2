@@ -53,8 +53,11 @@ export function renderHud(ctx, width, height, hud) {
   ctx.textBaseline = "top";
   // Ombre remontée à 50 % le 29 septembre 2026 (« attention aux contrastes ») :
   // sur le ciel d'hiver et la neige, 25 % ne détachait plus le blanc.
-  ctx.shadowColor = "rgba(0,0,0,0.5)";
-  ctx.shadowOffsetY = 2;
+  // PLUS AUCUNE OMBRE PORTÉE (30 septembre 2026 : « tu enlèves les ombres
+  // portées derrière les titres et les textes partout ») : le contraste vient
+  // de la couleur — texte noir de jour, blanc la nuit.
+  const TXT = hud.nuit > 0.5 ? BLANC : NOIR, TXT_VIDE = hud.nuit > 0.5 ? "rgba(255,255,255,0.28)" : "rgba(13,13,16,0.22)";
+  ctx.shadowColor = "transparent";
   const ecrire = (txt, x, y, taille = 0) => { ctx.shadowBlur = Math.max(3, taille * 0.12); ctx.fillText(txt, x, y); };
 
   // Colonnes : gauche = 14..(14+96), droite = 8 cases de 10 px.
@@ -74,7 +77,7 @@ export function renderHud(ctx, width, height, hud) {
   ctx.font = `700 14px ${POLICE}`;
   const wUnit = ctx.measureText(" pts").width;
   const x0 = cx - (wNum + wUnit) / 2;
-  ctx.fillStyle = BLANC;
+  ctx.fillStyle = TXT;
   ctx.textAlign = "left";
   ctx.font = `900 ${taille}px ${POLICE_TITRE}`;
   ecrire(num, x0, top + PAD - 6, taille);
@@ -86,7 +89,7 @@ export function renderHud(ctx, width, height, hud) {
     const s = Math.max(0, hud.restantS);
     ctx.font = `700 12px ${POLICE}`;
     ctx.textAlign = "center";
-    ctx.fillStyle = s <= 10 ? ROUGE : BLANC;
+    ctx.fillStyle = s <= 10 ? ROUGE : TXT;
     ecrire(`${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`, cx, top + PAD + taille * 0.9 + 2, 12);
   }
   // Pastille ×N sous le chrono.
@@ -101,23 +104,23 @@ export function renderHud(ctx, width, height, hud) {
     ctx.fillStyle = "#4a3305";
     ctx.textAlign = "center";
     ctx.fillText(txt, cx, top + PAD + taille * 0.9 + 22);
-    ctx.shadowColor = "rgba(0,0,0,0.5)"; ctx.shadowOffsetY = 2;
+    ctx.shadowColor = "transparent"; ctx.shadowOffsetY = 2;
   }
 
   // Droite : cases, compte, jauge. Les aplats ne portent pas l'ombre du texte.
   const sansOmbre = () => { ctx.shadowBlur = 0; ctx.shadowColor = "transparent"; };
-  const avecOmbre = () => { ctx.shadowColor = "rgba(0,0,0,0.5)"; ctx.shadowOffsetY = 2; };
+  const avecOmbre = () => { ctx.shadowColor = "transparent"; ctx.shadowOffsetY = 2; };
   const ry = top + PAD + 2;
   sansOmbre();
   for (let i = 0; i < total; i++) {
-    ctx.fillStyle = i < hud.potes ? BLANC : "rgba(255,255,255,0.28)";
+    ctx.fillStyle = i < hud.potes ? TXT : TXT_VIDE;
     roundRect(ctx, rx + i * (cell + gap), ry, cell, cell, 2);
     ctx.fill();
   }
   avecOmbre();
   ctx.font = `700 11px ${POLICE}`;
   ctx.textAlign = "right";
-  ctx.fillStyle = BLANC;
+  ctx.fillStyle = TXT;
   ecrire(total === 0 ? "INVITE TES POTES" : hud.potes === 0 ? "TOUT SEUL" : hud.potes === 1 ? "1 POTE" : `${hud.potes} POTES`, width - PAD, ry + cell + 5, 11);
   if (total > 0 && !hud.plein) {
     sansOmbre();
@@ -164,9 +167,7 @@ export function renderCountIn(ctx, width, height, t, beatPeriod, beats, linger) 
   // OMBRE PORTÉE franche (27 septembre 2026 : « il y a un problème avec les
   // chiffres : pas d'ombre portée ») — l'ancien flou noir à 55 % se perdait
   // sur le ciel clair. Un double décalé net, puis un flou doux dessous.
-  ctx.fillStyle = "rgba(13,13,16,0.55)";
-  ctx.fillText(texte, 4, 6);
-  ctx.shadowColor = "rgba(0,0,0,0.35)";
+  ctx.shadowColor = "transparent";
   ctx.shadowBlur = 10;
   ctx.shadowOffsetY = 2;
   ctx.lineWidth = 3;
@@ -198,7 +199,7 @@ export function renderHint(ctx, width, height, alpha) {
   ctx.globalAlpha = alpha;
   // Ni panneau ni contour : texte blanc, ombre portée à 25 %, comme le score.
   fitFont(ctx, "800", 12, txt, width - 40, 8);
-  ctx.shadowColor = "rgba(0,0,0,0.25)";
+  ctx.shadowColor = "transparent";
   ctx.shadowBlur = 4;
   ctx.shadowOffsetY = 2;
   ctx.fillStyle = BLANC;
@@ -430,7 +431,7 @@ export function renderFin(ctx, width, height, age, sous = "Tu es allé au bout d
     ctx.globalAlpha = a2;
     ctx.textAlign = "center"; ctx.textBaseline = "top";
     ctx.font = `700 15px ${POLICE}`;
-    ctx.shadowColor = "rgba(0,0,0,0.4)"; ctx.shadowBlur = 6; ctx.shadowOffsetY = 2;
+    ctx.shadowColor = "transparent"; ctx.shadowBlur = 6; ctx.shadowOffsetY = 2;
     ctx.fillStyle = BLANC;
     ctx.fillText(sous, width / 2, cy + 44 + (1 - a2) * 8);
     ctx.restore();

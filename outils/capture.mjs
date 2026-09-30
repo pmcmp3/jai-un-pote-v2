@@ -35,13 +35,13 @@ const page = await contexte.newPage();
 const erreurs = [];
 page.on("pageerror", (e) => erreurs.push(e.stack || e.message));
 page.on("console", (m) => { if (m.type() === "error") erreurs.push(m.text()); });
-await page.addInitScript(([parties, neuf, genre]) => {
-  if (genre) localStorage.setItem("jp2Skin", JSON.stringify({ genre }));
+await page.addInitScript(([parties, neuf, genre, velo]) => {
+  if (genre || velo) localStorage.setItem("jp2Skin", JSON.stringify({ genre: genre || "homme", velo: velo || "vtt" }));
   localStorage.setItem("jp2-appris", '["tap","haut","double"]'); // pas de conseil hors des scènes qui le testent
   localStorage.setItem("jp2Pseudo", "pmc");
   localStorage.setItem("jp2Parties", parties);
   if (!neuf) { localStorage.setItem("jp2MorceauOuvert", "1"); localStorage.setItem("jp2PmcSuivi", "1"); }
-}, [process.env.PARTIES || "5", process.env.NEUF === "1", process.env.GENRE || ""]);
+}, [process.env.PARTIES || "5", process.env.NEUF === "1", process.env.GENRE || "", process.env.VELO || ""]);
 await page.goto(url);
 const attendre = (ms) => page.waitForTimeout(ms);
 const photo = async (nom) => { await page.screenshot({ path: `${sorties}${nom}.png` }); console.log("  →", `outils/sorties/${nom}.png`); };
@@ -55,6 +55,7 @@ if (demandes.includes("menus")) {
 }
 await page.waitForFunction(() => !document.getElementById("play-button").disabled, null, { timeout: 15000 });
 await page.click("#play-button");
+if (process.env.EXPL) { await attendre(2600); await photo("05-explication"); }
 await page.waitForFunction(() => window.__pote && window.__pote.estDemarre(), null, { timeout: 8000 });
 await page.keyboard.press("KeyI"); // invincible : la course va au bout des captures
 const course = (expr, arg) => page.evaluate(expr, arg);
@@ -193,7 +194,7 @@ const SCENES = {
   },
   // Gros moutons et fermier, puis la nuit (acteurs éclairés).
   betes: async () => {
-    for (const k of ["mouton", "fermier", "botte"]) {
+    for (const k of ["mouton", "fermier", "costard"]) {
       const r = await course((k) => { const p = window.__pote; for (let r = Math.ceil(p.player.v) + 10; r < 4000; r++) if (p.rows.rowAt(r).kind === k) return r; return 0; }, k);
       await course((r) => { const p = window.__pote.player; p.v = r - 5; p.prevV = p.v; }, r);
       await page.keyboard.press("KeyD"); await attendre(250); await photo(`80-${k}`); await page.keyboard.press("KeyD");
@@ -202,6 +203,22 @@ const SCENES = {
     const r = await course(() => { const p = window.__pote; for (let r = Math.ceil(p.player.v) + 10; r < 4000; r++) if (p.rows.rowAt(r).type === "statique") return r; return 0; });
     await course((r) => { const p = window.__pote.player; p.v = r - 5; p.prevV = p.v; }, r);
     await page.keyboard.press("KeyD"); await attendre(250); await photo("81-nuit-bete"); await page.keyboard.press("KeyD");
+  },
+  // Tap PENDANT l'approche : le temps doit repartir tout de suite, le saut partir seul.
+  tapTot: async () => {
+    await page.keyboard.press("KeyI");
+    await course(() => localStorage.setItem("jp2-appris", '["haut","double"]'));
+    const r = await course(() => { const p = window.__pote; for (let r = Math.ceil(p.player.v) + 30; r < 4000; r++) { const row = p.rows.rowAt(r); if (row.type === "statique" && p.rows.familleDe(row.kind) === "tap") return r; } return 0; });
+    await course((r) => { const p = window.__pote.player; p.v = r - 18; p.prevV = p.v; }, r);
+    let c; for (let k = 0; k < 200; k++) { await attendre(40); c = await course(() => window.__pote.conseil()); if (c.phase === "approche" && c.ralenti < 0.5) break; }
+    console.log("VU", JSON.stringify(c), await course(() => window.__pote.player.v), r);
+    await page.keyboard.press("Space");
+    const trace = course(async () => { const out = []; for (let i = 0; i < 90; i++) { await new Promise((ok) => requestAnimationFrame(ok)); const p = window.__pote.player; out.push([+p.v.toFixed(2), +p.jumpY.toFixed(2), window.__pote.conseil().phase]); } return out; });
+    await attendre(250);
+    const apres = await course(() => window.__pote.conseil());
+    console.log("TRACE", JSON.stringify((await trace).filter((x, i) => i % 3 === 0)));
+    await attendre(2000);
+    console.log("TAPTOT", JSON.stringify({ avant: c.ralenti.toFixed(2), apres250ms: apres.ralenti.toFixed(2), chocs: await course(() => window.__pote.chocs()), appris: await course(() => localStorage.getItem("jp2-appris")) }));
   },
   // Saisons forcées (touche S) : printemps, été, automne, hiver.
   saisons: async () => {

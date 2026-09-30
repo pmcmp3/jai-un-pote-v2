@@ -6,6 +6,7 @@
 // reçoit les actions en callbacks via init().
 
 import * as audio from "./audio.js";
+import * as sfx from "./sfx.js";
 import * as net from "./net.js";
 import * as friends from "./friends.js";
 import { COULEURS, CHAPEAUX, VELOS, SKIN_DEFAUT } from "./rider.js";
@@ -121,7 +122,7 @@ export function getSource() { return lsGet(CLE_SOURCE) || null; }
 // Skin du joueur (personnalisation, étape 3 du menu).
 let skin = null;
 export function getSkin() {
-  if (!skin) { try { skin = { ...SKIN_DEFAUT, ...(JSON.parse(lsGet(CLE_SKIN) || "{}")) }; } catch (e) { skin = { ...SKIN_DEFAUT }; } }
+  if (!skin) { try { skin = { ...SKIN_DEFAUT, ...(JSON.parse(lsGet(CLE_SKIN) || "{}")) }; } catch (e) { skin = { ...SKIN_DEFAUT }; } if (skin.velo === "roller") skin.velo = "enfant"; }
   return skin;
 }
 function setSkin(cle, val) { getSkin()[cle] = val; lsSet(CLE_SKIN, JSON.stringify(skin)); construireSkinUi(); }
@@ -131,7 +132,7 @@ function construireSkinUi() {
   // T-shirt, on ne choisit pas le short ») : trois réglages au lieu de six —
   // le short et les chaussures se déduisent du maillot. Sur un petit iPhone,
   // la carte tenait à peine à l'écran.
-  const listes = { genre: [["Homme", "homme"], ["Femme", "femme"]], c1: COULEURS, chapeau: CHAPEAUX.map((c) => [c, c]), velo: [["VTT", "vtt"], ["Grand Bi", "grandbi"], ["Roller", "roller"]] };
+  const listes = { genre: [["Homme", "homme"], ["Femme", "femme"]], c1: COULEURS, chapeau: CHAPEAUX.map((c) => [c, c]), velo: [["VTT", "vtt"], ["Grand Bi", "grandbi"], ["Vélo enfant", "enfant"]] };
   document.querySelectorAll("#skin-options .chips").forEach((box) => {
     const cle = box.dataset.cle;
     box.textContent = "";
@@ -781,6 +782,42 @@ function syncMuteIcon() {
 }
 
 // --- Démarrage ---------------------------------------------------------------
+// Animation d'explication du boost, ~4,5 s, puis la course part toute seule
+// (un tap l'abrège). Montrée sur les 3 premières parties, et toujours en ligue
+// démo (c'est elle qu'on montre aux gens). Le contexte audio est débloqué
+// AVANT, dans le geste du JOUER : la musique pourra partir sans nouveau tap.
+const EXPL_S = 4.6;
+function montrerExplication(ensuite) {
+  const box = $("explication");
+  if (!box || (!demo && getParties() >= 3) || enBeta()) { ensuite(); return; }
+  const potes = [...box.querySelectorAll("#expl-potes span")];
+  const mult = $("expl-mult"), barre = box.querySelector("#expl-barre i");
+  potes.forEach((p) => p.classList.remove("on"));
+  mult.textContent = "×1,0";
+  barre.style.transition = "none"; barre.style.width = "0";
+  box.classList.remove("hidden");
+  requestAnimationFrame(() => { barre.style.transition = `width ${EXPL_S}s linear`; barre.style.width = "100%"; });
+  const minuteurs = potes.map((p, i) => setTimeout(() => {
+    p.classList.add("on");
+    mult.textContent = `×${(1 + (i + 1) * 0.1).toFixed(1).replace(".", ",")}`;
+    mult.classList.remove("pop"); void mult.offsetWidth; mult.classList.add("pop");
+    try { sfx.piece(); } catch (e) { /* pas de son, tant pis */ }
+  }, 700 + i * 450));
+  let fini = false;
+  const finir = () => {
+    if (fini) return; fini = true;
+    minuteurs.forEach(clearTimeout); clearTimeout(fin);
+    box.classList.add("hidden");
+    ensuite();
+  };
+  const fin = setTimeout(finir, EXPL_S * 1000);
+  if (!box.dataset.branche) {
+    box.dataset.branche = "1";
+    // Le tap qui abrège ne doit pas devenir un saut au départ (input.js écoute window).
+    ["touchstart", "mousedown", "touchend", "mouseup"].forEach((t) => box.addEventListener(t, (e) => e.stopPropagation()));
+  }
+  box.onpointerdown = (e) => { e.stopPropagation(); finir(); };
+}
 function startGame(opts = {}) {
   // Après une course, JOUER (depuis le menu, atteint par « Menu » sur l'écran
   // de fin) relance une course neuve — par la MÊME porte que REJOUER, sinon
@@ -790,12 +827,15 @@ function startGame(opts = {}) {
     return;
   }
   audio.unlock();
-  audio.play();
   enregistrerProfil();
-  preparerLigue();
-  deps.requestGameStart(opts);
-  hideOverlay();
-  showPauseButton();
+  const lancer = () => {
+    audio.play();
+    preparerLigue();
+    deps.requestGameStart(opts);
+    hideOverlay();
+    showPauseButton();
+  };
+  if (opts.sprint) lancer(); else montrerExplication(lancer);
 }
 
 export function init(d) {

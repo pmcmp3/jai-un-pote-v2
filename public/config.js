@@ -37,7 +37,13 @@ window.CONFIG = {
   // Vitesse d'avance en rangées/seconde : 4,4 au départ → plafond 9,4 (Crossy
   // Road : 1 rangée = 1 unité). Doublement toutes les 70 s (main.js).
   vitesseBase: 1.7,
-  vitesseMax: 2.6,          // 3,6 → 2,6 le 7 septembre 2026 (« quand ça va vite, ça va vraiment trop vite »)
+  vitesseMax: 2.6,
+  // DEUXIÈME ACCÉLÉRATION (30 septembre 2026 : « à partir du moment où il reste
+  // 1 minute 25, il faut que ça s'accélère, parce que là on s'ennuie trop
+  // vite ») : sur les `accelDernieresS` dernières secondes, la vitesse repart
+  // de vitesseMax vers vitesseFinale, atteinte ~15 s avant la fin.
+  vitesseFinale: 3.4,
+  accelDernieresS: 85,          // 3,6 → 2,6 le 7 septembre 2026 (« quand ça va vite, ça va vraiment trop vite »)
 
   // === VUE DE PROFIL (v2, 19 septembre 2026) ===
   // « Une seule voie, en 2D, exactement comme Jetpack Joyride ou Zombie

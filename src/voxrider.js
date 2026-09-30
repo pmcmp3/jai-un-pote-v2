@@ -62,6 +62,38 @@ function cadre(ctx, um, y, L, lift, pedal, P) {
   ctx.stroke();
 }
 
+// VÉLO ENFANT (30 septembre 2026, à la place du roller : « tu crois que tu peux
+// remplacer Roller par vélo pour enfant, ça serait hilarant ») : petites roues
+// roses, roulettes, guidon trop haut, fanion sur sa perche — et un adulte assis
+// tout en bas, les genoux aux oreilles.
+const ROSE = "#ff6fae";
+function veloEnfant(ctx, um, y, lift, pedal) {
+  const pt = (dv, h) => project(um - 0.002, y + dv, lift + h);
+  roue2(ctx, um + 0.2, y + 0.12, lift + 0.08, 0.08, pedal);     // roulette
+  roue2(ctx, um, y + 0.3, lift + 0.17, 0.17, pedal * 1.6);
+  roue2(ctx, um, y + 0.86, lift + 0.17, 0.17, pedal * 1.6);
+  const e = echelle(um);
+  const ar = pt(0.3, 0.17), av = pt(0.86, 0.17), pedalier = pt(0.5, 0.17), selle = pt(0.4, 0.46), douille = pt(0.78, 0.5), guidon = pt(0.72, 1.18);
+  ctx.lineCap = "square"; ctx.lineJoin = "miter";
+  for (const [larg, coul] of [[0.13, "#141418"], [0.08, ROSE]]) {
+    ctx.strokeStyle = coul; ctx.lineWidth = Math.max(1.5, larg * e);
+    ctx.beginPath();
+    for (const [a, b] of [[ar, pedalier], [ar, selle], [pedalier, selle], [selle, douille], [pedalier, douille], [douille, av], [douille, guidon]]) { ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); }
+    ctx.stroke();
+  }
+  ctx.strokeStyle = "#141418"; ctx.lineWidth = Math.max(2, 0.08 * e);
+  ctx.beginPath();
+  const r = 0.1 * e;
+  ctx.moveTo(pedalier.x - Math.cos(pedal) * r, pedalier.y - Math.sin(pedal) * r);
+  ctx.lineTo(pedalier.x + Math.cos(pedal) * r, pedalier.y + Math.sin(pedal) * r);
+  ctx.stroke();
+  // Guidon « chopper » et ses rubans, puis la perche et son fanion orange.
+  drawBox(ctx, um - 0.26, y + 0.66, 0.52, 0.1, 0.08, "#33333b", lift + 1.18);
+  for (const [du, c] of [[-0.26, "#ffcf2e"], [0.18, "#3fb6e8"]]) drawBox(ctx, um + du, y + 0.6 - Math.abs(Math.sin(pedal * 2)) * 0.08, 0.06, 0.12, 0.2, c, lift + 1.02);
+  drawBox(ctx, um + 0.1, y + 0.02, 0.04, 0.04, 1.9, "#f2ede2", lift + 0.2);
+  drawBox(ctx, um + 0.1, y - 0.36 + Math.sin(pedal * 3) * 0.04, 0.03, 0.38, 0.24, "#ff7a1a", lift + 1.84);
+}
+
 const TIRE = "#151518", RIM = "#8a8d98", FRAME = "#1b1b21", SKIN_SHOE = "#565a66";
 
 // Ancré au sol en (u, v) = centre du vélo. `lift` = hauteur de saut.
@@ -93,8 +125,9 @@ export function drawRider(ctx, u, v, lift, P, pedal, alpha = 1, flip = 0, ombre 
   const s = Math.sin(pedal), c = Math.cos(pedal);
   const grandBi = P.velo === "grandbi";
   const roller = P.velo === "roller";
+  const enfant = P.velo === "enfant";
   const um = x + W / 2;        // plan des roues et du cadre
-  const liftSelle = lift + (grandBi ? 0.4 : 0);
+  const liftSelle = lift + (grandBi ? 0.4 : enfant ? -0.3 : 0);
   // Jambes : le haut reste COLLÉ au bassin (20 septembre 2026 : « on dirait
   // que les jambes du personnage ne sont pas attachées »), seul le pied monte
   // et descend avec le pédalage.
@@ -110,7 +143,7 @@ export function drawRider(ctx, u, v, lift, P, pedal, alpha = 1, flip = 0, ombre 
       const k = Math.sin(pedal) * sens;
       return { v: y + 0.34 + 0.26 * k, h: lift + 0.16 + Math.max(0, -Math.cos(pedal) * sens) * 0.07 };
     }
-    const cv = grandBi ? y + L - 0.475 : y + 0.5, ch = grandBi ? lift + 0.475 : lift + 0.24, R = grandBi ? 0.14 : 0.16;
+    const cv = grandBi ? y + L - 0.475 : y + 0.5, ch = grandBi ? lift + 0.475 : enfant ? lift + 0.17 : lift + 0.24, R = grandBi ? 0.14 : enfant ? 0.1 : 0.16;
     const a = pedal + (sens > 0 ? 0 : Math.PI);
     return { v: cv + Math.cos(a) * R - 0.11, h: ch - Math.sin(a) * R + 0.02 };
   };
@@ -130,6 +163,8 @@ export function drawRider(ctx, u, v, lift, P, pedal, alpha = 1, flip = 0, ombre 
       drawBox(ctx, ux, p.v - 0.1, 0.16, 0.42, 0.06, "#33333b", Math.max(0, p.h - 0.06));
       for (let i = 0; i < 4; i++) drawDisque(ctx, ux - 0.01, p.v - 0.06 + i * 0.11, Math.max(0.06, p.h - 0.1), 0.06, "#f2ede2");
     }
+  } else if (enfant) {
+    veloEnfant(ctx, um, y, lift, pedal);
   } else if (grandBi) {
     roue2(ctx, um, y + L - 0.475, lift + 0.475, 0.475, v / 0.475);
     roue2(ctx, um, y + 0.16, lift + 0.16, 0.16, v / 0.16);
@@ -142,8 +177,9 @@ export function drawRider(ctx, u, v, lift, P, pedal, alpha = 1, flip = 0, ombre 
   if (grandBi) {
     drawBox(ctx, um - 0.04, y + 0.3, 0.08, 0.6, 0.1, FRAME, liftSelle + 0.4);
     drawBox(ctx, um - 0.05, y + 0.85, 0.1, 0.1, 0.4, FRAME, liftSelle + 0.45);
-  } else if (!roller) cadre(ctx, um, y, L, lift, pedal, P);
-  if (!roller) {
+  } else if (!roller && !enfant) cadre(ctx, um, y, L, lift, pedal, P);
+  if (enfant) drawBox(ctx, um - 0.12, y + 0.3, 0.24, 0.18, 0.08, "#141418", liftSelle + 0.8); // la selle, tout en bas
+  else if (!roller) {
     drawBox(ctx, x - 0.08, y + 0.92, W + 0.16, 0.08, 0.08, "#33333b", liftSelle + 0.85);
     drawBox(ctx, um - 0.12, y + 0.28, 0.24, 0.18, 0.08, P.pants, liftSelle + 0.8);
   }

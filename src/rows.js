@@ -85,6 +85,10 @@ export const KINDS = {
   botte:   { cout: 1, long: 0.85, larg: 0.85, h: 0.75, nom: "une botte de foin" },
   cochon:  { cout: 2, long: 1.30, larg: 0.85, h: 0.92, nom: "un cochon" },
   vache:   { cout: 2, long: 1.60, larg: 1.00, h: 1.22, nom: "une vache" },
+  // L'homme en COSTARD (30 septembre 2026 : « un gars en costard en plein
+  // milieu avec une valise, qui fait des gestes dans tous les sens, de manière
+  // statique. Il faut l'éviter, pareil »).
+  costard: { cout: 2, long: 0.8, larg: 0.7, h: 1.9, nom: "un homme en costard" },
   fermier: { cout: 2, long: 0.85, larg: 0.75, h: 2.2, nom: "un fermier" }, // plus grand le 29 septembre 2026
   // ⚠️ MONTABLE (20 septembre 2026, soir : « ça serait normal qu'on puisse
   // monter sur le toit d'une voiture ») : son toit devient un plancher dès
@@ -166,7 +170,7 @@ function tempsAuDessus(tier, H) {
 // On franchit un obstacle pendant (sa longueur sur la route + celle du vélo)
 // rangées ; à vitesse maximale c'est le pire cas. Pour un véhicule en sens
 // inverse, les deux vitesses s'additionnent : la fenêtre est plus courte.
-function vMaxRangees() { return V_UNIT * window.CONFIG.vitesseMax; }
+function vMaxRangees() { return V_UNIT * Math.max(window.CONFIG.vitesseMax, window.CONFIG.vitesseFinale || 0); }
 function vMinRangees() { return V_UNIT * window.CONFIG.vitesseBase; }
 // ⚠️ Le pire cas, c'est la vitesse MINIMALE : la longueur d'un obstacle est
 // fixée en rangées, donc plus on roule lentement, plus on reste longtemps
@@ -298,12 +302,14 @@ export function toitSous(route, v, jumpY, t = 0) {
 // --- Paquets d'espèces ------------------------------------------------------------
 const PAQUETS = [
   // Départ : que des petits sauts.
-  ["poule", "poule", "poule", "chat", "chat", "chien", "chien", "mouton", "mouton", "botte", "botte", "poulejetee"],
+  // (Plus de fermier qui jette une poule, 30 septembre 2026 : « tu me vires ça ».)
+  // ⚠️ Chaque paquet compte EXACTEMENT 12 espèces (especeDanger : i % 12).
+  ["poule", "poule", "poule", "chat", "chat", "chat", "chien", "chien", "mouton", "mouton", "botte", "botte"],
   // Ensuite : les gros animaux (appui maintenu) et les premiers véhicules.
   // + voitures EN FACE (29 septembre 2026 : « les voitures qui arrivent dans ta tête, faut en mettre beaucoup plus »).
-  ["poule", "poule", "chat", "chien", "mouton", "botte", "poulejetee", "cochon", "cochon", "vache", "tracteur", "voiture", "contresens", "contresens"],
+  ["poule", "chien", "mouton", "botte", "costard", "fermier", "cochon", "vache", "tracteur", "voiture", "contresens", "contresens"],
   // Fin : fermiers, voitures, et la voiture qui arrive en face.
-  ["poule", "chat", "mouton", "botte", "poulejetee", "cochon", "vache", "tracteur", "tracteur", "fermier", "voiture", "contresens", "contresens", "contresens"],
+  ["poule", "mouton", "botte", "costard", "costard", "vache", "tracteur", "fermier", "voiture", "contresens", "contresens", "contresens"],
 ];
 function paquetPour(d) { return PAQUETS[d < 2 ? 0 : d < 4 ? 1 : 2]; }
 function estDouble(kind) { return familleDe(kind) === "double"; }

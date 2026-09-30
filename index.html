@@ -195,6 +195,24 @@
     .chip.actif { border-color: var(--noir); box-shadow: 0 0 0 2px var(--jaune); }
     #sprint-button { margin-top: 8px; }
     /* Boost de ligue (29 septembre 2026) : sticker jaune sous JOUER. */
+    #explication { position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; padding: 24px; background: rgba(13,13,16,0.55); }
+    #explication.hidden { display: none; }
+    #expl-carte { position: relative; width: min(300px, 100%); box-sizing: border-box; padding: 30px 20px 16px; background: #fff; border: 1.5px solid var(--noir); border-radius: var(--rayon); text-align: center; animation: expl-in 0.35s ease-out both; }
+    #expl-titre { margin: 4px 0 12px; font: 900 28px/1 var(--titre); color: var(--noir); }
+    #expl-potes { display: flex; justify-content: center; gap: 6px; height: 34px; }
+    #expl-potes span { width: 30px; height: 30px; border: 1.5px solid var(--noir); border-radius: 3px; background: #2f7a46; opacity: 0; transform: scale(0.3); }
+    #expl-potes span:nth-child(2) { background: #e13e26; } #expl-potes span:nth-child(3) { background: #3f63b4; }
+    #expl-potes span:nth-child(4) { background: #ffcf2e; } #expl-potes span:nth-child(5) { background: #8a3fd4; } #expl-potes span:nth-child(6) { background: #f2ede2; }
+    #expl-potes span.on { opacity: 1; transform: scale(1); transition: transform 0.25s cubic-bezier(.3,1.6,.5,1), opacity 0.15s; }
+    #expl-mult { margin: 10px 0 8px; font: 900 44px/1 var(--titre); color: var(--rouge); }
+    #expl-mult.pop { animation: expl-pop 0.25s ease-out; }
+    #expl-texte { margin: 0; font: 500 13px/1.4 var(--police); color: var(--noir); }
+    #expl-texte2 { margin: 4px 0 12px; font: 500 12px/1.4 var(--police); color: rgba(0,0,0,0.6); }
+    #expl-barre { height: 4px; background: rgba(0,0,0,0.12); overflow: hidden; }
+    #expl-barre i { display: block; height: 100%; width: 0; background: var(--rouge); }
+    #expl-passer { margin: 8px 0 0; font: 700 10px var(--police); letter-spacing: 0.12em; text-transform: uppercase; color: rgba(0,0,0,0.45); }
+    @keyframes expl-in { from { transform: scale(0.9); opacity: 0; } to { transform: none; opacity: 1; } }
+    @keyframes expl-pop { 0% { transform: scale(1.25); } 100% { transform: scale(1); } }
     #boost-ligue { margin-top: 8px; width: 100%; padding: 8px 10px; border: 1.5px solid var(--noir); border-radius: 3px; background: #ffcf2e; color: var(--noir); font: 500 11px/1.35 var(--police); text-align: left; -webkit-tap-highlight-color: transparent; }
     #boost-ligue b { font-weight: 900; letter-spacing: 0.06em; }
     #boost-ligue small { display: block; margin-top: 3px; font: 600 10.5px/1.35 var(--police); color: rgba(0,0,0,0.7); }
@@ -508,6 +526,21 @@
   <!-- Tiroir de RETOUR (bêta fermée, 16 septembre 2026) : le testeur écrit,
        envoie, et une confirmation s'affiche dans la même carte. Le retour
        part avec son pseudo, son score et le numéro de sa partie. -->
+  <!-- Explication du boost au lancement (30 septembre 2026 : « il faut une
+       animation explicative au lancement du jeu pour expliquer vite fait le
+       concept, et après bam, lancement de partie »). -->
+  <div id="explication" class="hidden" aria-live="polite">
+    <div id="expl-carte">
+      <div class="panel-header"><p class="step-eyebrow">Comment gagner</p></div>
+      <p id="expl-titre">Tes potes = tes points</p>
+      <div id="expl-potes"><span></span><span></span><span></span><span></span><span></span><span></span></div>
+      <p id="expl-mult">×1,0</p>
+      <p id="expl-texte">Chaque pote qui joue 30 s dans ta ligue&nbsp;: <b>+10&nbsp;%</b> sur tous tes points.</p>
+      <p id="expl-texte2">Invite-les à la fin de ta partie.</p>
+      <div id="expl-barre"><i></i></div>
+      <p id="expl-passer">Touche pour jouer</p>
+    </div>
+  </div>
   <div id="retour-sheet" aria-hidden="true">
     <div id="retour-veil"></div>
     <div id="retour-card" role="dialog" aria-modal="true" aria-labelledby="retour-title">

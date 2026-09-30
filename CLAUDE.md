@@ -265,6 +265,29 @@ Code `TESTV2`, qui est aussi `config.ligueBeta` (menu simplifié + bouton « Lai
   n'est assombri qu'au quart — on voyait plus les bêtes la nuit en automne.
 - Classement de fin : sticker « Tu es 1er de ta ligue ! » (`#end-rang`).
 
+## Retours du 30 septembre 2026 (partie fake en direct)
+
+- **Tuto** : un tap pendant l'approche fait REPARTIR le temps tout de suite, et
+  le saut part seul au bon moment (tenue offerte pour l'appui long et le double,
+  re-tap gardé jusqu'au sommet). Chaque conseil n'est montré qu'UNE fois.
+  Tests : `node outils/capture.mjs audit tapTot`.
+- **Vélo enfant** à la place du roller (`veloEnfant`, voxrider) : roues roses,
+  roulette, guidon chopper à rubans, fanion — l'adulte assis tout en bas.
+  Ancien choix « roller » migré en « enfant » (rider.js + screens.getSkin).
+- **Animation d'explication au lancement** (`#explication`,
+  `montrerExplication`, screens.js) : « Tes potes = tes points », 6 carrés qui
+  apparaissent, ×1,0 → ×1,6, puis la course part seule (4,6 s, un tap abrège).
+  3 premières parties + toujours en ligue démo. Le contexte audio est débloqué
+  dans le geste du JOUER, la musique part après sans nouveau tap.
+- **Plus aucune ombre portée** sur les textes (hud.js) : texte du HUD NOIR de
+  jour, BLANC la nuit (`hud.nuit`).
+- **Plus de poule jetée** (retirée des PAQUETS) ; **homme en COSTARD** (appui
+  long, bras qui moulinent, mallette). ⚠️ Chaque paquet = EXACTEMENT 12 espèces.
+- **Deuxième accélération** : sur les `accelDernieresS` (85) dernières secondes,
+  la vitesse repart de `vitesseMax` vers `vitesseFinale` (3,4) — l'écart minimal
+  entre obstacles est calculé sur `vitesseFinale`. `VERSION_COURSE` 10.
+- Voitures garées du village décalées (rz % 24 = 20) : elles chevauchaient une maison.
+
 ## Invariants de la v2 (mesurés, `outils/mesurer.mjs`)
 
 - L'écart entre deux obstacles vient de la PHYSIQUE du saut (`ecartMin` : retombée du premier +

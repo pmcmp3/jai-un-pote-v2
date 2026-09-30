@@ -11,8 +11,13 @@ export const V_DOUBLING_S = 88;
 export const LEAD_IN = 3.3;         // décompte avant le GO (ancré sur la grille du morceau)
 
 export function targetSpeed(t) {
-  const { vitesseBase, vitesseMax } = window.CONFIG;
-  return V_UNIT * Math.min(vitesseMax, vitesseBase * Math.pow(2, Math.max(0, t) / V_DOUBLING_S));
+  const { vitesseBase, vitesseMax, vitesseFinale, accelDernieresS } = window.CONFIG;
+  let v = Math.min(vitesseMax, vitesseBase * Math.pow(2, Math.max(0, t) / V_DOUBLING_S));
+  if (vitesseFinale && accelDernieresS) {
+    const tA = dureeCourse() - accelDernieresS;
+    if (t > tA) v = Math.max(v, vitesseMax + (vitesseFinale - vitesseMax) * Math.min(1, (t - tA) / (accelDernieresS - 15)));
+  }
+  return V_UNIT * v;
 }
 export function multiplicateur(potes, turbo) {
   return (1 + window.CONFIG.potesBonusMetres * potes) * (turbo ? 2 : 1);
@@ -30,7 +35,7 @@ export function dureeCourse() {
 // les règles changent la route — les scores et fantômes d'une ligue sont
 // filtrés sur la graine, une nouvelle version repart donc sur un classement
 // vierge sans rien supprimer en base.
-export const VERSION_COURSE = 9; // 29 septembre 2026 (2) : pièces ÷2, moutons ×2, plus de voitures en face — // 29 septembre 2026 : poules ×1,4 — // 27 septembre 2026 : poule jetée de face, voiture en face plus lente et montable
+export const VERSION_COURSE = 10; // 30 septembre 2026 : costard, plus de poule jetée, seconde accélération — // 29 septembre 2026 (2) : pièces ÷2, moutons ×2, plus de voitures en face — // 29 septembre 2026 : poules ×1,4 — // 27 septembre 2026 : poule jetée de face, voiture en face plus lente et montable
 export function graineDepuisTexte(txt) {
   let h = 7;
   for (const ch of String(txt)) h = (h * 31 + ch.charCodeAt(0)) % 100000;

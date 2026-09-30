@@ -891,7 +891,10 @@ function decorVillage(ctx, push, r, side, sway, sud) {
   // l'importe). Le modèle simplifié d'ici avait des roues en cubes et une
   // vitre qui flottait (27 septembre 2026 : « dans le biome aux maisons
   // rouges, les voitures avaient un gros problème de modélisation »).
-  if (pres && rz % 12 === 1 && dessinVoiture) {
+  // Voitures garées posées LOIN des maisons (30 septembre 2026 : « des voitures
+  // qui passent derrière des maisons ») : à rz 1 la voiture chevauchait la
+  // maison de rz 4 — même profondeur, le tri les mélangeait.
+  if (pres && rz % 24 === 20 && dessinVoiture) {
     const cu = ROAD_HALF + 3.4, cv = r + 0.4;
     push(cu, cv, () => dessinVoiture(ctx, cu, cv));
   }

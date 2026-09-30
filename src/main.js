@@ -249,7 +249,7 @@ function conseilCherche(tm, vitesse) {
     const row = rows.rowAt(r);
     if (row.type !== "statique" && row.type !== "traverse" && row.type !== "contresens") continue;
     const f = rows.familleDe(row.kind);
-    if (deja.has(f) || (vus[f] || 0) >= 2) continue;
+    if (deja.has(f) || (vus[f] || 0) >= 1) continue; // UNE seule fois (30 septembre 2026 : « faut pas 2 fois le même tuto »)
     const t = tempsAvant(r, row, tm, vitesse);
     if (t !== null && t > momentIdeal(f) && t <= momentIdeal(f) + APPROCHE_S) {
       conseil.r = r; conseil.famille = f; conseil.phase = "approche"; conseil.ok = 0; conseil.tampon = false; conseil.touche = false;
@@ -291,7 +291,10 @@ function conseilStep(dt, tm, vitesse) {
   conseilCherche(tm, vitesse);
   let cible = 1;
   if (conseil.r !== null) {
-    if (conseil.phase === "approche") cible = RALENTI_APPROCHE;
+    // Un tap pendant l'approche : le temps REPART tout de suite (30 septembre
+    // 2026 : « si qqn appuie pour sauter, hop, faut accélérer ») et le saut
+    // part tout seul au bon moment, tenue comprise.
+    if (conseil.phase === "approche") cible = conseil.tampon ? 1 : RALENTI_APPROCHE;
     else if (conseil.phase === "attente") cible = RALENTI_MIN;
     else if (conseil.phase === "enl_air") {
       // Double : ralenti jusqu'au sommet, puis gel en attendant le re-tap.
@@ -700,7 +703,7 @@ function step(dt) {
     // Tant que le doigt reste appuyé et qu'on monte, la pesanteur est réduite.
     // Pendant un conseil « appui long » ou « double », la tenue est offerte :
     // le tuto doit réussir dès que le joueur a fait le bon geste, même un peu court.
-    const aide = conseil.r !== null && conseil.famille !== "tap" && (conseil.phase === "enl_air" || conseil.phase === "fini");
+    const aide = conseil.r !== null && conseil.famille !== "tap" && (conseil.phase === "enl_air" || conseil.phase === "fini" || conseil.phase === "attente");
     const tenu = (isHolding() || aide) && player.jumpVy > 0 && player.tHaut < phys.tenueMax;
     if (tenu) player.tHaut += dt;
     player.jumpVy -= (tenu ? phys.gTenu : phys.g) * dt;
@@ -1123,7 +1126,7 @@ function render(alpha) {
     hud.renderHud(ctx, width, height, {
       metres: game.metres, potes: friends.count(), potesMax: friends.max(), gaugeT,
       mult: Math.round(multiplicateur() * 100) / 100, restant: plein ? 0 : Math.max(0, prochainPalier() - game.points), plein,
-      restantS: game.ended ? 0 : tempsRestant(), turbo: game.turbo > 0, safeTop,
+      restantS: game.ended ? 0 : tempsRestant(), turbo: game.turbo > 0, safeTop, nuit: scene.getNight(),
     });
     ctx.restore();
   }
