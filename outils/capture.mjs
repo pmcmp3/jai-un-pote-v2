@@ -486,6 +486,94 @@ const SCENES = {
     console.log("véhicules vus :", [...vus].join(", ") || "aucun");
     console.log(await course(() => { const P = window.__pote, out = []; for (let r = 0; r < P.player.v + 40; r++) { const row = P.rows.rowAt(r); if (row.type !== "safe") out.push(r + ":" + row.kind + (row.armed ? "*" : "")); } return out.join(" "); }));
   },
+  // Potes et véhicules (4 octobre 2026) : le joueur saute « parfaitement »
+  // (pilote automatique ci-dessous), on compte les images où un pote est DANS
+  // une voiture en face, un car ou un tracteur sans être au-dessus.
+  potesVehicules: async () => {
+    await page.keyboard.press("KeyI");
+    for (let i = 0; i < 5; i++) await page.keyboard.press("KeyP");
+    await course(() => {
+      const P = window.__pote; P.clips = 0; P.clipsDetail = []; P.touchesJoueur = new Set(); P.clipsPar = new Map();
+      // Un véhicule « traversé » : pote dans sa boîte, plus bas que son toit.
+      const dedans = (v, y, r, row, o) => Math.abs(v - o.v) < P.rows.demiLongueurRoute(row.kind) + P.rows.VELO_DEMI - 0.15 && y < P.rows.hauteurAFranchir(row.kind) - 0.1;
+      const boucle = () => {
+        const tm = P.tMonde();
+        for (let r = Math.floor(P.player.v) - 10; r < P.player.v + 10; r++) {
+          const row = P.rows.rowAt(r);
+          if (row.type !== "contresens" || !row.armed) continue;
+          const o = P.rows.contresensAt(r, row, tm); if (!o) continue;
+          if (dedans(P.player.v, P.player.jumpY, r, row, o)) P.touchesJoueur.add(r);
+          for (const m of P.friends.members()) if (dedans(m.v, m.jumpY, r, row, o)) P.clipsPar.set(r, row.kind);
+        }
+        requestAnimationFrame(boucle);
+      };
+      boucle();
+    });
+    const t0 = Date.now(); let tenueJusqua = 0, attendApex = false, doubleA = 0;
+    while (Date.now() - t0 < 70000) {
+      const e = await course(() => {
+        const P = window.__pote, tm = P.tMonde(), v = P.player.v, sp = P.vitesse();
+        let best = null;
+        for (let r = Math.floor(v); r < v + 40; r++) {
+          const row = P.rows.rowAt(r); let c = null, vit = 0;
+          if (row.type === "statique") c = r;
+          else if (row.type === "contresens" && row.armed) { const o = P.rows.contresensAt(r, row, tm); if (o) { c = o.v; vit = row.vitesse; } }
+          if (c === null || c < v) continue;
+          const t = (c - v) / Math.max(0.5, sp + vit), f = P.rows.familleDe(row.kind);
+          if (!best || t < best.t) best = { t, f, m: P.rows.montee(f) };
+        }
+        return { best, auSol: P.player.auSol, vy: P.player.jumpVy, doubled: P.player.doubled, fin: P.game.ended };
+      });
+      if (e.fin) break;
+      const maintenant = Date.now();
+      if (tenueJusqua && maintenant >= tenueJusqua) { await page.keyboard.up("Space"); tenueJusqua = 0; }
+      if (attendApex && !doubleA && !e.auSol && e.vy <= 0 && !e.doubled) { await page.keyboard.press("Space"); attendApex = false; }
+      // IMPARFAIT=1 : un joueur humain — appui plus ou moins long, double saut
+      // plus ou moins tôt, départ un peu en avance ou en retard.
+      const imparfait = process.env.IMPARFAIT === "1";
+      const avance = imparfait ? (Math.random() - 0.4) * 0.12 : 0;
+      if (e.auSol && e.best && e.best.t <= e.best.m + 0.03 + avance && !tenueJusqua) {
+        if (e.best.f === "tap") await page.keyboard.press("Space");
+        else { await page.keyboard.down("Space"); tenueJusqua = maintenant + (imparfait ? 60 + Math.random() * 260 : 300); attendApex = e.best.f === "double"; if (imparfait) doubleA = maintenant + 120 + Math.random() * 380; }
+      }
+      if (imparfait && attendApex && doubleA && maintenant >= doubleA && !e.auSol && !e.doubled) { await page.keyboard.press("Space"); attendApex = false; doubleA = 0; }
+      await attendre(8);
+    }
+    const res = await course(() => { const P = window.__pote; const potesSeuls = [...P.clipsPar].filter(([r]) => !P.touchesJoueur.has(r)); return { vehiculesRatesParLeJoueur: P.touchesJoueur.size, vehiculesTraversesParUnPoteAlorsQueLeJoueurEstPasse: potesSeuls.length, detail: potesSeuls.slice(0, 10).map(([r, k]) => k + "@" + r), v: Math.round(P.player.v) }; });
+    console.log("POTES DANS UN VÉHICULE (images) :", JSON.stringify(res));
+  },
+  // Tuto « reste appuyé » avec un appui TROP TÔT et long (4 octobre 2026 :
+  // « je suis resté appuyé, il a fait un double saut tout seul »).
+  tutoHaut: async () => {
+    await page.waitForFunction(() => window.__pote.player.v > 2, null, { timeout: 15000 }); // fin du décompte
+    for (const essai of [0, 1, 2]) {
+      await course(() => { localStorage.setItem("jp2-appris", '["tap","double"]'); localStorage.removeItem("jp2-conseils-vus"); localStorage.setItem("jp2-conseils-vus", '{"lait":1,"alerte":1}'); });
+      const cible = await course(() => { const p = window.__pote; for (let r = Math.ceil(p.player.v) + 30; r < 4000; r++) { const row = p.rows.rowAt(r); if (row.type === "statique" && p.rows.familleDe(row.kind) === "haut") return { r, kind: row.kind }; } return null; });
+      await course((r) => { const p = window.__pote.player; p.v = r - 18; p.prevV = p.v; }, cible.r);
+      let c = null;
+      for (let k = 0; k < 400; k++) { await attendre(20); c = await course(() => window.__pote.conseil()); if (c.phase === "approche") break; }
+      if (!c || c.phase !== "approche") console.log("DEBUG", JSON.stringify(await course((r) => ({ now: window.__pote.clock.now(), fin: window.__pote.game.ended, sp: window.__pote.vitesse(), v: window.__pote.player.v, r, auSol: window.__pote.player.auSol, conseil: window.__pote.conseil(), appris: localStorage.getItem("jp2-appris"), vus: localStorage.getItem("jp2-conseils-vus"), projo: window.__pote.projo() }), cible.r)));
+      await page.keyboard.down("Space");
+      let double = false, maxY = 0;
+      for (let k = 0; k < 60; k++) { await attendre(40); const e = await course(() => ({ d: window.__pote.player.doubled, y: window.__pote.player.jumpY, v: window.__pote.player.v })); double = double || e.d; maxY = Math.max(maxY, e.y); }
+      await page.keyboard.up("Space");
+      await attendre(800);
+      const fin = await course((r) => ({ passe: window.__pote.player.v > r + 2, appris: localStorage.getItem("jp2-appris") }), cible.r);
+      console.log("TUTO HAUT essai", essai, JSON.stringify({ kind: cible.kind, phaseDepart: c && c.phase, doubleSautToutSeul: double, hauteurMax: +maxY.toFixed(2), ...fin }));
+    }
+  },
+  // Plafond des halles (4 octobre 2026) : double saut sur le plancher, la
+  // tête doit rester sous le toit.
+  plafond: async () => {
+    await page.waitForFunction(() => window.__pote.player.v > 2, null, { timeout: 15000 });
+    const d = await course(() => { const p = window.__pote; for (let r = 40; r < 1500; r++) if (p.rows.halleA(r) !== null) return p.rows.halleA(r); return 0; });
+    await course((d) => { const p = window.__pote; p.player.v = d + 12; p.player.prevV = p.player.v; p.player.jumpY = p.rows.solAt(p.player.v); }, d);
+    await attendre(300);
+    await page.keyboard.down("Space"); await attendre(250); await page.keyboard.up("Space"); await attendre(150); await page.keyboard.press("Space");
+    let maxY = 0;
+    for (let k = 0; k < 30; k++) { await attendre(25); maxY = Math.max(maxY, await course(() => window.__pote.player.jumpY)); if (k === 8) await photo("48-plafond-halle"); }
+    console.log("PLAFOND : hauteur max des roues", maxY.toFixed(2), "· plafond", await course((d) => window.__pote.rows.plafondA(d + 20), d));
+  },
   menus: async () => {
     // ⚠️ Pas de touche D ici : overlay masqué = touches de debug coupées (G, I…).
     await attendre(1200);

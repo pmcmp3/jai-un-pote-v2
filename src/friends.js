@@ -29,7 +29,8 @@ let maxCount = 0;
 let largeurEcran = 400; // pour garder les pastilles d'arrivée dans l'écran
 export function setLargeurEcran(w) { largeurEcran = w || largeurEcran; }
 let joins = 0;
-let marques = []; // { v, type: "saut" | "salto" } — là où le joueur a sauté
+let marques = []; // { id, v, type, ref } — là où le joueur a sauté, et devant quel obstacle
+let markId = 0;
 
 export function reset() { potes = []; maxCount = 0; joins = 0; marques = []; tirerSelection(); }
 export function alive() { return potes.filter((p) => !p.leave); }
@@ -50,8 +51,11 @@ export function max() { return Math.min(listeMembres().length, window.CONFIG.pot
 
 // Marque un saut ("saut"), un saut tenu ("haut") ou un double saut ("double")
 // du joueur en v : la meute le refait au même endroit.
-export function recordPlayer(v, type) {
-  if (type) marques.push({ v, type });
+// `ref` = { r, d } : l'obstacle franchi (sa rangée) et la distance qui l'en
+// séparait au moment du saut — le pote saute à la MÊME distance de lui, même
+// s'il roule (voiture en face, tracteur). Sans obstacle : au même endroit.
+export function recordPlayer(v, type, ref = null) {
+  if (type) marques.push({ id: ++markId, v, type, ref });
   const minV = vDuSlot(v, max() + 1) - 1;
   if (marques.length && marques[0].v < minV) marques = marques.filter((m) => m.v > minV);
 }
@@ -88,6 +92,12 @@ function tirerSelection() {
   selection = choisis.concat(manquants).slice(0, max);
 }
 // Le joueur a gardé l'appui : la dernière marque devient un saut tenu.
+// Durée réelle de l'appui du joueur sur son dernier saut : le pote la lit
+// pendant son propre saut (4 octobre 2026 — il tenait toujours au maximum,
+// son saut était plus long que celui du joueur et il ratait le suivant).
+export function majTenue(t) {
+  for (let i = marques.length - 1; i >= 0; i--) { const m = marques[i]; if (m.type === "saut" || m.type === "haut") { m.tenue = Math.max(m.tenue || 0, t); return; } if (m.type === "double") return; }
+}
 export function marquerTenue() {
   for (let i = marques.length - 1; i >= 0; i--) { if (marques[i].type === "saut") { marques[i].type = "haut"; return; } if (marques[i].type === "double") return; }
 }
@@ -125,7 +135,7 @@ export function join(player) {
     // du bas-côté (« regarde les textures qui se passent devant »).
     u: U_MEUTE[slot % U_MEUTE.length], v: v - 4.5, prevV: v - 4.5, u0: U_MEUTE[slot % U_MEUTE.length], dv0: -4.5,
     arrive: 0, leave: null, pedal: Math.random() * 6, phase: Math.random() * 6,
-    jumpY: 0, jumpVy: 0, doubled: false, flip: 0, lastMark: player.v,
+    jumpY: 0, jumpVy: 0, doubled: false, flip: 0, lastMarkId: markId,
   };
   potes.push(pote);
   maxCount = Math.max(maxCount, vivants.length + 1);
@@ -139,12 +149,18 @@ export function lose(n) {
   return perdus;
 }
 
+function sauter(p, m, sol, phys) {
+  p.jumpVy = phys.vJump; p.jumpY = sol + 0.001; p.doubled = false;
+  p.marqueSaut = m; p.tenueT = 0; // il tient l'appui exactement comme le joueur
+}
+
 let roueT = 0;
 export function update(dt, player, phys) {
   const vivants = alive().sort((a, b) => a.slot - b.slot);
   vivants.forEach((p, i) => { p.slot = i; });
   for (const p of potes) {
     p.prevV = p.v;
+    p.prevJumpY = p.jumpY;
     if (p.leave) { p.leave.t += dt / LEAVE_S; continue; }
     p.phase += dt;
     p.age = (p.age || 0) + dt;
@@ -164,28 +180,43 @@ export function update(dt, player, phys) {
     }
     p.u += (cibleU - p.u) * Math.min(1, 4 * dt);
     p.v = cibleV;
-    const sol = phys.sol ? phys.sol(p.v) : 0;
-    // Sauts, sauts tenus et doubles sauts, aux marques du joueur.
+    // Le sol sous lui : la route, la halle, ou le toit d'une voiture s'il est
+    // déjà au-dessus (il roule sur les toits comme le joueur).
+    const sol = phys.solSous ? phys.solSous(p.v, Math.max(p.jumpY, p.prevJumpY)) : phys.sol ? phys.sol(p.v) : 0;
+    // Un saut arrivé pendant qu'il était encore en l'air part dès qu'il touche
+    // le sol (0,3 s au plus) : sinon il sautait le saut, puis faisait le
+    // double saut suivant depuis trop bas et retombait AVANT la voiture.
+    if (p.enAttente) {
+      p.enAttente.t -= dt;
+      if (p.jumpY <= sol + 0.02) { sauter(p, p.enAttente.m, sol, phys); p.enAttente = null; }
+      else if (p.enAttente.t <= 0) p.enAttente = null;
+    }
+    // Sauts, sauts tenus et doubles sauts, aux marques du joueur, DANS L'ORDRE.
     for (const m of marques) {
-      if (m.v <= p.lastMark || m.v > p.v) continue;
-      p.lastMark = m.v;
-      if ((m.type === "saut" || m.type === "haut") && p.jumpY <= sol + 0.02) {
-        p.jumpVy = phys.vJump; p.jumpY = sol + 0.001; p.doubled = false;
-        p.tenue = m.type === "haut" ? phys.tenueMax : 0;   // il tient l'appui comme le joueur
+      if (p.enAttente) break;
+      if (m.id <= p.lastMarkId) continue;
+      const c = m.ref && phys.centreRef ? phys.centreRef(m.ref.r) : null;
+      const pret = c !== null ? c - p.v <= m.ref.d : m.v <= p.v;
+      if (!pret) break;
+      p.lastMarkId = m.id;
+      if (m.type === "saut" || m.type === "haut") {
+        if (p.jumpY <= sol + 0.02) sauter(p, m, sol, phys);
+        else p.enAttente = { m, t: 0.3 };
       } else if (m.type === "double" && p.jumpY > sol && !p.doubled) {
-        p.jumpVy = phys.vDouble; p.doubled = true; p.flip = 0.001;
+        p.jumpVy = phys.vDouble; p.doubled = true; p.flip = 0.001; p.marqueSaut = null; // plus d'appui après le double, comme le joueur
       }
     }
     if (p.jumpY > sol) {
-      const tenu = p.tenue > 0 && p.jumpVy > 0;
-      if (tenu) p.tenue -= dt;
+      const tenu = p.marqueSaut && p.jumpVy > 0 && p.tenueT < Math.min(phys.tenueMax, p.marqueSaut.tenue || 0);
+      if (tenu) p.tenueT += dt;
       p.jumpVy -= (tenu ? phys.gTenu : phys.g) * dt;
       p.jumpY += p.jumpVy * dt;
+      if (phys.plafond) { const pl = phys.plafond(p.v); if (p.jumpY > pl) { p.jumpY = pl; if (p.jumpVy > 0) p.jumpVy = 0; } }
     }
     // Comme le joueur, le pote colle au plancher de la halle (rows.solAt).
     // Collage à la descente, comme le joueur (main.js).
     if (p.auSol && p.jumpVy <= 0 && p.jumpY > sol && p.jumpY - sol < 0.35) p.jumpY = sol;
-    if (p.jumpY <= sol) { p.jumpY = sol; p.jumpVy = 0; p.doubled = false; p.flip = 0; p.tenue = 0; }
+    if (p.jumpY <= sol) { p.jumpY = sol; p.jumpVy = 0; p.doubled = false; p.flip = 0; p.marqueSaut = null; }
     p.auSol = p.jumpY <= sol + 0.001;
     if (p.flip > 0) p.flip = Math.min(Math.PI * 2, p.flip + dt * (Math.PI * 2 / 0.5));
     if (p.roue > 0) { p.roue += dt / 0.9; if (p.roue >= 1 || !p.auSol) p.roue = 0; }

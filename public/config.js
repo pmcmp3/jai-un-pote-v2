@@ -45,7 +45,7 @@ window.CONFIG = {
   // 30 septembre 2026 (« la difficulté que j'ai à 30 s de la fin, je l'attends
   // pour le milieu de la course ») : la 2e accélération démarre vers 50 s et
   // monte jusqu'à 4,0.
-  vitesseFinale: 4.0,
+  vitesseFinale: 4.4,            // 4,0 → 4,4 le 4 octobre 2026 (« jusqu'à la ligne d'arrivée assez facilement »)
   accelDernieresS: 120,          // 3,6 → 2,6 le 7 septembre 2026 (« quand ça va vite, ça va vraiment trop vite »)
 
   // === VUE DE PROFIL (v2, 19 septembre 2026) ===
@@ -122,6 +122,12 @@ window.CONFIG = {
   // pièces (20 septembre 2026 : « j'ai perdu tous mes potes et j'arrive pas
   // à les regagner »).
   poteRachatPieces: 5,
+  // … et de plus en plus cher : 5 pièces jusqu'à 60 s, puis jusqu'à
+  // `poteRachatPiecesFin` à 160 s (4 octobre 2026 : « plus ça avance, plus ça
+  // doit être difficile »). Et passé `chocPlusUnApres` (fraction de la
+  // course), chaque choc coûte UN pote de plus.
+  poteRachatPiecesFin: 14,
+  chocPlusUnApres: 0.5,
   // Prénoms des potes, dans l'ordre d'arrivée (Soberland en premier, verrouillé).
   // Sans ligue, le peloton c'est la LIGUE DE DÉMO (7 septembre 2026) : Paul et
   // ses quatre potes, avec leurs skins. Dans une ligue, ce sont les membres.

@@ -30,7 +30,7 @@ import { consumeJumpPress, consumeWheelie, isHolding } from "./input.js";
 import { PALETTES, paletteDepuisSkin } from "./rider.js";
 import { drawRider, RIDER_HEIGHT } from "./voxrider.js";
 import { drawCoin } from "./coin.js";
-import { V_UNIT, LEAD_IN, targetSpeed as targetSpeedRegle, multiplicateur as multRegle, graineLigue } from "./regles.js";
+import { V_UNIT, LEAD_IN, targetSpeed as targetSpeedRegle, multiplicateur as multRegle, graineLigue, dureeCourse } from "./regles.js";
 import { scoreParfait } from "./simulation.js";
 import * as fantome from "./fantome.js";
 
@@ -157,7 +157,11 @@ const targetSpeed = targetSpeedRegle;
 //                        maintenu) + salto (les fermiers, les voitures).
 function jumpPhysics() {
   const C = window.CONFIG;
-  return { vJump: C.sautVitesse, vDouble: C.sautVitesseDouble, g: C.sautGravite, gTenu: C.sautGraviteTenue, tenueMax: C.sautTenueMaxS, sol: rows.solAt };
+  return {
+    vJump: C.sautVitesse, vDouble: C.sautVitesseDouble, g: C.sautGravite, gTenu: C.sautGraviteTenue, tenueMax: C.sautTenueMaxS, sol: rows.solAt,
+    // Pour les potes : toits de voiture, plafond des halles, position des obstacles.
+    solSous, plafond: rows.plafondA, centreRef,
+  };
 }
 // Boost de ligue (screens.getBoost, posé au départ) : multiplie TOUT.
 function multiplicateur() { return multRegle(friends.count(), game.turbo > 0) * (game.boost || 1); }
@@ -173,7 +177,7 @@ function solSous(v, jumpY) { return Math.max(rows.solAt(v), rows.toitSous(rows.r
 function penteSol(v) { return -Math.atan2(rows.solAt(v + 0.6) - rows.solAt(v - 0.6), 1.2); }
 function palierPrecedent() {
   const p = window.CONFIG.potesPaliers;
-  if (game.cibleRachat !== null && game.cibleRachat !== undefined) return game.cibleRachat - (window.CONFIG.poteRachatPieces || 10);
+  if (game.cibleRachat !== null && game.cibleRachat !== undefined) return game.cibleRachat - (game.coutRachat || window.CONFIG.poteRachatPieces || 10);
   return game.potesGagnes === 0 ? 0 : p[game.potesGagnes - 1];
 }
 // Pièces à ramasser pour le prochain pote. Après le dernier palier, un pote
@@ -187,7 +191,17 @@ function prochainPalier() {
 function armerRachat() {
   if (friends.count() >= friends.max()) { game.cibleRachat = null; return; }
   if (game.potesGagnes < window.CONFIG.potesPaliers.length) return; // les paliers suffisent
-  game.cibleRachat = game.points + (window.CONFIG.poteRachatPieces || 10);
+  game.coutRachat = coutRachat();
+  game.cibleRachat = game.points + game.coutRachat;
+}
+// Racheter un pote coûte de plus en plus cher (4 octobre 2026 : « plus ça
+// avance, plus ça doit être difficile [...] je suis allé jusqu'à la ligne
+// d'arrivée assez facilement ») : `poteRachatPieces` jusqu'à 60 s, puis on
+// monte vers `poteRachatPiecesFin` à 160 s.
+function coutRachat() {
+  const C = window.CONFIG, base = C.poteRachatPieces || 5, fin = C.poteRachatPiecesFin || base;
+  const k = Math.max(0, Math.min(1, (clock.now() - 60) / 100));
+  return Math.round(base + (fin - base) * k);
 }
 const sparkles = [];
 function semerSparkles(u, v, n = 9, couleur = null) {
@@ -230,7 +244,7 @@ const RALENTI_MIN = 0.015, RALENTI_APPROCHE = 0.25, APPROCHE_S = 0.7;
 const conseil = { r: null, famille: null, phase: null, alpha: 0, ok: 0, tampon: false, touche: false };
 let ralenti = 1, retardMonde = 0;
 function tMonde() { return clock.now() - retardMonde; }
-function conseilCouper() { projo.type = null; conseil.autoDouble = false; conseil.r = null; conseil.phase = null; conseil.alpha = 0; conseil.ok = 0; conseil.tampon = false; audio.setRalenti(false); }
+function conseilCouper() { projo.type = null; conseil.plane = false; conseil.r = null; conseil.phase = null; conseil.alpha = 0; conseil.ok = 0; conseil.tampon = false; audio.setRalenti(false); }
 function conseilReset() { conseilCouper(); ralenti = 1; retardMonde = 0; }
 // Temps avant que l'obstacle de la rangée r croise le joueur (s), ou null.
 function tempsAvant(r, row, tm, vitesse) {
@@ -253,7 +267,7 @@ function conseilCherche(tm, vitesse) {
     if (deja.has(f) || (vus[f] || 0) >= 1) continue; // UNE seule fois (30 septembre 2026 : « faut pas 2 fois le même tuto »)
     const t = tempsAvant(r, row, tm, vitesse);
     if (t !== null && t > momentIdeal(f) && t <= momentIdeal(f) + APPROCHE_S) {
-      conseil.r = r; conseil.famille = f; conseil.phase = "approche"; conseil.ok = 0; conseil.tampon = false; conseil.touche = false; conseil.autoDouble = false;
+      conseil.r = r; conseil.famille = f; conseil.phase = "approche"; conseil.ok = 0; conseil.tampon = false; conseil.touche = false; conseil.plane = false;
       vus[f] = (vus[f] || 0) + 1; ecrireJson(CLE_VUS, vus);
       audio.setRalenti(true);
     }
@@ -273,14 +287,16 @@ function conseilTap(tap, tm, vitesse) {
     // tenue offerte, et double saut automatique au sommet si le tap était tôt.
     if (tap && player.auSol) {
       const avance = t !== null ? t - momentIdeal(conseil.famille) : 0;
-      conseil.autoDouble = conseil.famille !== "double" && avance > 0.12;
+      // 4 octobre 2026 : plus de double saut automatique (« je suis resté
+      // appuyé, il a fait un double saut tout seul ») — le saut trop tôt PLANE
+      // au-dessus de l'obstacle expliqué (voir la physique du saut).
+      conseil.plane = conseil.famille !== "double" && avance > 0.12;
       conseil.phase = "attente";
       return true;
     }
     if (t !== null && t <= momentIdeal(conseil.famille)) conseil.phase = "attente";
     return false;
   }
-  if (conseil.autoDouble && !player.doubled && player.jumpY > 0.05 && player.jumpVy <= 0) { conseil.autoDouble = false; return true; }
   // Double saut : un re-tap AVANT le sommet est gardé et part au sommet (un
   // re-tap trop tôt donnait un double saut trop bas pour le tracteur).
   if (conseil.phase === "enl_air" && conseil.famille === "double") {
@@ -622,7 +638,9 @@ function toucherJoueur(ev) {
   }
   marquerTombe(ev, tMonde());
   if (friends.count() > 0) {
-    const perdus = friends.lose(ev.cout);
+    // Deuxième moitié du morceau : chaque choc coûte un pote de plus.
+    const cout = ev.cout + (clock.now() > dureeCourse() * (window.CONFIG.chocPlusUnApres || 2) ? 1 : 0);
+    const perdus = friends.lose(cout);
     game.sansFaute = false;
     triggerShake(6, 0.45);
     damageFlash = 0.8;
@@ -635,6 +653,33 @@ function toucherJoueur(ev) {
   } else {
     mourir();
   }
+}
+
+// --- Les potes suivent le mouvement du joueur (4 octobre 2026) -----------------
+// « Quand je réussis mon double saut et que je tombe après la voiture ou le car,
+// j'ai des potes qui tombent avant la voiture. » Ils refaisaient le saut au
+// même ENDROIT ; or une voiture en face a avancé entre-temps. Chaque saut
+// retient donc l'obstacle qu'il franchit et la distance qui l'en séparait :
+// le pote saute quand il est à la même distance de CE véhicule, là où il est.
+function refObstacle(v, tm) {
+  let best = null;
+  for (let r = Math.floor(v) - 3; r <= v + 16; r++) {
+    const row = rows.rowAt(r);
+    let c = null, vit = 0;
+    if (row.type === "statique") c = r;
+    else if (row.type === "contresens" && row.armed) { const o = rows.contresensAt(r, row, tm); if (o) { c = o.v; vit = row.vitesse; } }
+    if (c === null || c + rows.demiLongueurRoute(row.kind) + rows.VELO_DEMI <= v) continue;
+    const t = (c - v) / Math.max(0.5, speed + vit);
+    if (!best || t < best.t) best = { r, d: c - v, t };
+  }
+  return best && best.t < 2.5 ? { r: best.r, d: best.d } : null;
+}
+// Position actuelle de l'obstacle de la rangée r (null s'il n'existe plus).
+function centreRef(r) {
+  const row = rows.rowAt(r);
+  if (row.type === "statique") return r;
+  if (row.type === "contresens") { const o = rows.contresensAt(r, row, tMonde()); return o ? o.v : null; }
+  return null;
 }
 
 // --- Traversées armées sur le passage du joueur --------------------------------
@@ -749,12 +794,28 @@ function step(dt) {
     // Tant que le doigt reste appuyé et qu'on monte, la pesanteur est réduite.
     // Pendant un conseil « appui long » ou « double », la tenue est offerte :
     // le tuto doit réussir dès que le joueur a fait le bon geste, même un peu court.
-    const aide = conseil.r !== null && (conseil.famille !== "tap" || conseil.autoDouble) && (conseil.phase === "enl_air" || conseil.phase === "fini" || conseil.phase === "attente");
+    const aide = conseil.r !== null && (conseil.famille !== "tap" || conseil.plane) && (conseil.phase === "enl_air" || conseil.phase === "fini" || conseil.phase === "attente");
     const tenu = (isHolding() || aide) && player.jumpVy > 0 && player.tHaut < phys.tenueMax;
     if (tenu) player.tHaut += dt;
     player.jumpVy -= (tenu ? phys.gTenu : phys.g) * dt;
     player.jumpY += player.jumpVy * dt;
     if (player.tHaut > 0.12 && !player.tenueMarquee) { player.tenueMarquee = true; friends.marquerTenue(); conseilGeste("haut"); }
+    if (tenu) friends.majTenue(player.tHaut); // les potes tiendront EXACTEMENT aussi longtemps
+    // Saut donné trop tôt pendant un conseil : descente freinée et plancher
+    // d'air au ras de l'obstacle expliqué, jusqu'à l'avoir passé.
+    if (conseil.plane && conseil.r !== null && player.jumpVy < 0) {
+      const row = rows.rowAt(conseil.r);
+      const o = row.type === "contresens" ? rows.contresensAt(conseil.r, row, tm) : { v: conseil.r };
+      if (o && player.v < o.v + rows.demiLongueurRoute(row.kind) + rows.VELO_DEMI) {
+        const H = rows.hauteurAFranchir(row.kind) + rows.solAt(o.v) + 0.1;
+        player.jumpVy = Math.max(player.jumpVy, -2.2);
+        if (player.jumpY < H) { player.jumpY = H; player.jumpVy = 0; }
+      } else conseil.plane = false;
+    }
+    // Sous le toit d'une halle, on reste DESSOUS (4 octobre 2026 : « le
+    // personnage reste en dessous, sans possibilité de dépasser le toit »).
+    const plafond = rows.plafondA(player.v);
+    if (player.jumpY > plafond) { player.jumpY = plafond; if (player.jumpVy > 0) player.jumpVy = 0; }
   }
   if (player.flip > 0) {
     player.flip = Math.min(Math.PI * 2, player.flip + dt * (Math.PI * 2 / 0.55));
@@ -799,7 +860,7 @@ function step(dt) {
   // qui annonce le bâtiment, 27 septembre 2026.)
   game.surHalle = rows.solAt(player.v) > 0.05;
   if (now >= 0) fantome.enregistrer(tm, player.u, player.v, player.jumpY);
-  friends.recordPlayer(player.v, marque);
+  friends.recordPlayer(player.v, marque, marque ? refObstacle(player.v, tm) : null);
   friends.update(dt, player, phys);
 
   // --- Traversées : armées pour croiser le joueur ---
@@ -1389,6 +1450,7 @@ if (debugOverlay.isEnabled()) {
     estDemarre: () => gameStarted,
     projo: () => projo.type,
     tMonde: () => tMonde(),
+    vitesse: () => speed,
     fps: () => perf.fps,
     frameMs: () => perf.frameMs,
     tombes: () => tombes.size,

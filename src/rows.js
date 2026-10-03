@@ -43,7 +43,7 @@
 // pièce sur des rangées réservées. Deux graines = deux routes différentes,
 // mêmes quantités.
 
-import { ROAD_HALF } from "./scene.js";
+import { ROAD_HALF, HALLE_TOIT_AU_DESSUS } from "./scene.js";
 import { V_UNIT, vitesseAuRang, rangAuTemps, dureeCourse } from "./regles.js";
 
 // --- Le bestiaire, à l'échelle : 1 unité ≈ 1 mètre --------------------------------
@@ -298,6 +298,15 @@ export function solAt(v) {
   return HALLE_HAUT * (1 - (p - HALLE_MONTEE - HALLE_PLAT) / HALLE_DESCENTE);
 }
 function dansHalle(r) { const d = halleA(r); return d !== null && r >= d && r <= d + HALLE_ROWS; }
+// Plafond du cycliste sous le toit d'une halle (4 octobre 2026 : « que le
+// personnage reste en dessous et n'ait pas la possibilité de dépasser le
+// toit ») : ses roues ne montent pas plus haut que le dessous des fermes
+// moins sa taille (2,1 u, salto compris). Infini partout ailleurs.
+export function plafondA(v) {
+  const d = halleA(Math.round(v));
+  if (d === null || v < d - 0.8 || v > d + HALLE_ROWS + 0.8) return Infinity;
+  return HALLE_HAUT + HALLE_TOIT_AU_DESSUS + 0.1 - 2.1;
+}
 
 // Hauteur du toit d'un obstacle MONTABLE sous la position v, mais seulement si
 // le cycliste arrive déjà au-dessus (`jumpY`). En dessous, ce n'est pas un

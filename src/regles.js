@@ -35,7 +35,7 @@ export function dureeCourse() {
 // les règles changent la route — les scores et fantômes d'une ligue sont
 // filtrés sur la graine, une nouvelle version repart donc sur un classement
 // vierge sans rien supprimer en base.
-export const VERSION_COURSE = 13; // 3 octobre 2026 : tracteurs dans le sens du joueur, car scolaire, finale plus dure, moins de lait — // 1er octobre 2026 : double saut plus haut, gravité −10 % — // 30 septembre 2026 (2) : difficulté avancée — // 30 septembre 2026 : costard, plus de poule jetée, seconde accélération — // 29 septembre 2026 (2) : pièces ÷2, moutons ×2, plus de voitures en face — // 29 septembre 2026 : poules ×1,4 — // 27 septembre 2026 : poule jetée de face, voiture en face plus lente et montable
+export const VERSION_COURSE = 14; // 4 octobre 2026 : vitesse finale 4,4 — // 3 octobre 2026 : tracteurs dans le sens du joueur, car scolaire, finale plus dure, moins de lait — // 1er octobre 2026 : double saut plus haut, gravité −10 % — // 30 septembre 2026 (2) : difficulté avancée — // 30 septembre 2026 : costard, plus de poule jetée, seconde accélération — // 29 septembre 2026 (2) : pièces ÷2, moutons ×2, plus de voitures en face — // 29 septembre 2026 : poules ×1,4 — // 27 septembre 2026 : poule jetée de face, voiture en face plus lente et montable
 export function graineDepuisTexte(txt) {
   let h = 7;
   for (const ch of String(txt)) h = (h * 31 + ch.charCodeAt(0)) % 100000;
