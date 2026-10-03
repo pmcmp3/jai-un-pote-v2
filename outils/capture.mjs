@@ -439,6 +439,16 @@ const SCENES = {
     });
     console.log(`  descente : ${res.air} images en l'air sur ${res.n}`);
   },
+  // Projecteurs (3 octobre 2026) : brique de lait et premier triangle, une fois chacun.
+  projo: async () => {
+    const vus = new Set();
+    for (let i = 0; i < 160 && vus.size < 2; i++) {
+      const t = await course(() => window.__pote.projo());
+      if (t && !vus.has(t)) { vus.add(t); await attendre(700); await photo(`45-projo-${t}`); await page.mouse.click(180, 400); }
+      await attendre(500);
+    }
+    console.log("projecteurs vus :", [...vus].join(", ") || "aucun");
+  },
   menus: async () => {
     // ⚠️ Pas de touche D ici : overlay masqué = touches de debug coupées (G, I…).
     await attendre(1200);

@@ -225,11 +225,16 @@ export function drawables(ctx, pedalPhase, penteAt = null) {
           const g = project(u, v, y + RIDER_HEIGHT + 0.2);
           ctx.save();
           ctx.globalAlpha *= vu;
-          ctx.font = `800 12px "Helvetica Neue", Helvetica, Arial, sans-serif`;
-          ctx.textAlign = "center"; ctx.textBaseline = "bottom";
-          ctx.shadowColor = "transparent";
-          ctx.fillStyle = "#fff";
-          ctx.fillText(p.name.toUpperCase(), g.x, g.y);
+          // Pastille « LEA EST LÀ » au-dessus du pote qui arrive (3 octobre
+          // 2026 : « un pop-up par-dessus le joueur [...] pendant 3 secondes,
+          // de manière hyper simple ») — remplace le grand bandeau.
+          const txt = `${p.name.toUpperCase()} EST LÀ`;
+          ctx.font = `900 11px "Helvetica Neue", Helvetica, Arial, sans-serif`;
+          const w = ctx.measureText(txt).width + 14, h = 19;
+          ctx.fillStyle = "#ffcf2e"; ctx.strokeStyle = "#0d0d10"; ctx.lineWidth = 1.5;
+          ctx.beginPath(); ctx.rect(Math.round(g.x - w / 2) + 0.5, Math.round(g.y - h - 4) + 0.5, Math.round(w), h); ctx.fill(); ctx.stroke();
+          ctx.fillStyle = "#0d0d10"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+          ctx.fillText(txt, g.x, g.y - 4 - h / 2 + 0.5);
           ctx.restore();
         }
       },

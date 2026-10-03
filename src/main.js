@@ -229,7 +229,7 @@ const RALENTI_MIN = 0.015, RALENTI_APPROCHE = 0.25, APPROCHE_S = 0.7;
 const conseil = { r: null, famille: null, phase: null, alpha: 0, ok: 0, tampon: false, touche: false };
 let ralenti = 1, retardMonde = 0;
 function tMonde() { return clock.now() - retardMonde; }
-function conseilCouper() { conseil.autoDouble = false; conseil.r = null; conseil.phase = null; conseil.alpha = 0; conseil.ok = 0; conseil.tampon = false; audio.setRalenti(false); }
+function conseilCouper() { projo.type = null; conseil.autoDouble = false; conseil.r = null; conseil.phase = null; conseil.alpha = 0; conseil.ok = 0; conseil.tampon = false; audio.setRalenti(false); }
 function conseilReset() { conseilCouper(); ralenti = 1; retardMonde = 0; }
 // Temps avant que l'obstacle de la rangée r croise le joueur (s), ou null.
 function tempsAvant(r, row, tm, vitesse) {
@@ -261,6 +261,7 @@ function conseilCherche(tm, vitesse) {
 }
 // Filtre du tap pendant un conseil : gardé en approche, relâché au bon moment.
 function conseilTap(tap, tm, vitesse) {
+  if (projo.type) { if (tap && projo.age > 0.5) projoFin(); return false; }
   if (conseil.r === null) return tap;
   if (conseil.phase === "approche") {
     const t = tempsAvant(conseil.r, rows.rowAt(conseil.r), tm, vitesse);
@@ -300,6 +301,7 @@ function conseilGeste(ev) {
 function conseilStep(dt, tm, vitesse) {
   conseilCherche(tm, vitesse);
   let cible = 1;
+  if (projo.type) { projo.age += dt; cible = RALENTI_MIN; if (projo.age > 8) projoFin(); }
   if (conseil.r !== null) {
     // Un tap pendant l'approche : le temps REPART tout de suite (30 septembre
     // 2026 : « si qqn appuie pour sauter, hop, faut accélérer ») et le saut
@@ -332,7 +334,36 @@ function conseilVue() {
   return { titre: fini ? "BIEN !" : titre, sous: fini ? null : c.sous, onglet: fini ? "BIEN !" : "À TOI", ok: fini, alpha: conseil.alpha, y: safeTop + 96 };
 }
 
+// --- Projecteur (3 octobre 2026) -----------------------------------------------
+// « La brique de lait : tu baisses l'opacité et la luminosité, tu mets en
+// surbrillance la brique et une indication » — pareil pour le premier
+// triangle d'alerte. Une fois par joueur (jp2-conseils-vus), le monde gèle,
+// l'écran s'assombrit sauf autour de l'objet, et un tap fait repartir.
+const PROJECTEURS = {
+  lait: { titre: "BRIQUE DE LAIT", sous: "Attrape-la : turbo et ×2 sur tes points pendant 5 s" },
+  alerte: { titre: "ATTENTION !", sous: "Ce panneau annonce un danger qui arrive : prépare-toi à sauter" },
+};
+const projo = { type: null, x: 0, y: 0, r: 40, age: 0 };
+function projoLancer(type, x, y, r) {
+  if (projo.type || game.sprint || game.ended || conseil.r !== null || !gameStarted || clock.now() < 1) return;
+  const vus = lireJson(CLE_VUS, {});
+  if ((vus[type] || 0) >= 1) return;
+  vus[type] = 1; ecrireJson(CLE_VUS, vus);
+  Object.assign(projo, { type, x, y, r, age: 0 });
+  audio.setRalenti(true);
+}
+function projoSuivre(type, x, y) { if (projo.type === type) { projo.x = x; projo.y = y; } }
+function projoFin() { if (!projo.type) return; projo.type = null; if (conseil.r === null) audio.setRalenti(false); }
+
 // --- Effets ------------------------------------------------------------------
+// Pastilles (3 octobre 2026 : « il y a trop de bandeaux turbo lait, ×2, etc. [...]
+// mes yeux sont en train de suivre la ligne avec les joueurs ») : les annonces
+// de course sont de petites pastilles au-dessus du joueur, plus des bandeaux.
+const pastilles = [];
+function pousserPastille(texte, duree = 2) {
+  pastilles.push({ texte, age: 0, duree });
+  if (pastilles.length > 2) pastilles.shift();
+}
 const popups = [];
 function pousserPopup(texte, couleur) {
   const decalage = popups.filter((p) => p.age < 0.5).length * 24;
@@ -421,7 +452,7 @@ function resetRun() {
   speed = V_UNIT * window.CONFIG.vitesseBase; nuitDebut = null;
   friends.reset();
   klaxonne = new Set();
-  popups.length = 0; banner = null; damageFlash = 0; shake.time = 0; hudAlpha = 0; hintTimer = 6;
+  popups.length = 0; pastilles.length = 0; banner = null; damageFlash = 0; shake.time = 0; hudAlpha = 0; hintTimer = 6;
   canvas.classList.remove("game-over-bw", "danger", "turbo");
   scene.setNight(0);
 }
@@ -472,7 +503,7 @@ function mourir() {
         consumeJumpPress();
         const retour = Math.min(2, friends.maxReached());
         for (let i = 0; i < retour; i++) friends.join(player);
-        afficherBanner(retour > 1 ? "TES POTES SONT REVENUS" : retour === 1 ? "TON POTE EST REVENU" : "C'EST REPARTI", null, JAUNE, 2.4, "REPRISE");
+        pousserPastille(retour > 1 ? "TES POTES SONT REVENUS" : retour === 1 ? "TON POTE EST REVENU" : "C'EST REPARTI", 2);
         reviveShieldUntil = clock.now() + 2.5;
       },
       onDecline: () => { revivePaused = false; applyPauseState(); endGame("mort"); },
@@ -524,7 +555,6 @@ function arriveePote(pote, direct) {
   sfx.pote();
   vibrer(30);
   // Une seule ligne, courte (7 septembre 2026 : « trop d'infos au mètre carré »).
-  afficherBanner(`@${(pote.name || "pote").toUpperCase()} EST LÀ !`, null, JAUNE, 1.6, "NOUVEAU POTE");
   audio.playComboJingle(Math.min(6, friends.count()));
 }
 
@@ -553,7 +583,7 @@ function gagnerLait(u, v) {
   sfx.lait();
   vibrer(40);
   semerSparkles(u, v, 16, "#ffffff");
-  afficherBanner("TURBO LAIT", "×2 sur tes points pendant 5 s", JAUNE, 1.6, "BONUS");
+  pousserPastille("TURBO · ×2 PENDANT 5 S", 1.8);
   canvas.classList.add("turbo");
   // Pas d'obstacles pendant le turbo : la route devient sûre au-delà de
   // l'écran (les rangées déjà visibles sont couvertes par l'invulnérabilité).
@@ -653,6 +683,7 @@ function step(dt) {
   for (let i = ghosts.length - 1; i >= 0; i--) { ghosts[i].age += dt; if (ghosts[i].age > 0.35) ghosts.splice(i, 1); }
 
   for (let i = popups.length - 1; i >= 0; i--) { popups[i].age += dt; if (popups[i].age >= 1.1) popups.splice(i, 1); }
+  for (let i = pastilles.length - 1; i >= 0; i--) { pastilles[i].age += dt; if (pastilles[i].age >= pastilles[i].duree) pastilles.splice(i, 1); }
   if (banner) { banner.timer -= dt; if (banner.timer <= 0) banner = null; }
   if (damageFlash > 0) damageFlash = Math.max(0, damageFlash - dt);
   if (shake.time > 0) shake.time = Math.max(0, shake.time - dt);
@@ -686,7 +717,8 @@ function step(dt) {
   if (!game.boostAnnonce && now >= COUNT_IN_GO_LINGER_S) {
     game.boostAnnonce = true;
     const b = screens.getBoost();
-    if (game.boost > 1) afficherBanner(`+${Math.round((game.boost - 1) * 100)} % DE POINTS`, `grâce à tes ${b.potes.length} pote${b.potes.length > 1 ? "s" : ""}`, JAUNE, 2.4, "TES POTES");
+    // Pas aux premières parties : le doigt qui tape a la priorité au départ.
+    if (game.boost > 1 && !game.tapHint) pousserPastille(`+${Math.round((game.boost - 1) * 100)} % GRÂCE À TES ${b.potes.length} POTES`, 2.4);
   }
   // --- Nuit : tombe à partir de nuitDebutS, 30 s de transition ---
   const nd = nuitDebut !== null ? nuitDebut : window.CONFIG.nuitDebutS;
@@ -864,6 +896,7 @@ function drawPiece(r, h, now, kind) {
   const bob = Math.sin(now * 3 + r * 0.7) * 0.05;
   const spin = (now * Math.PI * 2) / (clock.beatPeriod * 2) + r * 0.9 + h;
   if (kind === "lait") {
+    { const p = scene.project(0, r, h + 0.3); if (p.x < width * 0.82) projoLancer("lait", p.x, p.y, 46); projoSuivre("lait", p.x, p.y); }
     // Brique de lait : une VRAIE boîte qui tourne autour de son axe vertical
     // (scene.drawBoxR). L'astuce précédente — réduire la largeur au cosinus —
     // ne pouvait pas marcher : drawBox ne peint que des boîtes alignées sur
@@ -913,6 +946,7 @@ function renderAlertes(now, vitesse) {
     // droite, il apparaît pas dans tout l'écran »). Il est désormais posé sur
     // sa largeur réelle, 2 × taille, avec une marge franche.
     const x = width - 14 - taille * 2;
+    projoLancer("alerte", x + taille, y, taille * 2.2); projoSuivre("alerte", x + taille, y);
     ctx.save();
     // Halo puis panneau plein, contour blanc : il doit sauter aux yeux
     // (20 septembre 2026 : « le panneau d'attention n'est pas du tout assez visible »).
@@ -1150,6 +1184,13 @@ function render(alpha) {
     ctx.fillStyle = `rgba(225, 62, 38, ${0.35 * damageFlash})`;
     ctx.fillRect(0, 0, width, height);
   }
+  if (pastilles.length) {
+    const g = scene.project(u, v, jy + RIDER_HEIGHT + 0.5);
+    pastilles.forEach((pa, i) => {
+      const a = Math.min(1, pa.age * 6, (pa.duree - pa.age) * 3);
+      hud.renderPastille(ctx, g.x, g.y - 30 - (pastilles.length - 1 - i) * 26 - Math.min(1, pa.age * 5) * 8, pa.texte, a, true);
+    });
+  }
   if (popups.length) {
     const g = scene.project(u, v, jy + RIDER_HEIGHT + 0.3);
     const base = g.y;
@@ -1186,7 +1227,10 @@ function render(alpha) {
     hud.renderTuto(ctx, width, height, conseilVue());
   }
   // Le doigt qui tape : 3 premières parties, jusqu'au premier saut.
-  if (gameStarted && !game.ended && game.tapHint && now > -1) hud.renderTapHint(ctx, width, height, tAnim, Math.min(1, now + 1));
+  // Après le GO seulement, et jamais par-dessus une consigne (3 octobre 2026 :
+  // « 3 ou 4 écrans au tout début qui s'affichent en même temps »).
+  if (gameStarted && !game.ended && game.tapHint && now > COUNT_IN_GO_LINGER_S && !conseilVue() && !projo.type) hud.renderTapHint(ctx, width, height, tAnim, Math.min(1, (now - COUNT_IN_GO_LINGER_S) * 2));
+  if (projo.type) hud.renderProjecteur(ctx, width, height, projo, PROJECTEURS[projo.type], tAnim);
   if (gameStarted && hudAlpha > 0.001 && banner) {
     ctx.save();
     ctx.globalAlpha = hudAlpha;
@@ -1307,6 +1351,7 @@ if (debugOverlay.isEnabled()) {
     // Harnais headless : poser un fantôme sans réseau (pts = [[u, v, h], …] à 10 Hz).
     injecterFantome: (pts, pseudo = "test") => { ghost = { graine: game.graine, pseudo, metres: 0, palette: PALETTES.potes[0], trace: { hz: fantome.HZ, pts } }; },
     estDemarre: () => gameStarted,
+    projo: () => projo.type,
     fps: () => perf.fps,
     frameMs: () => perf.frameMs,
     tombes: () => tombes.size,

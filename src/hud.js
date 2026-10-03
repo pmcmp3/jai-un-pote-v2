@@ -457,3 +457,53 @@ export function renderFin(ctx, width, height, age, sous = "Tu es allé au bout d
     ctx.restore();
   }
 }
+
+// Pastille d'annonce (3 octobre 2026) : petite, au-dessus d'un cycliste, là où
+// les yeux regardent déjà. Fond blanc, bord noir, comme les cartes du menu.
+export function renderPastille(ctx, x, y, texte, alpha, jaune = false) {
+  if (alpha <= 0.01) return;
+  ctx.save();
+  ctx.globalAlpha *= alpha;
+  ctx.font = `900 11px ${POLICE}`;
+  const w = ctx.measureText(texte).width + 16, h = 20;
+  ctx.fillStyle = jaune ? JAUNE : BLANC; ctx.strokeStyle = NOIR; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.rect(Math.round(x - w / 2) + 0.5, Math.round(y - h) + 0.5, Math.round(w), h); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = NOIR; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.fillText(texte, x, y - h / 2 + 0.5);
+  ctx.restore();
+}
+
+// Projecteur : tout l'écran assombri sauf un cercle autour de l'objet, le
+// nom de l'objet en jaune, une phrase, et « touche pour continuer ».
+export function renderProjecteur(ctx, width, height, p, info, t) {
+  const a = Math.min(1, p.age * 5);
+  const r = p.r * (1 + 0.06 * Math.sin(t * 6));
+  ctx.save();
+  ctx.globalAlpha = a;
+  ctx.fillStyle = "rgba(8,8,12,0.74)";
+  ctx.beginPath(); ctx.rect(0, 0, width, height); ctx.arc(p.x, p.y, r, 0, Math.PI * 2, true); ctx.fill("evenodd");
+  ctx.strokeStyle = JAUNE; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.stroke();
+  // Texte sous l'objet, ou au-dessus s'il est bas dans l'écran.
+  const dessous = p.y < height * 0.55;
+  const y0 = dessous ? p.y + r + 34 : p.y - r - 70;
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  fitFont(ctx, "900", 24, info.titre, width - 40, 14);
+  ctx.fillStyle = JAUNE; ctx.fillText(info.titre, width / 2, y0);
+  ctx.font = `600 14px ${POLICE}`; ctx.fillStyle = BLANC;
+  const lignes = couper(ctx, info.sous, Math.min(300, width - 48));
+  lignes.forEach((l, i) => ctx.fillText(l, width / 2, y0 + 28 + i * 19));
+  if (p.age > 0.5) {
+    ctx.globalAlpha = a * (0.6 + 0.4 * Math.sin(t * 5));
+    ctx.font = `900 13px ${POLICE}`; ctx.fillStyle = BLANC;
+    ctx.fillText("TOUCHE POUR CONTINUER", width / 2, height - 60);
+  }
+  ctx.restore();
+}
+function couper(ctx, texte, max) {
+  const mots = texte.split(" "), out = [];
+  let l = "";
+  for (const m of mots) { const e = l ? l + " " + m : m; if (ctx.measureText(e).width > max && l) { out.push(l); l = m; } else l = e; }
+  if (l) out.push(l);
+  return out;
+}
