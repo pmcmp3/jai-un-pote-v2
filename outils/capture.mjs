@@ -58,7 +58,7 @@ if (demandes.includes("menus")) {
 }
 await page.waitForFunction(() => !document.getElementById("play-button").disabled, null, { timeout: 15000 });
 await page.click("#play-button");
-if (process.env.EXPL) { await attendre(2200); await photo("05-explication"); await attendre(4000); await photo("05b-explication"); await attendre(4800); await photo("05c-explication"); }
+if (process.env.EXPL) { await attendre(2200); await photo("05-explication"); await attendre(4000); await photo("05b-explication"); await attendre(4800); await photo("05c-explication"); await attendre(5000); await photo("05d-explication"); }
 await page.waitForFunction(() => window.__pote && window.__pote.estDemarre(), null, { timeout: 20000 });
 await page.keyboard.press("KeyI"); // invincible : la course va au bout des captures
 const course = (expr, arg) => page.evaluate(expr, arg);

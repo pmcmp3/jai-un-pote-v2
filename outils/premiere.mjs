@@ -27,9 +27,12 @@ await page.evaluate(() => { localStorage.setItem("jp2Pseudo", "ancien"); localSt
 await page.goto(`http://localhost:${port}/?premiere`);
 await attendre(700);
 await photo("49-premiere-chargement");
-await attendre(1800);
+await attendre(2600);
 console.log("url après chargement :", page.url(), "| pseudo :", await page.inputValue("#pseudo-input"));
 await photo("50-premiere-pseudo");
+await page.focus("#pseudo-input"); await attendre(500);
+await photo("50b-premiere-clavier");
+console.log("centre au focus :", await page.evaluate(() => getComputedStyle(document.getElementById("overlay")).getPropertyValue("--centre")));
 await page.fill("#pseudo-input", "paul");
 await page.click("#step1-next"); await attendre(400);
 await photo("51a-premiere-cycliste");

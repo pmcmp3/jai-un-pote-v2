@@ -53,6 +53,7 @@ function resize() {
   dprCourant = dpr;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   scene.setViewport(width, height);
+  friends.setLargeurEcran(width);
   // Encoche / barre d'état (iPhone en plein écran) : le HUD descend d'autant.
   safeTop = safeProbe ? Math.max(0, Math.round(safeProbe.getBoundingClientRect().top)) : 0;
 }
@@ -432,6 +433,7 @@ function requestGameStart(opts = {}) {
   startRequestedAt = perfClock();
   hintTimer = 9;
   game.sprint = !!opts.sprint;
+  game.sonAnnonce = screens.consommerAnnonceSon(); // la carte « Monte le son » vient de passer : le décompte ne le répète pas
   semerCourse();
   preparerJoueur();
   if (screens.getParties() === 0) net.evenement("premiere_course", { pseudo: screens.getPseudo(), source: screens.getSource(), ligue: screens.getLigue() ? screens.getLigue().code : null });
@@ -451,7 +453,7 @@ function resetRun() {
   sparkles.length = 0; ghosts.length = 0;
   speed = V_UNIT * window.CONFIG.vitesseBase; nuitDebut = null;
   friends.reset();
-  klaxonne = new Set();
+  klaxonne = new Set(); alertesVues.clear();
   popups.length = 0; pastilles.length = 0; banner = null; damageFlash = 0; shake.time = 0; hudAlpha = 0; hintTimer = 6;
   canvas.classList.remove("game-over-bw", "danger", "turbo");
   scene.setNight(0);
@@ -461,6 +463,7 @@ function restartGame(opts = {}) {
   screens.preparerLigue();
   preparerJoueur();
   game.sprint = !!opts.sprint; // REJOUER après un sprint = une vraie course ; le menu peut relancer un sprint
+  game.sonAnnonce = false;
   audio.restart();
   if (audio.isRunning()) {
     clock.setTimeSource(audio.now);
@@ -923,6 +926,7 @@ const PIECE_R = 0.3;
 
 // Avertisseur « ! » au bord droit (comme les missiles de Jetpack Joyride) :
 // une traversée est armée mais sa rangée n'est pas encore à l'écran.
+const alertesVues = new Map(); // rangée → instant (réel) où son panneau est apparu
 function renderAlertes(now, vitesse) {
   if (!gameStarted || game.ended || now < 0) return;
   const devant = scene.unitesDevant();
@@ -939,28 +943,35 @@ function renderAlertes(now, vitesse) {
     if (!ou || ou.v - (row.type === "contresens" ? rows.KINDS[row.kind].long / 2 : 0) <= player.v + devant + 1) continue;
     const tRest = row.type === "contresens" ? (ou.v - player.v) / Math.max(0.5, vitesse + row.vitesse) : (r - player.v) / Math.max(0.5, vitesse);
     const urgence = Math.max(0, Math.min(1, 1 - (tRest - 1) / 2.5));
-    const pouls = 0.82 + 0.18 * Math.sin(now * 16);
-    const taille = (26 + 16 * urgence) * pouls;
-    const y = scene.project(0, player.v, 1.4).y;
+    // 4 octobre 2026 (« il doit trembler pendant 1 seconde, et après se réduire
+    // en taille et être tout le temps là [...] c'est un poil trop ») : grand et
+    // qui tremble la première seconde, puis petit et calme jusqu'à l'arrivée.
+    const tReel = perfClock();
+    if (!alertesVues.has(r)) { alertesVues.set(r, tReel); if (alertesVues.size > 40) alertesVues.delete(alertesVues.keys().next().value); }
+    const age = tReel - alertesVues.get(r);
+    const reduit = Math.max(0, Math.min(1, (age - 1) / 0.3));
+    const taille = 32 * (1 - reduit) + 17 * reduit;
+    const tremble = age < 1 ? Math.sin(age * 72) * 5 * (1 - age * 0.6) : 0;
+    const y = scene.project(0, player.v, 1.4).y + (age < 1 ? Math.cos(age * 61) * 2 : 0);
     // ⚠️ Le panneau tenait sur `width − 18 − taille` et son sommet droit
     // partait donc HORS de l'écran (20 septembre 2026 : « il est coupé sur la
     // droite, il apparaît pas dans tout l'écran »). Il est désormais posé sur
     // sa largeur réelle, 2 × taille, avec une marge franche.
-    const x = width - 14 - taille * 2;
-    projoLancer("alerte", x + taille, y, taille * 2.2); projoSuivre("alerte", x + taille, y);
+    const x = width - 14 - taille * 2 + tremble;
+    projoLancer("alerte", x + taille, y, 70); projoSuivre("alerte", x + taille, y);
     ctx.save();
     // Halo puis panneau plein, contour blanc : il doit sauter aux yeux
     // (20 septembre 2026 : « le panneau d'attention n'est pas du tout assez visible »).
     const halo = ctx.createRadialGradient(x + taille, y, 0, x + taille, y, taille * 2.4);
     const grave = row.kind === "tracteur" || row.kind === "contresens" || row.kind === "bus";
     const teinte = grave ? "225,62,38" : "255,207,46";
-    halo.addColorStop(0, `rgba(${teinte},${0.5 * urgence + 0.2})`);
+    halo.addColorStop(0, `rgba(${teinte},${(0.5 * urgence + 0.2) * (1 - reduit * 0.75)})`);
     halo.addColorStop(1, `rgba(${teinte},0)`);
     ctx.fillStyle = halo;
     ctx.fillRect(x + taille - taille * 2.4, y - taille * 2.4, taille * 4.8, taille * 4.8);
     ctx.fillStyle = grave ? "#e13e26" : "#ffcf2e";
     ctx.strokeStyle = "#ffffff";
-    ctx.lineWidth = 3.5;
+    ctx.lineWidth = 3.5 - reduit * 1.3;
     ctx.lineJoin = "round";
     ctx.beginPath();
     ctx.moveTo(x + taille, y - taille * 1.15);
@@ -1100,22 +1111,21 @@ function render(alpha) {
   }
   if (game.arriveeR !== null && Math.abs(game.arriveeR - vc) < largeurRoute + 6) {
     const ra = game.arriveeR, RH = scene.ROAD_HALF;
-    // Damier au sol, puis l'arche : poteau du fond, poteau de devant, bandeau.
+    // 4 octobre 2026 (« arrête d'écrire ARRIVÉE de manière 2D alors que le jeu
+    // est modélisé en 3D, tu mets juste les carreaux noirs et blancs ») : plus
+    // de texte. Un damier au sol, et un drapeau à damier sur chaque poteau,
+    // tourné vers la caméra pour se lire de profil.
+    const damier = (i, j) => ((i + j) % 2 ? "#0d0d10" : "#f4efe4");
+    const drapeau = (u) => {
+      scene.drawBox(ctx, u, ra - 0.12, 0.24, 0.24, 5.2, "#3a3a40");
+      for (let i = 0; i < 6; i++) for (let j = 0; j < 4; j++) scene.drawBox(ctx, u - 0.02, ra + 0.12 + i * 0.32, 0.06, 0.32, 0.32, damier(i, j), 3.9 + j * 0.32);
+    };
     items.push({ decor: true, d: scene.depth(RH + 0.6, ra), draw: () => {
-      const n = 6, du = (2 * RH) / n;
-      for (let i = 0; i < n; i++) for (let j = 0; j < 2; j++) scene.drawFlat(ctx, -RH + i * du, ra - 0.5 + j * 0.5, du, 0.5, (i + j) % 2 ? "#0d0d10" : "#f4efe4");
-      scene.drawBox(ctx, RH + 0.3, ra - 0.15, 0.3, 0.3, 4.6, "#e13e26");
+      const n = 8, du = (2 * RH) / n;
+      for (let i = 0; i < n; i++) for (let j = 0; j < 3; j++) scene.drawFlat(ctx, -RH + i * du, ra - 0.6 + j * 0.4, du, 0.4, damier(i, j));
+      drapeau(RH + 0.3);
     } });
-    items.push({ d: scene.depth(-RH - 0.6, ra), draw: () => {
-      scene.drawBox(ctx, -RH - 0.6, ra - 0.15, 0.3, 0.3, 4.6, "#e13e26");
-      scene.drawBox(ctx, -RH - 0.6, ra - 0.3, 2 * RH + 1.5, 0.6, 0.9, "#e13e26", 4.6);
-      const p = scene.project(-RH - 0.6, ra, 5.05);
-      ctx.save();
-      ctx.fillStyle = "#ffffff"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
-      ctx.font = `900 ${Math.round(scene.scale() * 0.62)}px "Helvetica Neue", Helvetica, Arial, sans-serif`;
-      ctx.fillText("ARRIVÉE", p.x, p.y);
-      ctx.restore();
-    } });
+    items.push({ d: scene.depth(-RH - 0.6, ra), draw: () => drapeau(-RH - 0.6) });
   }
   if (gameStarted) for (const dr of friends.drawables(ctx, pedal, penteSol)) items.push({ d: scene.depth(dr.u, dr.v), draw: dr.draw });
   // Le fantôme du meilleur de la ligue : transparent, sans ombre, étiqueté.
@@ -1231,7 +1241,7 @@ function render(alpha) {
     ctx.restore();
   }
   if (gameStarted && !game.ended) {
-    if (now < COUNT_IN_GO_LINGER_S) hud.renderCountIn(ctx, width, height, now, clock.beatPeriod, COUNT_IN_BEATS, COUNT_IN_GO_LINGER_S);
+    if (now < COUNT_IN_GO_LINGER_S) hud.renderCountIn(ctx, width, height, now, clock.beatPeriod, COUNT_IN_BEATS, COUNT_IN_GO_LINGER_S, !game.sonAnnonce);
     hud.renderTuto(ctx, width, height, conseilVue());
   }
   // Le doigt qui tape : 3 premières parties, jusqu'au premier saut.
@@ -1262,26 +1272,44 @@ const skinCanvas = document.getElementById("skin-canvas");
 const skinCtx = skinCanvas ? skinCanvas.getContext("2d") : null;
 let apercuPedal = 0;
 function renderApercu(pedal) {
+  renderSplash();
   // Aussi APRÈS une course : le bouton « Menu » de l'écran de fin ramène ici.
   if (!skinCtx || !document.getElementById("overlay").classList.contains("visible") || !document.getElementById("onboarding").classList.contains("active") || screens.stepCourante() !== 3) return;
   apercuPedal += 0.12;
+  dessinerCycliste(skinCanvas, skinCtx, 240, 140, apercuPedal, false);
+}
+// Un cycliste qui pédale, centré dans un petit canvas : l'aperçu du menu, et
+// l'écran de chargement (4 octobre 2026 : « rajoute le cycliste en 3D en train
+// de pédaler »), où la route défile sous lui.
+function dessinerCycliste(cv, c2, cw, ch, ped, route) {
   const P = paletteDepuisSkin(screens.getSkin());
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
-  const cw = 240, ch = 140;
-  if (skinCanvas.width !== cw * dpr) { skinCanvas.width = cw * dpr; skinCanvas.height = ch * dpr; }
-  skinCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  skinCtx.clearRect(0, 0, cw, ch);
+  if (cv.width !== cw * dpr) { cv.width = cw * dpr; cv.height = ch * dpr; }
+  c2.setTransform(dpr, 0, 0, dpr, 0, 0);
+  c2.clearRect(0, 0, cw, ch);
   const VW = 700;
   scene.setViewport(VW, VW);
   scene.setJoueurX(0.36);
   scene.setCamera(0);
   const a = scene.project(0, 0, 0);
-  skinCtx.save();
-  skinCtx.translate(cw / 2 - a.x, ch * 0.88 - a.y);
-  scene.drawFlat(skinCtx, -0.7, -1.4, 1.4, 2.8, "#565250");
-  drawRider(skinCtx, 0, 0, 0, P, apercuPedal, 1, 0);
-  skinCtx.restore();
+  c2.save();
+  c2.translate(cw / 2 - a.x, ch * 0.88 - a.y);
+  if (route) {
+    scene.drawFlat(c2, -0.8, -3.4, 1.6, 6.8, "#3a3633");
+    const pas = 1.7, decal = (ped * 0.22) % pas;
+    for (let k = -3; k <= 3; k++) scene.drawFlat(c2, -0.05, k * pas - decal, 0.1, 0.8, "#f2ead8");
+  } else scene.drawFlat(c2, -0.7, -1.4, 1.4, 2.8, "#565250");
+  drawRider(c2, 0, 0, 0, P, ped, 1, 0);
+  c2.restore();
   scene.setViewport(width, height);
+}
+const splashVelo = document.getElementById("splash-velo");
+const splashCtx = splashVelo ? splashVelo.getContext("2d") : null;
+let splashPedal = 0;
+function renderSplash() {
+  if (!splashCtx || document.getElementById("splash").classList.contains("fini")) return;
+  splashPedal += 0.16;
+  dessinerCycliste(splashVelo, splashCtx, 200, 110, splashPedal, true);
 }
 
 if ("serviceWorker" in navigator && location.hostname !== "localhost") {

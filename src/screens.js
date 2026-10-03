@@ -171,6 +171,7 @@ const onboarding = $("onboarding");
 export function setStep(n) {
   if (enBeta() && n === 2) n = 3; // pas d'étape « ma ligue » en bêta : elle est imposée
   onboarding.dataset.step = String(n); if (n === 3) construireSkinUi(); majSprint(); majBoutonJouer();
+  requestAnimationFrame(centrerMenu);
 }
 // Ordre du premier passage (3 octobre 2026 : « choisir son personnage, ça
 // arrive avant de créer la ligue [...] ils ont envie de jouer ») : pseudo →
@@ -197,7 +198,54 @@ export function getParties() { return Number(lsGet(CLE_PARTIES)) || 0; }
 export function compterPartie() { lsSet(CLE_PARTIES, String(getParties() + 1)); }
 export function setRecord(m) { lsSet(CLE_RECORD, String(Math.floor(m))); }
 
-export function showOverlay() { overlay.classList.add("visible"); }
+export function showOverlay() { overlay.classList.add("visible"); requestAnimationFrame(centrerMenu); }
+
+// --- Menu centré, qui remonte quand le clavier s'ouvre (4 octobre 2026) -----
+// « Il faudrait que ça soit centré sur l'écran, que la personne clique sur le
+// premier champ et que le clavier s'ouvre de manière fluide : toute la bande
+// avec ton pseudo, ton Instagram, ton village monte vers le haut. » La marge
+// haute de l'overlay (--centre) centre le bloc titre + carte + album ; un
+// champ qui prend le focus la ramène à 0 en 0,35 s (transition CSS), le bloc
+// monte au-dessus du clavier. Les champs font 16 px : en dessous, Safari
+// zoome dans la page à l'ouverture du clavier (le « saut » qu'on voyait).
+function centrerMenu() {
+  const enMenu = overlay.classList.contains("visible") && onboardingEl.classList.contains("active") && !overlay.classList.contains("end-view");
+  if (!enMenu || overlay.classList.contains("clavier")) { overlay.style.setProperty("--centre", "0px"); return; }
+  const blocs = [...overlay.children].filter((e) => e.getClientRects().length && !/^(fixed|absolute)$/.test(getComputedStyle(e).position));
+  if (!blocs.length) return;
+  let haut = Infinity, bas = -Infinity;
+  for (const e of blocs) {
+    const r = e.getBoundingClientRect(), cs = getComputedStyle(e);
+    haut = Math.min(haut, r.top - parseFloat(cs.marginTop || 0));
+    bas = Math.max(bas, r.bottom + parseFloat(cs.marginBottom || 0));
+  }
+  const sonde = $("safe-probe");
+  const padHaut = 16 + (sonde ? sonde.getBoundingClientRect().top : 0);
+  const padBas = parseFloat(getComputedStyle(overlay).paddingBottom || 0);
+  const libre = overlay.clientHeight - padHaut - padBas - (bas - haut);
+  overlay.style.setProperty("--centre", `${Math.max(0, Math.round(libre / 2))}px`);
+}
+let clavierT = 0;
+function brancherCentrage() {
+  try { new ResizeObserver(() => centrerMenu()).observe(onboardingEl); } catch (e) { /* vieux navigateur : centrage au resize seulement */ }
+  window.addEventListener("resize", () => requestAnimationFrame(centrerMenu));
+  onboardingEl.addEventListener("focusin", (e) => {
+    if (!e.target.matches("input")) return;
+    clearTimeout(clavierT);
+    overlay.classList.add("clavier");
+    centrerMenu();
+  });
+  onboardingEl.addEventListener("focusout", () => {
+    clearTimeout(clavierT);
+    clavierT = setTimeout(() => {
+      const a = document.activeElement;
+      if (a && onboardingEl.contains(a) && a.matches("input")) return; // on passe d'un champ à l'autre
+      overlay.classList.remove("clavier");
+      window.scrollTo(0, 0); // Safari laisse parfois la page décalée après le clavier
+      centrerMenu();
+    }, 120);
+  });
+}
 export function hideOverlay() { overlay.classList.remove("visible"); }
 export function showOverlayOnLoad() { requestAnimationFrame(() => requestAnimationFrame(showOverlay)); }
 
@@ -206,6 +254,7 @@ function setView(view) {
   endScreenEl.classList.toggle("active", view === "end");
   overlay.classList.toggle("end-view", view === "end");
   ctaLink.style.display = view === "onboarding" ? "" : "none";
+  requestAnimationFrame(centrerMenu);
 }
 
 // --- Décompte circulaire (carte de mort) -----------------------------------
@@ -506,7 +555,23 @@ async function rafraichirBoost() {
   if (p) calculerBoost(p);
 }
 
-function ligueMessage(txt) { ligueMsg.textContent = txt || ""; ligueMsg.classList.toggle("hidden", !txt); }
+// Deux places pour les messages (4 octobre 2026 : « tu mets le code avec
+// Touche pour copier ; en dessous, tu écris : Ta ligue est créée, tu peux
+// inviter tes potes ») : sans ligue, sous le champ du code (erreurs) ; avec
+// une ligue, le bandeau jaune SOUS le code.
+let statutLigue = "";
+const MSG_CREEE = "Ta ligue est créée. Tu peux inviter tes potes.";
+function ligueMessage(txt) {
+  if (ligue) { statutLigue = txt || ""; ligueMsg.classList.add("hidden"); majStatut(); return; }
+  ligueMsg.textContent = txt || ""; ligueMsg.classList.toggle("hidden", !txt);
+}
+function majStatut() {
+  const el = $("ligue-statut");
+  if (!el) return;
+  const autres = ligue ? ligue.membres.filter((m) => m.nom !== getPseudo()) : [];
+  const t = !ligue || ligue.enAttente ? "" : statutLigue || (autres.length === 0 ? MSG_CREEE : "");
+  el.textContent = t; el.classList.toggle("hidden", !t);
+}
 // Le peloton compte au moins 4 cyclistes (3 octobre 2026 : « trois bots qui
 // s'appellent Bot 1, Bot 2 et Bot 3 [...] remplacés au fur et à mesure par
 // les personnes qui arrivent vraiment »). Mêmes noms dans le jeu (friends.js).
@@ -527,9 +592,9 @@ function afficherLigue() {
   suivant.classList.toggle("btn-primary", !!ligue && !seul);
   suivant.classList.toggle("btn-secondary", !ligue || seul);
   suivant.classList.toggle("btn-petit", !ligue);
-  if (!ligue) { pelotonAffiche = new Set(); return; }
+  if (!ligue) { pelotonAffiche = new Set(); statutLigue = ""; return; }
   ligueCodeEl.textContent = ligue.code;
-  $("ligue-titre").textContent = ligue.enAttente ? "Tu rejoins la ligue" : "Ta ligue";
+  $("ligue-titre").textContent = ligue.enAttente ? "Tu rejoins la ligue" : "Ma ligue";
   liguePartager.classList.toggle("hidden", !!ligue.enAttente);
   const ul = $("ligue-peloton");
   ul.textContent = "";
@@ -546,7 +611,8 @@ function afficherLigue() {
   if (ligue.enAttente) ligueMembresEl.textContent = "Tu en fais partie ! Appuie sur Jouer.";
   else ligueMembresEl.textContent = autres.length >= BOTS_LIGUE
     ? `${autres.length} pote${autres.length > 1 ? "s" : ""} dans ta ligue : ils pédalent derrière toi.`
-    : "En attendant tes potes, des bots roulent avec toi. Chaque pote qui rejoint remplace un bot.";
+    : "En attendant tes vrais potes, des bots jouent avec toi. Quand tes potes auront fait une partie, ils remplaceront les bots.";
+  majStatut();
 }
 function ligueDispo() { return (net.estConfigure() || demo) && !enBeta(); }
 function memoriserLigue() { if (ligue) lsSet(CLE_LIGUE, JSON.stringify(ligue)); else { try { localStorage.removeItem(CLE_LIGUE); } catch (e) { /* rien */ } } }
@@ -562,7 +628,7 @@ async function rejoindre(code, creer = false) {
   if (demo) {
     // Démo : créer = une ligue où l'on est seul ; rejoindre = la ligue démo pleine.
     ligue = { code, membres: creer ? [{ nom: pseudo, skin: null }] : DEMO.noms.map((nom) => ({ nom, skin: null })), demo: true };
-    memoriserLigue(); appliquerNomsLigue(); afficherLigue(); ligueMessage(creer ? "Ta ligue est créée ! Maintenant, invite tes potes." : ""); rafraichirBoost();
+    memoriserLigue(); appliquerNomsLigue(); afficherLigue(); ligueMessage(creer ? MSG_CREEE : ""); rafraichirBoost();
     return true;
   }
   ligueMessage("…");
@@ -574,7 +640,7 @@ async function rejoindre(code, creer = false) {
     return false;
   }
   ligue = { code, membres: r.membres };
-  memoriserLigue(); appliquerNomsLigue(); afficherLigue(); appliquerModeBeta(); ligueMessage(""); rafraichirBoost();
+  memoriserLigue(); appliquerNomsLigue(); afficherLigue(); appliquerModeBeta(); ligueMessage(creer ? MSG_CREEE : ""); rafraichirBoost();
   if (invitation) net.evenement("invitation_acceptee", { pseudo, ligue: code, source: getSource() });
   return true;
 }
@@ -883,7 +949,12 @@ function syncMuteIcon() {
 // potes, +10 % par pote. Un tap passe à l'étape suivante ; après la
 // troisième, la course part toute seule. Le contexte audio est débloqué AVANT,
 // dans le geste du JOUER. 3 premières parties + toujours en ligue démo.
-const EXPL_ETAPES = [4.2, 3.8, 5.4];
+const EXPL_ETAPES = [4.2, 3.8, 5.4, 5.0];
+// « Monte le son » (4 octobre 2026 : « il faut le mettre vraiment pendant 5
+// secondes avant que le jeu démarre ») : dernière carte avant la course, deux
+// coups de klaxon pour régler le volume. Le décompte ne le répète pas.
+let annonceSon = false;
+export function consommerAnnonceSon() { const a = annonceSon; annonceSon = false; return a; }
 function montrerExplication(ensuite) {
   const box = $("explication");
   if (!box || (!demo && getParties() >= 3) || enBeta()) { ensuite(); return; }
@@ -892,7 +963,7 @@ function montrerExplication(ensuite) {
   const mult = $("expl-mult"), barre = box.querySelector("#expl-barre i"), eyebrow = $("expl-eyebrow");
   let minuteurs = [], idx = -1, fini = false;
   const vider = () => { minuteurs.forEach(clearTimeout); minuteurs = []; };
-  const finir = () => { if (fini) return; fini = true; vider(); box.classList.add("hidden"); ensuite(); };
+  const finir = () => { if (fini) return; fini = true; vider(); box.classList.add("hidden"); annonceSon = idx >= 3; ensuite(); };
   const etape = (i) => {
     vider();
     if (i >= etapes.length) { finir(); return; }
@@ -912,6 +983,7 @@ function montrerExplication(ensuite) {
         try { sfx.piece(); } catch (e) { /* pas de son, tant pis */ }
       }, 500 + k * 550)));
     }
+    if (i === 3) [300, 1300].forEach((ms) => minuteurs.push(setTimeout(() => { try { sfx.klaxon(); } catch (e) { /* pas de son */ } }, ms)));
     minuteurs.push(setTimeout(() => etape(i + 1), EXPL_ETAPES[i] * 1000));
   };
   if (!box.dataset.branche) {
@@ -958,6 +1030,9 @@ export function init(d) {
   const step1Next = $("step1-next");
   const syncPlay = () => { majBoutonJouer(); step1Next.disabled = getPseudo().length === 0; };
   pseudoInput.addEventListener("input", syncPlay);
+  // Entrée sur le pseudo = Continuer (le clavier se ferme, la carte se recentre).
+  pseudoInput.addEventListener("keydown", (e) => { if (e.key === "Enter" && !step1Next.disabled) { e.preventDefault(); pseudoInput.blur(); step1Next.click(); } });
+  brancherCentrage();
   syncPlay();
   [pseudoInput, instaInput, villeInput].forEach((inp) => ["pointerdown", "touchstart", "touchmove", "mousedown"].forEach((t) => inp.addEventListener(t, (e) => e.stopPropagation())));
   step1Next.addEventListener("click", () => { if (!getPseudo()) { pseudoInput.focus(); return; } enregistrerProfil(); setStep(3); });

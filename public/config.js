@@ -13,7 +13,7 @@ window.CONFIG = {
   dureeMorceau: 173.65,
   fichierAudio: "assets/jai-un-pote.mp3", // 96 kbps, 2,1 Mo (le 320 de l'EPK fait 6,9 Mo)
   boucleMorceau: false,     // contre-la-montre : la fin du morceau = la fin de la partie (6 septembre 2026)
-  chargementMinS: 1.8,      // 5 → 1,8 le 20 septembre 2026 (« le démarrage est vraiment extrêmement lent »)
+  chargementMinS: 2.6,      // 5 → 1,8 le 20 septembre 2026 (« le démarrage est vraiment extrêmement lent ») → 2,6 le 4 octobre (« un tout petit peu plus, pour tous les appareils »)
   fonduEntree: 1.2,
   fonduSortie: 2.0,
   pauseFiltreHz: 800,

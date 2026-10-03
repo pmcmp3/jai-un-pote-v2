@@ -79,13 +79,15 @@
     #overlay {
       position: fixed; inset: 0; z-index: 20;
       display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
-      padding: calc(16px + var(--safe-top)) 20px calc(20px + var(--safe-bottom) + var(--browser-chrome-bottom));
+      padding: calc(16px + var(--safe-top) + var(--centre, 0px)) 20px calc(20px + var(--safe-bottom) + var(--browser-chrome-bottom));
       box-sizing: border-box; overflow-y: auto; -webkit-overflow-scrolling: touch; touch-action: pan-y;
       background: linear-gradient(180deg, rgba(13,13,16,0.1) 0%, rgba(13,13,16,0.3) 55%, rgba(13,13,16,0.5) 100%);
       opacity: 0; visibility: hidden;
       transition: opacity 0.45s ease, visibility 0s linear 0.45s;
     }
-    #overlay.visible { opacity: 1; visibility: visible; transition: opacity 0.45s ease, visibility 0s; }
+    #overlay.visible { opacity: 1; visibility: visible; transition: opacity 0.45s ease, visibility 0s, padding-top 0.35s ease; }
+    #overlay.clavier #menu-title { margin: 0 0 16px; }
+    #menu-title { transition: margin 0.35s ease; }
     #overlay .fade { opacity: 0; transform: translateY(10px); transition: opacity 0.5s ease, transform 0.5s ease; }
     #overlay.visible .fade { opacity: 1; transform: translateY(0); }
     #overlay.visible .fade:nth-child(2) { transition-delay: 0.12s; }
@@ -152,7 +154,7 @@
     #pseudo-row .icon { font: 500 14px var(--police); color: rgba(0,0,0,0.45); }
     #pseudo-input {
       flex: 1; min-width: 0; background: transparent; border: none; border-bottom: 1.5px solid rgba(0,0,0,0.4);
-      color: var(--noir); font: 500 15px var(--police); padding: 5px 2px; -webkit-appearance: none;
+      color: var(--noir); font: 500 16px var(--police); padding: 5px 2px; -webkit-appearance: none;
     }
     #pseudo-input::placeholder { color: rgba(0,0,0,0.32); }
     #pseudo-input:focus { outline: none; border-bottom-color: var(--rouge); }
@@ -160,12 +162,13 @@
     .regle { width: 240px; margin: 0 0 18px; padding: 0; list-style: none; font: 500 12.5px/1.5 var(--police); color: rgba(0,0,0,0.7); }
     .regle li { display: flex; gap: 8px; }
     .regle b { font-weight: 900; color: var(--noir); min-width: 62px; }
-    #splash { position: fixed; inset: 0; z-index: 200; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 34px; background: var(--rouge); transition: opacity 0.45s ease, visibility 0s linear 0.45s; }
+    #splash { position: fixed; inset: 0; z-index: 200; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; background: var(--rouge); transition: opacity 0.45s ease, visibility 0s linear 0.45s; }
     #splash.fini { opacity: 0; visibility: hidden; pointer-events: none; }
     #splash-logo { perspective: 700px; animation: splash-flotte 2.4s ease-in-out infinite; }
     #splash-logo img { display: block; width: 150px; height: auto; animation: splash-tour 2.4s cubic-bezier(.45,0,.55,1) infinite; backface-visibility: visible; }
     @keyframes splash-tour { from { transform: rotateY(0deg); } to { transform: rotateY(360deg); } }
     @keyframes splash-flotte { 0%, 100% { transform: translateY(-6px); } 50% { transform: translateY(6px); } }
+    #splash-velo { width: 200px; height: 110px; margin-top: -4px; }
     #loading { display: flex; flex-direction: column; align-items: center; gap: 8px; width: 200px; }
     #loading.failed #loading-track { display: none; }
     #loading-track { width: 100%; height: 3px; border-radius: 999px; background: rgba(255,255,255,0.3); overflow: hidden; }
@@ -176,10 +179,12 @@
     #onboarding .step { display: none; }
     #onboarding[data-step="1"] .step[data-step="1"], #onboarding[data-step="2"] .step[data-step="2"], #onboarding[data-step="3"] .step[data-step="3"] { display: block; }
     .champ-row { display: flex; align-items: center; gap: 10px; width: 240px; margin-top: 10px; }
+    .champ-titre { width: 240px; margin: 20px 0 0; font: 700 10.5px var(--police); letter-spacing: 0.14em; text-transform: uppercase; color: rgba(0,0,0,0.45); text-align: left; }
+    #step1-next { margin-top: 22px; }
     .champ-row .icon { font: 700 11px var(--police); color: rgba(0,0,0,0.45); min-width: 16px; text-align: center; }
-    .champ-row input { flex: 1; min-width: 0; background: transparent; border: none; border-bottom: 1.5px solid rgba(0,0,0,0.25); color: var(--noir); font: 500 14px var(--police); padding: 5px 2px; -webkit-appearance: none; }
+    .champ-row input { flex: 1; min-width: 0; background: transparent; border: none; border-bottom: 1.5px solid rgba(0,0,0,0.25); color: var(--noir); font: 500 16px var(--police); padding: 5px 2px; -webkit-appearance: none; }
     .champ-row input:focus { outline: none; border-bottom-color: var(--rouge); }
-    #step2-back, #step3-links { margin-top: 10px; }
+    #step3-links { margin-top: 10px; }
     #step3-links { display: flex; gap: 18px; }
     /* ⚠️ Le canvas fait 240×140 et s'affiche en 240×140 : il était dessiné en
        220×200 et affiché en 200×120, donc écrasé de 34 % en hauteur (« mon
@@ -218,6 +223,11 @@
     #expl-potes span:nth-child(2) { background: #e13e26; } #expl-potes span:nth-child(3) { background: #3f63b4; }
     #expl-potes span:nth-child(4) { background: #ffcf2e; } #expl-potes span:nth-child(5) { background: #8a3fd4; } #expl-potes span:nth-child(6) { background: #f2ede2; }
     #expl-potes span.on { opacity: 1; transform: scale(1); transition: transform 0.25s cubic-bezier(.3,1.6,.5,1), opacity 0.15s; }
+    #expl-son { position: relative; width: 120px; height: 90px; margin: 0 auto 10px; }
+    #expl-son .hp { position: absolute; left: 14px; top: 18px; font-size: 48px; line-height: 1; }
+    #expl-son .onde { position: absolute; left: 50px; top: 20px; width: 44px; height: 44px; border: 3px solid var(--rouge); border-left-color: transparent; border-bottom-color: transparent; border-radius: 50%; transform: rotate(45deg); opacity: 0; animation: expl-son 1.2s ease-out infinite; }
+    #expl-son .o2 { animation-delay: 0.25s; } #expl-son .o3 { animation-delay: 0.5s; }
+    @keyframes expl-son { 0% { opacity: 0; transform: rotate(45deg) scale(0.5); } 30% { opacity: 1; } 100% { opacity: 0; transform: rotate(45deg) scale(1.5); } }
     #expl-mult { margin: 10px 0 8px; font: 900 44px/1 var(--titre); color: var(--rouge); }
     #expl-mult.pop { animation: expl-pop 0.25s ease-out; }
     #expl-tag { display: inline-block; margin: 0 0 10px; padding: 7px 12px; background: #ffcf2e; border: 1.5px solid var(--noir); transform: rotate(6deg); font: 900 13px var(--police); letter-spacing: 0.06em; text-transform: uppercase; color: var(--noir); animation: expl-pop 0.3s ease-out; }
@@ -263,12 +273,12 @@
     #ligue-bloc { width: 240px; margin: 0 0 16px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
     #ligue-bloc.hidden { display: none; }
     #ligue-row { display: flex; gap: 8px; width: 100%; }
-    #ligue-input { flex: 1; min-width: 0; box-sizing: border-box; border: 1.5px solid rgba(0,0,0,0.35); border-radius: var(--rayon); padding: 8px 10px; font: 700 13px var(--police); letter-spacing: 0.12em; text-transform: uppercase; color: var(--noir); background: transparent; -webkit-appearance: none; }
+    #ligue-input { flex: 1; min-width: 0; box-sizing: border-box; border: 1.5px solid rgba(0,0,0,0.35); border-radius: var(--rayon); padding: 7px 10px; font: 700 16px var(--police); letter-spacing: 0.1em; text-transform: uppercase; color: var(--noir); background: transparent; -webkit-appearance: none; }
     #ligue-input:focus { outline: none; border-color: var(--rouge); }
     #ligue-row .btn { width: auto; min-height: 38px; padding: 8px 12px; font-size: 11px; }
     #ligue-sans, #ligue-avec { display: flex; flex-direction: column; align-items: center; gap: 8px; width: 100%; }
     #ligue-titre { margin: 0; font: 700 11px var(--police); letter-spacing: 0.14em; text-transform: uppercase; color: rgba(0,0,0,0.6); }
-    #ligue-titre b, #end-ligue-titre b { color: var(--rouge); font-weight: 900; font-size: 15px; letter-spacing: 0.18em; }
+    #end-ligue-titre b { color: var(--rouge); font-weight: 900; font-size: 15px; letter-spacing: 0.18em; }
     #ligue-membres { margin: 0; font: 500 12px/1.4 var(--police); color: var(--noir); text-align: center; }
     #ligue-actions { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 100%; }
     #ligue-actions .btn { width: 100%; min-height: 40px; padding: 8px 12px; font-size: 12px; }
@@ -287,15 +297,23 @@
     #ligue-code-btn b { font: 900 34px/1 var(--police); letter-spacing: 0.16em; color: var(--rouge); -webkit-user-select: all; user-select: all; }
     #ligue-code-btn small { font: 600 10px var(--police); letter-spacing: 0.1em; text-transform: uppercase; color: rgba(0,0,0,0.5); }
     #ligue-code-btn:active { transform: scale(0.97); }
-    #ligue-avec #ligue-partager { width: 100%; min-height: 54px; font-size: 14px; }
+    #ligue-avec #ligue-partager { width: 100%; min-height: 76px; font-size: 15px; }
+    #ligue-avec #ligue-partager .share-inner { gap: 9px; }
+    #ligue-avec #ligue-partager .share-apps { gap: 16px; opacity: 0.9; }
+    #ligue-code-btn { width: 100%; box-sizing: border-box; }
+    #ligue-avec, #ligue-sans { gap: 10px; }
     #ligue-peloton { display: flex; flex-wrap: wrap; justify-content: center; gap: 5px; width: 100%; margin: 2px 0 0; padding: 0; list-style: none; }
     #ligue-peloton li { padding: 4px 8px; border: 1.5px solid var(--noir); border-radius: 3px; font: 700 11.5px var(--police); color: var(--noir); }
     #ligue-peloton li.moi { background: #ffcf2e; }
     #ligue-peloton li.bot { border-style: dashed; border-color: rgba(0,0,0,0.3); color: rgba(0,0,0,0.4); font-weight: 600; }
     #ligue-peloton li.nouveau { animation: expl-pop 0.3s ease-out; }
     .btn.btn-petit { min-height: 38px; padding: 8px 14px; font-size: 11px; width: auto; }
-    #step2-liens { display: flex; gap: 22px; justify-content: center; }
-    #ligue-msg { width: 100%; box-sizing: border-box; margin: 0 0 12px; padding: 7px 10px; background: #ffcf2e; border: 1.5px solid var(--noir); border-radius: 3px; font: 700 12.5px/1.35 var(--police); color: var(--noir); text-align: center; }
+    #step2-liens { display: flex; gap: 26px; justify-content: center; align-items: center; margin-top: 14px; }
+    #step2-liens .link-minimal { margin: 0; line-height: 1.2; }
+    [data-step="2"] #step2-next { width: 100%; margin-top: 12px; }
+    [data-step="2"] #step2-next.btn-petit { width: auto; }
+    #ligue-msg { width: 100%; box-sizing: border-box; margin: 0; font: 700 12.5px/1.35 var(--police); color: var(--rouge); text-align: center; }
+    #ligue-statut { width: 100%; box-sizing: border-box; margin: 0; padding: 8px 10px; background: #ffcf2e; border: 1.5px solid var(--noir); border-radius: 3px; font: 700 13px/1.35 var(--police); color: var(--noir); text-align: center; }
     #end-ligue { width: 100%; margin: 0 0 12px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
     #end-ligue-titre { margin: 0; padding: 0; border: none; background: none; font: 700 11px var(--police); letter-spacing: 0.14em; text-transform: uppercase; color: rgba(0,0,0,0.6); cursor: pointer; -webkit-tap-highlight-color: transparent; }
     #end-ligue-titre b { text-decoration: underline; text-underline-offset: 4px; }
@@ -436,6 +454,7 @@
        morceau et le moteur ne sont pas prêts, puis fondu vers le menu. -->
   <div id="splash">
     <div id="splash-logo"><img src="assets/logo-lveb.webp" alt="la ville est belle" width="150" height="218" /></div>
+    <canvas id="splash-velo" width="200" height="110" aria-hidden="true"></canvas>
     <div id="loading">
       <div id="loading-track"><div id="loading-fill"></div></div>
       <span id="loading-label">0 %</span>
@@ -460,9 +479,9 @@
             <span class="icon">@</span>
             <input type="text" id="pseudo-input" placeholder="ton pseudo" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="32" />
           </div>
+          <p class="champ-titre beta-off">Pour aller plus loin</p>
           <div class="champ-row beta-off"><span class="icon">IG</span><input type="text" id="insta-input" placeholder="ton Instagram (facultatif)" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="40" /></div>
           <div class="champ-row beta-off"><span class="icon">⌂</span><input type="text" id="ville-input" placeholder="ton village, ta ville (facultatif)" autocomplete="off" spellcheck="false" maxlength="24" /></div>
-          <p class="field-note beta-off">Pour aller plus loin, tu as besoin de tes amis. Fais les choses correctement.</p>
           <p id="beta-note" class="field-note hidden">Bêta-test : tout le monde court la <b>même course</b>. Écris ton pseudo, joue, et laisse-moi ton retour à la fin.</p>
           <button id="step1-next" class="btn btn-primary" type="button" disabled>Continuer</button>
         </div>
@@ -474,10 +493,9 @@
           <!-- Ligue entre potes (7 septembre 2026), réécrite le 3 octobre 2026 :
                une phrase de pourquoi, deux chemins (créer / rejoindre), puis
                le code en gros, Inviter en gros, le peloton avec ses bots. -->
-          <p id="ligue-msg" class="hidden"></p>
           <div id="ligue-bloc">
             <div id="ligue-sans">
-              <p id="ligue-intro">Ce jeu se joue avec tes potes&nbsp;: <b>plus ils sont nombreux à jouer, plus tu marques de points.</b> Même route pour tous, donc un vrai classement entre vous.</p>
+              <p id="ligue-intro">Plus tes potes jouent, plus tu marques de points. <b>Deviens le meilleur score de ta ligue de potes.</b></p>
               <button id="ligue-creer" type="button" class="btn btn-primary">Créer ma ligue</button>
               <p class="lp-sep"><span>ou</span></p>
               <p class="lp-ou">Un pote t'a donné un code&nbsp;?</p>
@@ -485,15 +503,17 @@
                 <input type="text" id="ligue-input" placeholder="CODE" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="6" />
                 <button id="ligue-rejoindre" class="btn btn-secondary" type="button">Rejoindre</button>
               </div>
+              <p id="ligue-msg" class="hidden"></p>
             </div>
             <div id="ligue-avec" class="hidden">
-              <p id="ligue-titre">Ta ligue</p>
+              <p id="ligue-titre">Ma ligue</p>
               <button id="ligue-code-btn" type="button" aria-label="Copier le code de la ligue"><b id="ligue-code">—</b><small id="ligue-code-aide">Touche pour copier</small></button>
-              <button id="ligue-partager" class="btn btn-primary share-btn" type="button"><span class="share-inner"><span>Inviter des potes</span><span class="share-apps" aria-hidden="true">
-                <svg viewBox="0 0 24 24" width="13" height="13" focusable="false"><path d="M12 3a9 9 0 0 0-7.75 13.55L3 21l4.6-1.2A9 9 0 1 0 12 3z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M8.3 8.4c-.3.6-.5 1.3-.2 2.3.5 1.9 2.9 4.3 4.8 4.8 1 .3 1.7.1 2.3-.2.4-.2.9-.7 1-1.1.1-.3 0-.5-.2-.6l-1.7-.8c-.2-.1-.4 0-.5.1l-.5.6c-.1.1-.3.2-.5.1-.7-.3-2-1.6-2.3-2.3-.1-.2 0-.4.1-.5l.6-.5c.1-.1.2-.3.1-.5l-.8-1.7c-.1-.2-.3-.3-.6-.2-.4.1-.9.6-1.1 1z" fill="currentColor" stroke="none"/></svg>
-                <svg viewBox="0 0 24 24" width="13" height="13" focusable="false"><rect x="3" y="3" width="18" height="18" rx="5" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="17.2" cy="6.8" r="1" fill="currentColor"/></svg>
-                <svg viewBox="0 0 24 24" width="13" height="13" focusable="false"><path d="M4 5h16a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H9l-4 3.5V16H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
-                <svg viewBox="0 0 24 24" width="13" height="13" focusable="false"><path d="M12 4c2.4 0 3.9 1.9 3.8 4.4l-.1 1.7c.4.2.9.3 1.4.2.4-.1.8.2.7.6-.1.5-.7.9-1.3 1.2.1.5.6.9 1.4 1.1.4.1.5.6.2.9-.3.3-.9.5-1.4.7-.1.3-.1.6-.3.9-.2.4-.7.4-1.2.3-.5-.1-1-.1-1.5.2-.5.4-1.1 1-1.7 1-.6 0-1.2-.6-1.7-1-.5-.3-1-.3-1.5-.2-.5.1-1 .1-1.2-.3-.2-.3-.2-.6-.3-.9-.5-.2-1.1-.4-1.4-.7-.3-.3-.2-.8.2-.9.8-.2 1.3-.6 1.4-1.1-.6-.3-1.2-.7-1.3-1.2-.1-.4.3-.7.7-.6.5.1 1-.1 1.4-.2l-.1-1.7C8.1 5.9 9.6 4 12 4z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/></svg>
+              <p id="ligue-statut" class="hidden"></p>
+              <button id="ligue-partager" class="btn btn-primary share-btn" type="button"><span class="share-inner"><span>Inviter tes potes</span><span class="share-apps" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="24" height="24" focusable="false"><path d="M12 3a9 9 0 0 0-7.75 13.55L3 21l4.6-1.2A9 9 0 1 0 12 3z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M8.3 8.4c-.3.6-.5 1.3-.2 2.3.5 1.9 2.9 4.3 4.8 4.8 1 .3 1.7.1 2.3-.2.4-.2.9-.7 1-1.1.1-.3 0-.5-.2-.6l-1.7-.8c-.2-.1-.4 0-.5.1l-.5.6c-.1.1-.3.2-.5.1-.7-.3-2-1.6-2.3-2.3-.1-.2 0-.4.1-.5l.6-.5c.1-.1.2-.3.1-.5l-.8-1.7c-.1-.2-.3-.3-.6-.2-.4.1-.9.6-1.1 1z" fill="currentColor" stroke="none"/></svg>
+                <svg viewBox="0 0 24 24" width="24" height="24" focusable="false"><rect x="3" y="3" width="18" height="18" rx="5" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="17.2" cy="6.8" r="1" fill="currentColor"/></svg>
+                <svg viewBox="0 0 24 24" width="24" height="24" focusable="false"><path d="M4 5h16a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H9l-4 3.5V16H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+                <svg viewBox="0 0 24 24" width="24" height="24" focusable="false"><path d="M12 4c2.4 0 3.9 1.9 3.8 4.4l-.1 1.7c.4.2.9.3 1.4.2.4-.1.8.2.7.6-.1.5-.7.9-1.3 1.2.1.5.6.9 1.4 1.1.4.1.5.6.2.9-.3.3-.9.5-1.4.7-.1.3-.1.6-.3.9-.2.4-.7.4-1.2.3-.5-.1-1-.1-1.5.2-.5.4-1.1 1-1.7 1-.6 0-1.2-.6-1.7-1-.5-.3-1-.3-1.5-.2-.5.1-1 .1-1.2-.3-.2-.3-.2-.6-.3-.9-.5-.2-1.1-.4-1.4-.7-.3-.3-.2-.8.2-.9.8-.2 1.3-.6 1.4-1.1-.6-.3-1.2-.7-1.3-1.2-.1-.4.3-.7.7-.6.5.1 1-.1 1.4-.2l-.1-1.7C8.1 5.9 9.6 4 12 4z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/></svg>
               </span></span></button>
               <ul id="ligue-peloton"></ul>
               <p id="ligue-membres"></p>
@@ -580,7 +600,6 @@
         <p class="expl-texte">Tape n'importe où sur l'écran, <b>pas besoin de glisser.</b> Re-tape en l'air = double saut.</p>
       </div>
       <div class="expl-etape" data-e="2">
-        <p class="expl-titre">1 partie = 1 morceau</p>
         <div id="expl-arrivee"><span>ARRIVÉE</span></div>
         <p class="expl-texte">La course dure le temps de la musique. <b>Tiens jusqu'à la ligne d'arrivée.</b></p>
       </div>
@@ -590,6 +609,11 @@
         <p id="expl-mult">+0 %</p>
         <p id="expl-tag">Jusqu'à +200 % !</p>
         <p class="expl-texte">Crée ta ligue, invite tes potes&nbsp;: vous avez votre classement. <b>Chaque pote qui joue te donne +10&nbsp;% de points.</b></p>
+      </div>
+      <div class="expl-etape" data-e="4">
+        <p class="expl-titre">Monte le son&nbsp;!</p>
+        <div id="expl-son"><span class="hp">🔊</span><span class="onde o1"></span><span class="onde o2"></span><span class="onde o3"></span></div>
+        <p class="expl-texte"><b>Les klaxons t'annoncent les voitures.</b> Écoute-les, ils arrivent avant elles.</p>
       </div>
       <div id="expl-barre"><i></i></div>
     </div>

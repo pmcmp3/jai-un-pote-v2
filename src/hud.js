@@ -167,7 +167,7 @@ export function renderTapHint(ctx, width, height, t, alpha) {
 }
 
 // Décompte « 3, 2, 1, GO » calé sur les temps (voir main.js).
-export function renderCountIn(ctx, width, height, t, beatPeriod, beats, linger) {
+export function renderCountIn(ctx, width, height, t, beatPeriod, beats, linger, avecSon = true) {
   let texte, age;
   if (t < 0) {
     const restant = -t / beatPeriod;
@@ -205,6 +205,8 @@ export function renderCountIn(ctx, width, height, t, beatPeriod, beats, linger) 
   ctx.fillText(texte, 0, 0);
   ctx.restore();
   // « Il faut mettre au début qu'il faut jouer avec du son » (29 septembre 2026).
+  // Pas si la carte « Monte le son » de l'explication vient de passer.
+  if (!avecSon) return;
   const msg = "MONTE LE SON : LES KLAXONS T'ANNONCENT LES VOITURES";
   ctx.save();
   ctx.globalAlpha = alpha;
@@ -466,6 +468,7 @@ export function renderPastille(ctx, x, y, texte, alpha, jaune = false) {
   ctx.globalAlpha *= alpha;
   ctx.font = `900 11px ${POLICE}`;
   const w = ctx.measureText(texte).width + 16, h = 20;
+  x = Math.max(8 + w / 2, Math.min(ctx.canvas.clientWidth - 8 - w / 2, x)); // jamais coupée au bord
   ctx.fillStyle = jaune ? JAUNE : BLANC; ctx.strokeStyle = NOIR; ctx.lineWidth = 1.5;
   ctx.beginPath(); ctx.rect(Math.round(x - w / 2) + 0.5, Math.round(y - h) + 0.5, Math.round(w), h); ctx.fill(); ctx.stroke();
   ctx.fillStyle = NOIR; ctx.textAlign = "center"; ctx.textBaseline = "middle";

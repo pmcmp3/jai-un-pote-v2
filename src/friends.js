@@ -26,6 +26,8 @@ const ARRIVAL_S = 1.1;
 
 let potes = [];
 let maxCount = 0;
+let largeurEcran = 400; // pour garder les pastilles d'arrivée dans l'écran
+export function setLargeurEcran(w) { largeurEcran = w || largeurEcran; }
 let joins = 0;
 let marques = []; // { v, type: "saut" | "salto" } — là où le joueur a sauté
 
@@ -231,10 +233,13 @@ export function drawables(ctx, pedalPhase, penteAt = null) {
           const txt = `${p.name.toUpperCase()} EST LÀ`;
           ctx.font = `900 11px "Helvetica Neue", Helvetica, Arial, sans-serif`;
           const w = ctx.measureText(txt).width + 14, h = 19;
+          // Toujours ENTIÈRE dans l'écran (4 octobre 2026 : « bot 5 est là,
+          // on ne voit pas le tag en entier, il est coupé à gauche »).
+          const x = Math.max(8 + w / 2, Math.min(largeurEcran - 8 - w / 2, g.x));
           ctx.fillStyle = "#ffcf2e"; ctx.strokeStyle = "#0d0d10"; ctx.lineWidth = 1.5;
-          ctx.beginPath(); ctx.rect(Math.round(g.x - w / 2) + 0.5, Math.round(g.y - h - 4) + 0.5, Math.round(w), h); ctx.fill(); ctx.stroke();
+          ctx.beginPath(); ctx.rect(Math.round(x - w / 2) + 0.5, Math.round(g.y - h - 4) + 0.5, Math.round(w), h); ctx.fill(); ctx.stroke();
           ctx.fillStyle = "#0d0d10"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
-          ctx.fillText(txt, g.x, g.y - 4 - h / 2 + 0.5);
+          ctx.fillText(txt, x, g.y - 4 - h / 2 + 0.5);
           ctx.restore();
         }
       },
