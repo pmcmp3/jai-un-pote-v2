@@ -423,12 +423,27 @@ Code `TESTV2`, qui est aussi `config.ligueBeta` (menu simplifié + bouton « Lai
     1080×1920, 30 i/s, simulation pas à pas (`__pote.videoPas`), pilote
     automatique, 5 potes, morceau calé (ffmpeg).
 - **5 octobre 2026, cinquième série (ouvert dans Instagram : clavier, HUD,
-  partage, marché, piétons, plage)** — `VERSION_COURSE` 18, SW `jp2-v26` :
-  - *Clavier* : la carte « Qui es-tu ? » garde ses espacements normaux et se
-    CENTRE dans la zone visible au-dessus du clavier (`centrerMenu` en mode
-    `clavier`, `--centre`) ; la version serrée (`serre`) ne s'enclenche que si
-    elle ne tient pas (iPhone SE). Mesuré : `outils/premiere.mjs` (432 px et
-    287 px visibles).
+  partage, marché, piétons, plage)** — `VERSION_COURSE` 18, SW `jp2-v27` (clavier : v27) :
+  - *Clavier, troisième passe* (capture iPhone DANS Instagram, le soir même :
+    carte coupée en haut, « ça monte d'un seul coup et ça redescend », « les
+    lignes se rétrécissent au fur et à mesure ») : trois mécanismes se
+    battaient (marge haute recentrée avec transition, overlay recalé sur la
+    zone visible à chaque événement, overlay défilé pour montrer le bouton),
+    en plus du défilement d'iOS. ⚠️ Tous SUPPRIMÉS, ainsi que la version
+    serrée (`serre`). UNE règle (`placerSaisie`, screens.js) : clavier ouvert
+    (écran tactile seulement), la carte — même forme, mêmes espacements,
+    270 px + 15 de sticker : elle tient au-dessus du clavier d'un iPhone SE
+    dans Instagram — est posée par une translation (`--saisie-y`), centrée
+    dans la zone visible ; l'overlay ne défile plus. Au focus, la zone est
+    ESTIMÉE (ce que cache le clavier, retenu la première fois dans
+    `jp2Clavier`, sinon `0,32 × écran + 102` px : 362 px mesurés sur l'écran
+    de 812 de la capture) : la carte glisse UNE fois avec le clavier, se pose
+    à ≤ 8 px près la première fois, plus du tout ensuite. Si iOS fait quand
+    même défiler la zone visible, la carte la suit dans la même image.
+    Vérifié : `node outils/clavier.mjs` (6 cas : Instagram sur iPhone, SE,
+    Pro Max, Safari, défilement forcé d'iOS, Android — faux visualViewport
+    pour le modèle iOS). ⚠️ Pas de simulateur iOS sur ce poste (pas de
+    Xcode) : le vrai test reste le téléphone.
   - *HUD refait* (`hud.renderHud`) : la barre du MORCEAU tout en haut, sur la
     largeur, jusqu'au drapeau à damier (comme les barres d'une story ; rouge
     les 10 dernières secondes) ; les points au centre ; à droite les cases des

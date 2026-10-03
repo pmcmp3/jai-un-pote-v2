@@ -91,21 +91,15 @@
        Le titre et le lien de l'album s'effacent net, la carte monte en haut. */
     #overlay.visible.fige { transition: opacity 0.45s ease, visibility 0s; }
     #overlay.clavier #menu-title, #overlay.clavier #beta-tag, #overlay.clavier #cta-link, #overlay.clavier ~ #mute-button { display: none; }
-    /* Carte « Qui es-tu ? » COMPACTE pendant la saisie (5 octobre 2026 : « il faut
-       baisser un petit peu la taille de ce truc-là, parce que les gens qui vont
-       avoir des petits téléphones n'arriveront pas à tout voir avec le
-       clavier ») : marges serrées, bouton plus bas — les champs gardent leurs
-       16 px (en dessous, Safari zoome). ~90 px de gagnés. */
-    /* Clavier ouvert : la carte garde son espacement et se CENTRE dans la zone
-       visible (screens.centrerMenu). La version serrée n'arrive que si elle ne
-       tiendrait pas autrement (classe `serre`, petits téléphones). */
-    #overlay.clavier { padding-top: calc(10px + var(--safe-top) + var(--centre, 0px)); }
-    #overlay.clavier.serre #onboarding .panel-body { padding: 16px 14px 10px; }
-    #overlay.clavier.serre #pseudo-row { margin-top: 2px; }
-    #overlay.clavier.serre .champ-titre { margin-top: 10px; }
-    #overlay.clavier.serre .champ-row { margin-top: 4px; }
-    #overlay.clavier.serre #pseudo-input, #overlay.clavier.serre .champ-row input { padding: 3px 2px; }
-    #overlay.clavier.serre #step1-next { margin-top: 12px; min-height: 40px; padding: 8px 18px; }
+    /* Clavier ouvert (5 octobre 2026, troisième passe — « ça monte d'un seul
+       coup et ça redescend », « les lignes se rétrécissent ») : la carte garde
+       EXACTEMENT sa forme ; elle est posée par une translation (--saisie-y,
+       screens.placerSaisie), centrée au-dessus du clavier. L'overlay ne
+       défile plus et n'a plus de marges : rien d'autre ne bouge. */
+    #overlay.clavier { padding-top: 0; padding-bottom: 0; overflow: hidden; }
+    #onboarding .step { transform: translateY(var(--saisie-y, 0px)); transition: transform 0.3s cubic-bezier(0.22, 0.8, 0.24, 1); }
+    #overlay.retour #menu-title { animation: titre-retour 0.35s ease both; }
+    @keyframes titre-retour { from { opacity: 0; } to { opacity: 1; } }
     #overlay .fade { opacity: 0; transform: translateY(10px); transition: opacity 0.5s ease, transform 0.5s ease; }
     #overlay.visible .fade { opacity: 1; transform: translateY(0); }
     #overlay.visible .fade:nth-child(2) { transition-delay: 0.12s; }

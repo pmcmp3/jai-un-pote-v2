@@ -216,23 +216,15 @@ export function setRecord(m) { lsSet(CLE_RECORD, String(Math.floor(m))); }
 
 export function showOverlay() { overlay.classList.add("visible"); requestAnimationFrame(centrerMenu); }
 
-// --- Menu centré, qui remonte quand le clavier s'ouvre (4 octobre 2026) -----
-// « Il faudrait que ça soit centré sur l'écran, que la personne clique sur le
-// premier champ et que le clavier s'ouvre de manière fluide : toute la bande
-// avec ton pseudo, ton Instagram, ton village monte vers le haut. » La marge
-// haute de l'overlay (--centre) centre le bloc titre + carte + album ; un
-// champ qui prend le focus la ramène à 0 en 0,35 s (transition CSS), le bloc
-// monte au-dessus du clavier. Les champs font 16 px : en dessous, Safari
-// zoome dans la page à l'ouverture du clavier (le « saut » qu'on voyait).
-// ⚠️ 5 octobre 2026 (capture iPhone dans Instagram : « les lignes sont trop
-// rapprochées, elles ne sont pas du tout centrées, elles sont en haut de
-// l'écran ») : clavier ouvert, la carte se CENTRE aussi, dans la zone visible
-// au-dessus du clavier, avec son espacement normal. La version serrée
-// (`serre`) ne sert plus que si elle ne tient pas autrement (petits téléphones).
-function centrerMenu(profondeur = 0) {
+// --- Menu centré (4 octobre 2026) ---------------------------------------------
+// « Il faudrait que ça soit centré sur l'écran » : la marge haute de l'overlay
+// (--centre) centre le bloc titre + carte + album. Les champs font 16 px : en
+// dessous, Safari zoome dans la page à l'ouverture du clavier. Clavier ouvert,
+// c'est placerSaisie (plus bas) qui pose la carte : centrerMenu ne s'en mêle pas.
+function centrerMenu() {
+  if (overlay.classList.contains("clavier")) return;
   const enMenu = overlay.classList.contains("visible") && onboardingEl.classList.contains("active") && !overlay.classList.contains("end-view");
   if (!enMenu) { overlay.style.setProperty("--centre", "0px"); return; }
-  const clavier = overlay.classList.contains("clavier");
   const blocs = [...overlay.children].filter((e) => e.getClientRects().length && !/^(fixed|absolute)$/.test(getComputedStyle(e).position));
   if (!blocs.length) return;
   let haut = Infinity, bas = -Infinity;
@@ -242,76 +234,151 @@ function centrerMenu(profondeur = 0) {
     bas = Math.max(bas, r.bottom + parseFloat(cs.marginBottom || 0));
   }
   const sonde = $("safe-probe");
-  const padHaut = (clavier ? 10 : 16) + (sonde ? sonde.getBoundingClientRect().top : 0);
+  const padHaut = 16 + (sonde ? sonde.getBoundingClientRect().top : 0);
   const padBas = parseFloat(getComputedStyle(overlay).paddingBottom || 0);
   const libre = overlay.clientHeight - padHaut - padBas - (bas - haut);
-  if (clavier && profondeur < 2) {
-    const serre = overlay.classList.contains("serre");
-    if (libre < 0 && !serre) { overlay.classList.add("serre"); centrerMenu(profondeur + 1); return; }
-    if (libre > 110 && serre) { overlay.classList.remove("serre"); centrerMenu(profondeur + 1); return; }
-  }
   overlay.style.setProperty("--centre", `${Math.max(0, Math.round(libre / 2))}px`);
 }
-let clavierT = 0;
-// iOS : le clavier ne redimensionne pas la page, il RÉDUIT la zone visible
-// (visualViewport) et Safari la décale pour montrer le champ. Pendant la
-// saisie, l'overlay épouse exactement cette zone (hauteur ET décalage) : rien
-// ne saute, quoi que fasse Safari, et le champ actif est ramené en vue DANS
-// l'overlay, avec le bouton Continuer quand il y a la place.
-function montrerChamp() {
-  const a = document.activeElement;
-  if (!a || !overlay.contains(a) || !a.matches("input")) return;
-  const r = a.getBoundingClientRect(), o = overlay.getBoundingClientRect();
-  const bouton = $("step1-next");
-  const rb = bouton && bouton.getClientRects().length ? bouton.getBoundingClientRect() : null;
-  let haut = r.top - 14, bas = Math.max(r.bottom, rb ? rb.bottom : 0) + 14;
-  if (bas - haut > o.height) bas = r.bottom + 14;
-  if (bas > o.bottom) overlay.scrollTop += bas - o.bottom;
-  else if (haut < o.top) overlay.scrollTop -= o.top - haut;
+
+// --- Clavier ouvert (5 octobre 2026, troisième passe) -----------------------
+// Capture iPhone dans Instagram : la carte partait en haut, COUPÉE, « ça monte
+// d'un seul coup et ça redescend », et les lignes se resserraient au fur et à
+// mesure. Trois mécanismes se battaient — la marge haute recentrée avec une
+// transition, l'overlay recalé sur la zone visible à chaque événement, l'overlay
+// qu'on faisait défiler pour montrer le bouton — en plus du défilement d'iOS.
+// UNE seule règle désormais : clavier ouvert, la carte (même forme, même
+// espacement : 270 px, elle tient au-dessus du clavier d'un iPhone SE dans
+// Instagram) est posée par une TRANSLATION, centrée dans la zone visible.
+// Au focus, cette zone est ESTIMÉE (la part de l'écran que prend le clavier,
+// mesurée et retenue la première fois, sinon la moitié — volontairement un peu
+// trop : le champ ne passe jamais sous le clavier, iOS n'a rien à faire
+// défiler, c'était ça le saut). La carte glisse UNE fois, avec le clavier ;
+// une fois le clavier là, on corrige seulement si l'estimation s'est trompée.
+// Seulement sur écran tactile : avec un vrai clavier, rien ne bouge.
+const CLE_CLAVIER = "jp2Clavier";
+const TACTILE = (() => { try { return matchMedia("(pointer: coarse)").matches; } catch (e) { return "ontouchstart" in window; } })();
+let hauteurRef = window.innerHeight;
+let clavierT = 0, saisieT = 0, dernierOff = 0;
+function carteActive() { return onboardingEl.querySelector(`.step[data-step="${onboardingEl.dataset.step}"]`); }
+// Haut de la carte sans translation, dans le repère de l'écran (l'overlay est
+// fixe en 0 ; on ne le fait plus jamais défiler pendant la saisie).
+function hautNaturel(carte) { return carte.offsetTop - overlay.scrollTop; }
+function poserY(carte, y, anime) {
+  if (!anime) carte.style.transition = "none";
+  carte.style.setProperty("--saisie-y", `${Math.round(y)}px`);
+  if (!anime) { void carte.offsetHeight; carte.style.transition = ""; }
 }
-function calerSurZoneVisible() {
+function zoneSaisie() {
   const vv = window.visualViewport;
-  if (!vv || !overlay.classList.contains("clavier")) return;
-  overlay.style.height = `${Math.round(vv.height)}px`;
-  overlay.style.transform = `translateY(${Math.round(vv.offsetTop)}px)`;
+  const V = vv ? vv.height : window.innerHeight;
+  if (hauteurRef - V > 120) return { V, off: vv ? vv.offsetTop : 0 }; // clavier déjà là (on change de champ)
+  // Ce que le clavier va cacher : la part retenue la dernière fois, sinon une
+  // estimation d'après la hauteur de l'ÉCRAN (clavier + barre « ^ v OK »
+  // d'un iPhone : 362 px mesurés sur un écran de 812 dans Instagram, ~304
+  // sur un SE, ~390 sur un Pro Max), arrondie vers le haut : la carte
+  // s'arrête au pire un rien trop haut et se pose, sans passer sous le clavier.
+  const memo = Number(lsGet(CLE_CLAVIER));
+  const ecran = (window.screen && window.screen.height) || hauteurRef;
+  const cache = memo > 0.25 && memo < 0.7 ? memo * hauteurRef : Math.min(hauteurRef * 0.6, Math.max(hauteurRef * 0.38, 0.32 * ecran + 102));
+  return { V: hauteurRef - cache, off: 0 };
+}
+// Où poser le haut de la carte pour la centrer dans la zone [off, off + V].
+// Le sticker dépasse de 15 px au-dessus de la carte.
+function cibleSaisie(carte, V, off) {
+  const H = carte.offsetHeight, STICKER = 15, MARGE = 4;
+  if (H + STICKER + 2 * MARGE <= V) return off + (V - H - STICKER) / 2 + STICKER;
+  // Ne tient pas (écran minuscule) : le bouton juste au-dessus du clavier,
+  // sans jamais laisser le champ actif passer au-dessus du bord.
+  let haut = off + V - MARGE - H;
+  const a = document.activeElement;
+  if (a && carte.contains(a)) {
+    const relHaut = a.getBoundingClientRect().top - carte.getBoundingClientRect().top;
+    if (haut + relHaut < off + MARGE) haut = off + MARGE - relHaut;
+  }
+  return haut;
+}
+let zonePosee = null;
+function placerSaisie(zone, anime = true) {
+  const carte = carteActive();
+  if (!carte || !overlay.classList.contains("clavier")) return;
+  zonePosee = zone;
+  overlay.scrollTop = 0;
+  poserY(carte, cibleSaisie(carte, zone.V, zone.off) - hautNaturel(carte), anime);
+}
+function entrerSaisie(champ) {
+  const carte = carteActive();
+  if (!carte) return;
+  if (!overlay.classList.contains("clavier")) {
+    // Même image : la carte reste où elle était (translation compensée)…
+    const avant = carte.getBoundingClientRect().top;
+    const champBas = champ.getBoundingClientRect().bottom;
+    overlay.classList.add("clavier", "fige");
+    dernierOff = 0;
+    poserY(carte, avant - hautNaturel(carte), false);
+    // … puis glisse vers le centre de la zone estimée. Si le champ touché
+    // est déjà plus bas que le haut du futur clavier, elle y va d'un coup :
+    // sinon iOS ferait défiler la page pour le montrer (le saut).
+    const z = zoneSaisie();
+    placerSaisie(z, champBas < z.off + z.V - 12);
+    return;
+  }
+  placerSaisie(zoneSaisie());
+}
+function sortirSaisie() {
+  const carte = carteActive();
+  const avant = carte ? carte.getBoundingClientRect().top : 0;
+  overlay.classList.add("fige", "retour");
+  overlay.classList.remove("clavier");
+  onboardingEl.querySelectorAll(".step").forEach((c) => { if (c !== carte) poserY(c, 0, false); });
+  window.scrollTo(0, 0); // Safari laisse parfois la page décalée après le clavier
+  overlay.scrollTop = 0;
   centrerMenu();
-  montrerChamp();
+  if (carte) { poserY(carte, avant - hautNaturel(carte), false); poserY(carte, 0, true); }
+  clavierT = setTimeout(() => overlay.classList.remove("fige", "retour"), 450);
+}
+// Le clavier a fini de bouger (iOS : la zone visible ; Android : la page
+// elle-même) : on recale sur la VRAIE zone, et on retient la part de l'écran
+// qu'il prend pour la prochaine fois.
+function surZoneVisible() {
+  if (!overlay.classList.contains("clavier")) return;
+  const vv = window.visualViewport;
+  // Si iOS fait quand même défiler la zone visible, la carte la suit DANS LA
+  // MÊME IMAGE, sans glisser : à l'écran, elle ne bouge pas.
+  if (vv && zonePosee && Math.abs(vv.offsetTop - dernierOff) >= 1) {
+    dernierOff = vv.offsetTop;
+    placerSaisie({ V: zonePosee.V, off: dernierOff }, false);
+  }
+  clearTimeout(saisieT);
+  saisieT = setTimeout(() => {
+    if (!overlay.classList.contains("clavier")) return;
+    const V = vv ? vv.height : window.innerHeight, off = vv ? vv.offsetTop : 0;
+    if (hauteurRef - V > 120) lsSet(CLE_CLAVIER, ((hauteurRef - V) / hauteurRef).toFixed(3));
+    dernierOff = off;
+    placerSaisie({ V, off });
+  }, 70);
 }
 function brancherCentrage() {
   try { new ResizeObserver(() => centrerMenu()).observe(onboardingEl); } catch (e) { /* vieux navigateur : centrage au resize seulement */ }
-  window.addEventListener("resize", () => requestAnimationFrame(centrerMenu));
+  window.addEventListener("resize", () => {
+    if (!overlay.classList.contains("clavier")) hauteurRef = window.innerHeight;
+    requestAnimationFrame(centrerMenu);
+  });
   if (window.visualViewport) {
-    window.visualViewport.addEventListener("resize", calerSurZoneVisible);
-    window.visualViewport.addEventListener("scroll", calerSurZoneVisible);
+    window.visualViewport.addEventListener("resize", surZoneVisible);
+    window.visualViewport.addEventListener("scroll", surZoneVisible);
   }
+  if (!TACTILE) return;
   onboardingEl.addEventListener("focusin", (e) => {
     if (!e.target.matches("input")) return;
     clearTimeout(clavierT);
-    // Mise en page « clavier » SYNCHRONE et SANS SAUT : le titre s'efface et
-    // la carte reste exactement où elle était (la marge compense), avant que
-    // Safari ne mesure où est le champ. Puis, à mesure que le clavier monte
-    // (visualViewport), la carte glisse jusqu'au centre de la zone visible.
-    const avant = onboardingEl.getBoundingClientRect().top;
-    const deja = overlay.classList.contains("clavier");
-    overlay.classList.add("fige", "clavier");
-    if (!deja) {
-      overlay.style.setProperty("--centre", "0px");
-      const apres = onboardingEl.getBoundingClientRect().top;
-      overlay.style.setProperty("--centre", `${Math.max(0, Math.round(avant - apres))}px`);
-    }
-    requestAnimationFrame(() => requestAnimationFrame(() => { overlay.classList.remove("fige"); calerSurZoneVisible(); }));
+    entrerSaisie(e.target);
   });
   onboardingEl.addEventListener("focusout", () => {
     clearTimeout(clavierT);
     clavierT = setTimeout(() => {
       const a = document.activeElement;
       if (a && onboardingEl.contains(a) && a.matches("input")) return; // on passe d'un champ à l'autre
-      overlay.classList.remove("clavier", "serre");
-      overlay.style.height = ""; overlay.style.transform = "";
-      overlay.scrollTop = 0;
-      window.scrollTo(0, 0); // Safari laisse parfois la page décalée après le clavier
-      centrerMenu();
-      clavierT = setTimeout(() => overlay.classList.remove("fige"), 450);
+      sortirSaisie();
     }, 120);
   });
 }
