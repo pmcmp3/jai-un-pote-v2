@@ -114,12 +114,26 @@ function morceauDejaOuvert() { return lsGet(CLE_MORCEAU_OUVERT) === "1"; }
 function pmcDejaSuivi() { return lsGet(CLE_PMC_SUIVI) === "1"; }
 let fanCache = morceauDejaOuvert();
 export function estFan() { return fanCache; }
-function niveauConversion() {
-  if (!morceauDejaOuvert()) return "presave";
-  if (!pmcDejaSuivi()) return "suivre";
-  return "libre";
+// Échelle de conversion (5 octobre 2026 : « faudrait qu'il y en ait qu'un seul
+// [...] tu veux rejouer une première fois, tu dois ajouter l'album ; une
+// seconde fois, il faut que la personne puisse faire une deuxième partie ; si
+// elle refait une troisième partie, elle doit s'abonner à PMC » — et « une
+// personne qui veut continuer la course [...] doit s'abonner à moi sur
+// Spotify »). UNE demande à la fois : l'ancien enchaînement album PUIS
+// abonnement sur deux REJOUER d'affilée était « hyper chiant ».
+//   CONTINUER la course   → abonnement à PMC (tant qu'il n'est pas fait) ;
+//   REJOUER après la 1re  → album ; après la 2e → libre ; à partir de la 3e → abonnement.
+// `getParties()` compte les courses LANCÉES (la course qui vient de finir comprise).
+function niveauPour(action) {
+  if (action === "continuer") return pmcDejaSuivi() ? "libre" : "suivre";
+  const n = getParties();
+  if (n <= 1) return morceauDejaOuvert() ? "libre" : "presave";
+  if (n === 2) return "libre";
+  return pmcDejaSuivi() ? "libre" : "suivre";
 }
-export function niveauConversionCourant() { return niveauConversion(); }
+export function niveauConversionCourant() { return `rejouer:${niveauPour("rejouer")} continuer:${niveauPour("continuer")} partie:${getParties()}`; }
+// Événement de funnel avec ses détails (colonne `details`, schema-v2.sql).
+function suivi(type, details = {}) { net.evenement(type, { pseudo: getPseudo() || null, ligue: ligue ? ligue.code : null, source: getSource(), details: { partie: getParties(), ...details } }); }
 
 export function getPseudo() { return pseudoInput.value.trim().replace(/^@+/, ""); }
 const instaInput = $("insta-input"), villeInput = $("ville-input");
@@ -393,7 +407,7 @@ function construirePlateformes() {
       if (!gateEtat || gateEtat.phase !== "demande") return;
       lsSet(CLE_PLATEFORME, p.id || p.nom);
       lsSet(CLE_MORCEAU_OUVERT, "1");
-      net.evenement("clic_album", { pseudo: getPseudo(), ligue: ligue ? ligue.code : null, source: getSource() });
+      suivi("clic_album", { plateforme: p.id || p.nom, action: gateEtat.action });
       fanCache = true;
       setTimeout(gatePhaseAbsence, 0);
     });
@@ -410,18 +424,19 @@ function gateTextes(action, niveau) {
   const presave = niveau === "presave";
   return {
     // Sticker rouge, comme toutes les cartes (28 septembre 2026, cohérence des menus).
-    eyebrow: presave ? "L'album est sorti" : "Dernière étape",
+    eyebrow: presave ? "L'album est sorti" : continuer ? "Continue ta course" : "Dernière étape",
     titre: presave
       ? (continuer ? "Ajoute l'album à ta bibliothèque pour continuer la partie" : "Ajoute l'album à ta bibliothèque pour rejouer")
-      : (continuer ? "Abonne-toi à PMC pour continuer la partie" : "Abonne-toi à PMC pour rejouer"),
+      : (continuer ? "Abonne-toi à PMC sur Spotify pour continuer la partie" : "Abonne-toi à PMC sur Spotify, et rejoue autant que tu veux"),
     texte: "",
     ctaLabel: presave ? "Écouter l'album" : "S'abonner à PMC",
     goLabel: continuer ? "Continuer ma course" : "Rejouer",
   };
 }
 
-function ouvrirGate({ action, onUnlocked, onCancel, niveauForce, goLabelForce = null }) {
-  const niveau = niveauForce || niveauConversion();
+function ouvrirGate({ action, onUnlocked, onCancel, niveauForce, goLabelForce = null, ecoute = false }) {
+  const niveau = niveauForce || niveauPour(action);
+  if (!ecoute) suivi("porte_vue", { niveau, action });
   const t = gateTextes(action, niveau);
   gateEtat = { action, onUnlocked, onCancel, niveau, phase: "demande" };
   gateEyebrow.textContent = t.eyebrow;
@@ -485,9 +500,12 @@ export function ouvrirEcoute() {
   // Depuis l'écran de fin, le bouton armé au retour relance une course ;
   // depuis le menu, il ferme simplement (JOUER est juste là).
   const enFin = endScreenEl.classList.contains("active");
+  suivi("ecouter_album", { depuis: enFin ? "fin" : "menu" });
   ouvrirGate({
-    action: "rejouer", niveauForce: "presave",
-    onUnlocked: enFin ? () => { hideOverlay(); showPauseButton(); deps.restartGame(); } : null,
+    action: "rejouer", niveauForce: "presave", ecoute: true,
+    // Le REJOUER armé au retour passe quand même par l'échelle (sinon « écouter
+    // l'album » contournerait l'abonnement demandé à partir de la 3e partie).
+    onUnlocked: enFin ? () => exigerConversion({ action: "rejouer", onOk: () => { hideOverlay(); showPauseButton(); deps.restartGame(); }, onCancel: () => {} }) : null,
     onCancel: null,
     goLabelForce: enFin ? null : "Fermer",
   });
@@ -495,8 +513,9 @@ export function ouvrirEcoute() {
 function exigerConversion({ action, onOk, onCancel }) {
   // En bêta, aucune porte : les testeurs sont déjà des fans (groupe WhatsApp)
   // et doivent pouvoir enchaîner les parties pour trouver des bugs.
-  if (enBeta() || niveauConversion() === "libre") { onOk(); return; }
-  ouvrirGate({ action, onUnlocked: onOk, onCancel });
+  const niveau = enBeta() ? "libre" : niveauPour(action);
+  if (niveau === "libre") { suivi(action === "continuer" ? "continuer" : "rejouer", { niveau }); onOk(); return; }
+  ouvrirGate({ action, onUnlocked: () => { suivi(action === "continuer" ? "continuer" : "rejouer", { niveau, apresPorte: true }); onOk(); }, onCancel, niveauForce: niveau });
 }
 
 // --- Ligue entre potes (7 septembre 2026) -------------------------------------
@@ -1113,14 +1132,14 @@ export function init(d) {
     decompteRevive.arreter();
     exigerConversion({ action, onOk: () => reviveResoudre(issue), onCancel: () => reprendreDecompteRevive(restant) });
   }
-  reviveCta.addEventListener("click", () => porteDepuisCarteDeMort("continuer", "onAccept"));
-  reviveReplay.addEventListener("click", () => porteDepuisCarteDeMort("rejouer", "onReplay"));
-  reviveDecline.addEventListener("click", () => reviveResoudre("onDecline"));
+  reviveCta.addEventListener("click", () => { suivi("mort_choix", { choix: "continuer" }); porteDepuisCarteDeMort("continuer", "onAccept"); });
+  reviveReplay.addEventListener("click", () => { suivi("mort_choix", { choix: "rejouer" }); porteDepuisCarteDeMort("rejouer", "onReplay"); });
+  reviveDecline.addEventListener("click", () => { suivi("mort_choix", { choix: "score" }); reviveResoudre("onDecline"); });
 
   gateCta.addEventListener("click", () => {
     if (!gateEtat || gateEtat.phase !== "demande") return;
-    if (gateEtat.niveau === "presave") { lsSet(CLE_MORCEAU_OUVERT, "1"); fanCache = true; }
-    else lsSet(CLE_PMC_SUIVI, "1");
+    if (gateEtat.niveau === "presave") { lsSet(CLE_MORCEAU_OUVERT, "1"); fanCache = true; suivi("clic_album", { plateforme: "lien", action: gateEtat.action }); }
+    else { lsSet(CLE_PMC_SUIVI, "1"); suivi("clic_suivre", { action: gateEtat.action }); }
     setTimeout(gatePhaseAbsence, 0);
   });
   gateGo.addEventListener("click", () => { if (!gateEtat || gateEtat.phase !== "pret") return; gateResoudre("onUnlocked"); });

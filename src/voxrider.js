@@ -230,4 +230,22 @@ export function drawRider(ctx, u, v, lift, P, pedal, alpha = 1, flip = 0, ombre 
 }
 
 export const RIDER_HEIGHT = 1.9;
+
+// JETPACK (5 octobre 2026) : deux bouteilles argentées sur le dos du cycliste
+// (le dos est côté −v : il roule vers +v), sangles rouges, et des flammes qui
+// crépitent sous les tuyères quand il pousse.
+export function drawJetpack(ctx, u, v, lift, flamme, t) {
+  const dos = v - 0.5;
+  for (const du of [-0.17, 0.05]) {
+    drawBox(ctx, u + du, dos - 0.1, 0.16, 0.2, 0.62, "#cfd4dc", lift + 0.82);
+    drawBox(ctx, u + du + 0.01, dos - 0.09, 0.14, 0.18, 0.08, "#e13e26", lift + 1.44);
+    drawBox(ctx, u + du + 0.03, dos - 0.06, 0.1, 0.12, 0.1, "#3a3d46", lift + 0.72);
+    if (flamme) {
+      const k = 0.55 + 0.45 * Math.sin(t * 38 + du * 40);
+      drawBox(ctx, u + du + 0.02, dos - 0.07, 0.12, 0.14, 0.34 * k + 0.12, "#ff9a1a", lift + 0.72 - (0.34 * k + 0.12));
+      drawBox(ctx, u + du + 0.045, dos - 0.04, 0.07, 0.08, 0.2 * k + 0.06, "#ffe36a", lift + 0.72 - (0.2 * k + 0.06));
+    }
+  }
+  drawBox(ctx, u - 0.19, dos + 0.08, 0.38, 0.06, 0.08, "#e13e26", lift + 1.2);
+}
 export function riderDepth(u, v) { return depth(u, v); }

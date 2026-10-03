@@ -93,7 +93,8 @@ export function scoreParfait(seed, potesMax) {
     for (const ev of route.checkMember("sim", prevV, v, jumpY, now)) {
       const mult = multiplicateur(potes, turbo > 0);
       if (ev.type === "piece") {
-        stats.pieces += 1; points += 1; metres += C.pieceMetres * mult;
+        const val = ev.double ? 2 : 1;
+        stats.pieces += val; points += val; metres += C.pieceMetres * mult * val;
         while (potesGagnes < paliers.length && points >= paliers[potesGagnes]) { potesGagnes += 1; if (potes < potesMax) potes += 1; }
         if (cible !== null && points >= cible) { cible = null; if (potes < potesMax) potes += 1; }
       } else if (ev.type === "lait") {
@@ -116,7 +117,7 @@ export function scoreParfait(seed, potesMax) {
 // quotas (outil de mesure).
 export function recenser(seed, nRangees = 1100) {
   const route = new Route(seed);
-  const n = { dangers: 0, pieces: 0, piecesAir: 0, laits: 0, grosses: 0, halles: 0, tap: 0, haut: 0, double: 0, ecartMin: 99, ecartMax: 0 };
+  const n = { dangers: 0, pieces: 0, piecesAir: 0, piecesDoubles: 0, laits: 0, grosses: 0, halles: 0, tap: 0, haut: 0, double: 0, ecartMin: 99, ecartMax: 0 };
   let dernier = null;
   for (let r = 0; r < nRangees; r++) {
     const row = route.rowAt(r);
@@ -126,6 +127,7 @@ export function recenser(seed, nRangees = 1100) {
       dernier = r;
     }
     n.pieces += row.coins.length;
+    if (row.double && row.coins.length) n.piecesDoubles += 1;
     for (const h of row.coins) if (h > CORPS_HAUT) n.piecesAir += 1;
     if (row.lait !== undefined) n.laits += 1;
     if (row.grosse !== undefined) n.grosses += 1;

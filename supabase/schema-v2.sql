@@ -122,8 +122,10 @@ create table if not exists public.evenements (
   pseudo text,
   source text,
   ligue text,
+  details jsonb,           -- 5 octobre 2026 : palier de la porte, action, numéro de partie, plateforme
   created_at timestamptz not null default now()
 );
+alter table public.evenements add column if not exists details jsonb;
 alter table public.evenements enable row level security;
 drop policy if exists "Envoi public d'un evenement" on public.evenements;
 create policy "Envoi public d'un evenement" on public.evenements for insert to anon with check (true);

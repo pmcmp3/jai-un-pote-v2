@@ -574,6 +574,63 @@ const SCENES = {
     for (let k = 0; k < 30; k++) { await attendre(25); maxY = Math.max(maxY, await course(() => window.__pote.player.jumpY)); if (k === 8) await photo("48-plafond-halle"); }
     console.log("PLAFOND : hauteur max des roues", maxY.toFixed(2), "· plafond", await course((d) => window.__pote.rows.plafondA(d + 20), d));
   },
+  // PORTE de conversion (5 octobre 2026) : à lancer avec NEUF=1 PARTIES=0.
+  // CONTINUER → abonnement ; REJOUER après la 1re partie → album.
+  porte: async () => {
+    await page.waitForFunction(() => window.__pote.player.v > 2, null, { timeout: 15000 });
+    const texte = () => course(() => ({ titre: document.getElementById("gate-title").textContent, sticker: document.getElementById("gate-eyebrow").textContent, conv: window.__pote && document.getElementById("debug-overlay") ? "" : "" }));
+    await page.keyboard.press("KeyG"); await attendre(900); await photo("58-porte-mort");
+    await page.click("#revive-cta"); await attendre(600); await photo("58b-porte-continuer");
+    console.log("PORTE continuer :", JSON.stringify(await texte()));
+    await page.click("#gate-later"); await attendre(500);
+    await page.click("#revive-replay"); await attendre(600); await photo("58c-porte-rejouer");
+    console.log("PORTE rejouer (après la partie", await course(() => localStorage.getItem("jp2Parties")), ") :", JSON.stringify(await texte()));
+  },
+  // PAUSE (5 octobre 2026 : « quand j'ai mis pause, le chasse-neige avait
+  // continué d'avancer ») : l'horloge du monde doit rester gelée, et la
+  // course rester calée sur le morceau après la reprise.
+  pause: async () => {
+    await page.waitForFunction(() => window.__pote.player.v > 2, null, { timeout: 15000 });
+    await attendre(1500);
+    const avant = await course(() => ({ t: window.__pote.clock.now(), v: window.__pote.player.v }));
+    await page.click("#pause-button"); await attendre(3500);
+    const pendant = await course(() => ({ t: window.__pote.clock.now(), v: window.__pote.player.v }));
+    await page.click("#resume-button"); await attendre(2000);
+    const apres = await course(() => ({ t: window.__pote.clock.now(), v: window.__pote.player.v, debug: document.getElementById("debug-overlay") ? document.getElementById("debug-overlay").textContent.slice(0, 200) : "" }));
+    console.log("PAUSE horloge", avant.t.toFixed(2), "→ pendant 3,5 s de pause", pendant.t.toFixed(2), "→ 2 s après reprise", apres.t.toFixed(2), "| v", avant.v.toFixed(1), pendant.v.toFixed(1), apres.v.toFixed(1));
+  },
+  // JETPACK (5 octobre 2026) : forcé, joueur posé juste avant, on tient pour
+  // voler, on relâche, on retient — la meute doit suivre la trajectoire.
+  jetpack: async () => {
+    await page.waitForFunction(() => window.__pote.player.v > 2, null, { timeout: 15000 });
+    await page.keyboard.press("KeyD");
+    for (let i = 0; i < 5; i++) await page.keyboard.press("KeyP");
+    const r = await course(() => window.__pote.forcerJetpack());
+    await course((r) => { const p = window.__pote; p.player.v = r - 14; p.player.prevV = p.player.v; p.player.jumpY = 0; }, r);
+    await page.waitForFunction(() => window.__pote.jetpack().pris, null, { timeout: 10000 });
+    await attendre(150); await photo("57-jetpack-pris");
+    await page.keyboard.down("Space"); await attendre(1400); await photo("57b-jetpack-monte");
+    await attendre(900); await photo("57c-jetpack-haut");
+    await page.keyboard.up("Space"); await attendre(700); await photo("57d-jetpack-plane");
+    await page.keyboard.down("Space"); await attendre(1500); await photo("57e-jetpack-pieces");
+    await attendre(1500); await page.keyboard.up("Space");
+    await attendre(4500); await photo("57f-jetpack-fin");
+    console.log("JETPACK", JSON.stringify(await course(() => window.__pote.jetpack())), "· hauteur", await course(() => window.__pote.player.jumpY.toFixed(2)));
+    await page.keyboard.press("KeyD");
+  },
+  // La plage de fin au coucher du soleil (5 octobre 2026) : horloge avancée à
+  // ~150 s (nuit, saison, soleil bas), joueur posé à l'entrée de la plage.
+  plage: async () => {
+    await page.waitForFunction(() => window.__pote.player.v > 2, null, { timeout: 15000 });
+    await page.keyboard.press("KeyD");
+    const r0 = await course(() => { const p = window.__pote; for (let r = 300; r < 3000; r++) if (p.rows.enPlage(r)) return r; return 0; });
+    for (const [t, dv, nom] of [[146, -16, "56-plage-arrivee"], [150, 12, "56b-plage"], [160, 60, "56c-plage-fin"]]) {
+      await course(([t, v]) => { const p = window.__pote; p.clock.jumpBy(t - p.clock.now()); p.player.v = v; p.player.prevV = v; p.player.jumpY = p.rows.solAt(v); }, [t, r0 + dv]);
+      await attendre(2600); await photo(nom);
+    }
+    console.log("PLAGE à partir de la rangée", r0);
+    await page.keyboard.press("KeyD");
+  },
   // Montagne à bosses et bouchon de fin (4 octobre 2026).
   montagne: async () => {
     await page.waitForFunction(() => window.__pote.player.v > 2, null, { timeout: 15000 });
@@ -586,9 +643,13 @@ const SCENES = {
       await attendre(1200); await photo(nom);
     }
     // Le chasse-neige et le gros bonhomme de neige sur la route.
-    const trouve = await course(() => { const p = window.__pote, o = {}; for (let r = 300; r < 3000; r++) { const row = p.rows.rowAt(r); if (!o[row.kind] && (row.kind === "chasseneige" || row.kind === "bonhomme")) o[row.kind] = r; } return o; });
+    const trouve = await course(() => { const p = window.__pote, o = {}; for (let r = 300; r < 3000; r++) { const row = p.rows.rowAt(r); if (!o[row.kind] && (row.kind === "chasseneige" || row.kind === "bonhomme" || row.kind === "skieur")) o[row.kind] = r; } return o; });
     console.log("MONTAGNE premiers", JSON.stringify(trouve), "· sol", JSON.stringify(await course((t) => Object.fromEntries(Object.entries(t).map(([k, r]) => [k, window.__pote.rows.solAt(r).toFixed(2)])), trouve)));
     if (trouve.bonhomme) { await aller(trouve.bonhomme - 7); await attendre(400); await photo("49f-bonhomme"); }
+    if (trouve.skieur) {
+      await aller(trouve.skieur - 26);
+      for (let k = 0; k < 3; k++) { await attendre(800); await photo(`49h-skieur-${k}`); }
+    }
     if (trouve.chasseneige) {
       await aller(trouve.chasseneige - 30);
       for (let k = 0; k < 4; k++) { await attendre(900); await photo(`49g-chasseneige-${k}`); }

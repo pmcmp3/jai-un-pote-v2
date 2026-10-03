@@ -192,6 +192,37 @@ export function drawChasseNeige(ctx, K, uC, v, t) {
   });
 }
 
+// Skieur de fond (5 octobre 2026 : « un mec qui arrive en ski face à nous,
+// en ski de fond ») : il vient EN FACE (vers −v), en pas alternatif — un ski
+// glisse devant pendant que l'autre recule, le bras opposé plante son bâton
+// derrière lui. Combinaison rouge, bonnet jaune à pompon.
+export function drawSkieur(ctx, K, uC, v, t) {
+  const s = Math.sin(t * 5.4);
+  groupe(ctx, () => {
+    drawShadow(ctx, uC, v, 0.38, 0.95, 0.22);
+    for (const [du, k] of [[-0.17, 1], [0.12, -1]]) {
+      const dvJambe = -0.3 * s * k, dvBras = 0.3 * s * k;   // −v = vers le joueur
+      drawBox(ctx, uC + du - 0.05, v - 0.85 + dvJambe, 0.1, 1.7, 0.035, "#1f5fb8");        // ski
+      drawBox(ctx, uC + du - 0.05, v - 0.93 + dvJambe, 0.1, 0.1, 0.09, "#1f5fb8", 0.035);  // spatule
+      drawBox(ctx, uC + du - 0.07, v - 0.14 + dvJambe, 0.14, 0.3, 0.12, "#1a1a1e", 0.035); // chaussure
+      drawBox(ctx, uC + du - 0.07, v - 0.07 + dvJambe * 0.7, 0.14, 0.15, 0.42, "#23252e", 0.15); // tibia
+      drawBox(ctx, uC + du - 0.08, v - 0.08 + dvJambe * 0.3, 0.16, 0.17, 0.36, "#23252e", 0.55); // cuisse
+      // Bras (épaule → main), puis le bâton, de la main jusqu'à la neige derrière.
+      const ub = uC + (k > 0 ? -0.27 : 0.2), vMain = v - 0.12 + dvBras;
+      drawBox(ctx, ub, v - 0.14 + dvBras * 0.4, 0.08, 0.12, 0.22, "#d8352a", 1.1);
+      drawBox(ctx, ub, vMain - 0.06, 0.08, 0.12, 0.2, "#d8352a", 0.92);
+      drawBox(ctx, ub, vMain - 0.05, 0.08, 0.1, 0.08, "#1a1a1e", 0.88);                   // gant
+      for (let i = 0; i < 8; i++) { const f = i / 7; drawBox(ctx, ub + 0.02, vMain + f * 0.6 - 0.02, 0.04, 0.05, 0.13, "#9aa0a8", 0.9 * (1 - f)); }
+    }
+    drawBox(ctx, uC - 0.2, v - 0.26, 0.4, 0.36, 0.5, "#d8352a", 0.88);                    // buste, penché vers l'avant
+    drawBox(ctx, uC - 0.21, v - 0.27, 0.42, 0.38, 0.06, "#ffffff", 1.18);                 // bande blanche
+    drawBox(ctx, uC - 0.13, v - 0.38, 0.26, 0.26, 0.24, "#e2a77a", 1.38);                 // tête
+    drawBox(ctx, uC - 0.14, v - 0.13 - 0.25, 0.01, 0.06, 0.05, BLACK, 1.5);               // œil (côté caméra)
+    drawBox(ctx, uC - 0.14, v - 0.39, 0.28, 0.28, 0.13, "#f2c21c", 1.58);                 // bonnet
+    drawBox(ctx, uC - 0.05, v - 0.3, 0.1, 0.1, 0.1, "#ffffff", 1.71);                      // pompon
+  });
+}
+
 // Feux de détresse (le bouchon, 4 octobre 2026) : les quatre coins de la
 // voiture garée clignotent orange.
 export function drawFeuxDetresse(ctx, K, uC, v, t) {

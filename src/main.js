@@ -28,9 +28,9 @@ import * as net from "./net.js";
 import * as debugOverlay from "./debug.js";
 import { consumeJumpPress, consumeWheelie, isHolding } from "./input.js";
 import { PALETTES, paletteDepuisSkin } from "./rider.js";
-import { drawRider, RIDER_HEIGHT } from "./voxrider.js";
+import { drawRider, drawJetpack, RIDER_HEIGHT } from "./voxrider.js";
 import { drawCoin } from "./coin.js";
-import { V_UNIT, LEAD_IN, targetSpeed as targetSpeedRegle, multiplicateur as multRegle, graineLigue, dureeCourse } from "./regles.js";
+import { V_UNIT, LEAD_IN, targetSpeed as targetSpeedRegle, multiplicateur as multRegle, graineLigue, dureeCourse, rangAuTemps } from "./regles.js";
 import { scoreParfait } from "./simulation.js";
 import * as fantome from "./fantome.js";
 
@@ -45,7 +45,8 @@ function resize() {
   // cubes à bords nets, la différence ne se voit pas, le coût de remplissage
   // baisse de 44 %.
   const mobile = Math.min(window.innerWidth, window.innerHeight) < 600;
-  const dpr = Math.min(window.devicePixelRatio || 1, mobile ? 1.5 : 2);
+  // `?dpr=3` : plafond levé pour filmer en 1080 px de large (outils/video.mjs).
+  const dpr = Math.min(window.devicePixelRatio || 1, Number(new URLSearchParams(location.search).get("dpr")) || (mobile ? 1.5 : 2));
   width = window.innerWidth;
   height = window.innerHeight;
   canvas.width = Math.round(width * dpr);
@@ -118,11 +119,17 @@ function applyPauseState() {
   const next = revivePaused ? "revive" : hiddenPaused ? "silent" : manualPaused ? "muffled" : "running";
   audio.setPlaybackMode(next);
   if (next !== "running") {
-    if (pauseStartedAt === 0) pauseStartedAt = perfClock();
+    if (pauseStartedAt === 0) {
+      pauseStartedAt = perfClock();
+      // Horloge de secours (audio en panne) : gelée pendant la pause, comme
+      // l'horloge audio l'est par audio.js — sinon le monde avance derrière.
+      if (gameStarted && !audioDrivesClock) { const fige = clock.now(); clock.setTimeSource(() => fige, true); }
+    }
   } else {
     if (pauseStartedAt > 0) {
       const ecart = perfClock() - pauseStartedAt;
-      if (!audioDrivesClock) clock.jumpBy(-Math.round(ecart / clock.beatPeriod) * clock.beatPeriod);
+      if (gameStarted && !audioDrivesClock) clock.setTimeSource(perfClock, true);
+      else if (!audioDrivesClock) clock.jumpBy(-Math.round(ecart / clock.beatPeriod) * clock.beatPeriod);
       if (startRequested && !gameStarted) startRequestedAt += ecart;
     }
     pauseStartedAt = 0;
@@ -155,12 +162,74 @@ const targetSpeed = targetSpeedRegle;
 //                        (les vaches, les tracteurs) ;
 //   - re-tap en l'air  → on REMONTE d'un coup (apex ~3,7 depuis un saut
 //                        maintenu) + salto (les fermiers, les voitures).
+// --- JETPACK (5 octobre 2026) ---------------------------------------------------
+// « Dans une partie sur cinq, un jetpack apparaît au milieu, qui te permet de
+// rester appuyé pour voler. Ça dure 10 secondes [...] juste pour le plaisir.
+// Quand tu as le jetpack, tu peux mettre des pièces tout en haut de l'écran,
+// en fonction du responsive de l'écran. » Posé sur une rangée libre vers
+// `jetpackTempsS` ; appuyé = on monte, relâché = on redescend en douceur ; les
+// pièces du vol sont calées sur la HAUTEUR DE L'ÉCRAN (scene.hauteurA). Les
+// potes suivent la trajectoire exacte du joueur (friends.js, phys.trace).
+// Hors du générateur de rangées : la route (et le score parfait des ligues)
+// reste la même avec ou sans jetpack.
+const HAUT_HUD_PX = 112;   // sous le score et le chrono
+const jet = { r: null, pris: false, reste: 0, pieces: [], trace: [], flamme: false, enregistre: false };
+let jetpackForce = new URLSearchParams(location.search).has("jetpack");
+function partieJetpack() { const C = window.CONFIG; return jetpackForce || (!game.sprint && screens.getParties() % (C.jetpackUneSur || 5) === (C.jetpackPartie ?? 3)); }
+function poserJetpack() {
+  jet.r = null; jet.pris = false; jet.reste = 0; jet.pieces = []; jet.trace = []; jet.flamme = false; jet.enregistre = false;
+  if (!partieJetpack()) return;
+  const cible = Math.round(rangAuTemps(window.CONFIG.jetpackTempsS || 70));
+  for (let d = 0; d < 60; d++) for (const r of [cible + d, cible - d]) {
+    const row = rows.rowAt(r);
+    if (row.type === "safe" && !row.coins.length && row.lait === undefined && rows.solAt(r) < 0.05 && !rows.rowAt(r - 1).coins.length && !rows.rowAt(r + 1).coins.length) { jet.r = r; return; }
+  }
+}
+function gagnerJetpack() {
+  const C = window.CONFIG;
+  jet.pris = true; jet.enregistre = true;
+  jet.reste = C.jetpackDureeS || 10;
+  sfx.lait(); vibrer(50);
+  semerSparkles(player.u, player.v, 18, "#ffd84a");
+  pousserPastille("JETPACK ! RESTE APPUYÉ POUR VOLER", 2.6);
+  // Les pièces du vol : une vague tout en haut de l'écran, qui démarre bas
+  // (le temps de décoller) et ondule entre le tiers haut et le bandeau du score.
+  const hHaut = scene.hauteurA(HAUT_HUD_PX + 34), hBas = scene.hauteurA(HAUT_HUD_PX + 210);
+  const v0 = player.v + 5, long = Math.max(30, speed * jet.reste * 0.95);
+  for (let v = v0; v < v0 + long; v += 2.4) {
+    const f = (v - v0) / long, montee = Math.min(1, (v - v0) / 16);
+    const vague = hBas + (hHaut - hBas) * (0.5 + 0.5 * Math.sin(f * Math.PI * 2 * 2.2 - 1.2));
+    jet.pieces.push({ v, h: 1.6 + (vague - 1.6) * montee, pris: false });
+  }
+}
+function voler(dt) {
+  const C = window.CONFIG;
+  jet.reste -= dt;
+  const pousse = isHolding();
+  jet.flamme = pousse;
+  player.jumpVy += (pousse ? (C.jetpackPoussee || 30) : -(C.jetpackGravite || 15)) * dt;
+  player.jumpVy = Math.max(-7, Math.min(9, player.jumpVy));
+  player.jumpY += player.jumpVy * dt;
+  const plafond = Math.min(rows.plafondA(player.v), scene.hauteurA(HAUT_HUD_PX) - RIDER_HEIGHT - 0.2);
+  if (player.jumpY > plafond) { player.jumpY = plafond; if (player.jumpVy > 0) player.jumpVy = 0; }
+  player.doubled = true; player.tHaut = 9;
+  if (jet.reste <= 0) { jet.reste = 0; jet.flamme = false; player.doubled = false; pousserPastille("FIN DU JETPACK", 1.3); }
+}
+// Hauteur de la trajectoire du joueur à la position v (null hors du vol).
+function traceJet(v) {
+  const T = jet.trace;
+  if (T.length < 2 || v < T[0][0] || v > T[T.length - 1][0]) return null;
+  let a = 0, b = T.length - 1;
+  while (b - a > 1) { const m = (a + b) >> 1; if (T[m][0] <= v) a = m; else b = m; }
+  const [v1, h1] = T[a], [v2, h2] = T[b];
+  return v2 > v1 ? h1 + (h2 - h1) * (v - v1) / (v2 - v1) : h1;
+}
 function jumpPhysics() {
   const C = window.CONFIG;
   return {
     vJump: C.sautVitesse, vDouble: C.sautVitesseDouble, g: C.sautGravite, gTenu: C.sautGraviteTenue, tenueMax: C.sautTenueMaxS, sol: rows.solAt,
     // Pour les potes : toits de voiture, plafond des halles, position des obstacles.
-    solSous, plafond: rows.plafondA, centreRef,
+    solSous, plafond: rows.plafondA, centreRef, trace: traceJet,
   };
 }
 // Boost de ligue (screens.getBoost, posé au départ) : multiplie TOUT.
@@ -469,6 +538,7 @@ function requestGameStart(opts = {}) {
   if (screens.getParties() === 0) net.evenement("premiere_course", { pseudo: screens.getPseudo(), source: screens.getSource(), ligue: screens.getLigue() ? screens.getLigue().code : null });
   conseilReset();
   screens.compterPartie();
+  poserJetpack();
 }
 function isGameStartRequested() { return startRequested; }
 
@@ -483,7 +553,8 @@ function resetRun() {
   sparkles.length = 0; ghosts.length = 0;
   speed = V_UNIT * window.CONFIG.vitesseBase; nuitDebut = null;
   friends.reset();
-  klaxonne = new Set(); alertesVues.clear(); montagneFondu = 0;
+  klaxonne = new Set(); alertesVues.clear(); montagneFondu = 0; leveeCam = 0; scene.setLevee(0); plageFondu = 0; scene.setPlage(0);
+  jet.r = null; jet.pris = false; jet.reste = 0; jet.pieces = []; jet.trace = []; jet.flamme = false; jet.enregistre = false;
   popups.length = 0; pastilles.length = 0; banner = null; damageFlash = 0; shake.time = 0; hudAlpha = 0; hintTimer = 6;
   canvas.classList.remove("game-over-bw", "danger", "turbo");
   scene.setNight(0);
@@ -509,11 +580,13 @@ function restartGame(opts = {}) {
   startRequested = true;
   conseilReset();
   screens.compterPartie();
+  poserJetpack();
 }
 
 // --- Mort / fin ------------------------------------------------------------------
 function mourir() {
   conseilCouper();
+  net.evenement("mort", { pseudo: screens.getPseudo() || null, source: screens.getSource(), ligue: screens.getLigue() ? screens.getLigue().code : null, details: { partie: screens.getParties(), temps: Math.round(Math.max(0, clock.now())), score: Math.floor(game.metres), seconde: game.reviveOffered } });
   game.sansFaute = false;
   triggerShake(10, 0.6);
   damageFlash = 1;
@@ -561,7 +634,7 @@ function terminer() {
   if (record) screens.setRecord(game.metres);
   screens.showEndScreen({ metres: game.metres, potesMax: friends.maxReached(), record, fin: true, sprint: game.sprint, scoreMax: game.scoreMax });
   screens.finLigue(game.metres, friends.maxReached(), game.sprint ? "sprint" : "course", bilanCourse());
-  net.evenement("course_finie", { pseudo: screens.getPseudo(), source: screens.getSource(), ligue: screens.getLigue() ? screens.getLigue().code : null });
+  net.evenement("course_finie", { pseudo: screens.getPseudo(), source: screens.getSource(), ligue: screens.getLigue() ? screens.getLigue().code : null, details: { partie: screens.getParties(), score: Math.floor(game.metres), potes: friends.maxReached() } });
 }
 
 function endGame(reason) {
@@ -591,14 +664,16 @@ function arriveePote(pote, direct) {
   audio.playComboJingle(Math.min(6, friends.count()));
 }
 
-function gagnerPiece(u, v) {
+// `val` = 2 pour la pièce DOUBLE (5 octobre 2026) : elle compte pour deux
+// pièces, au score comme vers le prochain pote.
+function gagnerPiece(u, v, val = 1) {
   const mult = multiplicateur();
-  const m = window.CONFIG.pieceMetres * mult;
-  game.points += 1;
+  const m = window.CONFIG.pieceMetres * mult * val;
+  game.points += val;
   game.metres += m;
-  game.etoiles += 1;
-  semerSparkles(u, v);
-  sfx.piece();
+  game.etoiles += val;
+  semerSparkles(u, v, val > 1 ? 14 : undefined, val > 1 ? "#ffd84a" : undefined);
+  if (val > 1) { sfx.pieceDouble(); pousserPopup("+2 PIÈCES", JAUNE); } else sfx.piece();
   while (game.potesGagnes < window.CONFIG.potesPaliers.length && game.points >= window.CONFIG.potesPaliers[game.potesGagnes]) {
     game.potesGagnes += 1;
     arriveePote(friends.join(player), false);
@@ -635,7 +710,7 @@ function gagnerRouge(u, v) {
 // l'instant, le rendu la fait basculer pendant 1,6 s.
 const tombes = new Map();
 function marquerTombe(ev, now) { if (ev.r !== undefined && !KINDS_ROULANTS.has(ev.kind)) tombes.set(ev.r, now); }
-const KINDS_ROULANTS = new Set(["tracteur", "bus", "chasseneige", "voiture", "contresens", "poulejetee"]);
+const KINDS_ROULANTS = new Set(["tracteur", "bus", "chasseneige", "skieur", "voiture", "contresens", "poulejetee"]);
 
 const chocs = []; // debug : les derniers chocs (auto-audit)
 function toucherJoueur(ev) {
@@ -730,7 +805,13 @@ function step(dt) {
     }
     if (gameStarted) ancrerDepartSurLaGrille();
   }
-  if (gameStarted && audioDrivesClock && !game.ended) {
+  // ⚠️ Jamais pendant une pause (5 octobre 2026) : audio.now() y est GELÉ
+  // exprès (pauseAnchor). Le chien de garde y voyait une horloge audio en
+  // panne, basculait au bout d'une seconde sur l'horloge de secours… qui, elle,
+  // tourne : le monde avançait derrière le menu pause (« le chasse-neige avait
+  // continué d'avancer ») et la course se décalait du morceau pour de bon
+  // (« à la fin, il y a du vide et la musique s'arrête »).
+  if (gameStarted && audioDrivesClock && !game.ended && !isPaused()) {
     const audioT = audio.now();
     if (audioT > audioWatch.lastT + 1e-4) { audioWatch.lastT = audioT; audioWatch.lastReal = perfClock(); }
     else if (perfClock() - audioWatch.lastReal > AUDIO_STALL_TIMEOUT) useFallbackClock(true);
@@ -784,12 +865,19 @@ function step(dt) {
   }
   // --- Nuit : tombe à partir de nuitDebutS, 30 s de transition ---
   const nd = nuitDebut !== null ? nuitDebut : window.CONFIG.nuitDebutS;
-  if (nd !== undefined) scene.setNight(Math.max(0, Math.min(1, (now - nd) / 30)));
+  // La plage de fin rallume un coucher de soleil : la nuit s'y lève aux 4/5.
+  plageFondu += ((rows.enPlage(Math.round(player.v + 8)) ? 1 : 0) - plageFondu) * Math.min(1, dt * 0.45);
+  scene.setPlage(plageFondu);
+  if (nd !== undefined) scene.setNight(Math.max(0, Math.min(1, (now - nd) / 30)) * (1 - 0.8 * plageFondu));
   // Le soleil traverse le ciel sur toute la durée du morceau.
   scene.setHeure(now / Math.max(1, window.CONFIG.dureeMorceau));
   // Montagnes proches en fondu quand on entre dans le biome montagne.
   montagneFondu += ((rows.enMontagne(Math.round(player.v)) ? 1 : 0) - montagneFondu) * Math.min(1, dt * 0.6);
   scene.setMontagne(montagneFondu);
+  // La caméra monte avec la colline : son œil reste ≥ 2,4 u au-dessus de la
+  // chaussée sous le joueur (scene.setLevee), pour tout voir par-dessus.
+  leveeCam += (Math.max(0, rows.hauteurBosse(player.v) + 2.4 - (window.CONFIG.cameraHauteur || 3.6)) - leveeCam) * Math.min(1, dt * 3);
+  scene.setLevee(leveeCam);
 
   // --- Saut : tap, maintien, double saut ---
   // ⚠️ Le sol n'est plus toujours 0 : sur une halle, le plancher monte
@@ -797,7 +885,9 @@ function step(dt) {
   // hauteur du sol SOUS le joueur, jamais à zéro.
   let marque = null; // « saut » ou « double » : la meute le refera au même endroit
   const solIci = solSous(player.v, player.jumpY);
-  const tap = conseilTap(consumeJumpPress(), tm, speed);
+  const enVol = jet.reste > 0;
+  const tap = enVol ? (consumeJumpPress(), false) : conseilTap(consumeJumpPress(), tm, speed);
+  if (enVol) voler(dt);
   if (tap && player.jumpY <= solIci + 0.02) {
     player.jumpVy = phys.vJump; player.jumpY = solIci + 0.001; player.doubled = false; player.tHaut = 0; player.tenueMarquee = false;
     marque = "saut"; sfx.saut(); conseilGeste("jump"); game.tapHint = false;
@@ -807,7 +897,7 @@ function step(dt) {
     semerSparkles(player.u, player.v, 12);
     conseilGeste("salto");
   }
-  if (player.jumpY > solIci) {
+  if (!enVol && player.jumpY > solIci) {
     // Tant que le doigt reste appuyé et qu'on monte, la pesanteur est réduite.
     // ⚠️ Plus AUCUN appui offert pendant les tutos (4 octobre 2026 : « un petit
     // saut pour les petites bêtes, ça m'a fait sauter hyper haut tout seul [...]
@@ -878,6 +968,17 @@ function step(dt) {
   // qui annonce le bâtiment, 27 septembre 2026.)
   game.surHalle = rows.solAt(player.v) > 0.05;
   if (now >= 0) fantome.enregistrer(tm, player.u, player.v, player.jumpY);
+  // Jetpack : ramassage, trajectoire (pour les potes) et pièces du vol.
+  if (now >= 0 && jet.r !== null && !jet.pris && Math.abs(player.v - jet.r) < rows.PRISE_V + 0.2 && rows.dansLeCorps(rows.solAt(jet.r) + rows.PIECE_SOL, player.jumpY)) gagnerJetpack();
+  // (La trajectoire s'enregistre du ramassage jusqu'à l'atterrissage qui suit le
+  // vol, jamais au-delà : les sauts suivants se rejouent par les marques — un
+  // véhicule qui roule n'est plus au même endroit quand la meute passe.)
+  if (jet.enregistre) {
+    const T = jet.trace;
+    if (!T.length || player.v > T[T.length - 1][0] + 0.02) T.push([player.v, player.jumpY]);
+    if (jet.reste <= 0 && player.auSol) jet.enregistre = false;
+  }
+  for (const c of jet.pieces) if (!c.pris && Math.abs(player.v - c.v) < rows.PRISE_V && rows.dansLeCorps(c.h, player.jumpY)) { c.pris = true; gagnerPiece(player.u, player.v); }
   friends.recordPlayer(player.v, marque, marque ? refObstacle(player.v, tm) : null);
   friends.update(dt, player, phys);
 
@@ -887,14 +988,14 @@ function step(dt) {
   // --- Collisions et pièces ---
   if (now >= 0) {
     for (const ev of rows.checkMember("j", player.prevV, player.v, player.jumpY, tm)) {
-      if (ev.type === "piece") gagnerPiece(player.u, player.v);
+      if (ev.type === "piece") gagnerPiece(player.u, player.v, ev.double ? 2 : 1);
       else if (ev.type === "lait") gagnerLait(player.u, player.v);
       else if (ev.type === "rouge") gagnerRouge(player.u, player.v);
       else { toucherJoueur(ev); if (game.ended || revivePaused) break; }
     }
     for (const m of friends.members()) {
       for (const ev of rows.checkMember(m.id, m.prevV, m.v, m.jumpY, tm)) {
-        if (ev.type === "piece") gagnerPiece(m.u, m.v);
+        if (ev.type === "piece") gagnerPiece(m.u, m.v, ev.double ? 2 : 1);
         else if (ev.type === "lait") gagnerLait(m.u, m.v);
         else if (ev.type === "rouge") gagnerRouge(m.u, m.v);
       }
@@ -976,7 +1077,7 @@ scene.setMasqueDecor((r) => {
   return m;
 });
 scene.setDessinVoiture((c, u, v) => props.drawVoiture(c, rows.KINDS.voiture, u, v, 1, 0));
-scene.setZoneForcee((r) => (rows.enMontagne(r) ? "montagne" : null));
+scene.setZoneForcee((r) => (rows.enPlage(r) ? "plage" : rows.enMontagne(r) ? "montagne" : null));
 
 // Pièce, brique de lait ou pièce rouge, flottant à la hauteur `h` au-dessus
 // de la route (rangée r).
@@ -1001,19 +1102,42 @@ function drawPiece(r, h, now, kind) {
   // grande (20 septembre 2026 : « les tailles et l'espacement entre les
   // pièces, ça n'a aucun sens »).
   const p = scene.project(-0.35, r, h + bob);
-  const R = scene.scale() * (kind === "grosse" ? PIECE_R * 1.6 : PIECE_R);
+  const R = scene.scale() * (kind === "grosse" ? PIECE_R * 1.45 : PIECE_R);
   ctx.save();
   ctx.translate(p.x, p.y);
   drawCoin(ctx, R, spin, kind === "grosse");
   ctx.restore();
 }
-const PIECE_R = 0.3;
+const PIECE_R = 0.36;
+// Le jetpack posé sur la route : il flotte, tourne, brille, et s'annonce.
+function dessinerJetpackObjet(r, now) {
+  const bas = rows.solAt(r) + 0.35 + Math.sin(now * 3) * 0.08, spin = now * 2.2;
+  const p = scene.project(0, r, bas + 0.8);
+  const R = scene.scale() * 1.6;
+  ctx.save();
+  const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, R);
+  g.addColorStop(0, `rgba(255,214,90,${0.55 + 0.15 * Math.sin(now * 6)})`); g.addColorStop(1, "rgba(255,214,90,0)");
+  ctx.fillStyle = g; ctx.fillRect(p.x - R, p.y - R, R * 2, R * 2);
+  ctx.restore();
+  for (const dx of [-0.17, 0.17]) {
+    scene.drawBoxR(ctx, Math.cos(spin) * dx, r + Math.sin(spin) * dx, 0.26, 0.26, 0.95, "#cfd4dc", bas, spin);
+    scene.drawBoxR(ctx, Math.cos(spin) * dx, r + Math.sin(spin) * dx, 0.24, 0.24, 0.12, "#e13e26", bas + 0.95, spin);
+  }
+  scene.drawBoxR(ctx, 0, r, 0.62, 0.14, 0.1, "#e13e26", bas + 0.6, spin);
+  const t = scene.project(0, r, bas + 1.55);
+  ctx.save();
+  ctx.font = `800 ${Math.round(scene.scale() * 0.42)}px "Helvetica Neue", Helvetica, Arial, sans-serif`;
+  ctx.textAlign = "center"; ctx.textBaseline = "bottom";
+  ctx.lineWidth = 3; ctx.strokeStyle = "rgba(0,0,0,0.6)"; ctx.lineJoin = "round";
+  ctx.strokeText("JETPACK", t.x, t.y); ctx.fillStyle = "#ffcf2e"; ctx.fillText("JETPACK", t.x, t.y);
+  ctx.restore();
+} // +20 % le 5 octobre 2026 (« elles sont pas assez grosses »)
 
 // Avertisseur « ! » au bord droit (comme les missiles de Jetpack Joyride) :
 // une traversée est armée mais sa rangée n'est pas encore à l'écran.
 const alertesVues = new Map(); // rangée → instant (réel) où son panneau est apparu
 let debugAlertes = null; // harnais : rangée → { alerte, vu } (panneau affiché / véhicule à l'écran)
-let montagneFondu = 0;
+let montagneFondu = 0, leveeCam = 0, plageFondu = 0;
 function renderAlertes(now, vitesse) {
   if (!gameStarted || game.ended || now < 0) return;
   const devant = scene.unitesDevant();
@@ -1027,7 +1151,14 @@ function renderAlertes(now, vitesse) {
     // tant que la VOITURE n'y est pas (elle part de bien plus loin que sa rangée).
     const ou = row.type === "contresens" ? rows.contresensAt(r, row, now) : { v: r };
     // L'ARRIÈRE du véhicule compte : un tracteur lent entre dans l'écran par son cul.
-    if (!ou || ou.v - (row.type === "contresens" ? rows.KINDS[row.kind].long / 2 : 0) <= player.v + devant + 1) continue;
+    if (!ou || ou.v - (row.type === "contresens" ? rows.KINDS[row.kind].long / 2 : 0) <= player.v + devant + 0.2) continue;
+    // Le panneau ne s'allume que `alerteAvanceS` (3 s) avant que le véhicule
+    // n'entre dans l'écran (5 octobre 2026 : « ils arrivent trop longtemps
+    // avant [...] il y a vraiment un temps d'attente de 5 secondes »).
+    const avant = row.type === "contresens"
+      ? (ou.v - rows.KINDS[row.kind].long / 2 - (player.v + devant + 0.2)) / Math.max(0.5, vitesse + row.vitesse)
+      : (r - (player.v + devant + 0.2)) / Math.max(0.5, vitesse);
+    if (avant > (window.CONFIG.alerteAvanceS || 3)) continue;
     const tRest = row.type === "contresens" ? (ou.v - player.v) / Math.max(0.5, vitesse + row.vitesse) : (r - player.v) / Math.max(0.5, vitesse);
     const urgence = Math.max(0, Math.min(1, 1 - (tRest - 1) / 2.5));
     // 4 octobre 2026 (« il doit trembler pendant 1 seconde, et après se réduire
@@ -1039,7 +1170,8 @@ function renderAlertes(now, vitesse) {
     const reduit = Math.max(0, Math.min(1, (age - 1) / 0.3));
     const taille = 32 * (1 - reduit) + 17 * reduit;
     const tremble = age < 1 ? Math.sin(age * 72) * 5 * (1 - age * 0.6) : 0;
-    const y = scene.project(0, player.v, 1.4).y + (age < 1 ? Math.cos(age * 61) * 2 : 0);
+    // Posé à hauteur de chaussée SOUS le joueur (sur la colline, la route est montée).
+    const y = scene.project(0, player.v, rows.solAt(player.v) + 1.4).y + (age < 1 ? Math.cos(age * 61) * 2 : 0);
     // ⚠️ Le panneau tenait sur `width − 18 − taille` et son sommet droit
     // partait donc HORS de l'écran (20 septembre 2026 : « il est coupé sur la
     // droite, il apparaît pas dans tout l'écran »). Il est désormais posé sur
@@ -1200,6 +1332,7 @@ function render(alpha) {
         const dessin = row.kind === "tracteur" ? () => props.drawTracteurRoute(ctx, inst.K, 0, inst.v, t)
           : row.kind === "bus" ? () => props.drawBus(ctx, inst.K, 0, inst.v, t)
           : row.kind === "chasseneige" ? () => props.drawChasseNeige(ctx, inst.K, 0, inst.v, t)
+          : row.kind === "skieur" ? () => props.drawSkieur(ctx, inst.K, 0, inst.v, t)
           : () => props.drawVoiture(ctx, inst.K, 0, inst.v, -1, t);
         items.push({ d: scene.depth(0, inst.v), draw: () => surSol(inst.v, dessin, true) });
         if (debugAlertes) { const px = scene.project(0, inst.v, 0).x; if (px > 0 && px < width) { const e = debugAlertes.get(r) || { kind: row.kind, alerte: 0, vu: 0 }; e.vu += 1; debugAlertes.set(r, e); } }
@@ -1214,9 +1347,10 @@ function render(alpha) {
     }
     // Ce qui est sur la route : seulement à proximité de l'écran.
     if (Math.abs(r - vc) > largeurRoute) continue;
-    row.coins.forEach((h, i) => { if (!rows.coinTaken(r, i)) items.push({ d: scene.depth(-0.3, r), draw: () => drawPiece(r, h, now, "piece") }); });
+    row.coins.forEach((h, i) => { if (!rows.coinTaken(r, i)) items.push({ d: scene.depth(-0.3, r), draw: () => drawPiece(r, h, now, row.double ? "grosse" : "piece") }); });
     if (row.lait !== undefined && !rows.bonusTaken(r, "lait")) items.push({ d: scene.depth(-0.3, r), draw: () => drawPiece(r, row.lait, now, "lait") });
     if (row.grosse !== undefined && !rows.bonusTaken(r, "grosse")) items.push({ d: scene.depth(-0.3, r), draw: () => drawPiece(r, row.grosse, now, "grosse") });
+    if (r === jet.r && !jet.pris) items.push({ d: scene.depth(-0.3, r), draw: () => dessinerJetpackObjet(r, now) });
     if (row.type === "statique") {
       const tombe = tombes.get(r);
       items.push({ d: scene.depth(0, r), draw: () => surSol(r, () => (tombe !== undefined
@@ -1245,6 +1379,7 @@ function render(alpha) {
     items.push({ d: scene.depth(-RH - 0.6, ra), draw: () => drapeau(-RH - 0.6) });
   }
   if (gameStarted) for (const dr of friends.drawables(ctx, pedal, penteSol)) items.push({ d: scene.depth(dr.u, dr.v), draw: dr.draw });
+  for (const c of jet.pieces) if (!c.pris && Math.abs(c.v - vc) < largeurRoute) items.push({ d: scene.depth(-0.3, c.v), draw: () => drawPiece(c.v, c.h, now, "piece") });
   // Le fantôme du meilleur de la ligue : transparent, sans ombre, étiqueté.
   // Décalé vers le fond de la route (u + 0,7) : sur une seule voie, il serait
   // pile derrière le joueur.
@@ -1267,6 +1402,15 @@ function render(alpha) {
     // Pas d'ombre sur la route quand on roule sur une halle ou un toit de voiture.
     drawRider(ctx, u, v, jy, paletteJoueur, pedal, 1, flip, solSous(v, jy) < 0.05, player.prevRoue + (player.roue - player.prevRoue) * alpha,
       player.jumpY <= rows.solAt(player.v) + 0.02 ? penteSol(v) : 0);
+    if (jet.reste > 0) {
+      drawJetpack(ctx, u, v, jy, jet.flamme, tAnim);
+      // Jauge du jetpack au-dessus de la tête : elle se vide en 10 s.
+      const g = scene.project(u, v, jy + RIDER_HEIGHT + 0.95), L = scene.scale() * 1.5, f = jet.reste / (window.CONFIG.jetpackDureeS || 10);
+      ctx.save();
+      ctx.fillStyle = "rgba(13,13,16,0.55)"; ctx.fillRect(g.x - L / 2 - 2, g.y - 5, L + 4, 10);
+      ctx.fillStyle = f > 0.3 ? "#ffcf2e" : "#e13e26"; ctx.fillRect(g.x - L / 2, g.y - 3, L * f, 6);
+      ctx.restore();
+    }
     // Chevron « c'est toi » au-dessus de la tête : dans la meute, le joueur
     // se perdait parmi ses potes (même maillot possible).
     if (gameStarted && !game.ended) {
@@ -1473,7 +1617,12 @@ if (document.fonts && document.fonts.load) {
 function frame(nowMs) {
   try { frameInterne(nowMs); } finally { requestAnimationFrame(frame); }
 }
+// Mode VIDÉO (harnais ?debug, outils/video.mjs) : horloge et simulation
+// avancent à la main, image par image — une course filmée nette à 30 i/s
+// quel que soit le temps que prend chaque capture.
+let modeVideo = null;
 function frameInterne(nowMs) {
+  if (modeVideo) { lastTime = nowMs / 1000; return; }
   const t0 = performance.now();
   const now = nowMs / 1000;
   const frameTime = Math.min(now - lastTime, MAX_FRAME_TIME);
@@ -1514,6 +1663,13 @@ if (debugOverlay.isEnabled()) {
     tombes: () => tombes.size,
     conseil: () => ({ ...conseil, ralenti }),
     chocs: () => chocs.slice(),
+    forcerJetpack: () => { jetpackForce = true; poserJetpack(); return jet.r; },
+    jetPieces: () => jet.pieces.filter((c) => !c.pris).map((c) => ({ v: c.v, h: c.h })),
+    videoDemarrer: () => { modeVideo = { t: clock.now() }; audioDrivesClock = false; clock.setTimeSource(() => modeVideo.t, true); },
+    videoAvance: (jusque) => { while (clock.now() < jusque && !game.ended) { if (window.__pilote) window.__pilote(); modeVideo.t += STEP; step(STEP); } },
+    videoPas: (dt) => { const n = Math.max(1, Math.round(dt / STEP)); for (let i = 0; i < n && !game.ended; i++) { if (window.__pilote) window.__pilote(); modeVideo.t += STEP; step(STEP); } render(1); },
+    positionMorceau: () => departMorceau + clock.now(),
+    jetpack: () => ({ r: jet.r, pris: jet.pris, reste: jet.reste, pieces: jet.pieces.length, prises: jet.pieces.filter((c) => c.pris).length }),
   };
 }
 requestAnimationFrame(frame);

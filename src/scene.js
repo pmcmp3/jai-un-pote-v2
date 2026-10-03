@@ -44,6 +44,7 @@ let W = 375, H = 812, K = 26;
 let camD = 11, camH = 3.6;
 let camV = 0, vCentre = 0, joueurX = 0.28;
 let horizonY = 430;
+let camH0 = 3.6, horizonY0 = 430, levee = 0;
 let night = 0;
 let decorT = 0;
 let heure = 0;   // 0 = début de course, 1 = fin : le soleil traverse le ciel
@@ -56,10 +57,23 @@ export function setViewport(width, height) {
   // plafonnée par la hauteur sur un écran couché (ordinateur).
   K = Math.min(W / cfg("unitesVisibles", 14.5), H / 11);
   camD = cfg("cameraDistance", 11);
-  camH = cfg("cameraHauteur", 3.6);
-  horizonY = H * cfg("solEcran", 0.64) - camH * K;
+  camH0 = cfg("cameraHauteur", 3.6);
+  horizonY0 = H * cfg("solEcran", 0.64) - camH0 * K;
+  appliquerLevee();
   majCentre();
 }
+// Caméra qui MONTE avec la colline (5 octobre 2026 : en haut, la route passait
+// au-dessus de l'œil de la caméra et on voyait les vélos par en dessous — « les
+// vélos ne sont pas très bien modélisés »). L'œil monte de `levee` et l'image
+// est recalée pour que le plan de la route (u = 0) reste EXACTEMENT au même
+// endroit de l'écran : le joueur grimpe toujours autant à l'écran ; le fond
+// monte, le premier plan descend, et tout se voit de nouveau par-dessus.
+function appliquerLevee() { camH = camH0 + levee; horizonY = horizonY0 - levee * K; }
+export function setLevee(d) { levee = Math.max(0, d); appliquerLevee(); }
+// Hauteur (u) qui s'affiche à la ligne d'écran y, dans le plan de la route
+// (u = 0). Indépendante de la levée de caméra (le plan u = 0 ne bouge pas).
+export function hauteurA(y) { return camH + (horizonY - y) / K; }
+export function getLevee() { return levee; }
 function majCentre() { vCentre = camV + (0.5 - joueurX) * W / K; }
 // La caméra suit le joueur ; `setJoueurX` règle où il est à l'écran (fraction
 // de la largeur) — main.js l'avance quand la vitesse monte.
@@ -423,12 +437,18 @@ const ZONES = ["ble", "prairie", "village", "tournesol", "foret", "vigne", "vill
 let zoneForcee = () => null;
 export function setZoneForcee(f) { zoneForcee = typeof f === "function" ? f : () => null; }
 export function zoneAt(r) { return zoneForcee(r) || ZONES[Math.floor(Math.max(0, r) / ZONE_ROWS) % ZONES.length]; }
-const SOIL = { ble: "#c9a648", prairie: "#7aa63c", tournesol: "#6f8c2f", foret: "#3f5a2a", vigne: "#8a6a45", village: "#8fa864", villageSud: "#b9a06a", montagne: "#e4e9ee" };
-const HERBE = { ble: "#6f8f34", prairie: "#7aa63c", tournesol: "#66852f", foret: "#4a6a30", vigne: "#6f8f34", village: "#8fa864", villageSud: "#9aa86a", montagne: "#dfe5eb" };
+const SOIL = { ble: "#c9a648", prairie: "#7aa63c", tournesol: "#6f8c2f", foret: "#3f5a2a", vigne: "#8a6a45", village: "#8fa864", villageSud: "#b9a06a", montagne: "#e4e9ee", plage: "#ecd3a0" };
+const HERBE = { ble: "#6f8f34", prairie: "#7aa63c", tournesol: "#66852f", foret: "#4a6a30", vigne: "#6f8f34", village: "#8fa864", villageSud: "#9aa86a", montagne: "#dfe5eb", plage: "#e6c993" };
 // La route de la montagne est ENNEIGÉE (4 octobre 2026 : « il faudrait que la
 // route soit un peu pleine de neige ») : neige tassée et deux ornières.
 const NEIGE_ROUTE = "#dde3e9", ORNIERE = "#b9c2cc", BORD_NEIGE = "#cfd7df";
 function routeNeige(r) { return zoneForcee(r) === "montagne"; }
+// La PLAGE de fin (5 octobre 2026 : « tu peux finir avec plage, coucher de
+// soleil : c'est la mer au fond et des palmiers. On est un peu comme Miami
+// Beach ») : du sable jusqu'au rivage (u = RIVAGE), la mer au-delà.
+function enPlage(r) { return zoneForcee(r) === "plage"; }
+const RIVAGE = 7.25, SABLE_BORD = "#dcc08a";
+function bordure(r) { return routeNeige(r) ? BORD_NEIGE : enPlage(r) ? SABLE_BORD : DIRT; }
 const DIRT = "#9a7a4e";
 const ROAD = "#55514d";
 const LINE = "#f2ead8";
@@ -476,9 +496,9 @@ function bande(ctx, uPresB, uLoinB, couleur) {
   let debut = r0, c = couleur(r0);
   for (let r = r0 + 1; r <= r1; r++) {
     const cr = couleur(r);
-    if (cr !== c) { trace(debut, r - 1, c); debut = r; c = cr; }
+    if (cr !== c) { if (c) trace(debut, r - 1, c); debut = r; c = cr; }
   }
-  trace(debut, r1, c);
+  if (c) trace(debut, r1, c);
 }
 
 function collines(ctx, u, base, amp, couleur, graine) {
@@ -529,6 +549,39 @@ function montagnes(ctx, u) {
 // devant les Alpes lointaines, qui apparaît en fondu (setMontagne).
 let montagneAlpha = 0;
 export function setMontagne(a) { montagneAlpha = Math.max(0, Math.min(1, a)); }
+let plageAlpha = 0;
+export function setPlage(a) { plageAlpha = Math.max(0, Math.min(1, a)); }
+// La mer du coucher de soleil : claire et rosée à l'horizon, plus profonde
+// vers le rivage, des vagues en traits fins et le reflet du soleil en colonne.
+function mer(ctx, alpha) {
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  const y0 = horizonY, y1 = H;
+  const g = ctx.createLinearGradient(0, y0, 0, ySol(RIVAGE));
+  g.addColorStop(0, rgbA(melange(parseColor("#f3a77e"), HORIZON_NUIT, night * 0.5)));
+  g.addColorStop(0.18, rgbA(melange(parseColor("#8c6fa6"), HORIZON_NUIT, night * 0.5)));
+  g.addColorStop(1, rgbA(melange(parseColor("#3d5a9c"), HORIZON_NUIT, night * 0.5)));
+  ctx.fillStyle = g;
+  ctx.fillRect(0, y0, W, y1 - y0);
+  // Vagues : des traits qui dérivent, plus serrés au loin.
+  ctx.fillStyle = "rgba(255,236,214,0.35)";
+  for (let i = 0; i < 14; i++) {
+    const u = 18 + i * i * 2.2, s2 = echelle(u), y = horizonY + camH * s2;
+    if (y > ySol(RIVAGE)) continue;
+    const pas = 90 * s2 / K + 30, dec = ((decorT * 6 + i * 37) * s2) % pas;
+    for (let x = -pas + dec; x < W + pas; x += pas) ctx.fillRect(x + hash(i * 3 + Math.floor(x / pas)) * 20, y, Math.max(6, 22 * s2 / K + 8), Math.max(1, s2 * 0.05));
+  }
+  // Reflet du soleil : une colonne de reflets sous lui.
+  const sx = W * (0.08 + 0.84 * heure);
+  for (let i = 0; i < 12; i++) {
+    const y = horizonY + 3 + i * i * 1.6;
+    if (y > ySol(RIVAGE)) break;
+    const w = (18 + i * 5) * (0.6 + 0.4 * Math.sin(decorT * 3 + i * 1.7));
+    ctx.fillStyle = `rgba(255,214,150,${0.55 - i * 0.035})`;
+    ctx.fillRect(sx - w / 2, y, w, 2 + i * 0.3);
+  }
+  ctx.restore();
+}
 function montagnesProches(ctx) {
   const u = 170, s = echelle(u);
   const pic = (v) => {
@@ -560,10 +613,10 @@ function nuages(ctx) {
     const vc = i * 150 + hash(i * 3.1) * 70, hc = 38 + hash(i * 5.7) * 26, lg = 60 + hash(i * 1.3) * 60;
     const p = project(u, vc, hc);
     const w = lg * s, h = Math.max(6, w * 0.18);
-    ctx.fillStyle = night > 0.5 ? "#39406a" : "#fff7ea";
+    ctx.fillStyle = night > 0.5 ? "#39406a" : plageAlpha > 0.3 ? "#ffc7a6" : "#fff7ea";
     ctx.fillRect(p.x, p.y, w, h);
     ctx.fillRect(p.x + w * 0.18, p.y - h * 0.7, w * 0.5, h * 0.8);
-    ctx.fillStyle = night > 0.5 ? "#2c3358" : "#f1dcc6";
+    ctx.fillStyle = night > 0.5 ? "#2c3358" : plageAlpha > 0.3 ? "#e8957a" : "#f1dcc6";
     ctx.fillRect(p.x, p.y + h * 0.7, w, h * 0.3);
   }
   ctx.restore();
@@ -572,8 +625,10 @@ function nuages(ctx) {
 export function renderGround(ctx, boueAt) {
   // Ciel.
   const hiv = poidsHiver() * 0.3, aut = poids("automne") * 0.25;
-  const haut = melange(melange(melange(CIEL_HAUT, [176, 188, 204], hiv), [214, 170, 120], aut), CIEL_HAUT_NUIT, night);
-  const bas = melange(melange(melange(CIEL_BAS, [226, 230, 236], hiv), [240, 196, 150], aut), CIEL_BAS_NUIT, night);
+  let haut = melange(melange(melange(CIEL_HAUT, [176, 188, 204], hiv), [214, 170, 120], aut), CIEL_HAUT_NUIT, night);
+  let bas = melange(melange(melange(CIEL_BAS, [226, 230, 236], hiv), [240, 196, 150], aut), CIEL_BAS_NUIT, night);
+  // Coucher de soleil sur la plage : violet en haut, orange rosé à l'horizon.
+  if (plageAlpha > 0.01) { haut = melange(haut, [72, 56, 132], plageAlpha * 0.85); bas = melange(bas, [255, 142, 96], plageAlpha * 0.9); }
   const g = ctx.createLinearGradient(0, 0, 0, horizonY);
   g.addColorStop(0, rgbA(haut));
   g.addColorStop(0.6, rgbA(melange(haut, bas, 0.55)));
@@ -596,7 +651,7 @@ export function renderGround(ctx, boueAt) {
     ctx.fillStyle = couleur;
     ctx.beginPath(); ctx.arc(x, y, rayon, 0, Math.PI * 2); ctx.fill();
   };
-  if (night < 0.98) astre(heure, `rgba(255,236,190,${1 - night})`, K * 0.9, 1 - night);
+  if (night < 0.98) astre(heure, plageAlpha > 0.3 ? `rgba(255,186,110,${1 - night})` : `rgba(255,236,190,${1 - night})`, K * (0.9 + 0.5 * plageAlpha), 1 - night);
   if (night > 0.3) {
     const a = Math.min(1, (night - 0.3) / 0.5);
     ctx.fillStyle = `rgba(255,255,255,${0.75 * a})`;
@@ -607,23 +662,43 @@ export function renderGround(ctx, boueAt) {
   modeSaison = "sol";
   // Montagnes au loin (les villages du jeu sont en Isère : les Alpes en toile
   // de fond), neige sur les crêtes ; puis collines vertes, dans la brume.
+  // (À la plage, montagnes et collines s'effacent : la mer va jusqu'à l'horizon.)
+  ctx.save(); ctx.globalAlpha = 1 - plageAlpha;
   montagnes(ctx, 320);
-  if (montagneAlpha > 0.01) { ctx.save(); ctx.globalAlpha = montagneAlpha; montagnesProches(ctx); ctx.restore(); }
+  if (montagneAlpha > 0.01) { ctx.globalAlpha = (1 - plageAlpha) * montagneAlpha; montagnesProches(ctx); ctx.globalAlpha = 1 - plageAlpha; }
   collines(ctx, 150, 2, 26, teintes("#7c96a8", 14).plat, 1.7);
   collines(ctx, 62, 0.4, 9, teintes("#6d8c45", 12).plat, 4.1);
+  ctx.restore();
   // Champs lointains, jusqu'à la zone de décor.
   ctx.fillStyle = teintes("#8d9a4c", 14).plat;
   ctx.fillRect(0, ySol(62) - 1, W, H - ySol(62) + 1);
+  // La mer, de l'horizon au rivage : elle recouvre montagnes, collines et
+  // champs lointains, et reflète le soleil couchant.
+  if (plageAlpha > 0.01) mer(ctx, plageAlpha);
+  // Dans la montagne, collines et champs lointains passent sous la neige (5
+  // octobre 2026 : une bande jaune restait visible derrière les sapins).
+  if (montagneAlpha > 0.01) {
+    ctx.save(); ctx.globalAlpha = montagneAlpha;
+    collines(ctx, 62, 0.4, 9, teintes("#dfe6ec", 12).plat, 4.1);
+    ctx.fillStyle = teintes("#e3e9ee", 14).plat;
+    ctx.fillRect(0, ySol(62) - 1, W, H - ySol(62) + 1);
+    ctx.restore();
+  }
 
   // Champs du fond, en sillons parallèles à la route (bandes de 1,25 u).
-  const zSol = (r, u, k) => { const soil = SOIL[zoneAt(r)]; return teintes(k % 2 ? shadeHex(soil, -9) : soil, u).plat; };
+  const zSol = (r, u, k) => {
+    if (enPlage(r) && u >= RIVAGE - 0.01) return teintes(k % 2 ? "#3d5a9c" : "#41609f", u).plat;
+    const soil = SOIL[zoneAt(r)]; return teintes(k % 2 ? shadeHex(soil, -9) : soil, u).plat;
+  };
   let k = 0;
   for (let u = U_DECOR; u > ROAD_HALF + 1.0; u -= 1.25, k++) {
     const u0 = Math.max(ROAD_HALF + 1.0, u - 1.25), kk = k;
     bande(ctx, u0, u, (r) => zSol(r, u0, kk));
   }
+  // L'écume au rivage : elle avance et recule doucement.
+  { const e = 0.18 + 0.14 * Math.sin(decorT * 1.3); bande(ctx, RIVAGE - e, RIVAGE + 0.12, (r) => (enPlage(r) ? teintes("#f6efe2", RIVAGE).plat : null)); }
   bande(ctx, ROAD_HALF + 0.22, ROAD_HALF + 1.0, (r) => teintes(HERBE[zoneAt(r)], 1).plat);
-  bande(ctx, ROAD_HALF, ROAD_HALF + 0.22, (r) => teintes(routeNeige(r) ? BORD_NEIGE : DIRT, 1).plat);
+  bande(ctx, ROAD_HALF, ROAD_HALF + 0.22, (r) => teintes(bordure(r), 1).plat);
   // La route : asphalte et lignes de rive en tirets (repère de vitesse). Plus
   // de flaques de boue depuis le 20 septembre 2026 (« enlève les trucs de
   // terre par terre, les gens comprennent pas, je pense »).
@@ -636,7 +711,7 @@ export function renderGround(ctx, boueAt) {
   bande(ctx, -0.58, -0.4, orniere);
   bande(ctx, 0.4, 0.58, orniere);
   modeSaison = "sol";
-  bande(ctx, -ROAD_HALF - 0.22, -ROAD_HALF, (r) => teintes(routeNeige(r) ? BORD_NEIGE : DIRT, 0).plat);
+  bande(ctx, -ROAD_HALF - 0.22, -ROAD_HALF, (r) => teintes(bordure(r), 0).plat);
   bande(ctx, -ROAD_HALF - 1.3, -ROAD_HALF - 0.22, (r) => teintes(HERBE[zoneAt(r)], 0).plat);
   // Champ du premier plan, jusqu'au bas de l'écran : des sillons parallèles
   // à la route, bien marqués — la perspective les épaissit vers le bas.
@@ -693,6 +768,14 @@ export function rowDecor(ctx, r, clear) {
   const zone = zoneAt(r);
   const push = (u, v, draw) => out.push({ d: depth(u, v), draw: () => avecSaison("objet", draw) });
   const sway = (k) => Math.sin(decorT * 1.6 + k) * 0.05;
+  if (zone === "plage") {
+    // Palmiers le long de la route, parasols sur le sable, et de temps en
+    // temps une cabane de sauveteur pastel (Miami Beach).
+    if (r % 4 === 0) { const a = hash(r * 23 + 1), u = ROAD_HALF + 1.4 + a * 1.2, v = r - 0.3, k = r * 1.7; push(u, v, () => palmier(ctx, u, v, 6.2 + a * 2.4, Math.sin(decorT * 1.1 + k) * 0.12, hash(r * 5) < 0.5 ? -1 : 1)); }
+    if (r % 4 === 2 && hash(r * 29 + 4) < 0.55) { const a = hash(r * 31 + 2), u = ROAD_HALF + 3.0 + a * 2.0, v = r; push(u, v, () => parasol(ctx, u, v, Math.floor(hash(r * 7 + 1) * 4))); }
+    if (r % 41 === 17) { const u = ROAD_HALF + 3.2, v = r; push(u, v, () => cabaneSauveteur(ctx, u, v, Math.floor(hash(r) * 3))); }
+    return out;
+  }
   if (!clear) {
     for (const side of [1, -1]) {
       const base = side > 0 ? ROAD_HALF + 1.2 : ROAD_HALF + 6.0;
@@ -866,6 +949,57 @@ function sapinNoel(ctx, u, v, h) {
       for (let j = 0; j < 2; j++) drawBox(ctx, u + 0.5 - w / 2 - 0.08, v + 0.5 - w / 2 + (j + 0.3) * w * 0.45, 0.16, 0.16, 0.16, boules[(i + j) % 4], base + 0.08);
     }
     drawBox(ctx, u + 0.32, v + 0.32, 0.36, 0.36, 0.36, "#ffd84a", h * 0.97);
+  });
+}
+// Palmier (la plage) : un tronc en anneaux qui se courbe, une couronne de
+// palmes qui retombent, des noix de coco.
+function palmier(ctx, u, v, h, sw, sens) {
+  avecSaison(null, () => {
+    const n = 8, dh = h / n;
+    let dv = 0;
+    for (let i = 0; i < n; i++) {
+      const f = i / n; dv = sens * f * f * 1.2 + sw * f;
+      const w = 0.34 - i * 0.015;
+      drawBox(ctx, u + 0.5 - w / 2, v + 0.5 - w / 2 + dv, w, w, dh * 1.03, i % 2 ? "#8a6a45" : "#74563a", i * dh);
+    }
+    const cu = u + 0.5, cv = v + 0.5 + sens * 1.2 + sw;
+    for (let k = 0; k < 7; k++) {
+      const a = (k / 7) * Math.PI * 2 + 0.4, du = Math.cos(a) * 0.55, dvv = Math.sin(a);
+      for (let j = 0; j < 3; j++) {
+        const d = 0.35 + j * 0.55;
+        drawBox(ctx, cu + du * d - 0.22, cv + dvv * d - 0.22 + sw * j * 0.6, 0.44, 0.44, 0.12, j === 2 ? "#3c9a4a" : "#2e8a3c", h - 0.1 - j * j * 0.22);
+      }
+    }
+    drawBox(ctx, cu - 0.3, cv - 0.3, 0.6, 0.6, 0.2, "#2e8a3c", h - 0.05);
+    for (const [a, b] of [[-0.25, 0.05], [0.05, -0.2], [0.1, 0.15]]) drawBox(ctx, cu + a - 0.1, cv + b - 0.1, 0.2, 0.2, 0.2, "#5a3a1a", h - 0.35);
+  });
+}
+// Parasol rayé planté dans le sable, et sa serviette.
+const PARASOLS = [["#e13e26", "#f6efe2"], ["#2fb3b0", "#f6efe2"], ["#ffcf2e", "#e8618c"], ["#3f63b4", "#ffcf2e"]];
+function parasol(ctx, u, v, i) {
+  avecSaison(null, () => {
+    const [c1, c2] = PARASOLS[i % PARASOLS.length];
+    drawFlat(ctx, u - 0.9, v - 0.1, 0.9, 1.6, c2 === "#f6efe2" ? c1 : c2);
+    drawBox(ctx, u - 0.04, v - 0.04, 0.08, 0.08, 2.1, "#e9e3d6");
+    drawBox(ctx, u - 0.9, v - 0.9, 1.8, 1.8, 0.1, c1, 2.0);
+    drawBox(ctx, u - 0.55, v - 0.55, 1.1, 1.1, 0.1, c2, 2.1);
+    drawBox(ctx, u - 0.2, v - 0.2, 0.4, 0.4, 0.1, c1, 2.2);
+  });
+}
+// Cabane de sauveteur, pastel, sur pilotis (l'image de Miami Beach).
+const CABANES = [["#f4a6b8", "#5ec4c0"], ["#5ec4c0", "#ffd45a"], ["#ffd45a", "#f4a6b8"]];
+function cabaneSauveteur(ctx, u, v, i) {
+  avecSaison(null, () => {
+    const [mur, toit] = CABANES[i % CABANES.length];
+    for (const [a, b] of [[0, 0], [1.6, 0], [0, 1.6], [1.6, 1.6]]) drawBox(ctx, u + a, v + b, 0.14, 0.14, 1.7, "#f1ece2");
+    drawBox(ctx, u - 0.2, v - 0.2, 2.2, 2.2, 0.14, "#f1ece2", 1.7);
+    drawBox(ctx, u + 0.1, v + 0.1, 1.6, 1.6, 1.15, mur, 1.84);
+    drawBox(ctx, u + 0.09, v + 0.5, 1.62, 0.8, 0.5, "#2b3a4a", 2.3);
+    drawBox(ctx, u + 0.08, v + 0.08, 1.64, 0.14, 1.15, "#ffffff", 1.84);
+    drawBox(ctx, u - 0.15, v - 0.15, 2.1, 2.1, 0.16, toit, 2.99);
+    drawBox(ctx, u + 0.85, v + 0.85, 0.06, 0.06, 0.9, "#f1ece2", 3.15);
+    drawBox(ctx, u + 0.91, v + 0.6, 0.04, 0.32, 0.22, "#e13e26", 3.8);
+    for (let k = 0; k < 5; k++) drawBox(ctx, u + 0.6, v - 0.35 - k * 0.32, 0.8, 0.3, 0.08, "#f1ece2", 1.6 - k * 0.32); // la rampe
   });
 }
 // Rocher : deux blocs gris décalés.
@@ -1243,6 +1377,9 @@ export function drawBosse(ctx, d, geo, rFrom = -Infinity, rTo = Infinity, couche
   if (couche === "dos") {
     avecSaison("sol", () => {
       const soil = SOIL.montagne;
+      // Au loin, le plateau continue en neige unie (la caméra monte avec la
+      // colline et verrait sinon par-dessus son bord, jusqu'aux champs).
+      bande(U_DECOR, 70, teintes("#e3e9ee", 14).plat);
       let k = 0;
       for (let u = U_DECOR; u > ROAD_HALF + 1.0; u -= 1.25, k++) {
         const u0 = Math.max(ROAD_HALF + 1.0, u - 1.25);

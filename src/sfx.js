@@ -37,6 +37,14 @@ export function piece() {
   tone(o.ctx, o.dest, { f0: 880, f1: 1320, t0: o.ctx.currentTime, dur: 0.09, gain: 0.05 });
 }
 
+// Pièce DOUBLE (5 octobre 2026) : deux blips qui montent.
+export function pieceDouble() {
+  const o = out(); if (!o) return;
+  const t0 = o.ctx.currentTime;
+  tone(o.ctx, o.dest, { f0: 880, f1: 1320, t0, dur: 0.08, gain: 0.05 });
+  tone(o.ctx, o.dest, { f0: 1320, f1: 1980, t0: t0 + 0.07, dur: 0.11, gain: 0.05 });
+}
+
 // Pote qui arrive : souffle d'herbe (bruit filtré) + montée douce.
 export function pote() {
   const o = out(); if (!o) return;

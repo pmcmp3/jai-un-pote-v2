@@ -12,7 +12,7 @@
 
 import { project } from "./scene.js";
 import { PALETTES, paletteDepuisSkin } from "./rider.js";
-import { drawRider, RIDER_HEIGHT } from "./voxrider.js";
+import { drawRider, drawJetpack, RIDER_HEIGHT } from "./voxrider.js";
 
 // Profondeur de chaque place de la meute (+ = côté fond, − = côté caméra).
 const U_MEUTE = [0.55, -0.45, 0.95, -0.15, 0.3, -0.6, 0.75, 0.1];
@@ -185,6 +185,18 @@ export function update(dt, player, phys) {
     // Le sol sous lui : la route, la halle, ou le toit d'une voiture s'il est
     // déjà au-dessus (il roule sur les toits comme le joueur).
     const sol = phys.solSous ? phys.solSous(p.v, Math.max(p.jumpY, p.prevJumpY)) : phys.sol ? phys.sol(p.v) : 0;
+    // JETPACK (5 octobre 2026) : la meute suit EXACTEMENT la trajectoire du
+    // joueur dans les airs — même hauteur au même endroit de la route, comme
+    // une file indienne d'avions. Rien de ce qu'il a survolé ne la touche.
+    const ht = phys.trace ? phys.trace(p.v) : null;
+    if (ht !== null) {
+      p.jumpY = Math.max(sol, ht); p.jumpVy = 0; p.doubled = false; p.flip = 0; p.marqueSaut = null; p.enAttente = null;
+      for (const m of marques) if (m.v <= p.v && m.id > p.lastMarkId) p.lastMarkId = m.id;
+      p.jetpack = ht > sol + 0.05 || p.jetpack && p.jumpY > sol + 0.05;
+      p.auSol = p.jumpY <= sol + 0.001;
+      continue;
+    }
+    p.jetpack = false;
     // Un saut arrivé pendant qu'il était encore en l'air part dès qu'il touche
     // le sol (0,3 s au plus) : sinon il sautait le saut, puis faisait le
     // double saut suivant depuis trop bas et retombait AVANT la voiture.
@@ -252,7 +264,8 @@ export function drawables(ctx, pedalPhase, penteAt = null) {
     out.push({
       u, v, draw: () => {
         // Incliné dans la pente de la halle, comme le joueur.
-        drawRider(ctx, u, v, y, p.palette, pedalPhase + p.pedal, alpha, p.flip, solOmbre(v) < 0.05, p.roue || 0, p.auSol && penteAt ? penteAt(v) : 0);
+        drawRider(ctx, u, v, y, p.palette, pedalPhase + p.pedal, alpha, p.flip, solOmbre(v) < 0.05 && !p.jetpack, p.roue || 0, p.auSol && penteAt ? penteAt(v) : 0);
+        if (p.jetpack) drawJetpack(ctx, u, v, y, p.jumpY > (p.prevJumpY || 0) - 0.01, performance.now() / 1000 + p.slot);
         // Le prénom s'affiche 3 s à l'arrivée du pote, puis s'efface : dans
         // une meute serrée, cinq étiquettes permanentes se marchaient dessus.
         const vu = p.arrive >= 1 ? Math.max(0, Math.min(1, (3.6 - p.age) / 0.6)) : 0;

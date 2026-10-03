@@ -363,6 +363,60 @@ Code `TESTV2`, qui est aussi `config.ligueBeta` (menu simplifié + bouton « Lai
     en haut), overlay calé sur `visualViewport` (hauteur + décalage), champ
     actif ramené en vue dans l'overlay (`montrerChamp`). Vérifié en simulation
     (fenêtre réduite, `premiere.mjs`) ; ⚠️ pas vérifiable sans un vrai iPhone.
+- **5 octobre 2026, quatrième série (retours iPhone : pause, plage, jetpack, porte)**
+  — `VERSION_COURSE` 17, SW `jp2-v24` :
+  - *Pause* : ⚠️ le chien de garde de l'horloge audio tournait PENDANT la pause ;
+    `audio.now()` y est gelé exprès, il y voyait une panne et basculait au bout
+    d'une seconde sur l'horloge de secours… qui tourne : le monde avançait
+    derrière le menu (« le chasse-neige avait continué d'avancer ») et la course
+    restait décalée du morceau (« à la fin il y a du vide »). Chien de garde
+    coupé pendant toute pause (`!isPaused()`), horloge de secours gelée en
+    pause, et `pauseDeriveMax` 25 → 0 : ici le morceau EST le chrono, il repart
+    là où la course s'est arrêtée. Mesuré (`capture.mjs pause`) : horloge
+    1,97 → 2,00 s pendant 3,5 s de pause.
+  - *Montagne* : UNE seule colline (`MONTAGNE_AVANT`/`MONTAGNE_APRES`, le biome
+    se referme après sa descente). La CAMÉRA MONTE avec la colline
+    (`scene.setLevee`, œil ≥ 2,4 u au-dessus de la chaussée) en gardant le plan
+    de la route fixe à l'écran : en haut, on voyait les vélos et le
+    chasse-neige PAR EN DESSOUS (« les vélos ne sont pas très bien
+    modélisés »). Plateau prolongé en neige jusqu'à u = 70, collines et champs
+    lointains enneigés dans la montagne. SKIEUR DE FOND en face
+    (`skieur`, `props.drawSkieur`) : le 2e véhicule « en face » du biome, et en
+    alternance avec le bonhomme pour les gros obstacles posés — chaque course
+    a au moins un chasse-neige, un skieur, un bonhomme (mesuré, 20 graines).
+  - *Alertes* : le panneau ne s'allume que `alerteAvanceS` (3 s) avant que le
+    véhicule n'entre dans l'écran, et s'éteint dès qu'il y entre.
+  - *Pièces* : +20 % de taille (`PIECE_R` 0,36), une pièce tous les 3 rangs
+    PARTOUT (`ESPACEMENT` 3, plus d'éclaircissage « une sur deux » qui rendait
+    les espacements irréguliers), traînées de 2 pièces : +15 % de pièces,
+    +23 % en valeur. PIÈCE DOUBLE (dorée, ×1,45) au sommet de l'arc de chaque
+    double saut : compte pour 2 (`row.double`, simulation comprise).
+  - *Plage de fin* (`rows.enPlage`, 30 dernières secondes) : coucher de soleil
+    (ciel violet/orange, soleil bas, nuit levée aux 4/5), mer jusqu'à
+    l'horizon avec vagues et reflet (`scene.mer`), montagnes effacées, sable,
+    écume, palmiers, parasols, cabanes de sauveteur pastel (Miami Beach).
+  - *Jetpack* : une partie sur cinq (`jetpackUneSur`/`jetpackPartie` : la 3e,
+    la 8e…, `?jetpack` pour forcer), posé vers 70 s HORS du générateur (la
+    route et le score parfait ne changent pas) ; 10 s de vol, appuyé = on
+    monte, relâché = on plane vers le bas ; plafond sous le score ; pièces du
+    vol calées sur la hauteur de l'ÉCRAN (`scene.hauteurA`) ; les potes suivent
+    la trajectoire exacte du joueur (`phys.trace`, enregistrée du ramassage à
+    l'atterrissage seulement). ⚠️ Une course à jetpack peut dépasser le
+    « score parfait » affiché.
+  - *Porte de conversion, nouvelle échelle* (`niveauPour`, screens.js) : UNE
+    demande à la fois. CONTINUER → abonnement à PMC ; REJOUER après la 1re
+    partie → album, après la 2e → libre, à partir de la 3e → abonnement.
+    `?neuf` remet les paliers à zéro, `?zero`/`?premiere` aussi.
+  - *Trackers* : événements `porte_vue`, `clic_album` (plateforme), `clic_suivre`,
+    `mort_choix`, `continuer`, `rejouer`, `ecouter_album`, `mort`, `course_finie`
+    — avec une colonne `details` (jsonb) ajoutée à `supabase/schema-v2.sql`.
+    ⚠️ **AUCUN N'EST ENREGISTRÉ AUJOURD'HUI** : `apiBase`/`apiKey` de la v2 sont
+    vides (base v2 jamais créée), `net.js` n'envoie donc rien.
+  - *Clavier* : carte « Qui es-tu ? » compacte pendant la saisie (marges
+    serrées, bouton 40 px) — tient au-dessus du clavier d'un iPhone SE.
+  - *Vidéo 9:16* : `node outils/video.mjs <nom> <début_s> [durée] [jetpack]` —
+    1080×1920, 30 i/s, simulation pas à pas (`__pote.videoPas`), pilote
+    automatique, 5 potes, morceau calé (ffmpeg).
 - **Tuto au ralenti, deuxième version** (`conseilTap`/`conseilStep`) : approche
   ~1 s avant le bon moment (monde ×0,25), un tap donné pendant l'approche est
   GARDÉ et part pile au bon moment, gel ×0,06 s'il n'a rien fait ; reprise

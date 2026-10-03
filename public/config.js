@@ -18,7 +18,7 @@ window.CONFIG = {
   fonduSortie: 2.0,
   pauseFiltreHz: 800,
   pauseFondu: 0.5,
-  pauseDeriveMax: 25,
+  pauseDeriveMax: 0,        // 25 → 0 le 5 octobre 2026 : ici le morceau EST le chrono — à la reprise il repart là où la course s'était arrêtée (avec 25 s de dérive tolérée, il finissait avant la course : « à la fin, il y a du vide »)
 
   // Boucle du début pendant la seconde chance : 16 temps = 4 mesures à 85 BPM.
   loopMortDebut: 0.04,
@@ -167,6 +167,15 @@ window.CONFIG = {
   piecesLogo: false,        // « mets juste des pièces jaunes pour l'instant, enlève les dessins »
   laitDureeS: 5,            // brique de lait : ×2 sur les mètres pendant 5 s
   laitVitesse: 1.2,         // et seulement +20 % de vitesse (« pas ×2, c'est n'importe quoi »)
+  // JETPACK (5 octobre 2026) : une partie sur cinq (la 3e, la 8e, la 13e…),
+  // un jetpack posé vers 70 s ; 10 s de vol, appuyé = on monte.
+  jetpackUneSur: 5,
+  jetpackPartie: 3,
+  jetpackTempsS: 70,
+  jetpackDureeS: 10,
+  jetpackPoussee: 30,       // u/s² vers le haut, doigt appuyé
+  jetpackGravite: 15,       // u/s² vers le bas, doigt levé (moins qu'un saut : on plane)
+  alerteAvanceS: 3,        // le panneau « attention » s'allume 3 s avant que le véhicule n'entre dans l'écran (5 octobre 2026 : il restait ~5 s affiché pour rien)
   nuitDebutS: 50,           // la nuit tombe à partir de cet instant du morceau (30 s de transition) — 95 → 50 le 27 septembre 2026 (« le biome de nuit, il faudrait qu'il arrive beaucoup plus tôt dans la chanson »)
   tutoParties: 2,           // inutilisé depuis le 28 septembre 2026 (tuto contextuel au ralenti, main.js)
 

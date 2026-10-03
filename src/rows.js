@@ -75,6 +75,10 @@ export const KINDS = {
   // dans ce biome, il faut qu'on croise un chasse-neige ». Lame comprise dans
   // la longueur ; on peut rouler dessus comme sur le tracteur.
   chasseneige: { contresens: true, cout: 3, vitesse: 1.4, arme: 5.5, long: 3.6, larg: 1.9, h: 2.0, plancher: "double", montable: true, nom: "un chasse-neige" },
+  // Le SKIEUR DE FOND (5 octobre 2026 : « un mec qui arrive en ski face à
+  // nous, en ski de fond, quand on est dans le biome neige exclusivement ») :
+  // il vient en face, lentement, skis compris dans la longueur.
+  skieur:      { contresens: true, cout: 2, vitesse: 1.5, arme: 5.5, long: 1.9, larg: 0.7, h: 1.8, nom: "un skieur" },
   // En SENS INVERSE : elle roule sur la route, vers le joueur (20 septembre
   // 2026 : « une voiture qui roule en sens inverse, pour que ce soit vraiment
   // difficile »). Sa vitesse s'ajoute à celle du joueur.
@@ -266,9 +270,15 @@ export const BLOC = 24;
 // sur l'arc comme au sol (20 septembre 2026 : « les tailles et l'espacement
 // entre les pièces, ça n'a aucun sens ; ça doit être une règle conditionnelle,
 // avoir des standards »). Une seule taille de pièce aussi (main.js, PIECE_R).
-export const ESPACEMENT = 2;
-const TRAINEE_MIN = 7;           // rangées libres d'affilée avant de poser une traînée au sol
-const TRAINEE_LONGUEUR = 3;      // pièces d'une traînée
+// ⚠️ 5 octobre 2026 : 2 → 3, et plus d'éclaircissage « une sur deux » derrière
+// (« les espacements entre les pièces sont un peu bizarres » : l'éclaircissage
+// comptait les pièces à travers tout le bloc, et un arc ou une traînée perdait
+// tantôt sa première, tantôt sa deuxième pièce). Une pièce tous les 3 rangs,
+// partout et régulière : ~20 % de pièces en plus (« il en manque un tout petit
+// peu pour que ça soit vraiment, tout le temps, des pièces »).
+export const ESPACEMENT = 3;
+const TRAINEE_MIN = 8;           // rangées libres d'affilée avant de poser une traînée au sol (7 → 8 le 5 octobre 2026, avec ESPACEMENT 3 : +15 % de pièces, +23 % en valeur avec les doubles)
+const TRAINEE_LONGUEUR = 2;      // pièces d'une traînée (3 → 2 le 5 octobre 2026 : plus d'éclaircissage derrière)
 const LAIT_EVERY = 48;
 let FIN_LAIT = null;
 function rangFinLait() { if (FIN_LAIT === null) FIN_LAIT = Math.round(rangAuTemps(dureeCourse() - 55)); return FIN_LAIT; }
@@ -335,23 +345,28 @@ function dansHalle(r) { const d = halleA(r); return d !== null && r >= d && r <=
 // (28 rangs), plateau (22), descente (28), vallée (22). Les obstacles se posent
 // sur les plateaux et dans les vallées : sur PLAT tout autour de leur saut
 // (penteAutour), jamais dans une pente.
-const MONTAGNE_DEBUT_S = 46, MONTAGNE_FIN_S = 80;
+// ⚠️ 5 octobre 2026 : UNE SEULE colline (« il faut le faire qu'une seule fois,
+// là tu l'as fait deux fois [...] il faut qu'on sorte du biome neige un tout
+// petit peu plus tôt ») : un replat enneigé avant (MONTAGNE_AVANT rangs), la
+// colline, un replat après — et le biome se referme.
+const MONTAGNE_DEBUT_S = 46, MONTAGNE_AVANT = 24, MONTAGNE_APRES = 22;
 const COLLINE_MONTEE = 28, COLLINE_PLAT = 22, COLLINE_VALLEE = 22, COLLINE_HAUT = 6.5;
 const COLLINE_LONG = 2 * COLLINE_MONTEE + COLLINE_PLAT;
 export const GEO_BOSSE = { long: COLLINE_LONG, haut: COLLINE_HAUT };
 let MONTAGNE = null, BOSSES = null;
 function montagne() {
-  if (!MONTAGNE) MONTAGNE = [Math.round(rangAuTemps(MONTAGNE_DEBUT_S)), Math.round(rangAuTemps(MONTAGNE_FIN_S))];
+  if (!MONTAGNE) { const a = Math.round(rangAuTemps(MONTAGNE_DEBUT_S)); MONTAGNE = [a, a + MONTAGNE_AVANT + COLLINE_LONG + MONTAGNE_APRES]; }
   return MONTAGNE;
 }
 function bosses() {
-  if (!BOSSES) {
-    BOSSES = [];
-    const [a, b] = montagne();
-    for (let r = a + 8; r + COLLINE_LONG <= b; r += COLLINE_LONG + COLLINE_VALLEE) BOSSES.push(r);
-  }
+  if (!BOSSES) BOSSES = [montagne()[0] + MONTAGNE_AVANT];
   return BOSSES;
 }
+// La PLAGE de fin (5 octobre 2026 : « tu peux finir avec plage, coucher de
+// soleil : c'est la mer au fond et des palmiers ») : les 30 dernières secondes.
+const T_PLAGE = 30;
+let PLAGE = null;
+export function enPlage(r) { if (PLAGE === null) PLAGE = Math.round(rangAuTemps(dureeCourse() - T_PLAGE)); return r >= PLAGE; }
 // Rangées du biome (décor, route enneigée), un peu plus large que les collines.
 export function enMontagne(r) { const [a, b] = montagne(); return r >= a - 30 && r <= b + 20; }
 // Début de la colline qui couvre la rangée r, ou null.
@@ -534,11 +549,18 @@ export class Route {
       if (this.evts.convoi > 0) { kind = "bus"; this.evts.convoi -= 1; }
       const bouchon = !this.evts.bouchonFait && this.chaine.r >= rangAuTemps(dureeCourse() - T_BOUCHON_AVANT_FIN);
       if (bouchon) kind = "voiture";
-      // La montagne enneigée : tout ce qui arrive en face est un chasse-neige,
-      // les voitures garées et les messieurs deviennent des bonshommes de neige.
+      // La montagne enneigée : tout ce qui arrive en face est un chasse-neige ;
+      // voitures garées, messieurs et grosses bêtes de la ferme deviennent, en
+      // alternance, des bonshommes de neige et des SKIEURS qui viennent en face.
       if (enMontagne(this.chaine.r)) {
-        if (KINDS[kind].contresens && !KINDS[kind].lanceur) kind = "chasseneige";
-        else if (kind === "voiture" || kind === "costard" || kind === "fermier") kind = "bonhomme";
+        if (KINDS[kind].contresens && !KINDS[kind].lanceur) {
+          this.nNeigeFace = (this.nNeigeFace || 0) + 1;
+          kind = this.nNeigeFace === 2 ? "skieur" : "chasseneige"; // le 2e qui vient en face est TOUJOURS un skieur
+        }
+        else if (kind === "voiture" || kind === "costard" || kind === "fermier" || kind === "mouton" || kind === "vache") {
+          this.nNeige = (this.nNeige || 0) + 1;
+          kind = this.nNeige % 2 === 1 ? "bonhomme" : "skieur"; // en alternance : au moins un bonhomme par course
+        }
       }
       const t = Math.min(1, Math.max(0, this.chaine.r / RAMP_ROWS));
       const mou = Math.round(MOU_DEBUT + (MOU_FIN - MOU_DEBUT) * t);
@@ -604,7 +626,7 @@ export class Route {
     for (let p = 0; p < BLOC; p++) if (!rowsBloc[p]) rowsBloc[p] = { type: "safe", coins: [], boue: null };
     // 2. Les arcs de pièces (ils peuvent déborder du bloc : on garde ce qui
     //    tombe dedans, le bloc voisin recalcule sa part quand il se génère).
-    const pose = (r, h, grosse) => {
+    const pose = (r, h, grosse, double = false) => {
       const p = r - r0;
       if (p < 0 || p >= BLOC) return false;
       const row = rowsBloc[p];
@@ -612,13 +634,19 @@ export class Route {
       if (grosse) { row.grosse = h; row.coins = []; return true; }
       if (row.coins.length) return false;
       row.coins = [h];
+      if (double) row.double = true;
       return true;
     };
     for (let p = -12; p < BLOC + 12; p++) {
       const kind = this.dangers.get(r0 + p);
       if (!kind || this.bouchons.has(r0 + p)) continue;
       // Une pièce d'arc jamais DANS une bosse de montagne.
-      for (const c of this.arcPieces(r0 + p, kind)) if (c.h >= solAt(c.r) + PIECE_SOL - 0.3) pose(c.r, c.h, false);
+      const arc = this.arcPieces(r0 + p, kind).filter((c) => c.h >= solAt(c.r) + PIECE_SOL - 0.3);
+      // PIÈCE DOUBLE (5 octobre 2026 : « des pièces de compte double, un peu
+      // plus grosses ») : la plus haute de l'arc d'un DOUBLE saut — la
+      // récompense du gros saut, au sommet.
+      const sommet = familleDe(kind) === "double" && arc.length ? arc.reduce((a, c) => (c.h > a.h ? c : a)) : null;
+      for (const c of arc) pose(c.r, c.h, false, c === sommet);
     }
     // 3. Halle : plancher couvert de pièces (une rangée sur deux).
     for (let p = 0; p < BLOC; p++) {
@@ -641,12 +669,8 @@ export class Route {
         libre = 0;
       }
     }
-    // 4 bis. UNE PIÈCE SUR DEUX (29 septembre 2026 : « les pièces, il y en a
-    // beaucoup trop, divise une sur deux ») : les arcs gardent leur forme,
-    // simplement plus espacés. Les paliers de potes (config) ont été divisés
-    // par deux en même temps.
-    let nPiece = 0;
-    for (let p = 0; p < BLOC; p++) { const row = rowsBloc[p]; if (row.coins.length) { if (nPiece % 2 === 1) row.coins = []; nPiece += 1; } }
+    // (4 bis « une pièce sur deux », 29 septembre 2026, remplacé le 5 octobre
+    // par ESPACEMENT = 3 : même densité visée, espacement enfin régulier.)
     // 4 ter. Le bouchon : une pièce entre chaque paire de voitures, à hauteur
     // de toit — elles disent « roule dessus ».
     for (let p = -2 * BOUCHON_PAS; p < BLOC; p++) {
@@ -708,7 +732,7 @@ export class Route {
           const key = `${r}:${i}`;
           if (this.coins.has(key) || !dansLeCorps(row.coins[i], jumpY)) continue;
           this.coins.add(key);
-          events.push({ type: "piece", r, h: row.coins[i] });
+          events.push({ type: "piece", r, h: row.coins[i], double: !!row.double });
         }
         for (const [kind, h] of [["lait", row.lait], ["grosse", row.grosse]]) {
           if (h === undefined || this.coins.has(`${r}:${kind}`) || !dansLeCorps(h, jumpY)) continue;

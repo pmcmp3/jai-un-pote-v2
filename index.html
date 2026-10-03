@@ -93,6 +93,18 @@
        Le titre et le lien de l'album s'effacent net, la carte monte en haut. */
     #overlay.visible.fige { transition: opacity 0.45s ease, visibility 0s; }
     #overlay.clavier #menu-title, #overlay.clavier #beta-tag, #overlay.clavier #cta-link, #overlay.clavier ~ #mute-button { display: none; }
+    /* Carte « Qui es-tu ? » COMPACTE pendant la saisie (5 octobre 2026 : « il faut
+       baisser un petit peu la taille de ce truc-là, parce que les gens qui vont
+       avoir des petits téléphones n'arriveront pas à tout voir avec le
+       clavier ») : marges serrées, bouton plus bas — les champs gardent leurs
+       16 px (en dessous, Safari zoome). ~90 px de gagnés. */
+    #overlay.clavier { padding-top: calc(10px + var(--safe-top)); }
+    #overlay.clavier #onboarding .panel-body { padding: 16px 14px 10px; }
+    #overlay.clavier #pseudo-row { margin-top: 2px; }
+    #overlay.clavier .champ-titre { margin-top: 10px; }
+    #overlay.clavier .champ-row { margin-top: 4px; }
+    #overlay.clavier #pseudo-input, #overlay.clavier .champ-row input { padding: 3px 2px; }
+    #overlay.clavier #step1-next { margin-top: 12px; min-height: 40px; padding: 8px 18px; }
     #overlay .fade { opacity: 0; transform: translateY(10px); transition: opacity 0.5s ease, transform 0.5s ease; }
     #overlay.visible .fade { opacity: 1; transform: translateY(0); }
     #overlay.visible .fade:nth-child(2) { transition-delay: 0.12s; }
@@ -116,7 +128,7 @@
     @keyframes view-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     #onboarding.active { width: 100%; flex: none; }
     #onboarding .panel { margin: 0 auto; }
-    #onboarding .panel-body { padding: 26px 18px 14px; }
+    #onboarding .panel-body { padding: 22px 16px 12px; }
 
     /* --- Carte + sticker ------------------------------------------------ */
     .panel {
@@ -183,8 +195,8 @@
     #onboarding .step { display: none; }
     #onboarding[data-step="1"] .step[data-step="1"], #onboarding[data-step="2"] .step[data-step="2"], #onboarding[data-step="3"] .step[data-step="3"] { display: block; }
     .champ-row { display: flex; align-items: center; gap: 10px; width: 240px; margin-top: 10px; }
-    .champ-titre { width: 240px; margin: 20px 0 0; font: 700 10.5px var(--police); letter-spacing: 0.14em; text-transform: uppercase; color: rgba(0,0,0,0.45); text-align: left; }
-    #step1-next { margin-top: 22px; }
+    .champ-titre { width: 240px; margin: 16px 0 0; font: 700 10.5px var(--police); letter-spacing: 0.14em; text-transform: uppercase; color: rgba(0,0,0,0.45); text-align: left; }
+    #step1-next { margin-top: 18px; }
     .champ-row .icon { font: 700 11px var(--police); color: rgba(0,0,0,0.45); min-width: 16px; text-align: center; }
     .champ-row input { flex: 1; min-width: 0; background: transparent; border: none; border-bottom: 1.5px solid rgba(0,0,0,0.25); color: var(--noir); font: 500 16px var(--police); padding: 5px 2px; -webkit-appearance: none; }
     .champ-row input:focus { outline: none; border-bottom-color: var(--rouge); }
