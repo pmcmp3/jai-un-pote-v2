@@ -199,7 +199,14 @@ function gagnerJetpack() {
   for (let v = v0; v < v0 + long; v += 2.4) {
     const f = (v - v0) / long, montee = Math.min(1, (v - v0) / 16);
     const vague = hBas + (hHaut - hBas) * (0.5 + 0.5 * Math.sin(f * Math.PI * 2 * 2.2 - 1.2));
-    jet.pieces.push({ v, h: 1.6 + (vague - 1.6) * montee, pris: false });
+    // Jamais plus bas que ce qui roule ou se tient dessous (5 octobre 2026 :
+    // une pièce qu'on ne prend qu'en touchant un véhicule, c'est un piège).
+    let dessous = 0;
+    for (let r = Math.floor(v) - 4; r <= Math.ceil(v) + 4; r++) {
+      const row = rows.rowAt(r);
+      if (row.type !== "safe") dessous = Math.max(dessous, rows.KINDS[row.kind].h + rows.solAt(r));
+    }
+    jet.pieces.push({ v, h: Math.max(1.6 + (vague - 1.6) * montee, dessous + 0.45), pris: false });
   }
 }
 function voler(dt) {
@@ -865,10 +872,11 @@ function step(dt) {
   }
   // --- Nuit : tombe à partir de nuitDebutS, 30 s de transition ---
   const nd = nuitDebut !== null ? nuitDebut : window.CONFIG.nuitDebutS;
-  // La plage de fin rallume un coucher de soleil : la nuit s'y lève aux 4/5.
+  // La plage de fin rallume un coucher de soleil : la nuit s'y lève tout à
+  // fait (5 octobre 2026 : « intensifie le côté clarté soleil couchant »).
   plageFondu += ((rows.enPlage(Math.round(player.v + 8)) ? 1 : 0) - plageFondu) * Math.min(1, dt * 0.45);
   scene.setPlage(plageFondu);
-  if (nd !== undefined) scene.setNight(Math.max(0, Math.min(1, (now - nd) / 30)) * (1 - 0.8 * plageFondu));
+  if (nd !== undefined) scene.setNight(Math.max(0, Math.min(1, (now - nd) / 30)) * (1 - plageFondu));
   // Le soleil traverse le ciel sur toute la durée du morceau.
   scene.setHeure(now / Math.max(1, window.CONFIG.dureeMorceau));
   // Montagnes proches en fondu quand on entre dans le biome montagne.
@@ -1169,11 +1177,13 @@ function renderAlertes(now, vitesse) {
     const tReel = perfClock();
     if (!alertesVues.has(r)) { alertesVues.set(r, tReel); if (alertesVues.size > 40) alertesVues.delete(alertesVues.keys().next().value); }
     const age = tReel - alertesVues.get(r);
-    const reduit = Math.max(0, Math.min(1, (age - 1) / 0.3));
+    // Grand et qui tremble 0,6 s (1 s avant le 5 octobre 2026, avec un
+    // panneau qui ne reste plus que 1,8 s en tout), puis petit et calme.
+    const reduit = Math.max(0, Math.min(1, (age - 0.6) / 0.25));
     const taille = 32 * (1 - reduit) + 17 * reduit;
-    const tremble = age < 1 ? Math.sin(age * 72) * 5 * (1 - age * 0.6) : 0;
+    const tremble = age < 0.6 ? Math.sin(age * 72) * 5 * (1 - age) : 0;
     // Posé à hauteur de chaussée SOUS le joueur (sur la colline, la route est montée).
-    const y = scene.project(0, player.v, rows.solAt(player.v) + 1.4).y + (age < 1 ? Math.cos(age * 61) * 2 : 0);
+    const y = scene.project(0, player.v, rows.solAt(player.v) + 1.4).y + (age < 0.6 ? Math.cos(age * 61) * 2 : 0);
     // ⚠️ Le panneau tenait sur `width − 18 − taille` et son sommet droit
     // partait donc HORS de l'écran (20 septembre 2026 : « il est coupé sur la
     // droite, il apparaît pas dans tout l'écran »). Il est désormais posé sur

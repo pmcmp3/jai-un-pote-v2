@@ -367,12 +367,19 @@ function brancherCentrage() {
     window.visualViewport.addEventListener("resize", surZoneVisible);
     window.visualViewport.addEventListener("scroll", surZoneVisible);
   }
-  if (!TACTILE) return;
+  // Un focus que personne n'a demandé (aucun doigt, aucune touche depuis
+  // 1,5 s) est rendu aussitôt : dans Instagram, il ouvrirait le clavier tout
+  // seul. Clavier déjà ouvert, on laisse passer (flèches ^ v d'iOS).
+  let geste = -1e9;
+  for (const t of ["pointerdown", "touchstart", "keydown"]) window.addEventListener(t, () => { geste = performance.now(); }, true);
   onboardingEl.addEventListener("focusin", (e) => {
     if (!e.target.matches("input")) return;
+    if (!overlay.classList.contains("clavier") && performance.now() - geste > 1500) { e.target.blur(); return; }
+    if (!TACTILE) return;
     clearTimeout(clavierT);
     entrerSaisie(e.target);
   });
+  if (!TACTILE) return;
   onboardingEl.addEventListener("focusout", () => {
     clearTimeout(clavierT);
     clavierT = setTimeout(() => {
@@ -789,13 +796,14 @@ function lienLigue(code) { return `${window.CONFIG.lienJeu || location.origin + 
 
 // --- Partage (5 octobre 2026 : « Inviter tes potes, ça ne marche pas dans le
 // navigateur Instagram [...] je spamme le bouton, il ne se passe rien ») ------
-// Les navigateurs INTÉGRÉS (Instagram, Facebook, TikTok, Snapchat…) n'ont pas
-// de partage natif, ou il y échoue ; l'ancien repli — l'API presse-papiers —
-// y est refusé aussi, et l'erreur était avalée : rien ne se passait. Hors
-// d'eux, le partage natif du téléphone reste le meilleur ; dans eux (ou s'il
-// manque / échoue) : un tiroir maison. Le lien y est AFFICHÉ et
+// Dans certains navigateurs INTÉGRÉS le partage natif manque ou échoue, et
+// l'ancien repli — l'API presse-papiers — y était refusé aussi, l'erreur
+// avalée : rien ne se passait. Désormais le partage natif d'abord, partout où
+// il existe (il marche dans Instagram sur iPhone, essayé le 5 octobre) ; s'il
+// manque ou échoue : un tiroir maison. Le lien y est AFFICHÉ et
 // sélectionnable — la seule voie qui marche partout —, avec un bouton copier
-// et des raccourcis WhatsApp / Messages / Snapchat.
+// et des raccourcis WhatsApp / Messages / Snapchat. NAVIGATEUR_INTEGRE ne sert
+// plus qu'au suivi (événements).
 const UA = navigator.userAgent || "";
 const NAVIGATEUR_INTEGRE = /Instagram|FBAN|FBAV|FB_IAB|FBIOS|Messenger|Snapchat|TikTok|musical_ly|Bytedance|\bLine\/|LinkedInApp|Pinterest|Twitter/i.test(UA);
 const DANS_INSTAGRAM = /Instagram/i.test(UA);
@@ -882,7 +890,12 @@ async function partagerLigue(texte, texteSansLigue = "Viens jouer à « J'ai un 
   const msg = vraie ? texte : texteSansLigue;
   $("partage-text").textContent = vraie || demo ? "Chaque pote qui joue te rapporte des points en plus." : "Envoie-leur le jeu : qui fera le meilleur score ?";
   net.evenement("invitation_ouverte", { pseudo: getPseudo(), ligue: code || null, source: getSource(), details: { integre: NAVIGATEUR_INTEGRE } });
-  if (navigator.share && !NAVIGATEUR_INTEGRE) {
+  // Le partage natif du téléphone d'abord, partout où il existe — y compris
+  // dans Instagram (5 octobre 2026, essayé sur iPhone : « "Autres applis",
+  // ça fonctionne directement [...] pourquoi on ne fait pas directement
+  // là-dedans ? »). Le tiroir maison ne sert plus que s'il manque (navigateur
+  // d'Instagram sur Android, par exemple) ou s'il échoue.
+  if (navigator.share) {
     try { await navigator.share({ title: "J'ai un pote", text: msg, url }); partageFait("natif"); return; }
     catch (e) { if (e && e.name === "AbortError") return; /* sinon : le tiroir */ }
   }
@@ -1042,7 +1055,7 @@ export function syncLoadingUi() {
     loadingBlock.classList.add("failed");
     loadingLabel.textContent = "Son indisponible, le jeu reste jouable";
     playButton.disabled = false;
-    setTimeout(() => $("splash").classList.add("fini"), 1500);
+    setTimeout(finSplash, 1500);
     return;
   }
   const minS = window.CONFIG.chargementMinS || 0;
@@ -1052,7 +1065,17 @@ export function syncLoadingUi() {
   const pct = Math.round(p * 100);
   loadingFill.style.width = `${pct}%`;
   loadingLabel.textContent = `${ETAPES[Math.min(ETAPES.length - 1, Math.floor(p * ETAPES.length))]} · ${pct} %`;
-  if (p >= 1) { loadingDone = true; loadingBlock.classList.add("done"); $("splash").classList.add("fini"); majBoutonJouer(); }
+  if (p >= 1) { loadingDone = true; loadingBlock.classList.add("done"); finSplash(); majBoutonJouer(); }
+}
+// Le menu reste INERTE (ni tap ni focus possibles) tant que l'écran de
+// chargement est là, et jusqu'à la fin de son fondu (5 octobre 2026 : « le
+// clavier s'ouvre tout seul, et du coup on ne voit pas l'animation la ville
+// est belle » — dans Instagram, le moindre focus ouvre le clavier).
+function finSplash() {
+  const splash = $("splash");
+  if (splash.classList.contains("fini")) return;
+  splash.classList.add("fini");
+  setTimeout(() => overlay.removeAttribute("inert"), 480);
 }
 
 // --- Fin de partie -----------------------------------------------------------

@@ -493,6 +493,52 @@ Code `TESTV2`, qui est aussi `config.ligueBeta` (menu simplifié + bouton « Lai
     (béret, casquette) qui haranguent dans une bulle (« Elle est belle ma
     courgette ! »). Hors teinte de saison (en automne la pastèque virait au
     marron). Capture : `capture.mjs batiments`.
+- **5 octobre 2026, sixième série (essai complet dans Instagram)** —
+  `VERSION_COURSE` 19, SW `jp2-v28` :
+  - *Clavier qui s'ouvrait tout seul* (« on ne voit pas l'animation la ville
+    est belle ») : aucune ligne du jeu ne donne le focus au chargement
+    (vérifié), mais le navigateur d'Instagram ouvre le clavier sur N'IMPORTE
+    quel focus. Le menu est désormais `inert` tant que l'écran de chargement
+    est là (attribut posé dans index.html, retiré par `finSplash()` après le
+    fondu), et un focus que personne n'a demandé (ni doigt ni touche depuis
+    1,5 s, clavier pas déjà ouvert) est rendu aussitôt. ⚠️ Les outils de test
+    doivent TAPER dans les champs (`page.tap`), plus `page.focus`.
+  - *Partage* : le partage natif d'abord, PARTOUT où il existe — il marche
+    dans Instagram sur iPhone (« "Autres applis" fonctionne directement,
+    pourquoi on ne fait pas directement là-dedans ? »). Le tiroir maison ne
+    sert plus que s'il manque (Instagram sur Android) ou échoue.
+  - *Potes ×1,2* (« faut durcir de 20 % ») : paliers [4, 8, 17, 28, 41],
+    rachat 6 → 17 pièces. Joueur idéal : potes à 4, 10, 24, 37, 49 s (3, 8,
+    20, 31, 43 avant).
+  - *Pièces « à travers une voiture »* : aucune pièce n'est piégée (le joueur
+    idéal ne passe jamais une pièce dans un obstacle : 0 sur ~5 000,
+    `node outils/pieces-piegees.mjs`), mais un véhicule venu d'en face
+    TRAVERSAIT, à l'écran, les pièces posées au-delà de son point de
+    croisement — on croyait devoir le percuter pour les prendre. Le
+    générateur retire les pièces plus basses que son toit dans la zone qu'il
+    balaie à l'écran (`balayageVisible`, rows.js ; piétons exclus, trop
+    lents) : 60 → 5 pièces traversées sur 20 courses, −1,6 % de pièces. Et
+    les pièces du jetpack ne descendent jamais plus bas que ce qui roule
+    dessous.
+  - *Panneau « attention »* : 3 s → 1,8 s avant l'entrée du véhicule
+    (`alerteAvanceS`), grand et tremblant 0,6 s puis petit. Mesuré
+    (`node outils/alertes.mjs 110 170`) : 2,6 → 1,8 s par véhicule, présent
+    36 % de la dernière minute au lieu de 56 %.
+  - *Plage* : la nuit s'y lève tout à fait ; UN soleil qui descend se poser
+    sur l'horizon (moitié dans la mer), énorme, dégradé or → rose, rayé dans
+    le bas façon années 80 (`soleilCouchant`, découpe par `clip`, jamais de
+    `destination-out` qui trouerait le ciel) ; ciel indigo → magenta → corail
+    → or ; reflet doré large ; lumière chaude sur toute la scène. Coût
+    mesuré (`outils/perf-plage.mjs`, CPU ×4) : 5,8 ms par image, moins qu'au
+    début de course.
+  - *Gens de la plage* : piétons en slip avec un ballon brandi à deux mains,
+    une raquette où rebondit la balle, ou la serviette ; le baigneur planté
+    sur la route a une troisième pose (raquette levée, balle qui rebondit) ;
+    au bord de l'eau, des parties de raquettes (`raquettesPlage`).
+  - *Ligues* : une ligue = une graine (`graineLigue(code)`) → placement des
+    obstacles, des pièces, des groupes différents d'une ligue à l'autre ; la
+    COURBE de difficulté (vitesse, paquets d'espèces, biomes) est la même
+    pour tous. Sans ligue : graine au hasard, chaque partie différente.
 - **Tuto au ralenti, deuxième version** (`conseilTap`/`conseilStep`) : approche
   ~1 s avant le bon moment (monde ×0,25), un tap donné pendant l'approche est
   GARDÉ et part pile au bon moment, gel ×0,06 s'il n'a rien fait ; reprise

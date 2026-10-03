@@ -117,16 +117,18 @@ window.CONFIG = {
   // sortait de l'écran dès le 2e pote.
   potesRecul: 1.0,
   potesEcart: 0.5,
-  potesPaliers: [3, 7, 14, 23, 34],    // divisés par deux le 29 septembre 2026, avec les pièces (une sur deux)   // re-étalés le 20 septembre 2026 : les 5 potes arrivaient tous avant 25 s
+  // ×1,2 le 5 octobre 2026 (« un peu trop facile, la manière dont les potes
+  // arrivent [...] faut durcir de 20 % ») : [3, 7, 14, 23, 34] → [4, 8, 17, 28, 41].
+  potesPaliers: [4, 8, 17, 28, 41],    // divisés par deux le 29 septembre 2026, avec les pièces (une sur deux)   // re-étalés le 20 septembre 2026 : les 5 potes arrivaient tous avant 25 s
   // Après le dernier palier, un pote PERDU se rachète pour ce nombre de
   // pièces (20 septembre 2026 : « j'ai perdu tous mes potes et j'arrive pas
   // à les regagner »).
-  poteRachatPieces: 5,
+  poteRachatPieces: 6,                // 5 → 6 (×1,2, 5 octobre 2026)
   // … et de plus en plus cher : 5 pièces jusqu'à 60 s, puis jusqu'à
   // `poteRachatPiecesFin` à 160 s (4 octobre 2026 : « plus ça avance, plus ça
   // doit être difficile »). Et passé `chocPlusUnApres` (fraction de la
   // course), chaque choc coûte UN pote de plus.
-  poteRachatPiecesFin: 14,
+  poteRachatPiecesFin: 17,            // 14 → 17 (×1,2, 5 octobre 2026)
   chocPlusUnApres: 0.5,
   // Prénoms des potes, dans l'ordre d'arrivée (Soberland en premier, verrouillé).
   // Sans ligue, le peloton c'est la LIGUE DE DÉMO (7 septembre 2026) : Paul et
@@ -175,7 +177,7 @@ window.CONFIG = {
   jetpackDureeS: 10,
   jetpackPoussee: 30,       // u/s² vers le haut, doigt appuyé
   jetpackGravite: 15,       // u/s² vers le bas, doigt levé (moins qu'un saut : on plane)
-  alerteAvanceS: 3,        // le panneau « attention » s'allume 3 s avant que le véhicule n'entre dans l'écran (5 octobre 2026 : il restait ~5 s affiché pour rien)
+  alerteAvanceS: 1.8,      // le panneau « attention » s'allume 1,8 s avant que le véhicule n'entre dans l'écran (5 octobre 2026 : 5 s → 3 s, puis 3 → 1,8 le soir — « à la limite 2-3 secondes à l'écran [...] j'ai tout le temps le panneau sur la droite » : mesuré 2,6 s par véhicule et 56 % de la dernière minute, outils/alertes.mjs)
   nuitDebutS: 50,           // la nuit tombe à partir de cet instant du morceau (30 s de transition) — 95 → 50 le 27 septembre 2026 (« le biome de nuit, il faudrait qu'il arrive beaucoup plus tôt dans la chanson »)
   tutoParties: 2,           // inutilisé depuis le 28 septembre 2026 (tuto contextuel au ralenti, main.js)
 

@@ -233,9 +233,27 @@ const PIETONS = [
   { haut: "#7a828e", bas: "#2f4f9a", peau: "#b9835a", tete: "#2a1a10", objet: "telephone" },  // sweat gris
   { haut: "#2f9a6a", bas: "#1a1a1e", peau: "#e8b48a", tete: "#e8c66a", objet: "joggeur" },    // maillot vert
 ];
+// Sur la plage (5 octobre 2026 : « il faudrait qu'ils tiennent un ballon
+// au-dessus de leur tête, qu'ils jouent avec des raquettes ») : ballon de
+// plage brandi à deux mains, raquette de plage avec la balle qui rebondit
+// dessus, ou serviette sur l'épaule.
+const OBJETS_PLAGE = ["ballon", "raquette", "serviette"];
+// Ballon de plage : un disque à six quartiers qui tourne doucement.
+export function ballonPlage(ctx, u, v, h, rayon, t) {
+  const c = project(u, v, h), R = rayon * echelle(u);
+  const q = ["#ffffff", "#e13e26", "#ffffff", "#1f8fd6", "#ffffff", "#f2c21c"];
+  for (let i = 0; i < 6; i++) { ctx.fillStyle = q[i]; ctx.beginPath(); ctx.moveTo(c.x, c.y); ctx.arc(c.x, c.y, R, t * 0.8 + (i * Math.PI) / 3, t * 0.8 + ((i + 1) * Math.PI) / 3); ctx.closePath(); ctx.fill(); }
+  ctx.strokeStyle = "rgba(0,0,0,0.25)"; ctx.lineWidth = Math.max(1, R * 0.08);
+  ctx.beginPath(); ctx.arc(c.x, c.y, R, 0, Math.PI * 2); ctx.stroke();
+}
+// Petite balle jaune (raquettes de plage).
+export function balle(ctx, u, v, h, rayon = 0.07) {
+  const c = project(u, v, h), R = Math.max(1.5, rayon * echelle(u));
+  ctx.fillStyle = "#f2e01c"; ctx.beginPath(); ctx.arc(c.x, c.y, R, 0, Math.PI * 2); ctx.fill();
+}
 export function drawPieton(ctx, K, uC, v, t, r, plage = false) {
   const P = plage
-    ? { haut: null, bas: ["#e13e26", "#1f8fd6", "#f2c21c"][Math.abs(r) % 3], peau: "#c98a5a", tete: "#2a1a10", objet: "serviette" }
+    ? { haut: null, bas: ["#e13e26", "#1f8fd6", "#f2c21c"][Math.abs(r) % 3], peau: "#c98a5a", tete: "#2a1a10", objet: OBJETS_PLAGE[Math.abs(r) % 3] }
     : PIETONS[Math.abs(r) % 3];
   const cadence = P.objet === "joggeur" ? 9 : 6.2;
   const s = Math.sin(t * cadence + r);
@@ -252,14 +270,27 @@ export function drawPieton(ctx, K, uC, v, t, r, plage = false) {
     const H0 = 0.84 + rebond;
     if (plage) drawBox(ctx, uC - 0.16, v - 0.1, 0.32, 0.22, 0.14, P.bas, H0);                    // slip de bain
     drawBox(ctx, uC - 0.17, v - 0.11, 0.34, 0.24, 0.52, P.haut || P.peau, H0 + (plage ? 0.14 : 0)); // buste
-    // Bras côté caméra (balancé) et bras du fond.
-    for (const [du, k] of [[-0.24, -1], [0.17, 1]]) {
-      const dv = 0.18 * s * k;
-      drawBox(ctx, uC + du, v - 0.05 + dv * 0.5, 0.08, 0.1, 0.26, P.haut || P.peau, H0 + 0.36);
-      drawBox(ctx, uC + du, v - 0.05 + dv, 0.08, 0.1, 0.24, P.haut || P.peau, H0 + 0.14);
-      drawBox(ctx, uC + du, v - 0.05 + dv, 0.08, 0.09, 0.08, P.peau, H0 + 0.06);                // main
-    }
     const HT = H0 + (plage ? 0.66 : 0.52);
+    if (P.objet === "ballon") {
+      // Les deux bras levés, droits, qui tiennent le ballon au-dessus de la tête.
+      for (const du of [-0.24, 0.17]) drawBox(ctx, uC + du, v - 0.05, 0.08, 0.1, 0.62, P.peau, HT - 0.1);
+    } else if (P.objet === "raquette") {
+      // Bras du fond qui balance, bras côté caméra tendu devant, raquette à plat.
+      const dv = 0.18 * s;
+      drawBox(ctx, uC + 0.17, v - 0.05 + dv * 0.5, 0.08, 0.1, 0.26, P.peau, H0 + 0.36);
+      drawBox(ctx, uC + 0.17, v - 0.05 + dv, 0.08, 0.1, 0.24, P.peau, H0 + 0.14);
+      drawBox(ctx, uC - 0.24, v - 0.32, 0.08, 0.3, 0.09, P.peau, H0 + 0.5);                     // avant-bras tendu
+      drawBox(ctx, uC - 0.25, v - 0.42, 0.06, 0.1, 0.05, "#6b4b2e", H0 + 0.52);                 // manche
+      drawBox(ctx, uC - 0.32, v - 0.72, 0.22, 0.32, 0.04, "#2f6fd0", H0 + 0.53);                // la raquette
+    } else {
+      // Bras côté caméra (balancé) et bras du fond.
+      for (const [du, k] of [[-0.24, -1], [0.17, 1]]) {
+        const dv = 0.18 * s * k;
+        drawBox(ctx, uC + du, v - 0.05 + dv * 0.5, 0.08, 0.1, 0.26, P.haut || P.peau, H0 + 0.36);
+        drawBox(ctx, uC + du, v - 0.05 + dv, 0.08, 0.1, 0.24, P.haut || P.peau, H0 + 0.14);
+        drawBox(ctx, uC + du, v - 0.05 + dv, 0.08, 0.09, 0.08, P.peau, H0 + 0.06);              // main
+      }
+    }
     drawBox(ctx, uC - 0.12, v - 0.13, 0.24, 0.24, 0.26, P.peau, HT);                          // tête
     drawBox(ctx, uC - 0.13, v - 0.14, 0.01, 0.05, 0.05, BLACK, HT + 0.14);                    // œil (côté caméra)
     if (P.objet === "baguette") {
@@ -275,9 +306,15 @@ export function drawPieton(ctx, K, uC, v, t, r, plage = false) {
     } else {
       drawBox(ctx, uC - 0.12, v - 0.12, 0.24, 0.24, 0.06, P.tete, HT + 0.24);                 // cheveux
       drawBox(ctx, uC - 0.14, v - 0.15, 0.28, 0.04, 0.06, "#0d0d10", HT + 0.13);               // lunettes de soleil
-      drawBox(ctx, uC + 0.12, v - 0.12, 0.06, 0.3, 0.5, "#f4efe4", H0 + 0.4);                  // serviette sur l'épaule
+      if (P.objet === "serviette") drawBox(ctx, uC + 0.12, v - 0.12, 0.06, 0.3, 0.5, "#f4efe4", H0 + 0.4); // serviette sur l'épaule
     }
   });
+  // Peints après le corps (hors du tri des boîtes) : ils sont devant/au-dessus.
+  if (P.objet === "ballon") ballonPlage(ctx, uC - 0.03, v, HT + 0.82 + 0.03 * Math.sin(t * 5 + r), 0.3, t + r);
+  else if (P.objet === "raquette") {
+    const k = Math.abs(Math.sin(t * 4.2 + r));                                                      // la balle rebondit sur la raquette
+    balle(ctx, uC - 0.3, v - 0.56, H0 + 0.62 + k * 0.7);
+  }
 }
 
 // Feux de détresse (le bouchon, 4 octobre 2026) : les quatre coins de la
@@ -445,7 +482,17 @@ function baigneur2D(ctx, K, X, Y, s, uC, r, t) {
   // Chaîne en or.
   ctx.strokeStyle = "#f2c21c"; ctx.lineWidth = Math.max(1, 0.03 * k * s);
   ctx.beginPath(); ctx.moveTo(X(-0.12 * k), Y(1.4 * k)); ctx.quadraticCurveTo(X(0), Y(1.22 * k), X(0.12 * k), Y(1.4 * k)); ctx.stroke();
-  if (ri % 2 === 0) {
+  if (ri % 3 === 2) {
+    // Raquettes de plage : bras levé, raquette en l'air, la balle qui rebondit
+    // dessus (le bras pointe en haut à droite : la raquette finit vers 0,7 ; 2,2).
+    const rebond = Math.abs(Math.sin(t * 4 + r)), u = k * s;
+    membre(-0.3, 1.36, 0.35 + 0.08 * f, 0.6);
+    membre(0.3, 1.36, -(Math.PI - 0.45) + 0.06 * f, 0.6, (d) => {
+      ctx.fillStyle = "#6b4b2e"; ctx.fillRect(-0.03 * u, d - 0.02 * u, 0.06 * u, 0.16 * u);
+      ctx.fillStyle = "#2f6fd0"; ctx.beginPath(); ctx.ellipse(0, d + 0.3 * u, 0.17 * u, 0.2 * u, 0, 0, Math.PI * 2); ctx.fill();
+    });
+    ctx.fillStyle = "#f2e01c"; ctx.beginPath(); ctx.arc(X(0.7 * k), Y((2.5 + 0.65 * rebond) * k), Math.max(1.5, 0.07 * u), 0, Math.PI * 2); ctx.fill();
+  } else if (ri % 3 === 0) {
     // Le ballon de plage, brandi au-dessus de la tête.
     const by = 2.12 + 0.05 * f;
     membre(-0.3, 1.36, Math.PI - 0.35, 0.62);

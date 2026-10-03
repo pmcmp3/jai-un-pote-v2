@@ -18,6 +18,10 @@ const navigateur = await chromium.launch({ channel: "chrome", headless: true });
 const UA_INSTA = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 Instagram 350.0.0.21.106 (iPhone15,2; iOS 18_0; fr_FR; fr; scale=3.00; 1179x2556; 646427221)";
 const contexte = await navigateur.newContext({ viewport: { width: 375, height: petit ? 667 : 812 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, userAgent: UA_INSTA });
 await contexte.grantPermissions(["clipboard-read", "clipboard-write"], { origin: `http://localhost:${port}` });
+// Partage natif : il marche dans Instagram sur iPhone (essayé le 5 octobre
+// 2026) et le jeu l'utilise d'abord ; il MANQUE dans Instagram sur Android —
+// c'est ce cas-là, celui du tiroir maison, qu'on simule ici.
+await contexte.addInitScript(() => { try { Object.defineProperty(Navigator.prototype, "share", { value: undefined, configurable: true }); } catch (e) { /* rien */ } });
 const page = await contexte.newPage();
 const erreurs = [];
 page.on("pageerror", (e) => erreurs.push(e.stack || e.message));
@@ -41,12 +45,12 @@ const mesureChamp = (sel) => page.evaluate((sel) => {
   return { champ: [Math.round(r.top), Math.round(r.bottom)], overlay: [Math.round(ro.top), Math.round(ro.bottom)], visible: r.top >= ro.top && r.bottom <= ro.bottom, clavier: o.classList.contains("clavier"), titre: getComputedStyle(document.getElementById("menu-title")).display, transition: getComputedStyle(o).transitionProperty };
 }, sel);
 const hauteur = petit ? 667 : 812;
-await page.focus("#pseudo-input"); await attendre(60);
+await page.tap("#pseudo-input"); await attendre(60);
 console.log("focus pseudo (60 ms) :", JSON.stringify(await mesureChamp("#pseudo-input")));
 await page.setViewportSize({ width: 375, height: hauteur - 336 - 44 }); await attendre(400);
 await photo("50b-premiere-clavier");
 console.log("clavier ouvert, pseudo :", JSON.stringify(await mesureChamp("#pseudo-input")));
-await page.focus("#ville-input"); await attendre(300);
+await page.tap("#ville-input"); await attendre(300);
 await photo("50c-premiere-clavier-ville");
 console.log("clavier ouvert, ville :", JSON.stringify(await mesureChamp("#ville-input")));
 await page.evaluate(() => document.activeElement.blur());

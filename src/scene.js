@@ -558,9 +558,9 @@ function mer(ctx, alpha) {
   ctx.globalAlpha = alpha;
   const y0 = horizonY, y1 = H;
   const g = ctx.createLinearGradient(0, y0, 0, ySol(RIVAGE));
-  g.addColorStop(0, rgbA(melange(parseColor("#f3a77e"), HORIZON_NUIT, night * 0.5)));
-  g.addColorStop(0.18, rgbA(melange(parseColor("#8c6fa6"), HORIZON_NUIT, night * 0.5)));
-  g.addColorStop(1, rgbA(melange(parseColor("#3d5a9c"), HORIZON_NUIT, night * 0.5)));
+  g.addColorStop(0, rgbA(melange(parseColor("#ffb37a"), HORIZON_NUIT, night * 0.5)));
+  g.addColorStop(0.2, rgbA(melange(parseColor("#c4608e"), HORIZON_NUIT, night * 0.5)));
+  g.addColorStop(1, rgbA(melange(parseColor("#3d3f8c"), HORIZON_NUIT, night * 0.5)));
   ctx.fillStyle = g;
   ctx.fillRect(0, y0, W, y1 - y0);
   // Vagues : des traits qui dérivent, plus serrés au loin.
@@ -571,14 +571,14 @@ function mer(ctx, alpha) {
     const pas = 90 * s2 / K + 30, dec = ((decorT * 6 + i * 37) * s2) % pas;
     for (let x = -pas + dec; x < W + pas; x += pas) ctx.fillRect(x + hash(i * 3 + Math.floor(x / pas)) * 20, y, Math.max(6, 22 * s2 / K + 8), Math.max(1, s2 * 0.05));
   }
-  // Reflet du soleil : une colonne de reflets sous lui.
-  const sx = W * (0.08 + 0.84 * heure);
-  for (let i = 0; i < 12; i++) {
-    const y = horizonY + 3 + i * i * 1.6;
+  // Reflet du soleil : une colonne dorée, large, qui scintille jusqu'au rivage.
+  const { x: sx, R } = soleilPlage(plageAlpha);
+  for (let i = 0; i < 16; i++) {
+    const y = horizonY + 2 + i * i * 1.5;
     if (y > ySol(RIVAGE)) break;
-    const w = (18 + i * 5) * (0.6 + 0.4 * Math.sin(decorT * 3 + i * 1.7));
-    ctx.fillStyle = `rgba(255,214,150,${0.55 - i * 0.035})`;
-    ctx.fillRect(sx - w / 2, y, w, 2 + i * 0.3);
+    const w = (R * 1.6 + i * 7) * (0.55 + 0.45 * Math.sin(decorT * 3 + i * 1.7));
+    ctx.fillStyle = `rgba(255,${206 - i * 4},${120 - i * 3},${0.8 - i * 0.04})`;
+    ctx.fillRect(sx - w / 2, y, w, 2 + i * 0.35);
   }
   ctx.restore();
 }
@@ -604,6 +604,86 @@ function montagnesProches(ctx) {
   ctx.closePath(); ctx.fill();
 }
 
+// Deux joueurs de raquettes face à face le long de la plage ; la balle fait
+// l'aller-retour en cloche, chacun lève sa raquette quand elle arrive.
+function raquettesPlage(ctx, u, v, t, k) {
+  const ECART = 3.4, PEAU = "#c98a5a";
+  const SLIPS = ["#e13e26", "#1f8fd6", "#f2c21c", "#ff5fa2"];
+  const f = ((t * 0.5 + hash(k) * 3) % 1 + 1) % 1, aller = f < 0.5, p = aller ? f * 2 : (f - 0.5) * 2;
+  const vA = v, vB = v + ECART;
+  const joueur = (vv, sens, slip, frappe) => {
+    drawBox(ctx, u, vv - 0.13, 0.14, 0.1, 0.62, PEAU);
+    drawBox(ctx, u, vv + 0.05, 0.14, 0.1, 0.62, PEAU);
+    drawBox(ctx, u - 0.02, vv - 0.15, 0.18, 0.32, 0.16, slip, 0.58);
+    drawBox(ctx, u - 0.02, vv - 0.15, 0.18, 0.32, 0.46, PEAU, 0.74);           // torse
+    drawBox(ctx, u, vv - 0.11, 0.16, 0.24, 0.24, PEAU, 1.2);                     // tête
+    drawBox(ctx, u - 0.01, vv - 0.12, 0.18, 0.26, 0.07, "#2a1a10", 1.38);        // cheveux
+    drawBox(ctx, u - 0.04, vv - 0.05 + sens * 0.16, 0.08, 0.1, 0.3, PEAU, 0.86 + frappe * 0.34); // le bras qui frappe
+  };
+  // La balle arrive chez B pendant l'aller, chez A au retour : le bras se lève.
+  const fA = !aller ? Math.max(0, p - 0.6) / 0.4 : Math.max(0, 0.25 - p) / 0.25;
+  const fB = aller ? Math.max(0, p - 0.6) / 0.4 : Math.max(0, 0.25 - p) / 0.25;
+  joueur(vA, 1, SLIPS[Math.abs(k) % 4], fA);
+  joueur(vB, -1, SLIPS[(Math.abs(k) + 1) % 4], fB);
+  // Raquettes (vues de face) et balle, peintes après les corps.
+  const raquette = (vv, sens, frappe) => {
+    const c = project(u - 0.06, vv + sens * 0.26, 1.28 + frappe * 0.36), sc = echelle(u);
+    ctx.fillStyle = "#2f6fd0"; ctx.beginPath(); ctx.ellipse(c.x, c.y, 0.13 * sc, 0.16 * sc, 0, 0, Math.PI * 2); ctx.fill();
+  };
+  raquette(vA, 1, fA); raquette(vB, -1, fB);
+  const vb = aller ? vA + 0.3 + (ECART - 0.6) * p : vB - 0.3 - (ECART - 0.6) * p;
+  const b = project(u - 0.06, vb, 1.45 + 1.1 * Math.sin(Math.PI * p));
+  ctx.fillStyle = "#f2e01c"; ctx.beginPath(); ctx.arc(b.x, b.y, Math.max(1.5, 0.08 * echelle(u)), 0, Math.PI * 2); ctx.fill();
+}
+
+// Le soleil de la plage : posé sur la mer (la mer, peinte après, cache sa
+// moitié basse), énorme, dégradé or → orange → rose, rayé dans le bas comme
+// un coucher de soleil des années 80 — Miami, Vice City. Un grand halo
+// chaud éclaire tout le ciel.
+// En entrant sur la plage, le soleil DESCEND jusqu'à l'horizon et grossit
+// (un seul soleil, qui glisse de sa place dans le ciel à sa place sur la mer).
+export const SOLEIL_X = 0.64;
+function soleilPlage(a) {
+  const e = a * a * (3 - 2 * a);
+  const R0 = K * 0.9, R1 = K * 2.3;
+  const x0 = W * (0.08 + 0.84 * heure), y0 = horizonY * (1.02 - 0.86 * Math.sin(Math.PI * Math.max(0, Math.min(1, heure))));
+  const x1 = W * SOLEIL_X, y1 = horizonY - R1 * 0.3;
+  return { x: x0 + (x1 - x0) * e, y: y0 + (y1 - y0) * e, R: R0 + (R1 - R0) * e, e };
+}
+function soleilCouchant(ctx, a) {
+  const { x, y, R, e } = soleilPlage(a);
+  ctx.save();
+  const halo = ctx.createRadialGradient(x, y, R * 0.4, x, y, W * (0.75 + 0.3 * e));
+  halo.addColorStop(0, `rgba(255,226,150,${0.85 + 0.1 * e})`);
+  halo.addColorStop(0.18, `rgba(255,160,96,${0.35 + 0.2 * e})`);
+  halo.addColorStop(0.45, `rgba(255,96,120,${0.22 * e})`);
+  halo.addColorStop(1, "rgba(120,60,160,0)");
+  ctx.fillStyle = halo;
+  ctx.fillRect(0, 0, W, horizonY + 4);
+  // Le disque uni (le soleil d'avant) s'efface pendant que le disque rayé apparaît.
+  if (e < 1) { ctx.globalAlpha = 1 - e; ctx.fillStyle = "rgba(255,200,130,1)"; ctx.beginPath(); ctx.arc(x, y, R, 0, Math.PI * 2); ctx.fill(); }
+  ctx.globalAlpha = e;
+  const disque = ctx.createLinearGradient(0, y - R, 0, y + R);
+  disque.addColorStop(0, "#fff1a8");
+  disque.addColorStop(0.45, "#ffb347");
+  disque.addColorStop(0.8, "#ff6a5a");
+  disque.addColorStop(1, "#ff4f8a");
+  // Les rayures : le disque n'est peint qu'ENTRE des bandes de ciel de plus en
+  // plus épaisses vers le bas (découpe, le ciel déjà peint reste dessous).
+  ctx.beginPath();
+  let yc = y - R - 2;
+  for (let i = 0; i < 5; i++) {
+    const yb = y + R * (0.05 + i * 0.19), eb = R * (0.035 + i * 0.022);
+    ctx.rect(x - R - 2, yc, 2 * R + 4, yb - yc);
+    yc = yb + eb;
+  }
+  ctx.rect(x - R - 2, yc, 2 * R + 4, y + R + 2 - yc);
+  ctx.clip();
+  ctx.fillStyle = disque;
+  ctx.beginPath(); ctx.arc(x, y, R, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+}
+
 function nuages(ctx) {
   const u = 380, s = echelle(u);
   ctx.save();
@@ -627,12 +707,21 @@ export function renderGround(ctx, boueAt) {
   const hiv = poidsHiver() * 0.3, aut = poids("automne") * 0.25;
   let haut = melange(melange(melange(CIEL_HAUT, [176, 188, 204], hiv), [214, 170, 120], aut), CIEL_HAUT_NUIT, night);
   let bas = melange(melange(melange(CIEL_BAS, [226, 230, 236], hiv), [240, 196, 150], aut), CIEL_BAS_NUIT, night);
-  // Coucher de soleil sur la plage : violet en haut, orange rosé à l'horizon.
-  if (plageAlpha > 0.01) { haut = melange(haut, [72, 56, 132], plageAlpha * 0.85); bas = melange(bas, [255, 142, 96], plageAlpha * 0.9); }
+  // Coucher de soleil sur la plage (5 octobre 2026, intensifié : « il faut
+  // vraiment que le soleil soit à l'horizon ») : indigo en haut, magenta,
+  // corail, puis de l'or tout contre la mer.
   const g = ctx.createLinearGradient(0, 0, 0, horizonY);
-  g.addColorStop(0, rgbA(haut));
-  g.addColorStop(0.6, rgbA(melange(haut, bas, 0.55)));
-  g.addColorStop(1, rgbA(bas));
+  if (plageAlpha > 0.01) {
+    const p = plageAlpha;
+    g.addColorStop(0, rgbA(melange(haut, [43, 29, 92], p)));
+    g.addColorStop(0.45, rgbA(melange(melange(haut, bas, 0.55), [138, 63, 143], p)));
+    g.addColorStop(0.78, rgbA(melange(melange(haut, bas, 0.85), [255, 111, 97], p)));
+    g.addColorStop(1, rgbA(melange(bas, [255, 186, 92], p)));
+  } else {
+    g.addColorStop(0, rgbA(haut));
+    g.addColorStop(0.6, rgbA(melange(haut, bas, 0.55)));
+    g.addColorStop(1, rgbA(bas));
+  }
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, W, horizonY + 4);
   // Le soleil traverse le ciel pendant la course : il se lève à gauche,
@@ -651,7 +740,8 @@ export function renderGround(ctx, boueAt) {
     ctx.fillStyle = couleur;
     ctx.beginPath(); ctx.arc(x, y, rayon, 0, Math.PI * 2); ctx.fill();
   };
-  if (night < 0.98) astre(heure, plageAlpha > 0.3 ? `rgba(255,186,110,${1 - night})` : `rgba(255,236,190,${1 - night})`, K * (0.9 + 0.5 * plageAlpha), 1 - night);
+  if (plageAlpha > 0.01) soleilCouchant(ctx, plageAlpha);
+  else if (night < 0.98) astre(heure, `rgba(255,236,190,${1 - night})`, K * 0.9, 1 - night);
   if (night > 0.3) {
     const a = Math.min(1, (night - 0.3) / 0.5);
     ctx.fillStyle = `rgba(255,255,255,${0.75 * a})`;
@@ -733,6 +823,16 @@ export function renderHaze(ctx) {
   g.addColorStop(1, "rgba(246,220,180,0)");
   ctx.fillStyle = g;
   ctx.fillRect(0, horizonY - 20, W, 80);
+  // Plage : la lumière dorée du soleil couchant baigne toute la scène.
+  if (plageAlpha > 0.01) {
+    const sx = soleilPlage(plageAlpha).x;
+    const l = ctx.createRadialGradient(sx, horizonY, 10, sx, horizonY, H * 0.9);
+    l.addColorStop(0, `rgba(255,190,110,${0.32 * plageAlpha})`);
+    l.addColorStop(0.5, `rgba(255,140,110,${0.12 * plageAlpha})`);
+    l.addColorStop(1, "rgba(255,120,120,0)");
+    ctx.fillStyle = l;
+    ctx.fillRect(0, 0, W, H);
+  }
 }
 
 function shadeHex(hex, a) {
@@ -772,7 +872,11 @@ export function rowDecor(ctx, r, clear) {
     // Palmiers le long de la route, parasols sur le sable, et de temps en
     // temps une cabane de sauveteur pastel (Miami Beach).
     if (r % 4 === 0) { const a = hash(r * 23 + 1), u = ROAD_HALF + 1.4 + a * 1.2, v = r - 0.3, k = r * 1.7; push(u, v, () => palmier(ctx, u, v, 6.2 + a * 2.4, Math.sin(decorT * 1.1 + k) * 0.12, hash(r * 5) < 0.5 ? -1 : 1)); }
-    if (r % 4 === 2 && hash(r * 29 + 4) < 0.55) { const a = hash(r * 31 + 2), u = ROAD_HALF + 3.0 + a * 2.0, v = r; push(u, v, () => parasol(ctx, u, v, Math.floor(hash(r * 7 + 1) * 4))); }
+    // Une partie de raquettes au bord de l'eau, tous les 37 rangs (5 octobre
+    // 2026 : « qu'ils jouent avec des raquettes ») : pas de parasol dessus.
+    const jeu = ((r % 37) + 37) % 37;
+    if (jeu === 11) { const u = RIVAGE - 1.1, v = r; push(u, v, () => raquettesPlage(ctx, u, v, decorT, r)); }
+    if (r % 4 === 2 && !(jeu >= 9 && jeu <= 15) && hash(r * 29 + 4) < 0.55) { const a = hash(r * 31 + 2), u = ROAD_HALF + 3.0 + a * 2.0, v = r; push(u, v, () => parasol(ctx, u, v, Math.floor(hash(r * 7 + 1) * 4))); }
     if (r % 41 === 17) { const u = ROAD_HALF + 3.2, v = r; push(u, v, () => cabaneSauveteur(ctx, u, v, Math.floor(hash(r) * 3))); }
     return out;
   }

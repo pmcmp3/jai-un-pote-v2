@@ -741,6 +741,26 @@ export class Route {
       if (q === null) continue;
       rowsBloc[q][kind] = kind === "lait" ? solAt(r0 + q) + H_LAIT : solAt(r0 + q) + H_ROUGE;
     }
+    // 6. Aucune pièce qu'un véhicule venu d'en face TRAVERSE sous les yeux du
+    //    joueur (5 octobre 2026 : « une pièce qui est passée à travers une
+    //    voiture [...] on a l'impression qu'on ne peut pas faire le meilleur
+    //    score »). En face, il balaie les rangées au-delà de son point de
+    //    croisement pendant qu'il entre dans l'écran : une pièce plus basse
+    //    que son toit, là, semble prise dans la carrosserie. On l'enlève.
+    for (let p = 0; p < BLOC; p++) {
+      const row = rowsBloc[p];
+      if (!row.coins.length) continue;
+      const q = r0 + p;
+      for (let r = q - BALAYAGE_MAX; r < q; r++) {
+        const kind = this.dangers.get(r);
+        if (!kind) continue;
+        const K = KINDS[kind];
+        if (!K.contresens || !(K.vitesse >= 1.2) || K.lanceur) continue; // les piétons, lents, ne balaient presque rien
+        const d = q - r, demi = demiLongueurRoute(kind);
+        if (d <= demi + 0.4 || d > balayageVisible(r, kind)) continue;
+        if (row.coins[0] - solAt(q) < K.h + 0.3) { row.coins = []; row.double = false; break; }
+      }
+    }
     for (let p = 0; p < BLOC; p++) { const r = r0 + p; if (!this.cache.has(r) && !this.dansFenetre(r)) this.cache.set(r, rowsBloc[p]); }
   }
 
@@ -800,6 +820,25 @@ export class Route {
     }
     return events;
   }
+}
+
+// Jusqu'où, au-delà de son point de croisement r, un véhicule venu d'en face
+// balaie la route PENDANT qu'il est à l'écran : il y entre quand son nez est
+// à DEVANT rangées du joueur (72 % de la largeur visible, scene.joueurX), son
+// centre est alors à r + k·(DEVANT + demi)/(1 + k) — k = sa vitesse / celle
+// du joueur, avec l'accélération des véhicules en fin de course (armer()).
+const BALAYAGE_MAX = 10;
+function tempsAuRang(r) {
+  let a = 0, b = dureeCourse();
+  for (let i = 0; i < 24; i++) { const m = (a + b) / 2; if (rangAuTemps(m) < r) a = m; else b = m; }
+  return a;
+}
+function balayageVisible(r, kind) {
+  const K = KINDS[kind], demi = demiLongueurRoute(kind);
+  const devant = 0.72 * (window.CONFIG.unitesVisibles || 14.5) + 1;
+  const fin = 1 + 0.4 * Math.max(0, Math.min(1, (tempsAuRang(r) - 100) / 50));
+  const k = (K.vitesse * fin) / Math.max(1, vitesseAuRang(r));
+  return Math.min(BALAYAGE_MAX, demi + 0.6 + (k * (devant + demi)) / (1 + k));
 }
 
 // --- Rangées réservées ---------------------------------------------------------------
