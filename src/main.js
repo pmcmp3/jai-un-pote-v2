@@ -552,7 +552,7 @@ function isGameStartRequested() { return startRequested; }
 function resetRun() {
   game.metres = 0; game.points = 0; game.potesGagnes = 0; game.etoiles = 0;
   game.ended = false; game.endReason = null; game.reviveOffered = false; game.sansFaute = true;
-  game.turbo = 0; game.finAge = -1; game.arriveeR = null; game.surHalle = false; tombes.clear();
+  game.turbo = 0; game.finAge = -1; game.arriveeR = null; game.surHalle = false; tombes.clear(); ejectes.clear(); game.invincibleAnnonce = false;
   game.startedAt = perfClock();
   player.u = 0; player.prevU = 0; player.v = 0; player.prevV = 0; cameraX = null;
   player.jumpY = 0; player.prevJumpY = 0; player.jumpVy = 0; player.doubled = false; player.flip = 0; player.prevFlip = 0; player.tHaut = 0; player.roue = 0; player.prevRoue = 0;
@@ -717,7 +717,30 @@ function gagnerRouge(u, v) {
 // l'instant, le rendu la fait basculer pendant 1,6 s.
 const tombes = new Map();
 function marquerTombe(ev, now) { if (ev.r !== undefined && !KINDS_ROULANTS.has(ev.kind)) tombes.set(ev.r, now); }
-const KINDS_ROULANTS = new Set(["tracteur", "bus", "chasseneige", "skieur", "pieton", "voiture", "contresens", "poulejetee"]);
+// Ce qui ROULE (ou glisse, ou marche) et qu'on percute en étant invincible —
+// turbo du lait, bouclier de reprise — est ÉJECTÉ : il s'envole en tournant
+// et disparaît (5 octobre 2026 : « je suis passé au travers du skieur,
+// normalement je dois mourir » — c'était le turbo, rien ne le montrait).
+const ejectes = new Map(); // rangée → { t0 (horloge du monde), v (où il était) }
+const EJECTION_S = 0.9;
+function ejecter(ev, now) {
+  if (ev.r === undefined || !KINDS_ROULANTS.has(ev.kind) || ejectes.has(ev.r)) return;
+  const row = rows.rowAt(ev.r), o = row.type === "contresens" ? rows.contresensAt(ev.r, row, now) : null;
+  ejectes.set(ev.r, { t0: now, v: o ? o.v : ev.r, sens: ev.r % 2 ? 1 : -1 });
+  if (ejectes.size > 30) ejectes.delete(ejectes.keys().next().value);
+}
+// Dessin d'un éjecté : il monte en cloche, part vers le fond en tournant, s'efface.
+function dessinerEjecte(ej, K, tm, dessin) {
+  const a = tm - ej.t0;
+  if (a < 0 || a > EJECTION_S) return;
+  const lift = 7 * a - 6 * a * a, du = 2.4 * a, v = ej.v - 0.8 * a;
+  const c = scene.project(du, v, lift + K.h / 2);
+  ctx.save();
+  ctx.globalAlpha *= Math.max(0, Math.min(1, 1 - (a - 0.5) / 0.4));
+  ctx.translate(c.x, c.y); ctx.rotate(ej.sens * 6.5 * a); ctx.translate(-c.x, -c.y);
+  try { scene.avecLift(lift + rows.solAt(v), () => dessin(du, v)); } finally { ctx.restore(); }
+}
+const KINDS_ROULANTS = new Set(["tracteur", "bus", "chasseneige", "skieur", "buggy", "pieton", "voiture", "contresens", "poulejetee"]);
 
 const chocs = []; // debug : les derniers chocs (auto-audit)
 function toucherJoueur(ev) {
@@ -729,7 +752,11 @@ function toucherJoueur(ev) {
   // de défaut »).
   if (clock.now() < reviveShieldUntil || invincible || game.turbo > 0) {
     marquerTombe(ev, tMonde());
-    semerSparkles(player.u, player.v, 10, "#ffffff");
+    ejecter(ev, tMonde());
+    semerSparkles(player.u, player.v, 14, "#ffffff");
+    triggerShake(3, 0.2);
+    // La première fois de la course, on le DIT.
+    if (!game.invincibleAnnonce) { game.invincibleAnnonce = true; pousserPopup(game.turbo > 0 ? "TURBO : INVINCIBLE !" : "INVINCIBLE !", JAUNE); }
     return;
   }
   marquerTombe(ev, tMonde());
@@ -851,7 +878,22 @@ function step(dt) {
   }
   if (game.ended) {
     // Roue libre après « TERMINÉ ! » : on continue d'avancer, sans rien ramasser.
-    if (game.finAge >= 0) { game.finAge += dt; player.v += speed * 0.6 * dt; player.pedal += speed * dt * 2; friends.recordPlayer(player.v, null); friends.update(dt, player, jumpPhysics()); }
+    if (game.finAge >= 0) {
+      game.finAge += dt; player.v += speed * 0.6 * dt; player.pedal += speed * dt * 2;
+      // … et la PESANTEUR continue (5 octobre 2026 : « au moment où je passe
+      // la ligne d'arrivée, la gravité n'agit plus sur mon personnage ») :
+      // franchie en plein saut, la ligne laissait le cycliste suspendu.
+      player.prevJumpY = player.jumpY; player.prevFlip = player.flip;
+      const sol = solSous(player.v, player.jumpY);
+      if (player.jumpY > sol + 0.001 || player.jumpVy > 0) {
+        player.jumpVy -= jumpPhysics().g * dt;
+        player.jumpY += player.jumpVy * dt;
+        if (player.flip > 0) player.flip = Math.min(Math.PI * 2, player.flip + dt * (Math.PI * 2 / 0.55));
+        if (player.jumpY <= sol) { player.jumpY = sol; player.jumpVy = 0; player.doubled = false; player.flip = 0; player.tHaut = 0; }
+      }
+      player.auSol = player.jumpY <= sol + 0.001;
+      friends.recordPlayer(player.v, null); friends.update(dt, player, jumpPhysics());
+    }
     return;
   }
   if (isPaused()) return;
@@ -1296,6 +1338,7 @@ function render(alpha) {
     const geo = { ...GEO_HALLE, ...rows.geoHalle(d), type: rows.typeHalle(d) };
     if (geo.type === "gare") items.push({ decor: true, d: scene.depth(scene.ROAD_HALF + 3.0, d), draw: () => scene.drawHalle(ctx, d, geo, from, to, "train") });
     if (geo.type === "bowling") { geo.t = tAnim; items.push({ decor: true, d: scene.depth(scene.ROAD_HALF + 6.5, d), draw: () => scene.drawHalle(ctx, d, geo, from, to, "salle") }); }
+    if (geo.type === "marche") items.push({ decor: true, d: scene.depth(scene.ROAD_HALF + 2.4, d), draw: () => scene.drawHalle(ctx, d, geo, from, to, "estrade") });
     items.push({ decor: true, d: scene.depth(scene.ROAD_HALF + 0.5, d), draw: () => scene.drawHalle(ctx, d, geo, from, to, "fond") });
     items.push({ decor: true, d: scene.depth(-scene.ROAD_HALF - 0.3, d), draw: () => scene.drawHalle(ctx, d, geo, from, to, "devant") });
   }
@@ -1341,13 +1384,16 @@ function render(alpha) {
         items.push({ d: scene.depth(fu, fv), draw: () => surSol(fv, () => props.drawLanceurFace(ctx, fu, fv, tAnim, lance)) });
         if (inst) items.push({ d: scene.depth(0, inst.v), draw: () => surSol(inst.v, () => props.drawPouleJetee(ctx, 0, inst.v, t)) });
       } else if (inst) {
-        const dessin = row.kind === "tracteur" ? () => props.drawTracteurRoute(ctx, inst.K, 0, inst.v, t)
-          : row.kind === "bus" ? () => props.drawBus(ctx, inst.K, 0, inst.v, t)
-          : row.kind === "chasseneige" ? () => props.drawChasseNeige(ctx, inst.K, 0, inst.v, t)
-          : row.kind === "skieur" ? () => props.drawSkieur(ctx, inst.K, 0, inst.v, t)
-          : row.kind === "pieton" ? () => props.drawPieton(ctx, inst.K, 0, inst.v, t, r, rows.enPlage(r))
-          : () => props.drawVoiture(ctx, inst.K, 0, inst.v, -1, t);
-        items.push({ d: scene.depth(0, inst.v), draw: () => surSol(inst.v, dessin, true) });
+        const dessinA = (u, vv) => (row.kind === "tracteur" ? props.drawTracteurRoute(ctx, inst.K, u, vv, t)
+          : row.kind === "bus" ? props.drawBus(ctx, inst.K, u, vv, t)
+          : row.kind === "chasseneige" ? props.drawChasseNeige(ctx, inst.K, u, vv, t)
+          : row.kind === "skieur" ? props.drawSkieur(ctx, inst.K, u, vv, t)
+          : row.kind === "buggy" ? props.drawBuggy(ctx, inst.K, u, vv, t, r)
+          : row.kind === "pieton" ? props.drawPieton(ctx, inst.K, u, vv, t, r, rows.enPlage(r))
+          : props.drawVoiture(ctx, inst.K, u, vv, -1, t));
+        const ej = ejectes.get(r);
+        if (ej) items.push({ d: scene.depth(0, ej.v), draw: () => dessinerEjecte(ej, inst.K, t, dessinA) });
+        else items.push({ d: scene.depth(0, inst.v), draw: () => surSol(inst.v, () => dessinA(0, inst.v), true) });
         if (debugAlertes) { const px = scene.project(0, inst.v, 0).x; if (px > 0 && px < width) { const e = debugAlertes.get(r) || { kind: row.kind, alerte: 0, vu: 0 }; e.vu += 1; debugAlertes.set(r, e); } }
       }
     }
@@ -1364,7 +1410,11 @@ function render(alpha) {
     if (row.lait !== undefined && !rows.bonusTaken(r, "lait")) items.push({ d: scene.depth(-0.3, r), draw: () => drawPiece(r, row.lait, now, "lait") });
     if (row.grosse !== undefined && !rows.bonusTaken(r, "grosse")) items.push({ d: scene.depth(-0.3, r), draw: () => drawPiece(r, row.grosse, now, "grosse") });
     if (r === jet.r && !jet.pris) items.push({ d: scene.depth(-0.3, r), draw: () => dessinerJetpackObjet(r, now) });
-    if (row.type === "statique") {
+    if (row.type === "statique" && ejectes.has(r)) {
+      // La voiture garée percutée en turbo s'envole aussi.
+      const ej = ejectes.get(r), K = rows.KINDS[row.kind];
+      items.push({ d: scene.depth(0, r), draw: () => dessinerEjecte(ej, K, tm, (u, vv) => props.drawVoiture(ctx, K, u, vv, 1, tAnim, row.bouchon !== undefined ? props.COULEURS_BOUCHON[row.bouchon % 3] : null)) });
+    } else if (row.type === "statique") {
       const tombe = tombes.get(r);
       items.push({ d: scene.depth(0, r), draw: () => surSol(r, () => (tombe !== undefined
         ? props.drawStaticTombe(ctx, row.kind, 0, r, tAnim, Math.max(0, tm - tombe))
@@ -1510,7 +1560,7 @@ function render(alpha) {
     hud.renderHud(ctx, width, height, {
       metres: game.metres, potes: friends.count(), potesMax: friends.max(), gaugeT,
       mult: Math.round(multiplicateur() * 100) / 100, restant: plein ? 0 : Math.max(0, prochainPalier() - game.points), plein,
-      restantS: game.ended ? 0 : tempsRestant(), turbo: game.turbo > 0, safeTop, nuit: scene.getNight(),
+      restantS: game.ended ? 0 : tempsRestant(), turbo: game.turbo > 0, safeTop, nuit: scene.getNight(), plage: plageFondu,
       avance: game.sprint ? Math.max(0, clock.now()) / (window.CONFIG.sprintDureeS || 60) : 1 - (game.ended ? 0 : tempsRestant()) / Math.max(1, window.CONFIG.dureeMorceau - departMorceau),
     });
     ctx.restore();
@@ -1575,6 +1625,54 @@ function dessinerCycliste(cv, c2, cw, ch, ped, route) {
     for (let k = -3; k <= 3; k++) scene.drawFlat(c2, -0.05, k * pas - decal, 0.1, 0.8, "#f2ead8");
   } else scene.drawFlat(c2, -0.7, -1.4, 1.4, 2.8, "#565250");
   drawRider(c2, 0, 0, 0, P, ped, 1, 0);
+  c2.restore();
+  scene.setViewport(width, height);
+}
+// Le peloton de la carte « Joue avec tes potes » (5 octobre 2026 : « mets
+// vraiment un dessin [...] tu rajoutes des cyclistes dans l'image, comme dans
+// le jeu, parce que c'est incompréhensible avec les tags de couleur ») : le
+// joueur devant (à droite), ses potes qui arrivent derrière lui un par un,
+// « +10 % » qui jaillit au-dessus de chacun. Dessinés par le VRAI moteur.
+function dessinerPeloton(cv, t, arrivees) {
+  const c2 = cv.getContext("2d");
+  const cw = cv.clientWidth || 260, ch = cv.clientHeight || 124;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  if (cv.width !== Math.round(cw * dpr)) { cv.width = Math.round(cw * dpr); cv.height = Math.round(ch * dpr); }
+  c2.setTransform(dpr, 0, 0, dpr, 0, 0);
+  c2.clearRect(0, 0, cw, ch);
+  const VW = 470, ECART = 1.15;
+  scene.setViewport(VW, VW);
+  scene.setJoueurX(0.5);
+  scene.setCamera(0);
+  const ped = t * 9;
+  const a = scene.project(0, 0, 0);
+  c2.save();
+  c2.translate(cw - 34 - a.x, ch * 0.9 - a.y);
+  scene.drawFlat(c2, -0.8, -7.4, 1.6, 8.6, "#3a3633");
+  const decal = (t * 1.6) % 1.7;
+  for (let k = -5; k <= 1; k++) scene.drawFlat(c2, -0.05, k * 1.7 - decal, 0.1, 0.8, "#f2ead8");
+  const P = paletteDepuisSkin(screens.getSkin());
+  // Du dernier arrivé (le plus à gauche) au joueur, pour que chacun passe devant le précédent.
+  for (let i = arrivees.length - 1; i >= 0; i--) {
+    const age = t - arrivees[i], v = -(i + 1) * ECART - Math.max(0, 0.5 - age) * 3;
+    drawRider(c2, 0, v, 0, PALETTES.potes[i % PALETTES.potes.length], ped + i * 0.7, Math.min(1, age * 4), 0);
+  }
+  drawRider(c2, 0, 0, 0, P, ped, 1, 0);
+  // « +10 % » au-dessus de chaque pote, qui glisse AVEC lui, monte et s'efface —
+  // et laisse la place dès que le suivant arrive (un seul à la fois : deux
+  // étiquettes voisines se chevauchaient, les cyclistes ne sont qu'à ~37 px).
+  for (let i = 0; i < arrivees.length; i++) {
+    const age = t - arrivees[i];
+    const suivant = i + 1 < arrivees.length ? t - arrivees[i + 1] : -1;
+    if (age > 1.4 || suivant > 0.15) continue;
+    const p = scene.project(0, -(i + 1) * ECART - Math.max(0, 0.5 - age) * 3, 2.05 + age * 0.45);
+    c2.globalAlpha = Math.min(1, age * 4) * Math.max(0, 1 - Math.max(0, age - 0.8) / 0.6) * (suivant > 0 ? 1 - suivant / 0.15 : 1);
+    c2.font = `900 ${Math.round(15 + 4 * Math.max(0, 0.25 - age) / 0.25)}px "Source Serif 2", Georgia, serif`;
+    c2.textAlign = "center"; c2.textBaseline = "bottom";
+    c2.lineWidth = 3; c2.strokeStyle = "#ffffff"; c2.strokeText("+10 %", p.x, p.y);
+    c2.fillStyle = "#e13e26"; c2.fillText("+10 %", p.x, p.y);
+    c2.globalAlpha = 1;
+  }
   c2.restore();
   scene.setViewport(width, height);
 }
@@ -1651,6 +1749,7 @@ function frameInterne(nowMs) {
 }
 
 screens.init({
+  dessinerPeloton,
   game,
   requestGameStart,
   isGameStartRequested,

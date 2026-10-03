@@ -1209,49 +1209,63 @@ function syncMuteIcon() {
 }
 
 // --- Démarrage ---------------------------------------------------------------
-// Explication au lancement, en TROIS temps (1er octobre 2026, test avec une
+// Explication au lancement, en QUATRE temps depuis (son, tap, arrivée, potes),
+// d'abord en TROIS (1er octobre 2026, test avec une
 // joueuse : elle glissait au lieu de taper, lisait « 1,6 % », ne savait pas que
 // la partie dure le morceau) : 1) tape l'écran, pas besoin de glisser ;
 // 2) une partie = un morceau, jusqu'à la ligne d'arrivée ; 3) joue avec tes
 // potes, +10 % par pote. Un tap passe à l'étape suivante ; après la
 // troisième, la course part toute seule. Le contexte audio est débloqué AVANT,
 // dans le geste du JOUER. 3 premières parties + toujours en ligue démo.
-const EXPL_ETAPES = [4.2, 3.8, 5.4, 5.0];
+// ⚠️ 5 octobre 2026 : « Monte le son » passe EN PREMIER (« je le mettrais en
+// tout premier, et après 2, 3, 4 ») ; les cartes se reconnaissent à leur NOM
+// (data-e), plus à leur rang. Durées par carte :
+const EXPL_DUREES = { son: 5.0, tap: 4.2, arrivee: 3.8, potes: 6.4 };
 // « Monte le son » (4 octobre 2026 : « il faut le mettre vraiment pendant 5
-// secondes avant que le jeu démarre ») : dernière carte avant la course, deux
-// coups de klaxon pour régler le volume. Le décompte ne le répète pas.
+// secondes avant que le jeu démarre ») : deux coups de klaxon pour régler le
+// volume. Le décompte ne le répète pas.
 let annonceSon = false;
 export function consommerAnnonceSon() { const a = annonceSon; annonceSon = false; return a; }
 function montrerExplication(ensuite) {
   const box = $("explication");
   if (!box || (!demo && getParties() >= 3) || enBeta()) { ensuite(); return; }
   const etapes = [...box.querySelectorAll(".expl-etape")];
-  const potes = [...box.querySelectorAll("#expl-potes span")];
   const mult = $("expl-mult"), barre = box.querySelector("#expl-barre i"), eyebrow = $("expl-eyebrow");
-  let minuteurs = [], idx = -1, fini = false;
-  const vider = () => { minuteurs.forEach(clearTimeout); minuteurs = []; };
-  const finir = () => { if (fini) return; fini = true; vider(); box.classList.add("hidden"); overlay.classList.remove("estompe"); annonceSon = idx >= 3; ensuite(); };
+  let minuteurs = [], idx = -1, fini = false, rafPeloton = 0;
+  const vider = () => { minuteurs.forEach(clearTimeout); minuteurs = []; cancelAnimationFrame(rafPeloton); };
+  const finir = () => { if (fini) return; fini = true; vider(); box.classList.add("hidden"); overlay.classList.remove("estompe"); ensuite(); };
+  // Le peloton : un pote de plus toutes les 0,7 s, « +10 % » au-dessus de lui.
+  const animerPeloton = () => {
+    const cv = $("expl-peloton"), t0 = performance.now(), arrivees = [];
+    mult.textContent = "+0 %";
+    const boucle = () => {
+      if (fini) return;
+      const t = (performance.now() - t0) / 1000;
+      const voulu = t < 0.5 ? 0 : Math.min(5, 1 + Math.floor((t - 0.5) / 0.7));
+      while (arrivees.length < voulu) {
+        arrivees.push(t);
+        mult.textContent = `+${arrivees.length * 10} %`;
+        mult.classList.remove("pop"); void mult.offsetWidth; mult.classList.add("pop");
+        try { sfx.piece(); } catch (e) { /* pas de son, tant pis */ }
+      }
+      if (cv && deps.dessinerPeloton) deps.dessinerPeloton(cv, t, arrivees);
+      rafPeloton = requestAnimationFrame(boucle);
+    };
+    boucle();
+  };
   const etape = (i) => {
     vider();
     if (i >= etapes.length) { finir(); return; }
     idx = i;
+    const nom = etapes[i].dataset.e, duree = EXPL_DUREES[nom] || 4.5;
     etapes.forEach((e, k) => e.classList.toggle("on", k === i));
     eyebrow.textContent = `Comment jouer · ${i + 1}/${etapes.length}`;
     $("expl-passer").textContent = i < etapes.length - 1 ? "Touche pour continuer" : "Touche pour jouer";
     barre.style.transition = "none"; barre.style.width = "0";
-    requestAnimationFrame(() => requestAnimationFrame(() => { barre.style.transition = `width ${EXPL_ETAPES[i]}s linear`; barre.style.width = "100%"; }));
-    if (i === 2) {
-      potes.forEach((p) => p.classList.remove("on"));
-      mult.textContent = "+0 %";
-      potes.forEach((p, k) => minuteurs.push(setTimeout(() => {
-        p.classList.add("on");
-        mult.textContent = `+${(k + 1) * 10} %`;
-        mult.classList.remove("pop"); void mult.offsetWidth; mult.classList.add("pop");
-        try { sfx.piece(); } catch (e) { /* pas de son, tant pis */ }
-      }, 500 + k * 550)));
-    }
-    if (i === 3) [300, 1300].forEach((ms) => minuteurs.push(setTimeout(() => { try { sfx.klaxon(); } catch (e) { /* pas de son */ } }, ms)));
-    minuteurs.push(setTimeout(() => etape(i + 1), EXPL_ETAPES[i] * 1000));
+    requestAnimationFrame(() => requestAnimationFrame(() => { barre.style.transition = `width ${duree}s linear`; barre.style.width = "100%"; }));
+    if (nom === "potes") animerPeloton();
+    if (nom === "son") { annonceSon = true; [300, 1300].forEach((ms) => minuteurs.push(setTimeout(() => { try { sfx.klaxon(); } catch (e) { /* pas de son */ } }, ms))); }
+    minuteurs.push(setTimeout(() => etape(i + 1), duree * 1000));
   };
   if (!box.dataset.branche) {
     box.dataset.branche = "1";

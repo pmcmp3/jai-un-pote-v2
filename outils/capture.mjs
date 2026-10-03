@@ -58,7 +58,7 @@ if (demandes.includes("menus")) {
 }
 await page.waitForFunction(() => !document.getElementById("play-button").disabled, null, { timeout: 15000 });
 await page.click("#play-button");
-if (process.env.EXPL) { await attendre(2200); await photo("05-explication"); await attendre(4000); await photo("05b-explication"); await attendre(4800); await photo("05c-explication"); await attendre(5000); await photo("05d-explication"); }
+if (process.env.EXPL) { await attendre(2200); await photo("05-explication"); await attendre(4000); await photo("05b-explication"); await attendre(4800); await photo("05c-explication"); await attendre(5000); await photo("05d-explication"); await attendre(450); await photo("05e-explication"); }
 await page.waitForFunction(() => window.__pote && window.__pote.estDemarre(), null, { timeout: 20000 });
 await page.keyboard.press("KeyI"); // invincible : la course va au bout des captures
 const course = (expr, arg) => page.evaluate(expr, arg);
@@ -329,6 +329,18 @@ const SCENES = {
     await attendre(300); await photo("28-voiture");
     await page.keyboard.press("KeyD");
   },
+  // Ligne d'arrivée franchie EN PLEIN SAUT (5 octobre 2026 : « la gravité
+  // n'agit plus sur mon personnage ») : il doit retomber.
+  arriveeSaut: async () => {
+    await attendre(1500);
+    await page.keyboard.down("Space"); await attendre(180); await page.keyboard.up("Space");
+    await attendre(120);
+    const enLair = await course(() => window.__pote.player.jumpY);
+    await page.keyboard.press("KeyF");
+    const hauteurs = [];
+    for (let k = 0; k < 12; k++) { await attendre(120); hauteurs.push((await course(() => window.__pote.player.jumpY)).toFixed(2)); }
+    console.log(`ARRIVÉE EN SAUT : en l'air à ${enLair.toFixed(2)} u, puis ${hauteurs.join(" → ")}`);
+  },
   // Menu « Mon cycliste » atteint depuis l'écran de fin (bouton Menu).
   menuFin: async () => {
     await page.keyboard.press("KeyF"); await attendre(700); await photo("29-termine");
@@ -598,6 +610,10 @@ const SCENES = {
     await attendre(600); await photo("59c-hud-turbo");
     await page.keyboard.press("KeyD"); await page.keyboard.press("KeyN"); await page.keyboard.press("KeyD");
     await attendre(5000); await photo("59d-hud-nuit");
+    // Sur la plage (ciel violet) : texte blanc.
+    const rp = await course(() => { const p = window.__pote; for (let r = 300; r < 3000; r++) if (p.rows.enPlage(r)) return r; return 0; });
+    await course(([t, v]) => { const p = window.__pote; p.clock.jumpBy(t - p.clock.now()); p.player.v = v; p.player.prevV = v; p.player.jumpY = 0; }, [150, rp + 12]);
+    await attendre(4500); await photo("59e-hud-plage");
     await page.keyboard.press("KeyD");
   },
   // PORTE de conversion (5 octobre 2026) : à lancer avec NEUF=1 PARTIES=0.
@@ -693,12 +709,13 @@ const SCENES = {
         const k = P.rows.rowAt(r).kind;
         if (k === "pieton") { if (r - dernier > 16) { debut = r; n = 0; } n += 1; dernier = r; if (n >= 3 && !o.groupe) o.groupe = debut; if (P.rows.enPlage(r) && !o.plage) o.plage = r; }
         if (k === "baigneur" && !o.baigneur) o.baigneur = r;
+        if (k === "buggy" && !o.buggy) o.buggy = r;
       }
       return o;
     });
     console.log("PIÉTONS", JSON.stringify(cibles));
     const allerA = (r, avance) => course(([r, avance]) => { const P = window.__pote; let g = 0; while (P.player.v < r - avance && g++ < 40000) window.__pote.videoAvance(P.clock.now() + 0.25); return P.player.v; }, [r, avance]);
-    const ordre = [["groupe", "60-pietons-groupe"], ["plage", "60b-pietons-plage"], ["baigneur", "60c-baigneur"]].filter(([c]) => cibles[c]).sort((a, b) => cibles[a[0]] - cibles[b[0]]);
+    const ordre = [["groupe", "60-pietons-groupe"], ["plage", "60b-pietons-plage"], ["baigneur", "60c-baigneur"], ["buggy", "60d-buggy"]].filter(([c]) => cibles[c]).sort((a, b) => cibles[a[0]] - cibles[b[0]]);
     for (const [cle, nom] of ordre) {
       if (await course(() => window.__pote.player.v) > cibles[cle] - 4) continue;
       await allerA(cibles[cle], 9);

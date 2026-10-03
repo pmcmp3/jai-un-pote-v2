@@ -2,7 +2,7 @@
 // (2,1 Mo), les polices et la page sont mis en cache au premier passage.
 // Page et config : réseau d'abord (une mise à jour est vue tout de suite),
 // repli cache hors ligne. Tout le reste : cache d'abord, puis réseau.
-const CACHE = "jp2-v28"; // 29 septembre 2026 : boost de ligue, ?9, poules, décor — // 28 septembre 2026 (nuit) : saisons, tuto au ralenti, homme/femme, décor allégé
+const CACHE = "jp2-v29"; // 29 septembre 2026 : boost de ligue, ?9, poules, décor — // 28 septembre 2026 (nuit) : saisons, tuto au ralenti, homme/femme, décor allégé
 const PRECACHE = ["./", "./config.js", "./assets/jai-un-pote.mp3", "./fonts/SourceSerif2-Black.woff2", "./fonts/StageGrotesk-Medium.otf", "./fonts/StageGrotesk-Black.otf"];
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(PRECACHE)).then(() => self.skipWaiting()));

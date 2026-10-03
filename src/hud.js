@@ -37,72 +37,60 @@ function fitFont(ctx, weight, size, text, maxW, min = 9) {
   return t;
 }
 
-// `hud` = { metres, potes, potesMax, gaugeT, mult, restant, restantS, avance, turbo, safeTop, nuit }
+// `hud` = { metres, potes, potesMax, gaugeT, mult, restant, restantS, avance, turbo, safeTop, nuit, plage, plein }
 // Disposition revue le 5 octobre 2026 (« la manière dont les points sont
-// affichés et la temporalité, le 1,5, ce n'est pas hyper ergonomique [...]
-// que ça soit un peu plus intelligemment fait ») :
-//   haut   : la barre du MORCEAU (le chrono de la course), sur toute la
-//            largeur, qui se remplit jusqu'au drapeau — comme une story ;
+// affichés et la temporalité, le 1,5, ce n'est pas hyper ergonomique »), puis
+// SIMPLIFIÉE le soir même, en jouant en portrait (« mets un peu plus gros le
+// prochain pote dans 6 pièces, 1,5 [...] tu dis juste deux potes, c'est très
+// bien ; tu mets prochaine étape, t'enlèves la barre [...] t'enlèves les
+// carreaux qui montrent qu'il y a cinq potes maximum ») :
+//   haut   : la barre du MORCEAU (le chrono), sur toute la largeur, jusqu'au
+//            drapeau — rouge les 10 dernières secondes ;
 //   centre : les points ;
-//   droite : les cases des potes, puis « N POTES » avec le multiplicateur
-//            qu'ils donnent (×1,5…) — on lit d'où il vient —, puis la jauge
-//            du prochain pote. Plus aucun texte flouté.
+//   droite : « ×1,5  2 POTES » en gros, puis « PROCHAINE ÉTAPE » et
+//            « 6 PIÈCES ». Ni cases ni jauge, aucun texte flouté.
+// Texte blanc la nuit ET sur la plage (ciel violet : « le texte est en noir et
+// le ciel est en violet »).
 export function renderHud(ctx, width, height, hud) {
   ctx.save();
   const top = hud.safeTop || 0;
   ctx.textBaseline = "top";
   ctx.shadowColor = "transparent"; ctx.shadowBlur = 0;
-  // Texte noir de jour, blanc la nuit (pas d'ombre portée, 30 septembre 2026).
-  const TXT = hud.nuit > 0.5 ? BLANC : NOIR, TXT_VIDE = hud.nuit > 0.5 ? "rgba(255,255,255,0.28)" : "rgba(13,13,16,0.22)";
+  const clair = hud.nuit > 0.5 || (hud.plage || 0) > 0.35;
+  const TXT = clair ? BLANC : NOIR, TXT_VIDE = clair ? "rgba(255,255,255,0.28)" : "rgba(13,13,16,0.22)";
+  const TXT_DOUX = clair ? "rgba(255,255,255,0.8)" : "rgba(13,13,16,0.72)";
 
-  // --- Droite : cases, « N POTES » + multiplicateur, jauge -----------------
-  const cell = 10, gap = 3, total = hud.potesMax;
-  const rowW = Math.max(60, total * cell + (total - 1) * gap);
-  const rx = width - PAD - rowW, ry = top + PAD + 6;
-  for (let i = 0; i < total; i++) {
-    ctx.fillStyle = i < hud.potes ? TXT : TXT_VIDE;
-    roundRect(ctx, rx + i * (cell + gap), ry, cell, cell, 2);
-    ctx.fill();
-  }
+  // --- Droite : « ×1,5  2 POTES », puis la prochaine étape -----------------
+  const total = hud.potesMax;
+  const xD = width - PAD, y1 = top + PAD + 6;
   const libelle = total === 0 ? "INVITE TES POTES" : hud.potes === 0 ? "TOUT SEUL" : hud.potes === 1 ? "1 POTE" : `${hud.potes} POTES`;
-  ctx.font = `800 11px ${POLICE}`;
-  const wLib = ctx.measureText(libelle).width;
-  const y2 = ry + cell + 6;
   ctx.textAlign = "right";
+  ctx.font = `900 16px ${POLICE}`;
+  const wLib = ctx.measureText(libelle).width;
   ctx.fillStyle = TXT;
-  ctx.fillText(libelle, width - PAD, y2);
-  let gaucheDroite = Math.min(rx, width - PAD - wLib);
+  ctx.fillText(libelle, xD, y1 + 2);
+  let gaucheDroite = xD - wLib;
   if (hud.mult > 1.001) {
     const txt = `×${String(hud.mult).replace(".", ",")}`;
-    ctx.font = `900 11px ${POLICE}`;
-    const w = ctx.measureText(txt).width + 10;
-    const xP = width - PAD - wLib - 6 - w;
+    ctx.font = `900 15px ${POLICE}`;
+    const w = ctx.measureText(txt).width + 14;
+    const xP = xD - wLib - 8 - w;
     ctx.fillStyle = hud.turbo ? ROUGE : JAUNE;
-    roundRect(ctx, xP, y2 - 3, w, 17, 3);
+    roundRect(ctx, xP, y1 - 2, w, 24, 4);
     ctx.fill();
     ctx.fillStyle = hud.turbo ? BLANC : "#4a3305";
     ctx.textAlign = "center";
-    ctx.fillText(txt, xP + w / 2, y2 + 0.5);
+    ctx.fillText(txt, xP + w / 2, y1 + 3);
     gaucheDroite = Math.min(gaucheDroite, xP);
   }
   if (total > 0 && !hud.plein) {
-    const gy = y2 + 19;
-    ctx.fillStyle = TXT_VIDE;
-    roundRect(ctx, rx, gy, rowW, 4, 2);
-    ctx.fill();
-    ctx.fillStyle = JAUNE;
-    roundRect(ctx, rx, gy, Math.max(4, rowW * Math.min(1, hud.gaugeT)), 4, 2);
-    ctx.fill();
-    // Le texte de la jauge : net, sur une étiquette sombre (jaune pâle illisible sur le ciel).
-    const txt = `PROCHAIN POTE : ${hud.restant} PIÈCE${hud.restant > 1 ? "S" : ""}`;
-    fitFont(ctx, "800", 10, txt, rowW + 50, 8);
-    const w = ctx.measureText(txt).width + 8;
-    ctx.fillStyle = "rgba(13,13,16,0.55)";
-    roundRect(ctx, width - PAD - w, gy + 8, w, 15, 3);
-    ctx.fill();
-    ctx.fillStyle = JAUNE;
     ctx.textAlign = "right";
-    ctx.fillText(txt, width - PAD - 4, gy + 10.5);
+    ctx.font = `800 10.5px ${POLICE}`;
+    ctx.fillStyle = TXT_DOUX;
+    ctx.fillText("PROCHAINE ÉTAPE", xD, y1 + 29);
+    ctx.font = `900 16px ${POLICE}`;
+    ctx.fillStyle = TXT;
+    ctx.fillText(`${hud.restant} PIÈCE${hud.restant > 1 ? "S" : ""}`, xD, y1 + 43);
   }
 
   // --- Centre : les points ---------------------------------------------------

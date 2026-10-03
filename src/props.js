@@ -123,6 +123,49 @@ export function drawTracteurRoute(ctx, K, uC, v, t, sens = -1) {
   });
 }
 
+// Le BUGGY de la plage (5 octobre 2026 : « faut virer les tracteurs quand on
+// est sur la plage, il vaut mieux que tu rajoutes des voiturettes de plage ») :
+// coque rose bonbon façon Miami, gros pneus de sable, arceau de sécurité
+// turquoise, un conducteur à lunettes noires. Il vient en face (avant vers −v).
+const BUGGY = ["#ff5fa2", "#ffb347", "#36c6d0"];
+export function drawBuggy(ctx, K, uC, v, t, r = 0) {
+  groupe(ctx, () => {
+    const L = K.long, W = K.larg, H = K.h;
+    const x = uC - W / 2, av = v - L / 2;
+    const bloc = (a, da, b, db, h, lift, col) => drawBox(ctx, x + b * W, av + a * L, db * W, da * L, h * H, col, lift * H);
+    // Couleur tirée de la RANGÉE, jamais de v : il roule, sa coque changeait
+    // de couleur en route (vu à la capture, rose puis turquoise).
+    const COQUE = BUGGY[Math.abs(r) % 3], ARCEAU = "#36e0e6";
+    drawShadow(ctx, uC, v, W / 2, L / 2, 0.26);
+    // Le sable qui gicle derrière.
+    for (let i = 0; i < 4; i++) {
+      const ph = (t * 3.4 + i * 1.3) % 1, sz = 0.25 + ph * 0.45;
+      ctx.save(); ctx.globalAlpha *= 0.4 * (1 - ph);
+      drawBox(ctx, uC - sz / 2 + Math.sin(i * 2.1) * 0.3, v + L / 2 + 0.3 + i * 0.4 + ph * 0.7, sz, sz, sz * 0.7, "#e8d2a0", 0.05 + ph * 0.4);
+      ctx.restore();
+    }
+    // Quatre gros pneus de sable.
+    for (const b of [-0.02, 0.8]) for (const a of [0.2, 0.82]) {
+      const u = x + b * W + 0.12, vv = av + a * L;
+      drawDisque(ctx, u, vv, 0.5, 0.5, "#1a1a1e");
+      drawDisque(ctx, u - 0.002, vv, 0.5, 0.22, "#d8d8d8");
+    }
+    bloc(0.06, 0.88, 0.1, 0.8, 0.2, 0.3, COQUE);            // coque basse
+    bloc(0.0, 0.26, 0.14, 0.72, 0.16, 0.42, COQUE);          // nez relevé (avant)
+    bloc(0.72, 0.24, 0.12, 0.76, 0.24, 0.46, "#3a3a40");     // moteur à l'air (arrière)
+    bloc(0.3, 0.4, 0.2, 0.6, 0.12, 0.5, "#2a2a30");          // sièges
+    // Le conducteur : torse bronzé, lunettes noires, cheveux au vent.
+    bloc(0.42, 0.16, 0.36, 0.3, 0.34, 0.62, "#c98a5a");
+    bloc(0.42, 0.16, 0.38, 0.26, 0.2, 0.96, "#c98a5a");
+    bloc(0.4, 0.04, 0.36, 0.3, 0.05, 1.04, "#0d0d10");       // lunettes
+    bloc(0.46, 0.14, 0.36, 0.3, 0.06, 1.16, "#2a1a10");
+    // L'arceau : deux montants et la barre du haut.
+    for (const b of [0.1, 0.84]) bloc(0.56, 0.05, b, 0.06, 0.62, 0.5, ARCEAU);
+    bloc(0.56, 0.05, 0.1, 0.8, 0.06, 1.12, ARCEAU);
+    for (const b of [0.18, 0.7]) bloc(-0.01, 0.03, b, 0.12, 0.08, 0.52, "#fff6c8"); // phares
+  });
+}
+
 // Car scolaire de la Région (3 octobre 2026) : livrée blanche, bandeau bleu
 // nuit et filet turquoise, panneau jaune « transport d'enfants » à l'avant
 // et à l'arrière. Il arrive EN FACE : capot vers −v.

@@ -1281,7 +1281,7 @@ function decorVillage(ctx, push, r, side, sway, sud) {
 // Gazon synthétique sur la table, bâche rayée au-dessus du marchand, paniers
 // de fruits par terre, et le marchand qui harangue — bulle comprise.
 const BACHES = [["#e13e26", "#f7f2e6"], ["#2f8a4a", "#f7f2e6"], ["#1f5fb8", "#f7f2e6"]];
-const CRIS = ["Elle est belle ma courgette !", "Allez, 2 € le kilo !", "Goûtez-moi ça !", "Pastèque bien sucrée !", "Qui veut des tomates ?", "Le kilo, 1 € !"];
+const CRIS = ["Elle est belle ma courgette !", "Allez, 2 € le kilo !", "Tu veux voir ma grosse courge ?", "Pastèque bien sucrée !", "Qui veut des tomates ?", "Elles sont belles mes courgettes !", "Goûtez-moi ça !", "Le kilo, 1 € !"];
 function etalMarche(ctx, u, v, n, t) {
   const sorte = ((n % 3) + 3) % 3;
   const L = 3.5;                        // longueur de l'étal le long de la route
@@ -1479,6 +1479,26 @@ export function drawHalle(ctx, rDebut, geo, rFrom = -Infinity, rTo = Infinity, c
     }
     ctx.restore();
     drawBox(ctx, uD, a0, uW - uD, a1 - a0, 0.3, "#181226", TOIT + 0.2);           // plafond
+    return;
+  }
+  if (couche === "estrade") {
+    // Le marché EN HAUT, sur le plancher des halles (5 octobre 2026 : « il
+    // faut qu'ils soient en haut de l'estrade, en hauteur, logique, parce
+    // qu'on est dans les halles ») : le plancher se prolonge derrière la
+    // route, porté par des poteaux, et les étals s'y alignent entre les
+    // piliers. (Ceux d'en bas, sous le pont, restent.)
+    const uE = uD, pE = 3.7;
+    if (!visible(v1, v2)) return;
+    for (let i = 0; i <= plat; i += 6) { const v = v1 + Math.min(i, plat - 0.3); if (visible(v, v + 0.3)) drawBox(ctx, uE + pE - 0.4, v, 0.3, 0.3, haut - 0.42, POUTRE); }
+    drawBox(ctx, uE, v1, pE, plat, 0.42, BOIS, haut - 0.42);
+    drawBox(ctx, uE, v1, pE, plat, 0.03, BOIS_CLAIR, haut);
+    avecLift(haut, () => {
+      for (let i = 0; i + 6 <= total; i += 6) {
+        const v = rDebut + i + 1.25;
+        if (v < v1 + 0.3 || v + 3.5 > v2 - 0.3 || !visible(v - 1, v + 4.5)) continue;
+        etalMarche(ctx, uE + 0.15, v, i / 6 + 101, decorT);
+      }
+    });
     return;
   }
   if (couche === "train") {

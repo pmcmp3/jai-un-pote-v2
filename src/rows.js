@@ -79,6 +79,10 @@ export const KINDS = {
   // nous, en ski de fond, quand on est dans le biome neige exclusivement ») :
   // il vient en face, lentement, skis compris dans la longueur.
   skieur:      { contresens: true, cout: 2, vitesse: 1.5, arme: 5.5, long: 1.9, larg: 0.7, h: 1.8, nom: "un skieur" },
+  // Le BUGGY de la plage (5 octobre 2026 : « faut virer les tracteurs quand on
+  // est sur la plage, il vaut mieux des voiturettes de plage ») : remplace le
+  // tracteur sur la plage, même rôle — il vient en face, on peut rouler dessus.
+  buggy:       { contresens: true, cout: 3, vitesse: 1.4, arme: 5.5, long: 2.4, larg: 1.5, h: 1.5, plancher: "double", montable: true, nom: "un buggy de plage" },
   // Les PIÉTONS (5 octobre 2026 : « il me reste 1 minute, je m'ennuie [...]
   // sur la route, des piétons présents, tu vois vraiment que ça monte en
   // difficulté ») : ils marchent vers le joueur — seuls d'abord, puis en
@@ -586,8 +590,10 @@ export class Route {
           kind = this.nNeige % 2 === 1 ? "bonhomme" : "skieur"; // en alternance : au moins un bonhomme par course
         }
       }
-      // La plage : le costard et le fermier y sont en slip de bain.
+      // La plage : le costard et le fermier y sont en slip de bain, et les
+      // tracteurs y deviennent des buggys.
       if (enPlage(this.chaine.r) && (kind === "costard" || kind === "fermier")) kind = "baigneur";
+      if (enPlage(this.chaine.r) && kind === "tracteur") kind = "buggy";
       const t = Math.min(1, Math.max(0, this.chaine.r / RAMP_ROWS));
       const mou = Math.round(MOU_DEBUT + (MOU_FIN - MOU_DEBUT) * t);
       const base = this.chaine.kind ? ecartMin(this.chaine.kind, kind, Math.min(vMaxRangees(), vitesseAuRang(this.chaine.r + 20) * 1.08)) : 6;

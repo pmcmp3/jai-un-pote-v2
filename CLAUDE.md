@@ -539,6 +539,39 @@ Code `TESTV2`, qui est aussi `config.ligueBeta` (menu simplifié + bouton « Lai
     obstacles, des pièces, des groupes différents d'une ligue à l'autre ; la
     COURBE de difficulté (vitesse, paquets d'espèces, biomes) est la même
     pour tous. Sans ligue : graine au hasard, chaque partie différente.
+- **5 octobre 2026, septième série (retours après l'essai Instagram)** —
+  `VERSION_COURSE` 20, SW `jp2-v29` :
+  - *Explication* : « Monte le son » passe en PREMIER (1/4), puis 1 tap = 1
+    saut, l'arrivée, les potes. Les carrés de couleur de la carte potes
+    (« incompréhensible avec les tags de couleur ») sont remplacés par un
+    PELOTON dessiné par le vrai moteur (`dessinerPeloton`, main.js, passé à
+    screens.js par `deps`) : le joueur devant, un pote qui arrive par
+    derrière toutes les 0,7 s, « +10 % » au-dessus du DERNIER arrivé
+    seulement (deux étiquettes voisines se chevauchaient : ~37 px entre deux
+    cyclistes).
+  - *HUD, colonne de droite* : « ×1,5  2 POTES » en gros, puis « PROCHAINE
+    ÉTAPE / 6 PIÈCES ». Plus de barre de progression, plus des 5 carreaux du
+    maximum. Texte blanc la nuit ET sur la plage (ciel violet, `hud.plage`).
+  - *Marché* : les étals montent sur une ESTRADE dans les halles (couche
+    `"estrade"` de `drawHalle` : plancher, poteaux, étals entre les
+    piliers), en plus de ceux du sol. Cris : « Tu veux voir ma grosse
+    courge ? », « Elles sont belles mes courgettes ! ».
+  - *« Je suis passé à travers un skieur »* : mesuré dans le vrai jeu
+    (`node outils/collisions.mjs`, course sans sauter) — AUCUN obstacle
+    traversé sans contact ; tous les chocs gratuits tombent pendant le turbo
+    de la brique de lait (invincible 5 s), qui ne se voyait pas. Désormais
+    l'obstacle percuté pendant l'invincibilité est ÉJECTÉ (il s'envole en
+    tournant et s'efface, 0,9 s, `ejecter`/`dessinerEjecte`) + secousse,
+    et un popup « TURBO : INVINCIBLE ! » (« INVINCIBLE ! » pour le bouclier
+    de reprise) une fois par course.
+  - *Plage* : les tracteurs y deviennent des BUGGYS (`buggy`, rows.js —
+    même rôle : en face, montable, coût 3). Mesuré : 33 buggys sur 20
+    graines, plus aucun tracteur après la rangée 1012 (plage à 1087). La
+    couleur de coque se tire de la RANGÉE (tirée de `v`, elle changeait en
+    roulant). Les voitures d'en face restent (route du bord de mer).
+  - *Ligne d'arrivée franchie en l'air* : le cycliste restait suspendu, la
+    gravité s'appliquait plus après la fin. Elle s'applique jusqu'au sol,
+    le salto en cours continue.
 - **Tuto au ralenti, deuxième version** (`conseilTap`/`conseilStep`) : approche
   ~1 s avant le bon moment (monde ×0,25), un tap donné pendant l'approche est
   GARDÉ et part pile au bon moment, gel ×0,06 s'il n'a rien fait ; reprise
@@ -652,6 +685,10 @@ Code `TESTV2`, qui est aussi `config.ligueBeta` (menu simplifié + bouton « Lai
 - `node outils/mesurer.mjs [N]` — quotas, écarts, score parfait, joueurs scriptés.
 - `node outils/capture.mjs [scènes]` — Chrome headless 375×812, captures dans `outils/sorties/` ;
   `SERVIR=dist` teste le build, `PARTIES=0` le tuto ; scène `perf` = coût de rendu CPU ×4.
+- `node outils/collisions.mjs` — une course du VRAI jeu sans jamais sauter : chaque
+  obstacle rencontré doit coûter (« traversés SANS choc : 0 »), sauf sous turbo/bouclier.
+- `node outils/clavier.mjs` (6 téléphones, clavier simulé), `node outils/premiere.mjs`
+  (première visite façon Instagram), `node outils/porte-echelle.mjs` (porte album/abonnement).
 - ⚠️ La preview de l'IDE ne peut pas jouer le jeu (l'`AudioContext` fige l'onglet) : passer par
   `capture.mjs`, puis par un vrai téléphone.
 
