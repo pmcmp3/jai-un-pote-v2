@@ -41,6 +41,7 @@ await page.addInitScript(([parties, neuf, genre, velo]) => {
   localStorage.setItem("jp2-appris", '["tap","haut","double"]'); // pas de conseil hors des scènes qui le testent
   localStorage.setItem("jp2Pseudo", "pmc");
   localStorage.setItem("jp2LigueVue", "1");
+  localStorage.setItem("jp2-conseils-vus", '{"lait":1,"alerte":1}'); // projecteurs : seulement dans la scène qui les teste
   localStorage.setItem("jp2Parties", parties);
   if (!neuf) { localStorage.setItem("jp2MorceauOuvert", "1"); localStorage.setItem("jp2PmcSuivi", "1"); }
 }, [process.env.PARTIES || "5", process.env.NEUF === "1", process.env.GENRE || "", process.env.VELO || ""]);
@@ -441,6 +442,7 @@ const SCENES = {
   },
   // Projecteurs (3 octobre 2026) : brique de lait et premier triangle, une fois chacun.
   projo: async () => {
+    await course(() => localStorage.removeItem("jp2-conseils-vus"));
     const vus = new Set();
     for (let i = 0; i < 160 && vus.size < 2; i++) {
       const t = await course(() => window.__pote.projo());
@@ -448,6 +450,28 @@ const SCENES = {
       await attendre(500);
     }
     console.log("projecteurs vus :", [...vus].join(", ") || "aucun");
+  },
+  // Véhicules (3 octobre 2026) : tracteur dans le sens du joueur, car scolaire en face.
+  vehicules: async () => {
+    const vus = new Set();
+    for (let i = 0; i < 1400 && vus.size < 2; i++) {
+      const k = await course(() => {
+        const P = window.__pote, v = P.player.v;
+        for (let r = Math.floor(v) + 1; r < v + 30; r++) {
+          const row = P.rows.rowAt(r);
+          if (row.type === "contresens" && row.armed && (row.kind === "bus" || row.kind === "tracteur")) {
+            const o = P.rows.contresensAt ? null : null;
+            const centre = r + row.v0 - row.vitesse * (P.tMonde() - row.t0);
+            if (centre > v + 3.5 && centre < v + 8) return row.kind;
+          }
+        }
+        return null;
+      });
+      if (k && !vus.has(k)) { vus.add(k); await photo(`46-vehicule-${k}`); }
+      await attendre(60);
+    }
+    console.log("véhicules vus :", [...vus].join(", ") || "aucun");
+    console.log(await course(() => { const P = window.__pote, out = []; for (let r = 0; r < P.player.v + 40; r++) { const row = P.rows.rowAt(r); if (row.type !== "safe") out.push(r + ":" + row.kind + (row.armed ? "*" : "")); } return out.join(" "); }));
   },
   menus: async () => {
     // ⚠️ Pas de touche D ici : overlay masqué = touches de debug coupées (G, I…).

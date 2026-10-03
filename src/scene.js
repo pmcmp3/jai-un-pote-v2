@@ -590,7 +590,7 @@ export function renderGround(ctx, boueAt) {
   k = 0;
   for (let u = -ROAD_HALF - 1.3; u > uFin; u -= 0.6, k++) {
     const u1 = Math.max(uFin, u - 0.6), kk = k;
-    bande(ctx, u1, u, (r) => { const soil = SOIL[zoneAt(r)]; return teintes(kk % 2 ? shadeHex(soil, -16) : shadeHex(soil, 4), 0).plat; });
+    bande(ctx, u1, u, (r) => { const soil = SOIL[zoneAt(r)]; return teintes(kk % 2 ? shadeHex(soil, -7) : shadeHex(soil, 2), 0).plat; }); // sillons adoucis (3 octobre 2026)
   }
   modeSaison = null;
 }
@@ -716,8 +716,11 @@ export function rowDecor(ctx, r, clear) {
     });
   }
   // Premier plan : herbes, fleurs, épis, clôture — jamais plus haut que la route.
+  // ⚠️ RETIRÉ le 3 octobre 2026 (« simplifier les éléments au premier plan,
+  // pour qu'on arrive plus facilement à voir quand il y a quelque chose sur
+  // la route ») : le champ du premier plan est désormais nu.
   const pres = hash(r * 57 + 3);
-  for (let i = 0; i < 1; i++) {
+  for (let i = 0; i < 0; i++) {
     const a = hash(r * 23 + i * 11 + 5), b = hash(r * 29 + i * 3 + 9);
     const u = -(ROAD_HALF + 1.4 + a * 3.6), v = r - 0.5 + b;
     const s = echelle(u);

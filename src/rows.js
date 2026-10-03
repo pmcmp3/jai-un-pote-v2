@@ -44,7 +44,7 @@
 // mêmes quantités.
 
 import { ROAD_HALF } from "./scene.js";
-import { V_UNIT, vitesseAuRang, rangAuTemps } from "./regles.js";
+import { V_UNIT, vitesseAuRang, rangAuTemps, dureeCourse } from "./regles.js";
 
 // --- Le bestiaire, à l'échelle : 1 unité ≈ 1 mètre --------------------------------
 // Le cycliste fait 1,8 u de haut et 1,24 u de long (VELO_DEMI × 2). Tout le
@@ -55,7 +55,18 @@ import { V_UNIT, vitesseAuRang, rangAuTemps } from "./regles.js";
 // hauteur qu'il faut dépasser.
 export const KINDS = {
   // Traversants : ils roulent le long de u, donc c'est `larg` qui barre la route.
-  tracteur:    { traverse: true, cout: 3, vitesse: 2.2, vmax: 3.2, long: 4.2, larg: 1.6, h: 2.3, plancher: "double", nom: "un tracteur" },
+  // ⚠️ 3 octobre 2026 : le tracteur ne TRAVERSE plus depuis le fond (« enlève
+  // les tracteurs qui viennent du fond, fais venir des tracteurs de gauche à
+  // droite ») : il roule SUR la route, dans le même sens que le joueur, plus
+  // lentement — on le rattrape et on le passe au double saut. Mécanique
+  // « contresens » avec une vitesse NÉGATIVE (il s'éloigne). Raccourci à 2,6 :
+  // on le croise à (vitesse joueur − 0,8) rangées/s, la fenêtre de saut en
+  // dépend (outils/mesurer.mjs : 0 choc pour le joueur idéal).
+  tracteur:    { contresens: true, cout: 3, vitesse: -0.8, arme: 5.5, long: 2.6, larg: 1.6, h: 1.7, plancher: "double", nom: "un tracteur" },
+  // Le CAR SCOLAIRE de la Région (3 octobre 2026 : « rajoute un bus scolaire
+  // de la région Auvergne-Rhône-Alpes ») : comme la voiture en face, en plus
+  // long et plus haut. Montable aussi.
+  bus:         { contresens: true, cout: 3, vitesse: 2.0, arme: 5.5, long: 3.6, larg: 1.8, h: 1.9, plancher: "double", montable: true, nom: "un car scolaire" },
   // En SENS INVERSE : elle roule sur la route, vers le joueur (20 septembre
   // 2026 : « une voiture qui roule en sens inverse, pour que ce soit vraiment
   // difficile »). Sa vitesse s'ajoute à celle du joueur.
@@ -159,7 +170,7 @@ export function apexArc(tier) { return arcs()[tier].apex; }
 export function montee(tier) { return arcs()[tier].tApex; }
 export function retombee(tier) { return arcs()[tier].duree - arcs()[tier].tApex; }
 // Secondes passées au-dessus de la hauteur H.
-function tempsAuDessus(tier, H) {
+export function tempsAuDessus(tier, H) {
   const a = arcs()[tier];
   let n = 0;
   for (const h of a.pts) if (h >= H) n += 1;
@@ -247,6 +258,8 @@ export const ESPACEMENT = 2;
 const TRAINEE_MIN = 7;           // rangées libres d'affilée avant de poser une traînée au sol
 const TRAINEE_LONGUEUR = 3;      // pièces d'une traînée
 const LAIT_EVERY = 48;
+let FIN_LAIT = null;
+function rangFinLait() { if (FIN_LAIT === null) FIN_LAIT = Math.round(rangAuTemps(dureeCourse() - 55)); return FIN_LAIT; }
 const GROSSE_EVERY = 70;         // la grosse pièce dorée (ex-rouge)
 
 // --- Les HALLES (20 septembre 2026) ------------------------------------------------
@@ -258,7 +271,7 @@ const GROSSE_EVERY = 70;         // la grosse pièce dorée (ex-rouge)
 export const HALLE_HAUT = 4.2;
 const HALLE_MONTEE = 7, HALLE_PLAT = 26, HALLE_DESCENTE = 7;
 export const HALLE_ROWS = HALLE_MONTEE + HALLE_PLAT + HALLE_DESCENTE;
-const HALLE_TEMPS = [36, 76, 116, 156];  // secondes de course
+const HALLE_TEMPS = [36, 76, 116];  // secondes de course (156 retirée le 3 octobre 2026 : 9 s sans danger juste avant l'arrivée)
 let HALLES = null;
 function halles() {
   if (!HALLES) HALLES = HALLE_TEMPS.map((t) => Math.round(rangAuTemps(t)));
@@ -311,16 +324,22 @@ const PAQUETS = [
   // (Plus de fermier qui jette une poule, 30 septembre 2026 : « tu me vires ça ».)
   // ⚠️ Chaque paquet compte EXACTEMENT 12 espèces (especeDanger : i % 12).
   // Une VOITURE dès le premier paquet : le tuto du double saut doit venir tôt.
-  ["poule", "poule", "voiture", "chat", "chat", "chien", "chien", "mouton", "mouton", "botte", "botte", "voiture"],
+  // + UNE voiture en face (3 octobre 2026 : « à partir d'une vingtaine de
+  // secondes, il faut des voitures qui arrivent en face »).
+  ["poule", "poule", "voiture", "chat", "chat", "chien", "chien", "mouton", "mouton", "botte", "botte", "contresens"],
   // Ensuite : les gros animaux (appui maintenu) et les premiers véhicules.
   // + voitures EN FACE (29 septembre 2026 : « les voitures qui arrivent dans ta tête, faut en mettre beaucoup plus »).
-  ["poule", "chien", "mouton", "botte", "costard", "fermier", "cochon", "vache", "tracteur", "voiture", "contresens", "contresens"],
+  ["poule", "chien", "mouton", "botte", "costard", "fermier", "cochon", "vache", "tracteur", "bus", "contresens", "contresens"],
   // Fin : fermiers, voitures, et la voiture qui arrive en face.
-  ["poule", "mouton", "botte", "costard", "costard", "vache", "tracteur", "fermier", "voiture", "contresens", "contresens", "contresens"],
+  ["poule", "mouton", "botte", "costard", "costard", "vache", "tracteur", "fermier", "voiture", "contresens", "bus", "contresens"],
+  // Finale (3 octobre 2026 : « à 30 secondes de la fin je me fais chier [...]
+  // que ceux qui terminent soient vraiment les plus forts ») : presque tout
+  // roule, et vite (armer : les véhicules en face accélèrent en fin de course).
+  ["contresens", "bus", "tracteur", "contresens", "costard", "fermier", "contresens", "bus", "vache", "voiture", "contresens", "tracteur"],
 ];
 // Paquets avancés (30 septembre 2026 : « au bout de 40 secondes, ça doit devenir
 // difficile ») : 12 obstacles de départ, 12 intermédiaires, puis le dur.
-function paquetPour(d) { return PAQUETS[d < 1 ? 0 : d < 2 ? 1 : 2]; }
+function paquetPour(d) { return PAQUETS[d < 1 ? 0 : d < 2 ? 1 : d < 5 ? 2 : 3]; }
 function estDouble(kind) { return familleDe(kind) === "double"; }
 
 // --- La route ----------------------------------------------------------------------
@@ -384,7 +403,12 @@ export class Route {
     if (!this.chaine) this.chaine = { r: GRACE_ROWS - 4, kind: null, i: 0 };
     while (this.chaine.r <= rMax) {
       const i = this.chaine.i;
-      const kind = this.especeDanger(i);
+      let kind = this.especeDanger(i);
+      // Rien n'arrive en face avant ~20 s (3 octobre 2026) : une voiture garée à la place.
+      if (KINDS[kind].contresens && KINDS[kind].vitesse > 0 && this.chaine.r < rangAuTemps(20)) kind = "voiture";
+      // … ni dans les 8 dernières secondes : aucun véhicule qui roule ne
+      // traverse la ligne d'arrivée (3 octobre 2026).
+      if (KINDS[kind].contresens && this.chaine.r > rangAuTemps(dureeCourse() - 8)) kind = "vache";
       const t = Math.min(1, Math.max(0, this.chaine.r / RAMP_ROWS));
       const mou = Math.round(MOU_DEBUT + (MOU_FIN - MOU_DEBUT) * t);
       const base = this.chaine.kind ? ecartMin(this.chaine.kind, kind, Math.min(vMaxRangees(), vitesseAuRang(this.chaine.r + 20) * 1.08)) : 6;
@@ -500,7 +524,9 @@ export class Route {
       // La grosse pièce dorée est RETIRÉE le 20 septembre 2026 au soir
       // (« vire-la pour l'instant, c'est trop bizarre ») : sa rangée reste
       // réservée, elle ne porte plus rien.
-      const kind = r % LAIT_EVERY === LAIT_EVERY / 2 ? "lait" : null;
+      // Plus de lait dans les 55 dernières secondes (3 octobre 2026) : chaque
+      // brique vide la route 5 s, la fin de course devenait la plus calme.
+      const kind = r % LAIT_EVERY === LAIT_EVERY / 2 && r < rangFinLait() ? "lait" : null;
       if (!kind) continue;
       let q = null;
       for (let d = 0; d < BLOC && q === null; d++) { if (dispo(p + d)) q = p + d; else if (dispo(p - d)) q = p - d; }
@@ -590,7 +616,10 @@ export function armer(row, now, tArrivee) {
   const dt = Math.max(0.6, tArrivee - now);
   if (row.type === "contresens") {
     if (K.lanceur) { row.v0 = K.lanceur; row.vitesse = K.lanceur / dt; return; }
-    row.vitesse = K.vitesse; row.v0 = row.vitesse * dt; return;
+    // Les véhicules d'en face accélèrent sur la fin : jusqu'à +40 % entre
+    // 100 et 150 s (la fenêtre de saut raccourcit, le temps de réaction aussi).
+    const fin = K.vitesse > 0 ? 1 + 0.4 * Math.max(0, Math.min(1, (now - 100) / 50)) : 1;
+    row.vitesse = K.vitesse * fin; row.v0 = row.vitesse * dt; return;
   }
   row.u0 = -row.dir * (ROAD_HALF + 6.0);
   const dist = Math.abs(row.u0);

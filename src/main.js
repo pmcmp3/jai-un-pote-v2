@@ -240,7 +240,7 @@ function tempsAvant(r, row, tm, vitesse) {
 }
 function momentIdeal(f) { return rows.montee(f) + 0.03; } // le moment du joueur idéal (outils/mesurer.mjs), un poil avant
 function conseilCherche(tm, vitesse) {
-  if (conseil.r !== null || game.sprint || !player.auSol) return;
+  if (conseil.r !== null || projo.type || game.sprint || !player.auSol) return;
   const deja = appris();
   if (deja.size >= 3) return;
   const vus = lireJson(CLE_VUS, {});
@@ -602,7 +602,7 @@ function gagnerRouge(u, v) {
 // l'instant, le rendu la fait basculer pendant 1,6 s.
 const tombes = new Map();
 function marquerTombe(ev, now) { if (ev.r !== undefined && !KINDS_ROULANTS.has(ev.kind)) tombes.set(ev.r, now); }
-const KINDS_ROULANTS = new Set(["tracteur", "voiture", "contresens", "poulejetee"]);
+const KINDS_ROULANTS = new Set(["tracteur", "bus", "voiture", "contresens", "poulejetee"]);
 
 const chocs = []; // debug : les derniers chocs (auto-audit)
 function toucherJoueur(ev) {
@@ -647,7 +647,7 @@ function armerTraversees(now, vitesse) {
     const tArr = now + (r - player.v) / Math.max(0.5, vitesse);
     if (tArr - now > rows.delaiArmement(row)) continue;
     rows.armer(row, now, tArr);
-    if ((row.kind === "tracteur" || row.kind === "contresens") && !klaxonne.has(r)) { klaxonne.add(r); sfx.klaxon(); }
+    if ((row.kind === "tracteur" || row.kind === "contresens" || row.kind === "bus") && !klaxonne.has(r)) { klaxonne.add(r); sfx.klaxon(); }
   }
 }
 
@@ -935,7 +935,8 @@ function renderAlertes(now, vitesse) {
     // Tracteur : tant que sa rangée n'est pas à l'écran. Voiture en face :
     // tant que la VOITURE n'y est pas (elle part de bien plus loin que sa rangée).
     const ou = row.type === "contresens" ? rows.contresensAt(r, row, now) : { v: r };
-    if (!ou || ou.v <= player.v + devant - 0.5) continue;
+    // L'ARRIÈRE du véhicule compte : un tracteur lent entre dans l'écran par son cul.
+    if (!ou || ou.v - (row.type === "contresens" ? rows.KINDS[row.kind].long / 2 : 0) <= player.v + devant + 1) continue;
     const tRest = row.type === "contresens" ? (ou.v - player.v) / Math.max(0.5, vitesse + row.vitesse) : (r - player.v) / Math.max(0.5, vitesse);
     const urgence = Math.max(0, Math.min(1, 1 - (tRest - 1) / 2.5));
     const pouls = 0.82 + 0.18 * Math.sin(now * 16);
@@ -951,7 +952,7 @@ function renderAlertes(now, vitesse) {
     // Halo puis panneau plein, contour blanc : il doit sauter aux yeux
     // (20 septembre 2026 : « le panneau d'attention n'est pas du tout assez visible »).
     const halo = ctx.createRadialGradient(x + taille, y, 0, x + taille, y, taille * 2.4);
-    const grave = row.kind === "tracteur" || row.kind === "contresens";
+    const grave = row.kind === "tracteur" || row.kind === "contresens" || row.kind === "bus";
     const teinte = grave ? "225,62,38" : "255,207,46";
     halo.addColorStop(0, `rgba(${teinte},${0.5 * urgence + 0.2})`);
     halo.addColorStop(1, `rgba(${teinte},0)`);
@@ -1069,7 +1070,12 @@ function render(alpha) {
         const lance = row.armed ? Math.max(0, t - row.t0) : null;
         items.push({ d: scene.depth(fu, fv), draw: () => props.drawLanceurFace(ctx, fu, fv, tAnim, lance) });
         if (inst) items.push({ d: scene.depth(0, inst.v), draw: () => props.drawPouleJetee(ctx, 0, inst.v, t) });
-      } else if (inst) items.push({ d: scene.depth(0, inst.v), draw: () => props.drawVoiture(ctx, inst.K, 0, inst.v, -1, t) });
+      } else if (inst) {
+        const dessin = row.kind === "tracteur" ? () => props.drawTracteurRoute(ctx, inst.K, 0, inst.v, t)
+          : row.kind === "bus" ? () => props.drawBus(ctx, inst.K, 0, inst.v, t)
+          : () => props.drawVoiture(ctx, inst.K, 0, inst.v, -1, t);
+        items.push({ d: scene.depth(0, inst.v), draw: dessin });
+      }
     }
     // Les traversants se voient de loin (ils arrivent du fond) : tout l'intervalle.
     if (row.type === "traverse") {
@@ -1352,6 +1358,7 @@ if (debugOverlay.isEnabled()) {
     injecterFantome: (pts, pseudo = "test") => { ghost = { graine: game.graine, pseudo, metres: 0, palette: PALETTES.potes[0], trace: { hz: fantome.HZ, pts } }; },
     estDemarre: () => gameStarted,
     projo: () => projo.type,
+    tMonde: () => tMonde(),
     fps: () => perf.fps,
     frameMs: () => perf.frameMs,
     tombes: () => tombes.size,

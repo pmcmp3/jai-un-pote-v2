@@ -16,7 +16,7 @@
 // Le mouton fait un 360 sur lui-même (demandé) : vraie rotation 3D autour de
 // l'axe vertical, via scene.drawBoxR.
 
-import { drawBox, drawBoxR, drawShadow, drawFlat, drawDisque, getNight, project, groupe } from "./scene.js";
+import { drawBox, drawBoxR, drawShadow, drawFlat, drawDisque, getNight, project, groupe, echelle } from "./scene.js";
 import { KINDS } from "./rows.js";
 
 const ROUSSE = "#b8612c", ROUSSE_AILE = "#8a4420";
@@ -81,6 +81,75 @@ function drawTracteur(ctx, K, u, v, dir, t) {
   for (const bb of [y + 0.22, y + Wd - 0.44]) drawBox(ctx, avant - 0.02, bb, 0.06, 0.22, 0.18, getNight() > 0.2 ? "#fff6c8" : "#e8e2c8", 1.42);
 }
 
+// Tracteur SUR la route, de profil, capot vers +v (3 octobre 2026 : il roule
+// dans le sens du joueur, on le rattrape). `bloc(a, da, b, db, h, lift)` : `a`
+// depuis l'ARRIÈRE le long de la route, `b` en travers — en fractions de la
+// boîte, pour que le dessin suive K.long / K.larg / K.h.
+export function drawTracteurRoute(ctx, K, uC, v, t) {
+  groupe(ctx, () => {
+    const L = K.long, W = K.larg, H = K.h;
+    const x = uC - W / 2, arr = v - L / 2;
+    const bloc = (a, da, b, db, h, lift, col) => drawBox(ctx, x + b * W, arr + a * L, db * W, da * L, h * H, col, lift * H);
+    drawShadow(ctx, uC, v, W / 2, L / 2, 0.26);
+    // Poussière derrière lui.
+    for (let i = 0; i < 4; i++) {
+      const ph = (t * 3 + i * 1.3) % 1, sz = 0.3 + ph * 0.5;
+      ctx.save(); ctx.globalAlpha *= 0.35 * (1 - ph);
+      drawBox(ctx, uC - sz / 2 + Math.sin(i * 2.1) * 0.3, arr - 0.4 - i * 0.5 - ph * 0.8, sz, sz, sz * 0.8, "#d8c8a8", 0.08 + ph * 0.5);
+      ctx.restore();
+    }
+    // Grande roue arrière, petite roue avant, en disques comme la voiture.
+    for (const b of [-0.02, 0.8]) {
+      const u = x + b * W + 0.12;
+      drawDisque(ctx, u, arr + 0.24 * L, 0.62, 0.62, "#1a1a1e");
+      drawDisque(ctx, u - 0.002, arr + 0.24 * L, 0.62, 0.3, "#e0b02a");
+      drawDisque(ctx, u, arr + 0.84 * L, 0.34, 0.34, "#1a1a1e");
+      drawDisque(ctx, u - 0.002, arr + 0.84 * L, 0.34, 0.17, "#e0b02a");
+    }
+    bloc(0.02, 0.94, 0.12, 0.76, 0.18, 0.36, "#2f7a2f");     // châssis
+    bloc(0.52, 0.46, 0.18, 0.64, 0.34, 0.42, "#3a8a3a");     // capot
+    bloc(0.06, 0.44, 0.1, 0.8, 0.12, 0.42, "#2f7a2f");       // plancher de cabine
+    bloc(0.1, 0.36, 0.16, 0.68, 0.4, 0.54, VITRE);           // cabine vitrée
+    for (const a of [0.08, 0.42]) bloc(a, 0.05, 0.12, 0.76, 0.42, 0.54, "#2f7a2f"); // montants
+    bloc(0.04, 0.48, 0.06, 0.88, 0.06, 0.94, "#256525");     // toit
+    bloc(0.8, 0.05, 0.48, 0.1, 0.36, 0.64, "#3a3a40");       // pot d'échappement
+    const nuit = getNight() > 0.2;
+    for (const b of [0.18, 0.7]) bloc(0.97, 0.03, b, 0.12, 0.08, 0.6, nuit ? "#fff6c8" : "#e8e2c8"); // phares
+    if (nuit) { ctx.save(); ctx.globalAlpha *= 0.45; drawFlat(ctx, x - 0.1, v + L / 2, W + 0.2, 3.6, "#fff2b0", true); ctx.restore(); }
+  });
+}
+
+// Car scolaire de la Région (3 octobre 2026) : livrée blanche, bandeau bleu
+// nuit et filet turquoise, panneau jaune « transport d'enfants » à l'avant
+// et à l'arrière. Il arrive EN FACE : capot vers −v.
+export function drawBus(ctx, K, uC, v, t) {
+  groupe(ctx, () => {
+    const L = K.long, W = K.larg, H = K.h;
+    const x = uC - W / 2, av = v - L / 2;   // l'avant est côté joueur
+    const bloc = (a, da, b, db, h, lift, col) => drawBox(ctx, x + b * W, av + a * L, db * W, da * L, h * H, col, lift * H);
+    drawShadow(ctx, uC, v, W / 2, L / 2, 0.26);
+    for (const a of [0.14, 0.8]) for (const b of [-0.01, 0.84]) { drawDisque(ctx, x + b * W + 0.12, av + a * L, 0.36, 0.36, "#1a1a1e"); drawDisque(ctx, x + b * W + 0.118, av + a * L, 0.36, 0.18, "#9a9da8"); }
+    bloc(0, 1, 0, 1, 0.5, 0.14, "#f4f2ec");                  // caisse basse
+    bloc(0, 1, -0.01, 1.02, 0.1, 0.22, "#1f3a78");           // bandeau bleu nuit
+    bloc(0, 1, -0.012, 1.024, 0.035, 0.34, "#21b3c6");       // filet turquoise
+    bloc(0.02, 0.96, 0.04, 0.92, 0.26, 0.64, "#2a3442");      // vitres
+    for (let i = 0; i < 6; i++) bloc(0.1 + i * 0.15, 0.025, 0.03, 0.94, 0.26, 0.64, "#f4f2ec"); // montants
+    bloc(0, 1, 0, 1, 0.1, 0.9, "#f4f2ec");                    // toit
+    bloc(-0.01, 0.05, 0.06, 0.88, 0.5, 0.14, "#f4f2ec");      // face avant
+    // Panneau « transport d'enfants » : carré jaune, deux silhouettes.
+    for (const a of [-0.03, 1.0]) {
+      bloc(a, 0.03, 0.3, 0.4, 0.18, 0.66, "#ffcf2e");
+      bloc(a - 0.002, 0.034, 0.4, 0.07, 0.11, 0.69, "#1a1a1e");
+      bloc(a - 0.002, 0.034, 0.55, 0.06, 0.09, 0.69, "#1a1a1e");
+    }
+    const nuit = getNight() > 0.2;
+    for (const b of [0.08, 0.76]) bloc(-0.02, 0.03, b, 0.16, 0.08, 0.3, nuit ? "#fff6c8" : "#f4eed6");
+    ctx.save(); ctx.globalAlpha *= nuit ? 0.55 : 0.22;
+    drawFlat(ctx, x - 0.1, av - 4.2, W + 0.2, 4.2, "#fff2b0", true);
+    ctx.restore();
+  });
+}
+
 // Voiture : même carrosserie pour celle garée sur la route et celle qui arrive
 // en face. `sens` = +1 si son capot pointe vers +v (elle s'éloigne), −1 si elle
 // vient vers le joueur.
@@ -128,7 +197,76 @@ function voitureNue(ctx, K, uCenter, v, sens, t) {
 
 // Statique centré sur (uCenter, r). `t` anime les animaux sur place.
 export function drawStatic(ctx, kind, uCenter, r, t) {
+  if (kind === "costard" || kind === "fermier") { drawShadow(ctx, uCenter, r, 0.4, 0.4, 0.22); personnage2D(ctx, kind, uCenter, r, t); return; }
   groupe(ctx, () => staticNu(ctx, kind, uCenter, r, t));
+}
+
+// Costard et fermier DE FACE, en 2D plat (3 octobre 2026 : « pour que ce soit
+// plus logique, il faut qu'il soit de face en 2D, là il est en semi-3D » ;
+// « ses bras, on dirait qu'ils sont désarticulés » ; « le paysan, pas assez
+// clair »). Dessinés en vrai à l'écran, à l'échelle du monde : les bras
+// PIVOTENT à l'épaule (plus de cubes qui glissent indépendamment du corps).
+function personnage2D(ctx, kind, uC, r, t) {
+  const K = KINDS[kind];
+  const s = echelle(uC), pied = project(uC, r, 0);
+  const X = (x) => pied.x + x * s, Y = (h) => pied.y - h * s;
+  const H = K.h;
+  const costard = kind === "costard";
+  const C = costard
+    ? { jambe: "#23252e", buste: "#2b2d38", peau: "#d69a68", haut: "#2a1a10", accent: "#e13e26" }
+    : { jambe: "#2f4f9a", buste: "#c8402c", peau: "#d69a68", haut: "#e8c66a", accent: "#2f4f9a" };
+  const k = H / 1.9; // tout est dessiné pour 1,9 m puis mis à l'échelle
+  const rect = (x, h, w, hh, col) => { ctx.fillStyle = col; ctx.fillRect(X(x * k), Y((h + hh) * k), w * k * s, hh * k * s); };
+  const bras = (sx, ang, len, main) => {
+    // Bras d'une pièce, pivot à l'épaule (sx, 1.36) ; ang = 0 le long du corps.
+    ctx.save();
+    ctx.translate(X(sx * k), Y(1.36 * k)); ctx.rotate(ang);
+    ctx.fillStyle = C.buste; ctx.fillRect(-0.075 * k * s, 0, 0.15 * k * s, len * k * s);
+    ctx.fillStyle = C.peau; ctx.beginPath(); ctx.arc(0, (len + 0.05) * k * s, 0.08 * k * s, 0, Math.PI * 2); ctx.fill();
+    if (main) main((len + 0.05) * k * s);
+    ctx.restore();
+  };
+  ctx.save();
+  ctx.lineJoin = "round";
+  // Jambes et chaussures.
+  rect(-0.2, 0.06, 0.17, 0.74, C.jambe); rect(0.03, 0.06, 0.17, 0.74, C.jambe);
+  rect(-0.23, 0, 0.21, 0.08, "#0d0d10"); rect(0.02, 0, 0.21, 0.08, "#0d0d10");
+  if (costard) {
+    const f = Math.sin(t * 7 + r), g = Math.sin(t * 5.3 + r * 1.7);
+    // Bras gauche levé qui s'agite (au-dessus de la tête), bras droit avec la mallette.
+    bras(-0.3, Math.PI - 0.5 + 0.35 * f, 0.6);
+    rect(-0.31, 0.78, 0.62, 0.62, C.buste);                       // veste
+    ctx.fillStyle = "#f4efe4"; ctx.beginPath(); ctx.moveTo(X(-0.12 * k), Y(1.4 * k)); ctx.lineTo(X(0.12 * k), Y(1.4 * k)); ctx.lineTo(X(0), Y(1.1 * k)); ctx.fill(); // chemise
+    rect(-0.03, 1.02, 0.06, 0.34, C.accent);                      // cravate
+    bras(0.3, -0.25 + 0.3 * g, 0.6, (d) => { ctx.fillStyle = "#6b3a1a"; ctx.fillRect(-0.2 * k * s, d, 0.4 * k * s, 0.28 * k * s); ctx.fillStyle = "#3e2210"; ctx.fillRect(-0.06 * k * s, d - 0.04 * k * s, 0.12 * k * s, 0.05 * k * s); });
+  } else {
+    const f = Math.sin(t * 3 + r);
+    rect(-0.3, 0.78, 0.6, 0.62, C.buste);                         // chemise rouge
+    ctx.fillStyle = "rgba(0,0,0,0.18)";                           // carreaux
+    for (let i = 0; i < 3; i++) ctx.fillRect(X(-0.3 * k), Y((0.9 + i * 0.18) * k), 0.6 * k * s, 0.05 * k * s);
+    rect(-0.22, 0.78, 0.44, 0.4, C.jambe);                        // salopette
+    rect(-0.18, 1.18, 0.07, 0.22, C.jambe); rect(0.11, 1.18, 0.07, 0.22, C.jambe);
+    bras(-0.29, 0.25 + 0.1 * f, 0.58);
+    // Fourche tenue droite, levée.
+    bras(0.29, -0.35 - 0.1 * f, 0.58, (d) => {
+      ctx.fillStyle = "#6b4b2e"; ctx.fillRect(-0.03 * k * s, d - 1.3 * k * s, 0.06 * k * s, 1.7 * k * s);
+      ctx.fillStyle = "#8a8d98"; ctx.fillRect(-0.14 * k * s, d - 1.34 * k * s, 0.28 * k * s, 0.05 * k * s);
+      for (const x of [-0.14, -0.035, 0.07]) ctx.fillRect(x * k * s, d - 1.6 * k * s, 0.05 * k * s, 0.28 * k * s);
+    });
+  }
+  // Tête.
+  rect(-0.06, 1.38, 0.12, 0.08, C.peau);
+  ctx.fillStyle = C.peau; ctx.beginPath(); ctx.arc(X(0), Y(1.6 * k), 0.17 * k * s, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = "#0d0d10";
+  ctx.fillRect(X(-0.08 * k), Y(1.63 * k), 0.04 * k * s, 0.05 * k * s); ctx.fillRect(X(0.04 * k), Y(1.63 * k), 0.04 * k * s, 0.05 * k * s);
+  if (costard) { ctx.fillStyle = C.haut; ctx.beginPath(); ctx.arc(X(0), Y(1.64 * k), 0.175 * k * s, Math.PI, 0); ctx.fill(); }
+  else {
+    // Grand chapeau de paille : bord large + calotte.
+    ctx.fillStyle = C.haut; ctx.fillRect(X(-0.36 * k), Y(1.76 * k), 0.72 * k * s, 0.07 * k * s);
+    ctx.fillRect(X(-0.18 * k), Y(1.92 * k), 0.36 * k * s, 0.17 * k * s);
+    ctx.fillStyle = "#b8402c"; ctx.fillRect(X(-0.18 * k), Y(1.8 * k), 0.36 * k * s, 0.04 * k * s);
+  }
+  ctx.restore();
 }
 function staticNu(ctx, kind, uCenter, r, t) {
   const K = KINDS[kind];
