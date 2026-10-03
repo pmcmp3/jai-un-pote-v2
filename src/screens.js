@@ -10,8 +10,6 @@ import * as sfx from "./sfx.js";
 import * as net from "./net.js";
 import * as friends from "./friends.js";
 import { COULEURS, CHAPEAUX, VELOS, SKIN_DEFAUT } from "./rider.js";
-import { graineLigue } from "./regles.js";
-import { scoreParfait } from "./simulation.js";
 
 const pts = (n) => `${Math.floor(Number(n) || 0).toLocaleString("fr-FR")} pts`;
 
@@ -172,7 +170,21 @@ function construireSkinUi() {
 const onboarding = $("onboarding");
 export function setStep(n) {
   if (enBeta() && n === 2) n = 3; // pas d'étape « ma ligue » en bêta : elle est imposée
-  onboarding.dataset.step = String(n); if (n === 3) construireSkinUi(); majSprint();
+  onboarding.dataset.step = String(n); if (n === 3) construireSkinUi(); majSprint(); majBoutonJouer();
+}
+// Ordre du premier passage (3 octobre 2026 : « choisir son personnage, ça
+// arrive avant de créer la ligue [...] ils ont envie de jouer ») : pseudo →
+// cycliste (« Continuer ») → ligue (« Jouer »). Ensuite, le cycliste est
+// l'accueil avec JOUER, la ligue reste à un tap (« Ma ligue »).
+const CLE_LIGUE_VUE = "jp2LigueVue";
+function premierPassage() { return ligueDispo() && !ligue && !lsGet(CLE_LIGUE_VUE); }
+function majBoutonJouer() {
+  const premier = premierPassage();
+  playButton.textContent = premier ? "Continuer" : "Jouer";
+  playButton.disabled = getPseudo().length === 0 || (!premier && !loadingDone);
+  const b = $("boost-ligue"), liens = $("step3-links");
+  if (liens) liens.classList.toggle("hidden", premier);
+  if (b && premier) b.classList.add("hidden"); else afficherBoost();
 }
 export function stepCourante() { return Number(onboarding.dataset.step) || 1; }
 function enregistrerProfil() {
@@ -411,7 +423,6 @@ function exigerConversion({ action, onOk, onCancel }) {
 const ligueBloc = $("ligue-bloc"), ligueSans = $("ligue-sans"), ligueAvec = $("ligue-avec");
 const ligueInput = $("ligue-input"), ligueRejoindre = $("ligue-rejoindre"), ligueCreer = $("ligue-creer");
 const ligueCodeEl = $("ligue-code"), ligueMembresEl = $("ligue-membres"), liguePartager = $("ligue-partager"), ligueQuitter = $("ligue-quitter"), ligueMsg = $("ligue-msg");
-const liguePlaces = $("ligue-places");
 const endLigue = $("end-ligue"), endLigueCode = $("end-ligue-code"), endLigueListe = $("end-ligue-liste"), endLiguePartager = $("end-ligue-partager");
 let ligue = null;           // { code, membres: [] }
 let ligueInvitation = null; // code reçu par l'URL, en attente d'un pseudo
@@ -475,7 +486,7 @@ function afficherBoost() {
   // (sauf en ligue démo).
   el.classList.toggle("hidden", (!net.estConfigure() && !demo) || enBeta());
   const C = window.CONFIG, pct = Math.round((C.boostLigueParPote || 0.1) * 100);
-  const n = boost.potes.length;
+  const n = ligue && !ligue.enAttente ? ligue.membres.filter((m) => m.nom !== getPseudo()).length : 0;
   // Explication en deux lignes (« il faut que j'arrive à trouver un moyen
   // d'expliquer assez simplement comment ça fonctionne ») : le chiffre, puis la règle.
   el.innerHTML = "";
@@ -483,7 +494,7 @@ function afficherBoost() {
   // En POURCENTAGE (« les 1,6 %, faut faire des phrases plus simples »).
   titre.textContent = `TES POINTS +${Math.round((boost.mult - 1) * 100)} %`;
   const ligne1 = document.createElement("span");
-  ligne1.textContent = n ? ` · ${n} pote${n > 1 ? "s ont" : " a"} joué` : "";
+  ligne1.textContent = n ? ` · ${n} pote${n > 1 ? "s" : ""} dans ta ligue` : "";
   const regle = document.createElement("small");
   regle.textContent = `1 pote qui joue ${C.boostLigueDureeS || 30} s = +${pct} % pour toi · Inviter →`;
   el.append(titre, ligne1, regle);
@@ -496,32 +507,48 @@ async function rafraichirBoost() {
 }
 
 function ligueMessage(txt) { ligueMsg.textContent = txt || ""; ligueMsg.classList.toggle("hidden", !txt); }
+// Le peloton compte au moins 4 cyclistes (3 octobre 2026 : « trois bots qui
+// s'appellent Bot 1, Bot 2 et Bot 3 [...] remplacés au fur et à mesure par
+// les personnes qui arrivent vraiment »). Mêmes noms dans le jeu (friends.js).
+export const BOTS_LIGUE = 3;
+let pelotonAffiche = new Set();
 function afficherLigue() {
-  if (!net.estConfigure() && !demo) { ligueBloc.classList.add("hidden"); return; }
+  if (!ligueDispo()) { ligueBloc.classList.add("hidden"); return; }
   ligueBloc.classList.remove("hidden");
   ligueSans.classList.toggle("hidden", !!ligue);
   ligueAvec.classList.toggle("hidden", !ligue);
+  ligueQuitter.classList.toggle("hidden", !ligue);
   const suivant = $("step2-next");
-  suivant.textContent = ligue ? "Continuer" : "Plus tard";
-  // Le rouge suit l'étape du « comment » : sans ligue → Créer ; seul dans sa
-  // ligue → Inviter ; des potes sont là → Continuer.
-  const seul = !!ligue && !ligue.enAttente && ligue.membres.filter((m) => m.nom !== getPseudo()).length === 0;
-  const pret = !!ligue && !seul;
-  suivant.classList.toggle("btn-primary", pret); suivant.classList.toggle("btn-secondary", !pret);
-  liguePartager.classList.toggle("btn-primary", seul); liguePartager.classList.toggle("btn-secondary", !seul);
-  if (ligue) {
-    ligueCodeEl.textContent = ligue.code;
-    const autres = ligue.membres.filter((m) => m.nom !== getPseudo());
-    if (ligue.enAttente) ligueMembresEl.textContent = "Tu en fais partie ! Appuie sur Continuer.";
-    else ligueMembresEl.textContent = autres.length ? `Tes potes dans le peloton : ${autres.map((m) => "@" + m.nom).join(", ")}` : "Tu es seul pour l'instant : invite des potes, ce sont eux qui pédaleront derrière toi.";
-    const n = ligue.membres.length;
-    // La ligue a SA course (graine) ; le score parfait dépend du nombre de
-    // potes possibles, donc du nombre d'autres membres (simulation.js).
-    let parfait = "";
-    try { if (!ligue.enAttente) parfait = ` · score parfait ${pts(scoreParfait(graineLigue(ligue.code), window.CONFIG.potesMax).score)}`; } catch (e) { parfait = ""; }
-    liguePlaces.textContent = ligue.enAttente ? "" : `${n}/${net.LIGUE_MAX} place${n > 1 ? "s" : ""} prise${n > 1 ? "s" : ""}${parfait}`;
-  }
+  // Hiérarchie : sans ligue → CRÉER en rouge, « Jouer sans ligue » en petit ;
+  // seul dans sa ligue → INVITER en rouge ; des potes sont là → JOUER.
+  const autres = ligue ? ligue.membres.filter((m) => m.nom !== getPseudo()) : [];
+  const seul = !!ligue && !ligue.enAttente && autres.length === 0;
+  suivant.textContent = ligue ? "Jouer" : "Jouer sans ligue";
+  suivant.classList.toggle("btn-primary", !!ligue && !seul);
+  suivant.classList.toggle("btn-secondary", !ligue || seul);
+  suivant.classList.toggle("btn-petit", !ligue);
+  if (!ligue) { pelotonAffiche = new Set(); return; }
+  ligueCodeEl.textContent = ligue.code;
+  $("ligue-titre").textContent = ligue.enAttente ? "Tu rejoins la ligue" : "Ta ligue";
+  liguePartager.classList.toggle("hidden", !!ligue.enAttente);
+  const ul = $("ligue-peloton");
+  ul.textContent = "";
+  const slots = [{ nom: getPseudo() || "toi", cls: "moi" }].concat(autres.map((m) => ({ nom: m.nom, cls: "" })));
+  for (let k = autres.length + 1; k <= BOTS_LIGUE; k++) slots.push({ nom: `bot ${k}`, cls: "bot" });
+  const vus = new Set();
+  slots.forEach((sl) => {
+    const li = document.createElement("li");
+    li.className = sl.cls + (sl.cls === "" && pelotonAffiche.size && !pelotonAffiche.has(sl.nom) ? " nouveau" : "");
+    li.textContent = sl.cls === "bot" ? sl.nom.replace("bot", "Bot") : `@${sl.nom}`;
+    ul.appendChild(li); vus.add(sl.nom);
+  });
+  pelotonAffiche = vus;
+  if (ligue.enAttente) ligueMembresEl.textContent = "Tu en fais partie ! Appuie sur Jouer.";
+  else ligueMembresEl.textContent = autres.length >= BOTS_LIGUE
+    ? `${autres.length} pote${autres.length > 1 ? "s" : ""} dans ta ligue : ils pédalent derrière toi.`
+    : "En attendant tes potes, des bots roulent avec toi. Chaque pote qui rejoint remplace un bot.";
 }
+function ligueDispo() { return (net.estConfigure() || demo) && !enBeta(); }
 function memoriserLigue() { if (ligue) lsSet(CLE_LIGUE, JSON.stringify(ligue)); else { try { localStorage.removeItem(CLE_LIGUE); } catch (e) { /* rien */ } } }
 function appliquerNomsLigue() {
   const moi = getPseudo();
@@ -535,7 +562,7 @@ async function rejoindre(code, creer = false) {
   if (demo) {
     // Démo : créer = une ligue où l'on est seul ; rejoindre = la ligue démo pleine.
     ligue = { code, membres: creer ? [{ nom: pseudo, skin: null }] : DEMO.noms.map((nom) => ({ nom, skin: null })), demo: true };
-    memoriserLigue(); appliquerNomsLigue(); afficherLigue(); ligueMessage(creer ? "Ta ligue est créée. Maintenant, invite tes potes !" : ""); rafraichirBoost();
+    memoriserLigue(); appliquerNomsLigue(); afficherLigue(); ligueMessage(creer ? "Ta ligue est créée ! Maintenant, invite tes potes." : ""); rafraichirBoost();
     return true;
   }
   ligueMessage("…");
@@ -583,7 +610,7 @@ export async function finLigue(metres, potes, mode = "course", bilan = {}) {
   if (mode === "sprint") lsSet(CLE_SPRINT, net.jourSprint());
   const code = ligue ? ligue.code : (window.CONFIG.ligueDemo || "PMCMP");
   if (!ligue && mode !== "sprint") return;
-  if (demo && mode !== "sprint") { afficherClassement(ligue.code, classementDemo(metres, bilan.fin), demoCree ? null : "Ligue démo"); return; }
+  if (demo && mode !== "sprint") { afficherClassement(ligue.code, classementDemo(metres, bilan.fin)); return; }
   let trace = null;
   if (mode !== "sprint" && bilan.trace) {
     const avant = await net.classement(ligue.code, bilan.graine);
@@ -660,6 +687,18 @@ function initLigue() {
   ligueRejoindre.addEventListener("click", () => rejoindre(ligueInput.value));
   ligueCreer.addEventListener("click", () => rejoindre(net.genererCode(), true));
   ligueQuitter.addEventListener("click", () => { stopperArrivees(); ligue = null; memoriserLigue(); appliquerNomsLigue(); afficherLigue(); appliquerModeBeta(); });
+  const copierCode = async () => {
+    if (!ligue) return;
+    try { await navigator.clipboard.writeText(ligue.code); } catch (e) { /* rien */ }
+    ligueMessage(`Code ${ligue.code} copié !`);
+    const aide = $("ligue-code-aide"); if (aide) { aide.textContent = "Copié !"; setTimeout(() => { aide.textContent = "Touche pour copier"; }, 1600); }
+  };
+  $("ligue-code-btn").addEventListener("click", copierCode);
+  $("end-ligue-titre").addEventListener("click", async () => {
+    const code = ligue ? ligue.code : endLigueCode.textContent;
+    try { await navigator.clipboard.writeText(code); } catch (e) { /* rien */ }
+    const c = $("end-ligue-copier"); if (c) { c.textContent = "· copié !"; setTimeout(() => { c.textContent = "· copier"; }, 1600); }
+  });
   liguePartager.addEventListener("click", () => partagerLigue(`Tu es dans ma ligue « J'ai un pote » (code ${ligue ? ligue.code : ""}) : tu pédales derrière moi, viens battre mon score`));
   endLiguePartager.addEventListener("click", () => partagerLigue(`J'ai fait ${scoreVal.textContent} pts dans notre ligue « J'ai un pote » (code ${ligue ? ligue.code : ""}), même course pour tout le monde. Viens me battre`));
   ["pointerdown", "touchstart", "touchmove", "mousedown"].forEach((t) => ligueInput.addEventListener(t, (e) => e.stopPropagation()));
@@ -693,6 +732,7 @@ export function syncLoadingUi() {
     loadingBlock.classList.add("failed");
     loadingLabel.textContent = "Son indisponible, le jeu reste jouable";
     playButton.disabled = false;
+    setTimeout(() => $("splash").classList.add("fini"), 1500);
     return;
   }
   const minS = window.CONFIG.chargementMinS || 0;
@@ -702,7 +742,7 @@ export function syncLoadingUi() {
   const pct = Math.round(p * 100);
   loadingFill.style.width = `${pct}%`;
   loadingLabel.textContent = `${ETAPES[Math.min(ETAPES.length - 1, Math.floor(p * ETAPES.length))]} · ${pct} %`;
-  if (p >= 1) { loadingDone = true; loadingBlock.classList.add("done"); playButton.disabled = getPseudo().length === 0; }
+  if (p >= 1) { loadingDone = true; loadingBlock.classList.add("done"); $("splash").classList.add("fini"); majBoutonJouer(); }
 }
 
 // --- Fin de partie -----------------------------------------------------------
@@ -719,7 +759,9 @@ export function showEndScreen({ metres, potesMax, record, fin, sprint, scoreMax 
     : `<b>+${pct} %</b> de points par pote invité qui joue`;
   // (30 septembre 2026 : « à la place du score parfait, dis : Tu peux encore
   // faire un meilleur score ».)
-  const mieux = scoreMax && metres < scoreMax ? "Tu peux encore faire un meilleur score." : "";
+  // 3 octobre 2026 : « mets meilleur score [...] tu peux battre ton meilleur score ».
+  const meilleur = Math.max(getRecord(), Math.floor(metres));
+  const mieux = record ? "" : `Meilleur score : ${pts(meilleur)} · tu peux le battre.`;
   endMax.classList.toggle("hidden", !mieux && !ligneBoost);
   endMax.innerHTML = [mieux, ligneBoost].filter(Boolean).join("<br>");
   // Le but : arriver au bout du morceau avec un max de potes.
@@ -730,7 +772,7 @@ export function showEndScreen({ metres, potesMax, record, fin, sprint, scoreMax 
   // 5 potes. Faut mettre : nouveau record, 5 potes maximum. Tu enlèves le tag
   // terminé » — et le sticker record fait doublon avec la ligne (place gagnée
   // pour l'iPhone 16).
-  endSub.textContent = record ? `Nouveau record · ${potesTxt} maximum` : fin ? `${potesTxt} maximum` : `Tombé avant la fin · ${potesTxt}`;
+  endSub.textContent = record ? `Meilleur score · ${potesTxt} maximum` : fin ? `${potesTxt} maximum` : `Tombé avant la fin · ${potesTxt}`;
   endBest.classList.add("hidden");
   $("end-eyebrow").textContent = sprint ? "Sprint du dimanche" : "Ta course";
   if (sprint) endSub.textContent = `Sprint · ${potesTxt}`;
@@ -914,16 +956,20 @@ export function init(d) {
   instaInput.value = lsGet(CLE_INSTA) || "";
   villeInput.value = lsGet(CLE_VILLE) || "";
   const step1Next = $("step1-next");
-  const syncPlay = () => { if (loadingDone) playButton.disabled = getPseudo().length === 0; step1Next.disabled = getPseudo().length === 0; };
+  const syncPlay = () => { majBoutonJouer(); step1Next.disabled = getPseudo().length === 0; };
   pseudoInput.addEventListener("input", syncPlay);
   syncPlay();
   [pseudoInput, instaInput, villeInput].forEach((inp) => ["pointerdown", "touchstart", "touchmove", "mousedown"].forEach((t) => inp.addEventListener(t, (e) => e.stopPropagation())));
-  step1Next.addEventListener("click", () => { if (!getPseudo()) { pseudoInput.focus(); return; } enregistrerProfil(); setStep(enBeta() ? 3 : 2); });
-  $("step2-next").addEventListener("click", () => setStep(3));
-  $("step2-back").addEventListener("click", () => setStep(1));
+  step1Next.addEventListener("click", () => { if (!getPseudo()) { pseudoInput.focus(); return; } enregistrerProfil(); setStep(3); });
+  $("step2-next").addEventListener("click", () => { if (!loadingDone) return; lsSet(CLE_LIGUE_VUE, "1"); if (getPseudo().length === 0) { setStep(1); return; } startGame(); });
+  $("step2-back").addEventListener("click", () => setStep(3));
   $("step3-ligue").addEventListener("click", () => setStep(2));
   $("step3-profil").addEventListener("click", () => setStep(1));
-  playButton.addEventListener("click", () => { if (getPseudo().length === 0) { setStep(1); pseudoInput.focus(); return; } startGame(); });
+  playButton.addEventListener("click", () => {
+    if (getPseudo().length === 0) { setStep(1); pseudoInput.focus(); return; }
+    if (premierPassage()) { lsSet(CLE_LIGUE_VUE, "1"); setStep(2); return; }
+    startGame();
+  });
   sprintButton.addEventListener("click", () => { if (getPseudo().length === 0) { setStep(1); return; } startGame({ sprint: true }); });
   net.evenement("arrivee", { pseudo: lsGet(CLE_PSEUDO) || null, source: getSource(), ligue: null });
   // (Pas de MutationObserver sur `disabled` : il se redéclenchait lui-même en

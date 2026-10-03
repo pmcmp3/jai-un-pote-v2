@@ -78,7 +78,11 @@ function tirerSelection() {
   const pool = nomsLigue.slice();
   for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
   const choisis = pool.slice(0, max);
-  const manquants = potesParDefaut().filter((d) => !choisis.some((m) => m.nom === d.nom));
+  // Dans une ligue, les places vides sont des BOTS (3 octobre 2026 : « Bot 1,
+  // Bot 2, Bot 3 [...] remplacés au fur et à mesure par tes vrais potes »),
+  // numérotés après les vrais membres — même numérotation que le menu.
+  const manquants = potesParDefaut().filter((d) => !choisis.some((m) => m.nom === d.nom))
+    .map((d, k) => ({ nom: `bot ${choisis.length + k + 1}`, skin: d.skin }));
   selection = choisis.concat(manquants).slice(0, max);
 }
 // Le joueur a gardé l'appui : la dernière marque devient un saut tenu.

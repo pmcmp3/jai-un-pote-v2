@@ -160,13 +160,17 @@
     .regle { width: 240px; margin: 0 0 18px; padding: 0; list-style: none; font: 500 12.5px/1.5 var(--police); color: rgba(0,0,0,0.7); }
     .regle li { display: flex; gap: 8px; }
     .regle b { font-weight: 900; color: var(--noir); min-width: 62px; }
-    #loading { display: flex; flex-direction: column; align-items: center; gap: 8px; width: 200px; margin-bottom: 18px; }
-    #loading.done { display: none; }
+    #splash { position: fixed; inset: 0; z-index: 200; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 34px; background: var(--rouge); transition: opacity 0.45s ease, visibility 0s linear 0.45s; }
+    #splash.fini { opacity: 0; visibility: hidden; pointer-events: none; }
+    #splash-logo { perspective: 700px; animation: splash-flotte 2.4s ease-in-out infinite; }
+    #splash-logo img { display: block; width: 150px; height: auto; animation: splash-tour 2.4s cubic-bezier(.45,0,.55,1) infinite; backface-visibility: visible; }
+    @keyframes splash-tour { from { transform: rotateY(0deg); } to { transform: rotateY(360deg); } }
+    @keyframes splash-flotte { 0%, 100% { transform: translateY(-6px); } 50% { transform: translateY(6px); } }
+    #loading { display: flex; flex-direction: column; align-items: center; gap: 8px; width: 200px; }
     #loading.failed #loading-track { display: none; }
-    #loading.failed #loading-label { color: var(--rouge); }
-    #loading-track { width: 100%; height: 3px; border-radius: 999px; background: rgba(0,0,0,0.12); overflow: hidden; }
-    #loading-fill { width: 0%; height: 100%; background: var(--rouge); transition: width 0.25s linear; }
-    #loading-label { font: 500 13px var(--police); color: rgba(0,0,0,0.55); font-variant-numeric: tabular-nums; }
+    #loading-track { width: 100%; height: 3px; border-radius: 999px; background: rgba(255,255,255,0.3); overflow: hidden; }
+    #loading-fill { width: 0%; height: 100%; background: #fff; transition: width 0.25s linear; }
+    #loading-label { font: 500 13px var(--police); color: rgba(255,255,255,0.85); font-variant-numeric: tabular-nums; }
 
     /* --- Menu en trois étapes ------------------------------------------- */
     #onboarding .step { display: none; }
@@ -219,7 +223,9 @@
     #expl-tag { display: inline-block; margin: 0 0 10px; padding: 7px 12px; background: #ffcf2e; border: 1.5px solid var(--noir); transform: rotate(6deg); font: 900 13px var(--police); letter-spacing: 0.06em; text-transform: uppercase; color: var(--noir); animation: expl-pop 0.3s ease-out; }
     #expl-barre { height: 4px; background: rgba(0,0,0,0.12); overflow: hidden; }
     #expl-barre i { display: block; height: 100%; width: 0; background: var(--rouge); }
-    #expl-passer { margin: 8px 0 0; font: 700 10px var(--police); letter-spacing: 0.12em; text-transform: uppercase; color: rgba(0,0,0,0.45); }
+    #explication { flex-direction: column; }
+    #expl-passer { position: absolute; left: 0; right: 0; bottom: calc(28px + env(safe-area-inset-bottom, 0px)); margin: 0; font: 900 13px var(--police); letter-spacing: 0.14em; text-transform: uppercase; color: #fff; text-align: center; animation: expl-clignote 1.2s ease-in-out infinite; }
+    @keyframes expl-clignote { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
     @keyframes expl-in { from { transform: scale(0.9); opacity: 0; } to { transform: none; opacity: 1; } }
     @keyframes expl-pop { 0% { transform: scale(1.25); } 100% { transform: scale(1); } }
     #boost-ligue { margin-top: 8px; width: 100%; padding: 8px 10px; border: 1.5px solid var(--noir); border-radius: 3px; background: #ffcf2e; color: var(--noir); font: 500 11px/1.35 var(--police); text-align: left; -webkit-tap-highlight-color: transparent; }
@@ -270,16 +276,31 @@
     .share-inner { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; }
     .share-apps { display: flex; align-items: center; justify-content: center; gap: 7px; opacity: 0.55; }
     .share-apps svg { display: block; flex: none; }
-    #ligue-pourquoi { width: 100%; text-align: left; font: 500 12px/1.35 var(--police); color: var(--noir); }
-    #ligue-pourquoi .lp-titre { margin: 0 0 3px; font: 900 10.5px var(--police); letter-spacing: 0.14em; text-transform: uppercase; color: var(--rouge); }
-    #ligue-pourquoi ul, #ligue-pourquoi ol { margin: 0 0 9px; padding-left: 18px; }
-    #ligue-pourquoi li { margin: 0 0 2px; }
-    #ligue-pourquoi b { font-weight: 900; }
+    #ligue-intro { margin: 0 0 6px; font: 500 13px/1.4 var(--police); color: var(--noir); text-align: center; text-wrap: balance; }
+    #ligue-intro b { font-weight: 900; }
     #ligue-sans > #ligue-creer { width: 100%; }
-    .lp-ou { margin: 4px 0 -2px; font: 500 11px var(--police); color: rgba(0,0,0,0.55); }
-    #ligue-msg { margin: 0; font: 500 12px var(--police); color: var(--rouge); text-align: center; }
+    .lp-sep { position: relative; width: 100%; margin: 4px 0 0; text-align: center; font: 700 10px var(--police); letter-spacing: 0.14em; text-transform: uppercase; color: rgba(0,0,0,0.4); }
+    .lp-sep::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; border-top: 1px solid rgba(0,0,0,0.15); }
+    .lp-sep span { position: relative; padding: 0 8px; background: #fff; }
+    .lp-ou { margin: 0 0 -2px; font: 700 12px var(--police); color: var(--noir); }
+    #ligue-code-btn { display: flex; flex-direction: column; align-items: center; gap: 2px; margin: -2px 0 2px; padding: 6px 14px; border: 1.5px dashed rgba(0,0,0,0.35); border-radius: var(--rayon); background: none; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+    #ligue-code-btn b { font: 900 34px/1 var(--police); letter-spacing: 0.16em; color: var(--rouge); -webkit-user-select: all; user-select: all; }
+    #ligue-code-btn small { font: 600 10px var(--police); letter-spacing: 0.1em; text-transform: uppercase; color: rgba(0,0,0,0.5); }
+    #ligue-code-btn:active { transform: scale(0.97); }
+    #ligue-avec #ligue-partager { width: 100%; min-height: 54px; font-size: 14px; }
+    #ligue-peloton { display: flex; flex-wrap: wrap; justify-content: center; gap: 5px; width: 100%; margin: 2px 0 0; padding: 0; list-style: none; }
+    #ligue-peloton li { padding: 4px 8px; border: 1.5px solid var(--noir); border-radius: 3px; font: 700 11.5px var(--police); color: var(--noir); }
+    #ligue-peloton li.moi { background: #ffcf2e; }
+    #ligue-peloton li.bot { border-style: dashed; border-color: rgba(0,0,0,0.3); color: rgba(0,0,0,0.4); font-weight: 600; }
+    #ligue-peloton li.nouveau { animation: expl-pop 0.3s ease-out; }
+    .btn.btn-petit { min-height: 38px; padding: 8px 14px; font-size: 11px; width: auto; }
+    #step2-liens { display: flex; gap: 22px; justify-content: center; }
+    #ligue-msg { width: 100%; box-sizing: border-box; margin: 0 0 12px; padding: 7px 10px; background: #ffcf2e; border: 1.5px solid var(--noir); border-radius: 3px; font: 700 12.5px/1.35 var(--police); color: var(--noir); text-align: center; }
     #end-ligue { width: 100%; margin: 0 0 12px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
-    #end-ligue-titre { margin: 0; font: 700 11px var(--police); letter-spacing: 0.14em; text-transform: uppercase; color: rgba(0,0,0,0.6); }
+    #end-ligue-titre { margin: 0; padding: 0; border: none; background: none; font: 700 11px var(--police); letter-spacing: 0.14em; text-transform: uppercase; color: rgba(0,0,0,0.6); cursor: pointer; -webkit-tap-highlight-color: transparent; }
+    #end-ligue-titre b { text-decoration: underline; text-underline-offset: 4px; }
+    #end-ligue-titre small { font: 600 10px var(--police); letter-spacing: 0.08em; color: rgba(0,0,0,0.45); text-decoration: underline; text-underline-offset: 3px; }
+    #ligue-titre { margin: 0; }
     #end-ligue-liste { width: 100%; margin: 0; padding: 0; list-style: none; font: 500 13px var(--police); color: var(--noir); }
     #end-ligue-liste li { display: flex; gap: 8px; padding: 5px 4px; border-bottom: 1px solid rgba(0,0,0,0.08); }
     #end-ligue-liste li.moi { background: rgba(255,207,46,0.35); border-radius: 3px; font-weight: 900; }
@@ -314,7 +335,8 @@
     }
     #end-credit { margin: 10px 0 0; font: 500 10px/1.4 var(--police); color: rgba(0,0,0,0.45); text-align: center; text-wrap: balance; }
     #end-ecouter { margin-top: 2px; }
-    #end-links { display: flex; gap: 22px; margin-top: 4px; }
+    #end-links { display: flex; justify-content: space-between; width: 100%; margin-top: 6px; }
+    #end-links .link-minimal { font: 500 13px var(--police); color: rgba(0,0,0,0.6); text-decoration: underline; }
     #end-credit a { color: var(--rouge); font-weight: 900; text-decoration: none; }
     #end-actions { display: flex; flex-direction: column; align-items: center; gap: 10px; width: 100%; }
     #end-note { margin: 10px 0 0; font: 500 11px var(--police); color: rgba(0,0,0,0.55); text-align: center; }
@@ -409,6 +431,16 @@
   </style>
 </head>
 <body>
+  <!-- Écran de chargement (3 octobre 2026 : « le logo de la ville est belle
+       qui tourne en 360° sur un axe horizontal ») : opaque tant que le
+       morceau et le moteur ne sont pas prêts, puis fondu vers le menu. -->
+  <div id="splash">
+    <div id="splash-logo"><img src="assets/logo-lveb.webp" alt="la ville est belle" width="150" height="218" /></div>
+    <div id="loading">
+      <div id="loading-track"><div id="loading-fill"></div></div>
+      <span id="loading-label">0 %</span>
+    </div>
+  </div>
   <div id="app"><canvas id="game-canvas"></canvas></div>
   <div id="safe-probe" aria-hidden="true" style="position:fixed;left:0;top:var(--safe-top);width:0;height:0;pointer-events:none"></div>
   <div id="vignette" aria-hidden="true"></div>
@@ -439,53 +471,36 @@
       <div class="panel step" data-step="2">
         <div class="panel-header"><p class="step-eyebrow">Ma ligue</p></div>
         <div class="panel-body">
-          <!-- Ligue entre potes (7 septembre 2026) -->
+          <!-- Ligue entre potes (7 septembre 2026), réécrite le 3 octobre 2026 :
+               une phrase de pourquoi, deux chemins (créer / rejoindre), puis
+               le code en gros, Inviter en gros, le peloton avec ses bots. -->
+          <p id="ligue-msg" class="hidden"></p>
           <div id="ligue-bloc">
             <div id="ligue-sans">
-              <!-- Pourquoi / comment (3 octobre 2026 : « une explication du
-                   pourquoi et du comment »). Visible tant qu'on n'a pas de ligue. -->
-              <div id="ligue-pourquoi">
-                <p class="lp-titre">Pourquoi une ligue&nbsp;?</p>
-                <ul>
-                  <li><b>Tes potes pédalent derrière toi</b> dans le jeu.</li>
-                  <li><b>Chaque pote qui joue = +10&nbsp;% de points</b> pour toi.</li>
-                  <li><b>Même route pour tous</b>&nbsp;: votre classement à vous.</li>
-                </ul>
-                <p class="lp-titre">Comment&nbsp;?</p>
-                <ol>
-                  <li>Crée ta ligue.</li>
-                  <li>Envoie le lien à tes potes.</li>
-                  <li>Ils jouent 30&nbsp;s&nbsp;: ton bonus monte.</li>
-                </ol>
-              </div>
+              <p id="ligue-intro">Ce jeu se joue avec tes potes&nbsp;: <b>plus ils sont nombreux à jouer, plus tu marques de points.</b> Même route pour tous, donc un vrai classement entre vous.</p>
               <button id="ligue-creer" type="button" class="btn btn-primary">Créer ma ligue</button>
+              <p class="lp-sep"><span>ou</span></p>
               <p class="lp-ou">Un pote t'a donné un code&nbsp;?</p>
               <div id="ligue-row">
-                <input type="text" id="ligue-input" placeholder="CODE DE LIGUE" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="6" />
+                <input type="text" id="ligue-input" placeholder="CODE" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="6" />
                 <button id="ligue-rejoindre" class="btn btn-secondary" type="button">Rejoindre</button>
               </div>
             </div>
             <div id="ligue-avec" class="hidden">
-              <p id="ligue-titre">Ligue <b id="ligue-code">—</b></p>
-              <p id="ligue-membres">…</p>
-              <p id="ligue-places"></p>
-              <div id="ligue-actions">
-                <!-- Icônes WhatsApp/Instagram/Messages/Snap : indice visuel, le
-                     bouton ouvre le partage natif du téléphone (navigator.share),
-                     qui liste ces apps si elles sont installées. -->
-                <button id="ligue-partager" class="btn btn-secondary share-btn" type="button"><span class="share-inner"><span>Inviter des potes</span><span class="share-apps" aria-hidden="true">
+              <p id="ligue-titre">Ta ligue</p>
+              <button id="ligue-code-btn" type="button" aria-label="Copier le code de la ligue"><b id="ligue-code">—</b><small id="ligue-code-aide">Touche pour copier</small></button>
+              <button id="ligue-partager" class="btn btn-primary share-btn" type="button"><span class="share-inner"><span>Inviter des potes</span><span class="share-apps" aria-hidden="true">
                 <svg viewBox="0 0 24 24" width="13" height="13" focusable="false"><path d="M12 3a9 9 0 0 0-7.75 13.55L3 21l4.6-1.2A9 9 0 1 0 12 3z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M8.3 8.4c-.3.6-.5 1.3-.2 2.3.5 1.9 2.9 4.3 4.8 4.8 1 .3 1.7.1 2.3-.2.4-.2.9-.7 1-1.1.1-.3 0-.5-.2-.6l-1.7-.8c-.2-.1-.4 0-.5.1l-.5.6c-.1.1-.3.2-.5.1-.7-.3-2-1.6-2.3-2.3-.1-.2 0-.4.1-.5l.6-.5c.1-.1.2-.3.1-.5l-.8-1.7c-.1-.2-.3-.3-.6-.2-.4.1-.9.6-1.1 1z" fill="currentColor" stroke="none"/></svg>
                 <svg viewBox="0 0 24 24" width="13" height="13" focusable="false"><rect x="3" y="3" width="18" height="18" rx="5" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="17.2" cy="6.8" r="1" fill="currentColor"/></svg>
                 <svg viewBox="0 0 24 24" width="13" height="13" focusable="false"><path d="M4 5h16a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H9l-4 3.5V16H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
                 <svg viewBox="0 0 24 24" width="13" height="13" focusable="false"><path d="M12 4c2.4 0 3.9 1.9 3.8 4.4l-.1 1.7c.4.2.9.3 1.4.2.4-.1.8.2.7.6-.1.5-.7.9-1.3 1.2.1.5.6.9 1.4 1.1.4.1.5.6.2.9-.3.3-.9.5-1.4.7-.1.3-.1.6-.3.9-.2.4-.7.4-1.2.3-.5-.1-1-.1-1.5.2-.5.4-1.1 1-1.7 1-.6 0-1.2-.6-1.7-1-.5-.3-1-.3-1.5-.2-.5.1-1 .1-1.2-.3-.2-.3-.2-.6-.3-.9-.5-.2-1.1-.4-1.4-.7-.3-.3-.2-.8.2-.9.8-.2 1.3-.6 1.4-1.1-.6-.3-1.2-.7-1.3-1.2-.1-.4.3-.7.7-.6.5.1 1-.1 1.4-.2l-.1-1.7C8.1 5.9 9.6 4 12 4z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/></svg>
               </span></span></button>
-                <button id="ligue-quitter" type="button" class="link-minimal">Quitter la ligue</button>
-              </div>
+              <ul id="ligue-peloton"></ul>
+              <p id="ligue-membres"></p>
             </div>
-            <p id="ligue-msg" class="hidden"></p>
           </div>
-          <button id="step2-next" class="btn btn-primary" type="button">Continuer</button>
-          <button id="step2-back" type="button" class="link-minimal">Changer mon pseudo</button>
+          <button id="step2-next" class="btn btn-primary" type="button">Jouer</button>
+          <div id="step2-liens"><button id="step2-back" type="button" class="link-minimal">Mon cycliste</button><button id="ligue-quitter" type="button" class="link-minimal hidden">Quitter la ligue</button></div>
         </div>
       </div>
 
@@ -498,10 +513,6 @@
             <div class="skin-row"><span class="skin-label">Maillot</span><div class="chips" data-cle="c1"></div></div>
             <div class="skin-row"><span class="skin-label">Chapeau</span><div class="chips" data-cle="chapeau"></div></div>
             <div class="skin-row"><span class="skin-label">Engin</span><div class="chips" data-cle="velo"></div></div>
-          </div>
-          <div id="loading">
-            <div id="loading-track"><div id="loading-fill"></div></div>
-            <span id="loading-label">0 %</span>
           </div>
           <button id="play-button" class="btn btn-primary" type="button" disabled>Jouer</button>
           <button id="boost-ligue" type="button"></button>
@@ -524,7 +535,7 @@
           </div>
           <div id="end-ligue" class="hidden">
             <p id="end-rang" class="hidden"></p>
-            <p id="end-ligue-titre">Ligue <b id="end-ligue-code">—</b></p>
+            <button id="end-ligue-titre" type="button">Ligue <b id="end-ligue-code">—</b> <small id="end-ligue-copier">· copier</small></button>
             <ol id="end-ligue-liste"></ol>
             <p id="end-relais" class="hidden"></p>
           </div>
@@ -540,9 +551,9 @@
             <div id="end-links">
               <a id="end-cta" class="link-minimal" href="#" role="button">Écouter l'album</a>
               <button id="end-menu" class="link-minimal" type="button">Menu</button>
+              <a id="credit-insta" class="link-minimal" href="#" target="_blank" rel="noopener noreferrer">@pmc.mp3</a>
             </div>
           </div>
-          <p id="end-credit"><a id="credit-insta" href="#" target="_blank" rel="noopener noreferrer">@pmc.mp3</a></p>
           <a id="insta-link" href="#" class="hidden" target="_blank" rel="noopener noreferrer">@pmc.mp3</a>
         </div>
       </div>
@@ -564,12 +575,12 @@
     <div id="expl-carte">
       <div class="panel-header"><p class="step-eyebrow" id="expl-eyebrow">Comment jouer · 1/3</p></div>
       <div class="expl-etape" data-e="1">
-        <p class="expl-titre">Tape l'écran pour sauter</p>
+        <p class="expl-titre">1 tap = 1 saut</p>
         <div id="expl-main"><span class="onde"></span><span class="doigt">👆</span></div>
-        <p class="expl-texte"><b>Pas besoin de glisser.</b> Un tap = un saut. Re-tape en l'air = double saut.</p>
+        <p class="expl-texte">Tape n'importe où sur l'écran, <b>pas besoin de glisser.</b> Re-tape en l'air = double saut.</p>
       </div>
       <div class="expl-etape" data-e="2">
-        <p class="expl-titre">Une partie = un morceau</p>
+        <p class="expl-titre">1 partie = 1 morceau</p>
         <div id="expl-arrivee"><span>ARRIVÉE</span></div>
         <p class="expl-texte">La course dure le temps de la musique. <b>Tiens jusqu'à la ligne d'arrivée.</b></p>
       </div>
@@ -581,8 +592,8 @@
         <p class="expl-texte">Crée ta ligue, invite tes potes&nbsp;: vous avez votre classement. <b>Chaque pote qui joue te donne +10&nbsp;% de points.</b></p>
       </div>
       <div id="expl-barre"><i></i></div>
-      <p id="expl-passer">Touche pour continuer</p>
     </div>
+    <p id="expl-passer">Touche pour continuer</p>
   </div>
   <div id="retour-sheet" aria-hidden="true">
     <div id="retour-veil"></div>

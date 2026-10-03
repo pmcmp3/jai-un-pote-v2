@@ -40,6 +40,7 @@ await page.addInitScript(([parties, neuf, genre, velo]) => {
   if (genre || velo) localStorage.setItem("jp2Skin", JSON.stringify({ genre: genre || "homme", velo: velo || "vtt" }));
   localStorage.setItem("jp2-appris", '["tap","haut","double"]'); // pas de conseil hors des scènes qui le testent
   localStorage.setItem("jp2Pseudo", "pmc");
+  localStorage.setItem("jp2LigueVue", "1");
   localStorage.setItem("jp2Parties", parties);
   if (!neuf) { localStorage.setItem("jp2MorceauOuvert", "1"); localStorage.setItem("jp2PmcSuivi", "1"); }
 }, [process.env.PARTIES || "5", process.env.NEUF === "1", process.env.GENRE || "", process.env.VELO || ""]);
@@ -57,7 +58,7 @@ if (demandes.includes("menus")) {
 await page.waitForFunction(() => !document.getElementById("play-button").disabled, null, { timeout: 15000 });
 await page.click("#play-button");
 if (process.env.EXPL) { await attendre(2200); await photo("05-explication"); await attendre(4000); await photo("05b-explication"); await attendre(4800); await photo("05c-explication"); }
-await page.waitForFunction(() => window.__pote && window.__pote.estDemarre(), null, { timeout: 8000 });
+await page.waitForFunction(() => window.__pote && window.__pote.estDemarre(), null, { timeout: 20000 });
 await page.keyboard.press("KeyI"); // invincible : la course va au bout des captures
 const course = (expr, arg) => page.evaluate(expr, arg);
 
@@ -122,7 +123,7 @@ const SCENES = {
     await page.waitForFunction(() => !document.getElementById("play-button").disabled, null, { timeout: 15000 });
     await photo("21-menu-roller");
     await page.click("#play-button");
-    await page.waitForFunction(() => window.__pote && window.__pote.estDemarre(), null, { timeout: 8000 });
+    await page.waitForFunction(() => window.__pote && window.__pote.estDemarre(), null, { timeout: 20000 });
     await page.keyboard.press("KeyD");
     await attendre(4200); await photo("22-roller");
     await page.keyboard.press("KeyD");
