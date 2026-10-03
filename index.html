@@ -270,6 +270,13 @@
     .share-inner { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; }
     .share-apps { display: flex; align-items: center; justify-content: center; gap: 7px; opacity: 0.55; }
     .share-apps svg { display: block; flex: none; }
+    #ligue-pourquoi { width: 100%; text-align: left; font: 500 12px/1.35 var(--police); color: var(--noir); }
+    #ligue-pourquoi .lp-titre { margin: 0 0 3px; font: 900 10.5px var(--police); letter-spacing: 0.14em; text-transform: uppercase; color: var(--rouge); }
+    #ligue-pourquoi ul, #ligue-pourquoi ol { margin: 0 0 9px; padding-left: 18px; }
+    #ligue-pourquoi li { margin: 0 0 2px; }
+    #ligue-pourquoi b { font-weight: 900; }
+    #ligue-sans > #ligue-creer { width: 100%; }
+    .lp-ou { margin: 4px 0 -2px; font: 500 11px var(--police); color: rgba(0,0,0,0.55); }
     #ligue-msg { margin: 0; font: 500 12px var(--police); color: var(--rouge); text-align: center; }
     #end-ligue { width: 100%; margin: 0 0 12px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
     #end-ligue-titre { margin: 0; font: 700 11px var(--police); letter-spacing: 0.14em; text-transform: uppercase; color: rgba(0,0,0,0.6); }
@@ -432,15 +439,31 @@
       <div class="panel step" data-step="2">
         <div class="panel-header"><p class="step-eyebrow">Ma ligue</p></div>
         <div class="panel-body">
-          <p class="field-note">Tes potes de ligue pédalent derrière toi. Le but : un max de potes, jusqu'au bout du morceau.</p>
           <!-- Ligue entre potes (7 septembre 2026) -->
           <div id="ligue-bloc">
             <div id="ligue-sans">
+              <!-- Pourquoi / comment (3 octobre 2026 : « une explication du
+                   pourquoi et du comment »). Visible tant qu'on n'a pas de ligue. -->
+              <div id="ligue-pourquoi">
+                <p class="lp-titre">Pourquoi une ligue&nbsp;?</p>
+                <ul>
+                  <li><b>Tes potes pédalent derrière toi</b> dans le jeu.</li>
+                  <li><b>Chaque pote qui joue = +10&nbsp;% de points</b> pour toi.</li>
+                  <li><b>Même route pour tous</b>&nbsp;: votre classement à vous.</li>
+                </ul>
+                <p class="lp-titre">Comment&nbsp;?</p>
+                <ol>
+                  <li>Crée ta ligue.</li>
+                  <li>Envoie le lien à tes potes.</li>
+                  <li>Ils jouent 30&nbsp;s&nbsp;: ton bonus monte.</li>
+                </ol>
+              </div>
+              <button id="ligue-creer" type="button" class="btn btn-primary">Créer ma ligue</button>
+              <p class="lp-ou">Un pote t'a donné un code&nbsp;?</p>
               <div id="ligue-row">
                 <input type="text" id="ligue-input" placeholder="CODE DE LIGUE" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="6" />
                 <button id="ligue-rejoindre" class="btn btn-secondary" type="button">Rejoindre</button>
               </div>
-              <button id="ligue-creer" type="button" class="link-minimal">Créer ma ligue avec mes potes</button>
             </div>
             <div id="ligue-avec" class="hidden">
               <p id="ligue-titre">Ligue <b id="ligue-code">—</b></p>

@@ -88,6 +88,15 @@ try {
     localStorage.clear();
     const url = new URL(location.href); url.searchParams.delete("zero"); history.replaceState(null, "", url.toString());
   }
+  // `?premiere` (3 octobre 2026 : « un lien comme si c'était la première fois
+  // que je me connectais et que je pouvais créer ma ligue ») : tout effacer
+  // comme `?zero`, puis ligue démo VIDE — on crée sa ligue, on « invite », des
+  // potes fictifs arrivent un par un et le boost monte. Rien ne part au réseau.
+  if (new URLSearchParams(location.search).has("premiere")) {
+    localStorage.clear();
+    localStorage.setItem("jp2Demo", "cree");
+    const url = new URL(location.href); url.searchParams.delete("premiere"); history.replaceState(null, "", url.toString());
+  }
 } catch (e) { /* rien */ }
 try {
   if (new URLSearchParams(location.search).has("neuf")) {
@@ -414,18 +423,38 @@ export function getLigue() { return ligue; }
 // — 6 potes ont « joué », boost ×1,6 actif, classement de fin où l'on se
 // compare à eux. Rien n'est envoyé nulle part. Mémorisé (jp2Demo) jusqu'à `?zero`.
 const DEMO = { code: "DEMO", noms: ["lea", "marius", "ines", "hugo", "nita", "oscar"] };
-let demo = false;
+let demo = false, demoCree = false; // demoCree : ligue démo à créer soi-même (`?premiere`)
 try {
   if (new URLSearchParams(location.search).has("demo")) { localStorage.setItem("jp2Demo", "1"); const u = new URL(location.href); u.searchParams.delete("demo"); history.replaceState(null, "", u.toString()); }
-  demo = localStorage.getItem("jp2Demo") === "1";
+  const m = localStorage.getItem("jp2Demo");
+  demo = m === "1" || m === "cree"; demoCree = m === "cree";
 } catch (e) { demo = false; }
+// `?premiere` : après « Inviter des potes », les potes fictifs rejoignent la
+// ligue un par un (le partage réel enverrait un lien vers une ligue qui n'existe pas).
+let arriveesDemo = [];
+function stopperArrivees() { arriveesDemo.forEach(clearTimeout); arriveesDemo = []; }
+function simulerArrivees() {
+  if (arriveesDemo.length || !ligue) return;
+  const deja = new Set(ligue.membres.map((m) => m.nom));
+  const noms = DEMO.noms.filter((n) => !deja.has(n));
+  if (!noms.length) { ligueMessage("Tous tes potes sont là !"); return; }
+  ligueMessage("Ici c'est pour de faux : tes potes reçoivent le lien…");
+  noms.forEach((nom, i) => arriveesDemo.push(setTimeout(() => {
+    if (!ligue) return;
+    ligue.membres.push({ nom, skin: null });
+    memoriserLigue(); appliquerNomsLigue(); afficherLigue(); rafraichirBoost();
+    ligueMessage(`@${nom} a joué : tes points +${Math.round((boost.mult - 1) * 100)} %`);
+    if (i === noms.length - 1) arriveesDemo = [];
+  }, 1800 + i * 1500)));
+}
 export function estDemo() { return demo; }
 // Classement fake : les potes démo s'étagent SOUS une course terminée (on veut
 // voir « tu es premier »), au-dessus d'une course écourtée.
+function autresDemo() { const moi = getPseudo(); return ligue ? ligue.membres.map((m) => m.nom).filter((n) => n !== moi) : []; }
 function classementDemo(metres, fin) {
   const base = fin ? metres : Math.max(metres * 1.6, 900);
   const f = [0.93, 0.81, 0.7, 0.58, 0.44, 0.31];
-  const rows = DEMO.noms.map((n, i) => ({ pseudo: n, metres: Math.round(base * f[i]) }));
+  const rows = autresDemo().slice(0, f.length).map((n, i) => ({ pseudo: n, metres: Math.round(base * f[i]) }));
   rows.push({ pseudo: getPseudo() || "toi", metres: Math.floor(metres) });
   const moi = getPseudo() || "toi";
   return rows.sort((a, b) => b.metres - a.metres || (a.pseudo === moi ? -1 : b.pseudo === moi ? 1 : 0));
@@ -460,7 +489,7 @@ function afficherBoost() {
   el.append(titre, ligne1, regle);
 }
 async function rafraichirBoost() {
-  if (demo) { calculerBoost(DEMO.noms.slice()); return; }
+  if (demo) { calculerBoost(autresDemo()); return; }
   if (!ligue || ligue.enAttente || !net.estConfigure()) { calculerBoost([]); return; }
   const p = await net.potesActifs(ligue.code, getPseudo());
   if (p) calculerBoost(p);
@@ -468,11 +497,18 @@ async function rafraichirBoost() {
 
 function ligueMessage(txt) { ligueMsg.textContent = txt || ""; ligueMsg.classList.toggle("hidden", !txt); }
 function afficherLigue() {
-  if (!net.estConfigure()) { ligueBloc.classList.add("hidden"); return; }
+  if (!net.estConfigure() && !demo) { ligueBloc.classList.add("hidden"); return; }
   ligueBloc.classList.remove("hidden");
   ligueSans.classList.toggle("hidden", !!ligue);
   ligueAvec.classList.toggle("hidden", !ligue);
-  $("step2-next").textContent = ligue ? "Continuer" : "Continuer sans ligue";
+  const suivant = $("step2-next");
+  suivant.textContent = ligue ? "Continuer" : "Plus tard";
+  // Le rouge suit l'étape du « comment » : sans ligue → Créer ; seul dans sa
+  // ligue → Inviter ; des potes sont là → Continuer.
+  const seul = !!ligue && !ligue.enAttente && ligue.membres.filter((m) => m.nom !== getPseudo()).length === 0;
+  const pret = !!ligue && !seul;
+  suivant.classList.toggle("btn-primary", pret); suivant.classList.toggle("btn-secondary", !pret);
+  liguePartager.classList.toggle("btn-primary", seul); liguePartager.classList.toggle("btn-secondary", !seul);
   if (ligue) {
     ligueCodeEl.textContent = ligue.code;
     const autres = ligue.membres.filter((m) => m.nom !== getPseudo());
@@ -496,6 +532,12 @@ async function rejoindre(code, creer = false) {
   if (!pseudo) { ligueMessage("Écris ton pseudo d'abord."); pseudoInput.focus(); return false; }
   code = net.normaliserCode(code);
   if (code.length < 4) { ligueMessage("Code de ligue : 5 lettres."); return false; }
+  if (demo) {
+    // Démo : créer = une ligue où l'on est seul ; rejoindre = la ligue démo pleine.
+    ligue = { code, membres: creer ? [{ nom: pseudo, skin: null }] : DEMO.noms.map((nom) => ({ nom, skin: null })), demo: true };
+    memoriserLigue(); appliquerNomsLigue(); afficherLigue(); ligueMessage(creer ? "Ta ligue est créée. Maintenant, invite tes potes !" : ""); rafraichirBoost();
+    return true;
+  }
   ligueMessage("…");
   const invitation = !!(ligue && ligue.enAttente);
   const r = creer ? await net.creerLigue(code, pseudo, getSkin()) : await net.rejoindreLigue(code, pseudo, getSkin());
@@ -511,6 +553,7 @@ async function rejoindre(code, creer = false) {
 }
 function lienLigue(code) { return `${window.CONFIG.lienJeu || location.origin + location.pathname}?ligue=${code}`; }
 async function partagerLigue(texte) {
+  if (demo) { simulerArrivees(); return; }
   const code = ligue ? ligue.code : "";
   const data = { title: "J'ai un pote", text: texte, url: lienLigue(code) };
   net.evenement("invitation_envoyee", { pseudo: getPseudo(), ligue: code, source: getSource() });
@@ -540,7 +583,7 @@ export async function finLigue(metres, potes, mode = "course", bilan = {}) {
   if (mode === "sprint") lsSet(CLE_SPRINT, net.jourSprint());
   const code = ligue ? ligue.code : (window.CONFIG.ligueDemo || "PMCMP");
   if (!ligue && mode !== "sprint") return;
-  if (demo && mode !== "sprint") { afficherClassement(DEMO.code, classementDemo(metres, bilan.fin), "Ligue démo"); return; }
+  if (demo && mode !== "sprint") { afficherClassement(ligue.code, classementDemo(metres, bilan.fin), demoCree ? null : "Ligue démo"); return; }
   let trace = null;
   if (mode !== "sprint" && bilan.trace) {
     const avant = await net.classement(ligue.code, bilan.graine);
@@ -600,9 +643,9 @@ function initLigue() {
   afficherBoost();
   rafraichirBoost();
   const b = $("boost-ligue");
-  if (b) b.addEventListener("click", () => { if (ligue || demo) partagerLigue(`Viens jouer 30 s dans ma ligue « J'ai un pote » (code ${ligue.code}) : ça me booste mes points !`); else if (!enBeta()) setStep(2); });
+  if (b) b.addEventListener("click", () => { if (ligue && !ligue.enAttente) partagerLigue(`Viens jouer 30 s dans ma ligue « J'ai un pote » (code ${ligue.code}) : ça me booste mes points !`); else if (!enBeta()) setStep(2); });
   try { const j = lsGet(CLE_LIGUE); if (j) ligue = JSON.parse(j); } catch (e) { ligue = null; }
-  if (demo) ligue = { code: DEMO.code, membres: DEMO.noms.map((nom) => ({ nom, skin: null })), demo: true };
+  if (demo && !demoCree) ligue = { code: DEMO.code, membres: DEMO.noms.map((nom) => ({ nom, skin: null })), demo: true };
   try {
     const code = new URLSearchParams(location.search).get("ligue");
     // Le lien d'invitation suffit : la personne fait déjà partie de la ligue,
@@ -616,7 +659,7 @@ function initLigue() {
   afficherLigue(); appliquerNomsLigue();
   ligueRejoindre.addEventListener("click", () => rejoindre(ligueInput.value));
   ligueCreer.addEventListener("click", () => rejoindre(net.genererCode(), true));
-  ligueQuitter.addEventListener("click", () => { ligue = null; memoriserLigue(); appliquerNomsLigue(); afficherLigue(); appliquerModeBeta(); });
+  ligueQuitter.addEventListener("click", () => { stopperArrivees(); ligue = null; memoriserLigue(); appliquerNomsLigue(); afficherLigue(); appliquerModeBeta(); });
   liguePartager.addEventListener("click", () => partagerLigue(`Tu es dans ma ligue « J'ai un pote » (code ${ligue ? ligue.code : ""}) : tu pédales derrière moi, viens battre mon score`));
   endLiguePartager.addEventListener("click", () => partagerLigue(`J'ai fait ${scoreVal.textContent} pts dans notre ligue « J'ai un pote » (code ${ligue ? ligue.code : ""}), même course pour tout le monde. Viens me battre`));
   ["pointerdown", "touchstart", "touchmove", "mousedown"].forEach((t) => ligueInput.addEventListener(t, (e) => e.stopPropagation()));

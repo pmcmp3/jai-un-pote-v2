@@ -245,6 +245,12 @@ Code `TESTV2`, qui est aussi `config.ligueBeta` (menu simplifié + bouton « Lai
   locale « DEMO », 6 potes fictifs qui ont « joué », boost ×1,6 actif, classement
   de fin fictif (les potes s'étagent SOUS une course terminée : on voit « Tu es
   1er de ta ligue ! »). Rien ne part sur le réseau. Lien à montrer : `?9&demo`.
+- **Première visite** (3 octobre 2026) : `?premiere` efface tout (comme `?zero`)
+  puis `jp2Demo = "cree"` : ligue démo VIDE. Étape « Ma ligue » = bloc
+  « Pourquoi / Comment » (affiché aussi en vrai, tant qu'on n'a pas de ligue) +
+  CRÉER MA LIGUE en rouge ; seul dans sa ligue → INVITER en rouge ; en démo,
+  Inviter ne partage rien : les 6 potes fictifs « jouent » un par un (1,5 s) et
+  le boost monte. Lien à montrer : `?9&premiere`. Parcours : `outils/premiere.mjs`.
 - **Tuto au ralenti, deuxième version** (`conseilTap`/`conseilStep`) : approche
   ~1 s avant le bon moment (monde ×0,25), un tap donné pendant l'approche est
   GARDÉ et part pile au bon moment, gel ×0,06 s'il n'a rien fait ; reprise
