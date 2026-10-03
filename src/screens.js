@@ -114,20 +114,22 @@ function morceauDejaOuvert() { return lsGet(CLE_MORCEAU_OUVERT) === "1"; }
 function pmcDejaSuivi() { return lsGet(CLE_PMC_SUIVI) === "1"; }
 let fanCache = morceauDejaOuvert();
 export function estFan() { return fanCache; }
-// Échelle de conversion (5 octobre 2026 : « faudrait qu'il y en ait qu'un seul
-// [...] tu veux rejouer une première fois, tu dois ajouter l'album ; une
-// seconde fois, il faut que la personne puisse faire une deuxième partie ; si
-// elle refait une troisième partie, elle doit s'abonner à PMC » — et « une
-// personne qui veut continuer la course [...] doit s'abonner à moi sur
-// Spotify »). UNE demande à la fois : l'ancien enchaînement album PUIS
-// abonnement sur deux REJOUER d'affilée était « hyper chiant ».
-//   CONTINUER la course   → abonnement à PMC (tant qu'il n'est pas fait) ;
-//   REJOUER après la 1re  → album ; après la 2e → libre ; à partir de la 3e → abonnement.
-// `getParties()` compte les courses LANCÉES (la course qui vient de finir comprise).
+// Échelle de conversion (5 octobre 2026, précisée le soir même : « continuer
+// la course ou rejouer la première fois, c'est ajouter l'album ; et après,
+// rejouer après 1 partie : abonnement si déjà crash ; si pas de crash, rejouer
+// après la 1re partie : ajouter l'album ; et après, 2e partie libre ; 3e
+// abonnement ; et après libre ad vitam æternam »). UNE demande à la fois :
+//   partie 1   → la PREMIÈRE porte, CONTINUER comme REJOUER, c'est l'album ;
+//                album déjà ajouté (« déjà crash ») → REJOUER demande l'abonnement ;
+//   partie 2   → libre ;
+//   partie 3+  → abonnement tant qu'il n'est pas fait, puis libre à vie.
+// `getParties()` compte les courses LANCÉES (celle en cours ou qui vient de finir).
 function niveauPour(action) {
-  if (action === "continuer") return pmcDejaSuivi() ? "libre" : "suivre";
   const n = getParties();
-  if (n <= 1) return morceauDejaOuvert() ? "libre" : "presave";
+  if (n <= 1) {
+    if (!morceauDejaOuvert()) return "presave";
+    return action === "rejouer" && !pmcDejaSuivi() ? "suivre" : "libre";
+  }
   if (n === 2) return "libre";
   return pmcDejaSuivi() ? "libre" : "suivre";
 }
@@ -424,7 +426,7 @@ function gateTextes(action, niveau) {
   const presave = niveau === "presave";
   return {
     // Sticker rouge, comme toutes les cartes (28 septembre 2026, cohérence des menus).
-    eyebrow: presave ? "L'album est sorti" : continuer ? "Continue ta course" : "Dernière étape",
+    eyebrow: presave ? "L'album est sorti" : "Dernière étape",
     titre: presave
       ? (continuer ? "Ajoute l'album à ta bibliothèque pour continuer la partie" : "Ajoute l'album à ta bibliothèque pour rejouer")
       : (continuer ? "Abonne-toi à PMC sur Spotify pour continuer la partie" : "Abonne-toi à PMC sur Spotify, et rejoue autant que tu veux"),

@@ -1665,6 +1665,7 @@ if (debugOverlay.isEnabled()) {
     chocs: () => chocs.slice(),
     forcerJetpack: () => { jetpackForce = true; poserJetpack(); return jet.r; },
     jetPieces: () => jet.pieces.filter((c) => !c.pris).map((c) => ({ v: c.v, h: c.h })),
+    conversion: () => screens.niveauConversionCourant(),
     videoDemarrer: () => { modeVideo = { t: clock.now() }; audioDrivesClock = false; clock.setTimeSource(() => modeVideo.t, true); },
     videoAvance: (jusque) => { while (clock.now() < jusque && !game.ended) { if (window.__pilote) window.__pilote(); modeVideo.t += STEP; step(STEP); } },
     videoPas: (dt) => { const n = Math.max(1, Math.round(dt / STEP)); for (let i = 0; i < n && !game.ended; i++) { if (window.__pilote) window.__pilote(); modeVideo.t += STEP; step(STEP); } render(1); },

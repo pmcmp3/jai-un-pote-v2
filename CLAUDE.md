@@ -403,10 +403,15 @@ Code `TESTV2`, qui est aussi `config.ligueBeta` (menu simplifié + bouton « Lai
     la trajectoire exacte du joueur (`phys.trace`, enregistrée du ramassage à
     l'atterrissage seulement). ⚠️ Une course à jetpack peut dépasser le
     « score parfait » affiché.
-  - *Porte de conversion, nouvelle échelle* (`niveauPour`, screens.js) : UNE
-    demande à la fois. CONTINUER → abonnement à PMC ; REJOUER après la 1re
-    partie → album, après la 2e → libre, à partir de la 3e → abonnement.
-    `?neuf` remet les paliers à zéro, `?zero`/`?premiere` aussi.
+  - *Porte de conversion, nouvelle échelle* (`niveauPour`, screens.js, précisée
+    par l'artiste le soir même) : UNE demande à la fois. Partie 1 : la
+    PREMIÈRE porte, CONTINUER comme REJOUER, c'est l'ALBUM ; si l'album est
+    déjà ajouté (« si déjà crash »), REJOUER demande l'ABONNEMENT. Partie 2 :
+    libre. Partie 3 et suivantes : abonnement tant qu'il n'est pas fait, puis
+    libre « ad vitam æternam ». Vérifié dans le vrai jeu, 7 états :
+    `node outils/porte-echelle.mjs`. `?neuf` remet les paliers à zéro,
+    `?zero`/`?premiere` aussi. L'album = l'EP « La ville est belle », où est
+    « J'ai un pote » (`plateformesAlbum`).
   - *Trackers* : événements `porte_vue`, `clic_album` (plateforme), `clic_suivre`,
     `mort_choix`, `continuer`, `rejouer`, `ecouter_album`, `mort`, `course_finie`
     — avec une colonne `details` (jsonb) ajoutée à `supabase/schema-v2.sql`.
