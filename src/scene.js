@@ -756,7 +756,7 @@ function shadeHex(hex, a) {
 // passaient À TRAVERS son plancher et son toit).
 let masque = () => 0;
 export function setMasqueDecor(f) { masque = typeof f === "function" ? f : () => 0; }
-export const SANS_LAMPE = 1, DANS_HALLE = 2, SANS_DECOR = 4;
+export const SANS_LAMPE = 1, DANS_HALLE = 2, SANS_DECOR = 4, ETALS = 8;
 function lampeIci(r) { return r % 12 === 3 && !(masque(r) & (SANS_LAMPE | DANS_HALLE)); }
 function poteauIci(r) { return r % 5 === 0 && !(masque(r) & DANS_HALLE) && !(masque(r + 5) & DANS_HALLE); }
 
@@ -776,8 +776,16 @@ export function rowDecor(ctx, r, clear) {
     if (r % 41 === 17) { const u = ROAD_HALF + 3.2, v = r; push(u, v, () => cabaneSauveteur(ctx, u, v, Math.floor(hash(r) * 3))); }
     return out;
   }
+  // Le MARCHÉ de plein air le long des halles (5 octobre 2026 : « des stands
+  // comme s'ils étaient à Paris, des mecs qui vendent des courgettes, des
+  // légumes, des pastèques ») : les étals remplacent le premier plan, les
+  // maisons du fond restent.
+  const marche = (masque(r) & ETALS) !== 0;
+  // (Hors teinte de saison : en automne, la pastèque virait au marron.)
+  if (marche && ((r % 5) + 5) % 5 === 0) { const u = ROAD_HALF + 1.4, v = r; out.push({ d: depth(u, v), draw: () => etalMarche(ctx, u, v, Math.floor(r / 5), decorT) }); }
   if (!clear) {
     for (const side of [1, -1]) {
+      if (marche && side > 0) continue;
       const base = side > 0 ? ROAD_HALF + 1.2 : ROAD_HALF + 6.0;
       // Décor ALLÉGÉ (28 septembre 2026 : « simplifie les décors et la
       // complexité des choses ») : un seul élément semé par rangée, et
@@ -835,7 +843,7 @@ export function rowDecor(ctx, r, clear) {
     // (Plus de bottes de foin sur le bas-côté : de profil, elles se
     // confondaient avec la botte-obstacle posée sur la route.) Des buissons
     // bas, ronds et verts, à la place.
-    if (hash(r * 41 + 1) < 0.05 && zone !== "foret" && !estVillage(zone)) {
+    if (hash(r * 41 + 1) < 0.05 && zone !== "foret" && !estVillage(zone) && !marche) {
       const u = ROAD_HALF + 1.3, v = r - 0.25;
       push(u, v, () => { drawBox(ctx, u, v, 0.6, 0.7, 0.35, "#4f7f35"); drawBox(ctx, u + 0.1, v + 0.1, 0.4, 0.5, 0.18, "#5f9440", 0.35); });
     }
@@ -1159,6 +1167,134 @@ function decorVillage(ctx, push, r, side, sway, sud) {
     const pu = ROAD_HALF + 2.0, pv = r - 0.4;
     push(pu, pv, () => personnage(ctx, pu, pv + sway(r) * 4, 0, ["#e13e26", "#3f63b4", "#2f7a46"][k % 3], "#3a3e4e"));
   }
+}
+
+// --- Les ÉTALS du marché (5 octobre 2026) -------------------------------------------
+// Au sol, derrière la route, le long de la halle du marché : la caméra (3,6 u)
+// les voit d'en haut, on lit donc les cagettes. Trois étals qui tournent :
+// le primeur (courgettes, tomates, salades, aubergines, poireaux), le
+// fruitier (oranges, bananes, pommes, fraises) et le roi de la pastèque.
+// Gazon synthétique sur la table, bâche rayée au-dessus du marchand, paniers
+// de fruits par terre, et le marchand qui harangue — bulle comprise.
+const BACHES = [["#e13e26", "#f7f2e6"], ["#2f8a4a", "#f7f2e6"], ["#1f5fb8", "#f7f2e6"]];
+const CRIS = ["Elle est belle ma courgette !", "Allez, 2 € le kilo !", "Goûtez-moi ça !", "Pastèque bien sucrée !", "Qui veut des tomates ?", "Le kilo, 1 € !"];
+function etalMarche(ctx, u, v, n, t) {
+  const sorte = ((n % 3) + 3) % 3;
+  const L = 3.5;                        // longueur de l'étal le long de la route
+  const uT = u + 0.5, pT = 1.25, hT = 0.82; // la table : devant, profondeur, hauteur
+  const uM = uT + pT + 0.25;            // le marchand, derrière la table
+  const [c1, c2] = BACHES[sorte];
+  // Bâche : mâts, puis la toile rayée (bandes ⟂ à la route) et son lambrequin.
+  const uB = uT + 0.55, pB = 1.7, hB = 2.35;
+  for (const dv of [0.05, L - 0.17]) drawBox(ctx, uB + pB - 0.1, v + dv, 0.08, 0.08, hB + 0.25, "#5c4326");
+  // Le marchand (et parfois sa collègue) : tablier, marinière, béret ou casquette.
+  const vendeurs = sorte === 1 ? [L * 0.3, L * 0.72] : [L * 0.5];
+  vendeurs.forEach((dv, k) => {
+    const gest = Math.sin(t * 3.2 + n * 1.7 + k * 2.1);
+    const vv = v + dv;
+    drawBox(ctx, uM, vv - 0.17, 0.26, 0.15, 0.8, "#2a2f3e");                         // jambes
+    drawBox(ctx, uM, vv + 0.04, 0.26, 0.15, 0.8, "#2a2f3e");
+    drawBox(ctx, uM - 0.04, vv - 0.22, 0.34, 0.44, 0.62, "#f7f2e6", 0.8);              // marinière
+    for (let i = 0; i < 3; i++) drawBox(ctx, uM - 0.05, vv - 0.23, 0.35, 0.46, 0.07, "#1f3a78", 0.88 + i * 0.18);
+    drawBox(ctx, uM - 0.08, vv - 0.2, 0.06, 0.4, 0.95, sorte === 2 ? "#7a3a1a" : "#2f6a3a", 0.42); // tablier
+    drawBox(ctx, uM + 0.02, vv - 0.14, 0.26, 0.28, 0.3, "#d69a68", 1.42);              // tête
+    if (k === 0) drawBox(ctx, uM, vv - 0.16, 0.3, 0.32, 0.09, "#1a1a1e", 1.72);         // béret
+    else drawBox(ctx, uM, vv - 0.16, 0.3, 0.32, 0.12, "#e13e26", 1.7);                 // casquette
+    // Bras : l'un sur la hanche, l'autre qui harangue (levé, il s'agite).
+    drawBox(ctx, uM + 0.06, vv + 0.22, 0.14, 0.12, 0.5, "#f7f2e6", 0.92);
+    drawBox(ctx, uM + 0.06, vv - 0.36 - 0.06 * gest, 0.14, 0.12, 0.5, "#f7f2e6", 1.2 + 0.08 * gest);
+    drawBox(ctx, uM + 0.07, vv - 0.36 - 0.06 * gest, 0.12, 0.11, 0.12, "#d69a68", 1.7 + 0.08 * gest);
+  });
+  // La toile, par-dessus le marchand (la caméra la voit d'en haut).
+  const nb = 7;
+  for (let i = 0; i < nb; i++) drawBox(ctx, uB, v + (L * i) / nb, pB, L / nb, 0.06, i % 2 ? c2 : c1, hB);
+  for (let i = 0; i < nb * 2; i++) drawBox(ctx, uB - 0.04, v + (L * i) / (nb * 2), 0.04, L / (nb * 2), 0.26, i % 2 ? c2 : c1, hB - 0.2); // lambrequin
+  // La table : jupe de bois, plateau de gazon synthétique.
+  drawBox(ctx, uT, v, pT, L, hT - 0.06, "#8a6a44");
+  drawBox(ctx, uT - 0.03, v - 0.03, pT + 0.06, L + 0.06, 0.06, "#4f9a3a", hT - 0.06);
+  // Les cagettes, deux rangs (le rang du fond un peu plus haut, sur des cales).
+  const CAGETTE = "#d9b98a";
+  const produits = [
+    ["courgette", "tomate", "salade", "aubergine", "poireau", "tomate"],
+    ["orange", "banane", "pomme", "fraise", "pommeVerte", "orange"],
+    ["pasteque", "melon", "pastequeOuverte", "melon", "pasteque", "tomate"],
+  ][sorte];
+  const nC = 3, lC = (L - 0.3) / nC;
+  for (const [rang, du, cale] of [[1, pT * 0.5, 0.12], [0, 0.06, 0]]) {
+    for (let i = 0; i < nC; i++) {
+      const cv = v + 0.15 + i * lC, cu = uT + du, h0 = hT + cale, pr = produits[rang * nC + i];
+      if (cale) drawBox(ctx, cu, cv, pT * 0.44, lC - 0.08, cale, "#6b4b2e", hT);
+      drawBox(ctx, cu, cv, pT * 0.44, lC - 0.08, 0.16, CAGETTE, h0);
+      produit(ctx, pr, cu + 0.04, cv + 0.04, pT * 0.44 - 0.08, lC - 0.16, h0 + 0.16, n * 7 + i);
+      // L'étiquette du prix, plantée devant.
+      if (rang === 0) drawBox(ctx, cu - 0.02, cv + lC * 0.5 - 0.2, 0.02, 0.32, 0.2, "#ffffff", h0 + 0.12);
+    }
+  }
+  // Par terre, devant : paniers de fruits, et une pile de pastèques chez le dernier.
+  for (let i = 0; i < 2; i++) {
+    const pv = v + 0.4 + i * (L - 1.3), pu = u;
+    drawBox(ctx, pu, pv, 0.42, 0.55, 0.26, "#a8743a");
+    drawBox(ctx, pu - 0.01, pv - 0.01, 0.44, 0.57, 0.04, "#7a5226", 0.22);
+    produit(ctx, ["pomme", "orange", "fraise", "pommeVerte"][(n + i) % 4], pu + 0.03, pv + 0.04, 0.36, 0.47, 0.26, n * 3 + i);
+  }
+  if (sorte === 2) for (const [du, dv, h] of [[0, 1.45, 0], [0, 1.95, 0], [0.05, 1.7, 0.3]]) pasteque(ctx, u + du, v + dv, h);
+  // Le cri du marchand : une bulle de temps en temps, à tour de rôle.
+  const cycle = (t * 0.35 + n * 0.37) % 1;
+  if (cycle < 0.45) {
+    const p = project(uM, v + vendeurs[0], 2.35);
+    const txt = CRIS[((n % CRIS.length) + CRIS.length) % CRIS.length];
+    const sc = echelle(uM), taille = Math.max(8, Math.min(13, sc * 0.3));
+    ctx.save();
+    ctx.globalAlpha *= Math.min(1, cycle * 8, (0.45 - cycle) * 8);
+    ctx.font = `800 ${taille}px "Helvetica Neue", Helvetica, Arial, sans-serif`;
+    const w = ctx.measureText(txt).width + 12, h = taille + 9;
+    const x = Math.round(p.x - w * 0.3), y = Math.round(p.y - h - 6);
+    ctx.fillStyle = "#ffffff"; ctx.strokeStyle = "#0d0d10"; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x, y, w, h, 5) : ctx.rect(x, y, w, h); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x + w * 0.3 - 4, y + h); ctx.lineTo(x + w * 0.3 + 4, y + h); ctx.lineTo(x + w * 0.3 - 2, y + h + 6); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = "#0d0d10"; ctx.textAlign = "left"; ctx.textBaseline = "middle";
+    ctx.fillText(txt, x + 6, y + h / 2 + 0.5);
+    ctx.restore();
+  }
+}
+// Une pastèque entière : un gros ovale vert foncé zébré.
+function pasteque(ctx, u, v, h) {
+  drawBox(ctx, u, v, 0.4, 0.5, 0.34, "#2f6a2a", h);
+  for (const dv of [0.08, 0.22, 0.36]) drawBox(ctx, u - 0.005, v + dv, 0.41, 0.05, 0.345, "#1c4a1c", h);
+  drawBox(ctx, u + 0.05, v + 0.06, 0.3, 0.38, 0.06, "#3f8a3a", h + 0.34);
+}
+// Le contenu d'une cagette (dessus visible d'en haut), en petits cubes.
+function produit(ctx, sorte, u, v, du, dv, h, graine) {
+  const g = (k) => hash(graine * 13 + k * 7);
+  if (sorte === "pasteque") { pasteque(ctx, u, v + dv * 0.1, h - 0.1); return; }
+  if (sorte === "pastequeOuverte") {
+    // Une moitié de pastèque, chair rouge et pépins noirs vers le ciel.
+    drawBox(ctx, u, v + 0.05, du, dv - 0.1, 0.12, "#2f6a2a", h);
+    drawBox(ctx, u + 0.03, v + 0.08, du - 0.06, dv - 0.16, 0.04, "#f2f0d8", h + 0.12);
+    drawBox(ctx, u + 0.05, v + 0.1, du - 0.1, dv - 0.2, 0.04, "#e8364a", h + 0.15);
+    for (let k = 0; k < 6; k++) drawBox(ctx, u + 0.08 + g(k) * (du - 0.2), v + 0.14 + g(k + 9) * (dv - 0.3), 0.03, 0.04, 0.01, "#1a1a1e", h + 0.19);
+    return;
+  }
+  if (sorte === "courgette" || sorte === "poireau" || sorte === "banane") {
+    // Des légumes longs, couchés en travers de la cagette.
+    const n = sorte === "banane" ? 4 : 5;
+    for (let k = 0; k < n; k++) {
+      const vv = v + (k + 0.15) * (dv / n);
+      if (sorte === "poireau") { drawBox(ctx, u, vv, du * 0.55, dv / n * 0.7, 0.09, "#f2efe0", h); drawBox(ctx, u + du * 0.55, vv, du * 0.45, dv / n * 0.7, 0.1, "#3f8a3a", h); }
+      else drawBox(ctx, u + g(k) * 0.05, vv, du - 0.05, dv / n * 0.75, 0.1, sorte === "banane" ? "#f2c21c" : (k % 2 ? "#2f6a2a" : "#3a7a30"), h);
+    }
+    return;
+  }
+  if (sorte === "melon") {
+    for (let k = 0; k < 2; k++) drawBox(ctx, u + 0.02, v + 0.04 + k * dv * 0.5, du - 0.04, dv * 0.42, 0.22, "#d8c98a", h);
+    return;
+  }
+  // Des fruits ronds en tas : un cube par fruit, deux étages.
+  const COUL = { tomate: ["#e13e26", "#c8301c"], orange: ["#f28a1c", "#e8781a"], pomme: ["#d8352a", "#b82a22"], pommeVerte: ["#8ac43a", "#76b02e"], fraise: ["#e8283a", "#c81e2e"], salade: ["#8ac43a", "#a8d85a"], aubergine: ["#5a2a6a", "#4a1f5a"] }[sorte] || ["#e13e26", "#c8301c"];
+  const t = sorte === "salade" ? 0.26 : sorte === "aubergine" ? 0.16 : sorte === "fraise" ? 0.1 : 0.14;
+  const nu = Math.max(1, Math.floor(du / (t + 0.02))), nv = Math.max(1, Math.floor(dv / (t + 0.02)));
+  for (let a = 0; a < nu; a++) for (let b = 0; b < nv; b++) drawBox(ctx, u + a * (du / nu), v + b * (dv / nv), t, sorte === "aubergine" ? t * 1.6 : t, t, COUL[(a + b) % 2], h);
+  for (let a = 0; a < nu - 1; a++) for (let b = 0; b < nv - 1; b++) if (g(a * 5 + b) < 0.6) drawBox(ctx, u + (a + 0.5) * (du / nu), v + (b + 0.5) * (dv / nv), t, t, t * 0.9, COUL[(a + b + 1) % 2], h + t * 0.9);
 }
 
 // --- Les HALLES DE MARCHÉ (20 septembre 2026) ---------------------------------------

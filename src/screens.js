@@ -224,9 +224,15 @@ export function showOverlay() { overlay.classList.add("visible"); requestAnimati
 // champ qui prend le focus la ramène à 0 en 0,35 s (transition CSS), le bloc
 // monte au-dessus du clavier. Les champs font 16 px : en dessous, Safari
 // zoome dans la page à l'ouverture du clavier (le « saut » qu'on voyait).
-function centrerMenu() {
+// ⚠️ 5 octobre 2026 (capture iPhone dans Instagram : « les lignes sont trop
+// rapprochées, elles ne sont pas du tout centrées, elles sont en haut de
+// l'écran ») : clavier ouvert, la carte se CENTRE aussi, dans la zone visible
+// au-dessus du clavier, avec son espacement normal. La version serrée
+// (`serre`) ne sert plus que si elle ne tient pas autrement (petits téléphones).
+function centrerMenu(profondeur = 0) {
   const enMenu = overlay.classList.contains("visible") && onboardingEl.classList.contains("active") && !overlay.classList.contains("end-view");
-  if (!enMenu || overlay.classList.contains("clavier")) { overlay.style.setProperty("--centre", "0px"); return; }
+  if (!enMenu) { overlay.style.setProperty("--centre", "0px"); return; }
+  const clavier = overlay.classList.contains("clavier");
   const blocs = [...overlay.children].filter((e) => e.getClientRects().length && !/^(fixed|absolute)$/.test(getComputedStyle(e).position));
   if (!blocs.length) return;
   let haut = Infinity, bas = -Infinity;
@@ -236,9 +242,14 @@ function centrerMenu() {
     bas = Math.max(bas, r.bottom + parseFloat(cs.marginBottom || 0));
   }
   const sonde = $("safe-probe");
-  const padHaut = 16 + (sonde ? sonde.getBoundingClientRect().top : 0);
+  const padHaut = (clavier ? 10 : 16) + (sonde ? sonde.getBoundingClientRect().top : 0);
   const padBas = parseFloat(getComputedStyle(overlay).paddingBottom || 0);
   const libre = overlay.clientHeight - padHaut - padBas - (bas - haut);
+  if (clavier && profondeur < 2) {
+    const serre = overlay.classList.contains("serre");
+    if (libre < 0 && !serre) { overlay.classList.add("serre"); centrerMenu(profondeur + 1); return; }
+    if (libre > 110 && serre) { overlay.classList.remove("serre"); centrerMenu(profondeur + 1); return; }
+  }
   overlay.style.setProperty("--centre", `${Math.max(0, Math.round(libre / 2))}px`);
 }
 let clavierT = 0;
@@ -263,6 +274,7 @@ function calerSurZoneVisible() {
   if (!vv || !overlay.classList.contains("clavier")) return;
   overlay.style.height = `${Math.round(vv.height)}px`;
   overlay.style.transform = `translateY(${Math.round(vv.offsetTop)}px)`;
+  centrerMenu();
   montrerChamp();
 }
 function brancherCentrage() {
@@ -275,19 +287,26 @@ function brancherCentrage() {
   onboardingEl.addEventListener("focusin", (e) => {
     if (!e.target.matches("input")) return;
     clearTimeout(clavierT);
-    // Mise en page « clavier » SYNCHRONE, avant que Safari ne mesure où est
-    // le champ : il le trouve déjà en haut et n'a plus rien à décaler.
+    // Mise en page « clavier » SYNCHRONE et SANS SAUT : le titre s'efface et
+    // la carte reste exactement où elle était (la marge compense), avant que
+    // Safari ne mesure où est le champ. Puis, à mesure que le clavier monte
+    // (visualViewport), la carte glisse jusqu'au centre de la zone visible.
+    const avant = onboardingEl.getBoundingClientRect().top;
+    const deja = overlay.classList.contains("clavier");
     overlay.classList.add("fige", "clavier");
-    centrerMenu();
-    calerSurZoneVisible();
-    requestAnimationFrame(montrerChamp);
+    if (!deja) {
+      overlay.style.setProperty("--centre", "0px");
+      const apres = onboardingEl.getBoundingClientRect().top;
+      overlay.style.setProperty("--centre", `${Math.max(0, Math.round(avant - apres))}px`);
+    }
+    requestAnimationFrame(() => requestAnimationFrame(() => { overlay.classList.remove("fige"); calerSurZoneVisible(); }));
   });
   onboardingEl.addEventListener("focusout", () => {
     clearTimeout(clavierT);
     clavierT = setTimeout(() => {
       const a = document.activeElement;
       if (a && onboardingEl.contains(a) && a.matches("input")) return; // on passe d'un champ à l'autre
-      overlay.classList.remove("clavier");
+      overlay.classList.remove("clavier", "serre");
       overlay.style.height = ""; overlay.style.transform = "";
       overlay.scrollTop = 0;
       window.scrollTo(0, 0); // Safari laisse parfois la page décalée après le clavier
@@ -700,16 +719,118 @@ async function rejoindre(code, creer = false) {
   return true;
 }
 function lienLigue(code) { return `${window.CONFIG.lienJeu || location.origin + location.pathname}?ligue=${code}`; }
-async function partagerLigue(texte) {
-  if (demo) { simulerArrivees(); return; }
-  const code = ligue ? ligue.code : "";
-  const data = { title: "J'ai un pote", text: texte, url: lienLigue(code) };
-  net.evenement("invitation_envoyee", { pseudo: getPseudo(), ligue: code, source: getSource() });
+
+// --- Partage (5 octobre 2026 : « Inviter tes potes, ça ne marche pas dans le
+// navigateur Instagram [...] je spamme le bouton, il ne se passe rien ») ------
+// Les navigateurs INTÉGRÉS (Instagram, Facebook, TikTok, Snapchat…) n'ont pas
+// de partage natif, ou il y échoue ; l'ancien repli — l'API presse-papiers —
+// y est refusé aussi, et l'erreur était avalée : rien ne se passait. Hors
+// d'eux, le partage natif du téléphone reste le meilleur ; dans eux (ou s'il
+// manque / échoue) : un tiroir maison. Le lien y est AFFICHÉ et
+// sélectionnable — la seule voie qui marche partout —, avec un bouton copier
+// et des raccourcis WhatsApp / Messages / Snapchat.
+const UA = navigator.userAgent || "";
+const NAVIGATEUR_INTEGRE = /Instagram|FBAN|FBAV|FB_IAB|FBIOS|Messenger|Snapchat|TikTok|musical_ly|Bytedance|\bLine\/|LinkedInApp|Pinterest|Twitter/i.test(UA);
+const DANS_INSTAGRAM = /Instagram/i.test(UA);
+const IOS = /iPhone|iPad|iPod/.test(UA) || (/Macintosh/.test(UA) && navigator.maxTouchPoints > 1);
+// Copie fiable : execCommand d'abord, DANS le geste (webviews et Safari
+// l'acceptent là où l'API presse-papiers est refusée), l'API ensuite.
+function copierTexte(t) {
+  let ok = false;
   try {
-    if (navigator.share) { await navigator.share(data); return; }
-    await navigator.clipboard.writeText(`${texte} ${data.url}`);
-    ligueMessage("Lien copié !");
-  } catch (e) { /* partage annulé */ }
+    const ta = document.createElement("textarea");
+    ta.value = t;
+    ta.setAttribute("readonly", "");
+    ta.style.cssText = "position:fixed;top:0;left:0;width:2px;height:2px;opacity:0;border:0;padding:0;margin:0;font-size:16px";
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    ta.setSelectionRange(0, t.length);
+    ok = document.execCommand("copy");
+    ta.remove();
+    const sel = window.getSelection && window.getSelection();
+    if (sel) sel.removeAllRanges();
+  } catch (e) { ok = false; }
+  if (!ok && navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(t).then(() => true, () => false);
+  return Promise.resolve(ok);
+}
+const partageSheet = $("partage-sheet"), partageHint = $("partage-hint"), partageCopier = $("partage-copier");
+let partageEtat = null;
+function ouvrirPartage(texte, url) {
+  partageEtat = { texte, url, message: `${texte} ${url}` };
+  $("partage-lien").textContent = url;
+  $("partage-whatsapp").href = `https://wa.me/?text=${encodeURIComponent(partageEtat.message)}`;
+  // iOS veut « sms:&body= », Android « sms:?body= ».
+  $("partage-sms").href = `sms:${IOS ? "&" : "?"}body=${encodeURIComponent(partageEtat.message)}`;
+  $("partage-snap").href = `https://www.snapchat.com/scan?attachmentUrl=${encodeURIComponent(url)}`;
+  $("partage-plus").classList.toggle("hidden", !navigator.share);
+  partageHint.classList.add("hidden");
+  partageCopier.textContent = "Copier le lien";
+  partageCopier.classList.remove("fait");
+  partageSheet.classList.add("visible");
+  partageSheet.setAttribute("aria-hidden", "false");
+}
+function fermerPartage() {
+  partageSheet.classList.remove("visible");
+  partageSheet.setAttribute("aria-hidden", "true");
+}
+function partageFait(via) {
+  net.evenement("invitation_envoyee", { pseudo: getPseudo(), ligue: ligue ? ligue.code : null, source: getSource(), details: { via, integre: NAVIGATEUR_INTEGRE } });
+  // Démo : les potes fictifs n'arrivent qu'une fois le lien vraiment parti.
+  if (demo) simulerArrivees();
+}
+function copierLienPartage(via) {
+  if (!partageEtat) return;
+  copierTexte(partageEtat.message).then((ok) => {
+    partageHint.classList.remove("hidden");
+    partageHint.classList.toggle("echec", !ok);
+    partageHint.textContent = ok
+      ? (via === "insta" ? "Lien copié ! Reviens sur Insta et colle-le dans une conversation." : "Lien copié ! Colle-le dans une conversation avec tes potes.")
+      : "Ton navigateur bloque la copie : appuie longuement sur le lien ci-dessus, puis Copier.";
+    if (ok) { partageCopier.textContent = "Lien copié ✓"; partageCopier.classList.add("fait"); }
+    partageFait(via);
+  });
+}
+function initPartage() {
+  partageCopier.addEventListener("click", () => copierLienPartage("copie"));
+  $("partage-insta").addEventListener("click", () => copierLienPartage("insta"));
+  $("partage-whatsapp").addEventListener("click", () => partageFait("whatsapp"));
+  $("partage-sms").addEventListener("click", () => partageFait("sms"));
+  $("partage-snap").addEventListener("click", () => partageFait("snapchat"));
+  $("partage-plus").addEventListener("click", () => {
+    if (!partageEtat || !navigator.share) return;
+    navigator.share({ title: "J'ai un pote", text: partageEtat.texte, url: partageEtat.url }).then(() => partageFait("natif"), () => { /* annulé */ });
+  });
+  $("partage-fermer").addEventListener("click", fermerPartage);
+  $("partage-veil").addEventListener("click", fermerPartage);
+}
+// `texteSansLigue` : sans VRAIE ligue (aucune, en attente, ou démo — elle
+// n'existe nulle part), on partage le JEU, sans code. ⚠️ L'écran de fin
+// envoyait sinon « …?ligue= » avec un code vide à tous ceux qui n'avaient pas
+// de ligue — c'est-à-dire à tout le monde tant que la base v2 n'existe pas.
+async function partagerLigue(texte, texteSansLigue = "Viens jouer à « J'ai un pote », le jeu de PMC : plus on est de potes, plus on marque") {
+  const vraie = !!(ligue && !ligue.enAttente && !demo && ligue.code);
+  const code = vraie ? ligue.code : "";
+  const url = vraie ? lienLigue(code) : (window.CONFIG.lienJeu || location.origin + location.pathname);
+  const msg = vraie ? texte : texteSansLigue;
+  $("partage-text").textContent = vraie || demo ? "Chaque pote qui joue te rapporte des points en plus." : "Envoie-leur le jeu : qui fera le meilleur score ?";
+  net.evenement("invitation_ouverte", { pseudo: getPseudo(), ligue: code || null, source: getSource(), details: { integre: NAVIGATEUR_INTEGRE } });
+  if (navigator.share && !NAVIGATEUR_INTEGRE) {
+    try { await navigator.share({ title: "J'ai un pote", text: msg, url }); partageFait("natif"); return; }
+    catch (e) { if (e && e.name === "AbortError") return; /* sinon : le tiroir */ }
+  }
+  ouvrirPartage(msg, url);
+}
+// @pmc.mp3 : dans le navigateur d'Instagram, un lien https vers le profil
+// s'ouvre DANS ce navigateur (version web, souvent sans connexion) au lieu de
+// l'appli (5 octobre 2026 : « j'ouvre PMCMP3 dans le navigateur Instagram,
+// mais ça ne va pas sur Instagram ») — le schéma instagram:// y ouvre le
+// profil dans l'appli elle-même. Partout ailleurs, le lien https (lien
+// universel : l'appli s'ouvre si elle est installée).
+function lienInstaPmc() {
+  const web = window.CONFIG.lienInsta;
+  const m = /instagram\.com\/([^/?#]+)/.exec(web || "");
+  return DANS_INSTAGRAM && m ? `instagram://user?username=${m[1]}` : web;
 }
 // Rafraîchit les membres au démarrage d'une course (les potes qui ont
 // rejoint depuis apparaissent).
@@ -788,6 +909,7 @@ function afficherClassement(code, rows, titre = null) {
   endLigue.classList.remove("hidden");
 }
 function initLigue() {
+  initPartage();
   afficherBoost();
   rafraichirBoost();
   const b = $("boost-ligue");
@@ -810,18 +932,18 @@ function initLigue() {
   ligueQuitter.addEventListener("click", () => { stopperArrivees(); ligue = null; memoriserLigue(); appliquerNomsLigue(); afficherLigue(); appliquerModeBeta(); });
   const copierCode = async () => {
     if (!ligue) return;
-    try { await navigator.clipboard.writeText(ligue.code); } catch (e) { /* rien */ }
-    ligueMessage(`Code ${ligue.code} copié !`);
-    const aide = $("ligue-code-aide"); if (aide) { aide.textContent = "Copié !"; setTimeout(() => { aide.textContent = "Touche pour copier"; }, 1600); }
+    const ok = await copierTexte(ligue.code);
+    ligueMessage(ok ? `Code ${ligue.code} copié !` : `Ton code : ${ligue.code}`);
+    const aide = $("ligue-code-aide"); if (aide && ok) { aide.textContent = "Copié !"; setTimeout(() => { aide.textContent = "Touche pour copier"; }, 1600); }
   };
   $("ligue-code-btn").addEventListener("click", copierCode);
   $("end-ligue-titre").addEventListener("click", async () => {
     const code = ligue ? ligue.code : endLigueCode.textContent;
-    try { await navigator.clipboard.writeText(code); } catch (e) { /* rien */ }
-    const c = $("end-ligue-copier"); if (c) { c.textContent = "· copié !"; setTimeout(() => { c.textContent = "· copier"; }, 1600); }
+    const ok = await copierTexte(code);
+    const c = $("end-ligue-copier"); if (c && ok) { c.textContent = "· copié !"; setTimeout(() => { c.textContent = "· copier"; }, 1600); }
   });
   liguePartager.addEventListener("click", () => partagerLigue(`Tu es dans ma ligue « J'ai un pote » (code ${ligue ? ligue.code : ""}) : tu pédales derrière moi, viens battre mon score`));
-  endLiguePartager.addEventListener("click", () => partagerLigue(`J'ai fait ${scoreVal.textContent} pts dans notre ligue « J'ai un pote » (code ${ligue ? ligue.code : ""}), même course pour tout le monde. Viens me battre`));
+  endLiguePartager.addEventListener("click", () => partagerLigue(`J'ai fait ${scoreVal.textContent} pts dans notre ligue « J'ai un pote » (code ${ligue ? ligue.code : ""}), même course pour tout le monde. Viens me battre`, `J'ai fait ${scoreVal.textContent} pts à « J'ai un pote », le jeu de PMC. Viens me battre`));
   ["pointerdown", "touchstart", "touchmove", "mousedown"].forEach((t) => ligueInput.addEventListener(t, (e) => e.stopPropagation()));
   ligueInput.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); rejoindre(ligueInput.value); } });
 }
@@ -1077,8 +1199,9 @@ export function init(d) {
     lien.removeAttribute("href"); lien.removeAttribute("target"); lien.setAttribute("role", "button");
     lien.addEventListener("click", (e) => { e.preventDefault(); ouvrirEcoute(); });
   });
-  instaLink.href = window.CONFIG.lienInsta;
-  const credit = $("credit-insta"); if (credit) credit.href = window.CONFIG.lienInsta;
+  instaLink.href = lienInstaPmc();
+  const credit = $("credit-insta"); if (credit) credit.href = lienInstaPmc();
+  if (DANS_INSTAGRAM) { instaLink.removeAttribute("target"); if (credit) credit.removeAttribute("target"); }
   try { const src = new URLSearchParams(location.search).get("src"); if (src) lsSet(CLE_SOURCE, src.slice(0, 32)); } catch (e) { /* rien */ }
   pseudoInput.value = lsGet(CLE_PSEUDO) || "";
   instaInput.value = lsGet(CLE_INSTA) || "";

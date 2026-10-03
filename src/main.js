@@ -710,7 +710,7 @@ function gagnerRouge(u, v) {
 // l'instant, le rendu la fait basculer pendant 1,6 s.
 const tombes = new Map();
 function marquerTombe(ev, now) { if (ev.r !== undefined && !KINDS_ROULANTS.has(ev.kind)) tombes.set(ev.r, now); }
-const KINDS_ROULANTS = new Set(["tracteur", "bus", "chasseneige", "skieur", "voiture", "contresens", "poulejetee"]);
+const KINDS_ROULANTS = new Set(["tracteur", "bus", "chasseneige", "skieur", "pieton", "voiture", "contresens", "poulejetee"]);
 
 const chocs = []; // debug : les derniers chocs (auto-audit)
 function toucherJoueur(ev) {
@@ -1070,6 +1070,8 @@ scene.setMasqueDecor((r) => {
   if (prochDeHalle(r, 4)) m |= scene.DANS_HALLE;
   // Le bowling est une salle fermée : aucun décor derrière (4 octobre 2026).
   for (let k = -8; k <= 8; k += 2) { const dh = rows.halleA(r + k); if (dh !== null && rows.typeHalle(dh) === "bowling") { m |= scene.SANS_DECOR; break; } }
+  // Le marché de plein air longe la halle du marché (5 octobre 2026).
+  for (let k = -6; k <= 6; k += 2) { const dh = rows.halleA(r + k); if (dh !== null && rows.typeHalle(dh) === "marche") { m |= scene.ETALS; break; } }
   // Pas de lampadaire planté dans une bosse.
   for (let k = -2; k <= 2; k++) if (rows.bosseA(r + k) !== null) { m |= scene.SANS_LAMPE; break; }
   if (masqueCache.size > 4000) masqueCache.clear();
@@ -1146,7 +1148,7 @@ function renderAlertes(now, vitesse) {
     const row = rows.rowAt(r);
     if ((row.type !== "traverse" && row.type !== "contresens") || !row.armed) continue;
     // La poule jetée n'a pas d'alerte : on voit le fermier avant qu'il lance.
-    if (rows.KINDS[row.kind].lanceur) continue;
+    if (rows.KINDS[row.kind].lanceur || rows.KINDS[row.kind].sansAlerte) continue;
     // Tracteur : tant que sa rangée n'est pas à l'écran. Voiture en face :
     // tant que la VOITURE n'y est pas (elle part de bien plus loin que sa rangée).
     const ou = row.type === "contresens" ? rows.contresensAt(r, row, now) : { v: r };
@@ -1333,6 +1335,7 @@ function render(alpha) {
           : row.kind === "bus" ? () => props.drawBus(ctx, inst.K, 0, inst.v, t)
           : row.kind === "chasseneige" ? () => props.drawChasseNeige(ctx, inst.K, 0, inst.v, t)
           : row.kind === "skieur" ? () => props.drawSkieur(ctx, inst.K, 0, inst.v, t)
+          : row.kind === "pieton" ? () => props.drawPieton(ctx, inst.K, 0, inst.v, t, r, rows.enPlage(r))
           : () => props.drawVoiture(ctx, inst.K, 0, inst.v, -1, t);
         items.push({ d: scene.depth(0, inst.v), draw: () => surSol(inst.v, dessin, true) });
         if (debugAlertes) { const px = scene.project(0, inst.v, 0).x; if (px > 0 && px < width) { const e = debugAlertes.get(r) || { kind: row.kind, alerte: 0, vu: 0 }; e.vu += 1; debugAlertes.set(r, e); } }
@@ -1498,6 +1501,7 @@ function render(alpha) {
       metres: game.metres, potes: friends.count(), potesMax: friends.max(), gaugeT,
       mult: Math.round(multiplicateur() * 100) / 100, restant: plein ? 0 : Math.max(0, prochainPalier() - game.points), plein,
       restantS: game.ended ? 0 : tempsRestant(), turbo: game.turbo > 0, safeTop, nuit: scene.getNight(),
+      avance: game.sprint ? Math.max(0, clock.now()) / (window.CONFIG.sprintDureeS || 60) : 1 - (game.ended ? 0 : tempsRestant()) / Math.max(1, window.CONFIG.dureeMorceau - departMorceau),
     });
     ctx.restore();
   }

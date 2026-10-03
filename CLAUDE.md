@@ -422,6 +422,62 @@ Code `TESTV2`, qui est aussi `config.ligueBeta` (menu simplifié + bouton « Lai
   - *Vidéo 9:16* : `node outils/video.mjs <nom> <début_s> [durée] [jetpack]` —
     1080×1920, 30 i/s, simulation pas à pas (`__pote.videoPas`), pilote
     automatique, 5 potes, morceau calé (ffmpeg).
+- **5 octobre 2026, cinquième série (ouvert dans Instagram : clavier, HUD,
+  partage, marché, piétons, plage)** — `VERSION_COURSE` 18, SW `jp2-v26` :
+  - *Clavier* : la carte « Qui es-tu ? » garde ses espacements normaux et se
+    CENTRE dans la zone visible au-dessus du clavier (`centrerMenu` en mode
+    `clavier`, `--centre`) ; la version serrée (`serre`) ne s'enclenche que si
+    elle ne tient pas (iPhone SE). Mesuré : `outils/premiere.mjs` (432 px et
+    287 px visibles).
+  - *HUD refait* (`hud.renderHud`) : la barre du MORCEAU tout en haut, sur la
+    largeur, jusqu'au drapeau à damier (comme les barres d'une story ; rouge
+    les 10 dernières secondes) ; les points au centre ; à droite les cases des
+    potes, puis « N POTES » avec le MULTIPLICATEUR qu'ils donnent juste à côté
+    (pastille jaune, rouge en turbo) — on lit d'où vient le ×1,5 —, puis la
+    jauge « PROCHAIN POTE » sur une étiquette sombre. Plus aucun flou
+    (`#vignette` masqué, ni ombre ni blur sur le texte). Capture :
+    `capture.mjs hud` (seul, potes, turbo, nuit).
+  - *Partage dans les navigateurs intégrés* (« Inviter tes potes, ça ne marche
+    pas dans le navigateur Instagram ») : Instagram/Facebook/TikTok/Snapchat
+    n'ont pas de partage natif (ou il échoue) et l'API presse-papiers y est
+    refusée — l'erreur était avalée, rien ne se passait. Désormais
+    (`partagerLigue`, screens.js) : hors navigateur intégré, partage natif ;
+    dedans (ou s'il manque/échoue), le tiroir `#partage-sheet` — le lien
+    AFFICHÉ et sélectionnable, COPIER LE LIEN (copie fiable : `execCommand`
+    dans le geste, puis l'API), WhatsApp (`wa.me`), Messages (`sms:`),
+    Snapchat (`snapchat.com/scan?attachmentUrl=`), « Instagram (en DM) » =
+    copier + consigne, « Autres applis… » si `navigator.share` existe. En
+    démo (`?premiere`), le lien partagé est celui du JEU (la ligue n'existe
+    nulle part) et les potes fictifs n'arrivent qu'une fois le lien parti.
+    Événements `invitation_ouverte` / `invitation_envoyee` (`details.via`).
+    Vérifié avec un user-agent Instagram (`premiere.mjs`) ; ⚠️ le vrai
+    navigateur d'Instagram reste à essayer sur téléphone.
+  - *@pmc.mp3 dans Instagram* : dans son navigateur, un lien https vers le
+    profil s'ouvre en version web DANS ce navigateur ; on y sert
+    `instagram://user?username=pmc.mp3` (`lienInstaPmc`), qui ouvre le profil
+    dans l'appli. Ailleurs, lien https inchangé. ⚠️ À essayer sur téléphone.
+  - *PIÉTONS* (`pieton`, contresens lent, famille tap, sans panneau
+    d'alerte, `props.drawPieton` : dame à la baguette, gars sur son
+    téléphone, joggeur ; en slip de bain sur la plage) : seuls dès ~35 s,
+    par DEUX vers 75 s, par TROIS vers 2 min, par QUATRE sur la plage
+    (`taillePietons`, par numéro de paquet). Un groupe se pose comme le
+    bouchon : chaque piéton à `ecartMin` + 1 rangée du précédent, sans
+    consommer de place dans le paquet. Mesuré : 10 → 11 obstacles par 15 s
+    à 2 min, 9 → 10,8 à 2 min 15, 11,3 → 12,7 à 2 min 30 ; joueur idéal
+    0 choc sur 1 841 obstacles (20 graines). Piétons de la montagne → skieurs.
+  - *BAIGNEURS* (`baigneur`, statique, gabarit du costard) : sur la plage, le
+    costard et le fermier sont en slip de bain (2D de face, bronzé, lunettes
+    noires, chaîne en or ; ballon de plage brandi ou biceps gonflés), et les
+    8 dernières secondes alignent des baigneurs au lieu des vaches.
+  - *Marché de plein air* (`scene.etalMarche`, bit de décor `ETALS` autour de
+    la halle du marché) : étals au sol derrière la route — bâche rayée
+    (rouge, vert, bleu), table en gazon synthétique, cagettes (courgettes,
+    tomates, salades, aubergines, poireaux / oranges, bananes, pommes,
+    fraises / pastèques entières et ouvertes, melons), étiquettes de prix,
+    paniers de fruits par terre, pile de pastèques, marchands en marinière
+    (béret, casquette) qui haranguent dans une bulle (« Elle est belle ma
+    courgette ! »). Hors teinte de saison (en automne la pastèque virait au
+    marron). Capture : `capture.mjs batiments`.
 - **Tuto au ralenti, deuxième version** (`conseilTap`/`conseilStep`) : approche
   ~1 s avant le bon moment (monde ×0,25), un tap donné pendant l'approche est
   GARDÉ et part pile au bon moment, gel ×0,06 s'il n'a rien fait ; reprise
@@ -517,7 +573,7 @@ Code `TESTV2`, qui est aussi `config.ligueBeta` (menu simplifié + bouton « Lai
 
 - L'écart entre deux obstacles vient de la PHYSIQUE du saut (`ecartMin` : retombée du premier +
   élan du second), jamais d'un nombre fixe, et jamais deux « double saut » d'affilée. Un joueur
-  idéal scripté ne touche **aucun** obstacle sur 20 graines (1 643 franchis, 4 octobre 2026) ; un joueur immobile
+  idéal scripté ne touche **aucun** obstacle sur 20 graines (1 841 franchis, 5 octobre 2026, piétons compris) ; un joueur immobile
   les touche tous. À re-mesurer après toute modification du saut ou du générateur.
 - ⚠️ La fenêtre de franchissement se calcule à la vitesse MINIMALE, pas maximale : un obstacle
   est long en rangées, donc c'est en roulant lentement qu'on reste le plus longtemps dessus.

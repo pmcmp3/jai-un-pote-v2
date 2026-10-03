@@ -14,7 +14,10 @@ await serveur.listen();
 const port = serveur.config.server.port;
 const petit = process.env.ECRAN === "petit";
 const navigateur = await chromium.launch({ channel: "chrome", headless: true });
-const contexte = await navigateur.newContext({ viewport: { width: 375, height: petit ? 667 : 812 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+// Navigateur intégré d'Instagram (5 octobre 2026 : le partage y était muet).
+const UA_INSTA = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 Instagram 350.0.0.21.106 (iPhone15,2; iOS 18_0; fr_FR; fr; scale=3.00; 1179x2556; 646427221)";
+const contexte = await navigateur.newContext({ viewport: { width: 375, height: petit ? 667 : 812 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, userAgent: UA_INSTA });
+await contexte.grantPermissions(["clipboard-read", "clipboard-write"], { origin: `http://localhost:${port}` });
 const page = await contexte.newPage();
 const erreurs = [];
 page.on("pageerror", (e) => erreurs.push(e.stack || e.message));
@@ -58,7 +61,20 @@ await page.click("#play-button"); await attendre(400);
 await photo("51-premiere-ligue");
 await page.click("#ligue-creer"); await attendre(400);
 await photo("52-premiere-creee");
-await page.click("#ligue-partager"); await attendre(2500);
+await page.click("#ligue-partager"); await attendre(450);
+await photo("52b-partage-tiroir");
+console.log("tiroir de partage :", JSON.stringify(await page.evaluate(() => ({
+  visible: document.getElementById("partage-sheet").classList.contains("visible"),
+  lien: document.getElementById("partage-lien").textContent,
+  whatsapp: document.getElementById("partage-whatsapp").href.slice(0, 70),
+  sms: document.getElementById("partage-sms").href.slice(0, 40),
+  snap: document.getElementById("partage-snap").href.slice(0, 70),
+  insta: document.getElementById("credit-insta").href,
+}))));
+await page.click("#partage-copier"); await attendre(350);
+console.log("copie :", await page.textContent("#partage-hint"), "| presse-papiers :", await page.evaluate(() => navigator.clipboard.readText().catch((e) => "ILLISIBLE " + e.message)));
+await photo("52c-partage-copie");
+await page.click("#partage-fermer"); await attendre(2500);
 await photo("53-premiere-arrivee");
 await attendre(7000);
 await photo("54-premiere-tous");

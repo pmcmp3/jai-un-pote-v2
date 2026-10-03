@@ -37,42 +37,82 @@ function fitFont(ctx, weight, size, text, maxW, min = 9) {
   return t;
 }
 
-// `hud` = { metres, potes, potesMax, gaugeT, mult, restant, elan, restantS, turbo, safeTop }
-// Disposition (7 septembre 2026, « en haut tout se marche dessus ») :
-//   gauche  : pause (DOM), et SOUS lui la barre SALTO ;
-//   centre  : les mètres (taille adaptée au nombre de chiffres), le chrono ;
-//   droite  : les 8 cases, « N POTES », la jauge du prochain.
-// La pastille ×N vit SOUS le chrono, et le bandeau d'événement plus bas
-// encore (renderBanner) : trois étages qui ne se chevauchent jamais.
+// `hud` = { metres, potes, potesMax, gaugeT, mult, restant, restantS, avance, turbo, safeTop, nuit }
+// Disposition revue le 5 octobre 2026 (« la manière dont les points sont
+// affichés et la temporalité, le 1,5, ce n'est pas hyper ergonomique [...]
+// que ça soit un peu plus intelligemment fait ») :
+//   haut   : la barre du MORCEAU (le chrono de la course), sur toute la
+//            largeur, qui se remplit jusqu'au drapeau — comme une story ;
+//   centre : les points ;
+//   droite : les cases des potes, puis « N POTES » avec le multiplicateur
+//            qu'ils donnent (×1,5…) — on lit d'où il vient —, puis la jauge
+//            du prochain pote. Plus aucun texte flouté.
 export function renderHud(ctx, width, height, hud) {
   ctx.save();
   const top = hud.safeTop || 0;
-  // Ni bandeau sombre, ni contour noir (20 septembre 2026 : « les points en
-  // haut, c'est super, mais enlève le contour noir — laisse le texte blanc,
-  // avec une ombre portée à 25 % d'opacité, ça fera très bien le taf »).
   ctx.textBaseline = "top";
-  // Ombre remontée à 50 % le 29 septembre 2026 (« attention aux contrastes ») :
-  // sur le ciel d'hiver et la neige, 25 % ne détachait plus le blanc.
-  // PLUS AUCUNE OMBRE PORTÉE (30 septembre 2026 : « tu enlèves les ombres
-  // portées derrière les titres et les textes partout ») : le contraste vient
-  // de la couleur — texte noir de jour, blanc la nuit.
+  ctx.shadowColor = "transparent"; ctx.shadowBlur = 0;
+  // Texte noir de jour, blanc la nuit (pas d'ombre portée, 30 septembre 2026).
   const TXT = hud.nuit > 0.5 ? BLANC : NOIR, TXT_VIDE = hud.nuit > 0.5 ? "rgba(255,255,255,0.28)" : "rgba(13,13,16,0.22)";
-  ctx.shadowColor = "transparent";
-  const ecrire = (txt, x, y, taille = 0) => { ctx.shadowBlur = Math.max(3, taille * 0.12); ctx.fillText(txt, x, y); };
 
-  // Colonnes : gauche = 14..(14+96), droite = 8 cases de 10 px.
+  // --- Droite : cases, « N POTES » + multiplicateur, jauge -----------------
   const cell = 10, gap = 3, total = hud.potesMax;
   const rowW = Math.max(60, total * cell + (total - 1) * gap);
-  const rx = width - PAD - rowW;
-  const leftEnd = 14 + 96 + 10, rightStart = rx - 10;
+  const rx = width - PAD - rowW, ry = top + PAD + 6;
+  for (let i = 0; i < total; i++) {
+    ctx.fillStyle = i < hud.potes ? TXT : TXT_VIDE;
+    roundRect(ctx, rx + i * (cell + gap), ry, cell, cell, 2);
+    ctx.fill();
+  }
+  const libelle = total === 0 ? "INVITE TES POTES" : hud.potes === 0 ? "TOUT SEUL" : hud.potes === 1 ? "1 POTE" : `${hud.potes} POTES`;
+  ctx.font = `800 11px ${POLICE}`;
+  const wLib = ctx.measureText(libelle).width;
+  const y2 = ry + cell + 6;
+  ctx.textAlign = "right";
+  ctx.fillStyle = TXT;
+  ctx.fillText(libelle, width - PAD, y2);
+  let gaucheDroite = Math.min(rx, width - PAD - wLib);
+  if (hud.mult > 1.001) {
+    const txt = `×${String(hud.mult).replace(".", ",")}`;
+    ctx.font = `900 11px ${POLICE}`;
+    const w = ctx.measureText(txt).width + 10;
+    const xP = width - PAD - wLib - 6 - w;
+    ctx.fillStyle = hud.turbo ? ROUGE : JAUNE;
+    roundRect(ctx, xP, y2 - 3, w, 17, 3);
+    ctx.fill();
+    ctx.fillStyle = hud.turbo ? BLANC : "#4a3305";
+    ctx.textAlign = "center";
+    ctx.fillText(txt, xP + w / 2, y2 + 0.5);
+    gaucheDroite = Math.min(gaucheDroite, xP);
+  }
+  if (total > 0 && !hud.plein) {
+    const gy = y2 + 19;
+    ctx.fillStyle = TXT_VIDE;
+    roundRect(ctx, rx, gy, rowW, 4, 2);
+    ctx.fill();
+    ctx.fillStyle = JAUNE;
+    roundRect(ctx, rx, gy, Math.max(4, rowW * Math.min(1, hud.gaugeT)), 4, 2);
+    ctx.fill();
+    // Le texte de la jauge : net, sur une étiquette sombre (jaune pâle illisible sur le ciel).
+    const txt = `PROCHAIN POTE : ${hud.restant} PIÈCE${hud.restant > 1 ? "S" : ""}`;
+    fitFont(ctx, "800", 10, txt, rowW + 50, 8);
+    const w = ctx.measureText(txt).width + 8;
+    ctx.fillStyle = "rgba(13,13,16,0.55)";
+    roundRect(ctx, width - PAD - w, gy + 8, w, 15, 3);
+    ctx.fill();
+    ctx.fillStyle = JAUNE;
+    ctx.textAlign = "right";
+    ctx.fillText(txt, width - PAD - 4, gy + 10.5);
+  }
+
+  // --- Centre : les points ---------------------------------------------------
+  const leftEnd = 14 + 46 + 10, rightStart = gaucheDroite - 10;
   const centerW = rightStart - leftEnd;
   const cx = (leftEnd + rightStart) / 2;
-
-  // Mètres : serif, taille réduite si ça ne tient pas entre les colonnes.
   const num = formatMetres(hud.metres);
   let taille = 40;
   ctx.font = `900 ${taille}px ${POLICE_TITRE}`;
-  while (ctx.measureText(num).width + 22 > centerW && taille > 22) { taille -= 2; ctx.font = `900 ${taille}px ${POLICE_TITRE}`; }
+  while (ctx.measureText(num).width + 26 > centerW && taille > 22) { taille -= 2; ctx.font = `900 ${taille}px ${POLICE_TITRE}`; }
   const wNum = ctx.measureText(num).width;
   ctx.font = `700 14px ${POLICE}`;
   const wUnit = ctx.measureText(" pts").width;
@@ -80,63 +120,28 @@ export function renderHud(ctx, width, height, hud) {
   ctx.fillStyle = TXT;
   ctx.textAlign = "left";
   ctx.font = `900 ${taille}px ${POLICE_TITRE}`;
-  ecrire(num, x0, top + PAD - 6, taille);
+  ctx.fillText(num, x0, top + PAD - 2);
   ctx.font = `700 14px ${POLICE}`;
-  ecrire(" pts", x0 + wNum, top + PAD + taille * 0.5 - 4, 14);
+  ctx.fillText(" pts", x0 + wNum, top + PAD + taille * 0.5);
 
-  // Chrono sous les mètres.
-  if (hud.restantS !== undefined) {
-    const s = Math.max(0, hud.restantS);
-    ctx.font = `700 12px ${POLICE}`;
-    ctx.textAlign = "center";
-    ctx.fillStyle = s <= 10 ? ROUGE : TXT;
-    ecrire(`${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`, cx, top + PAD + taille * 0.9 + 2, 12);
-  }
-  // Pastille ×N sous le chrono.
-  if (hud.mult > 1.001) {
-    ctx.shadowBlur = 0; ctx.shadowColor = "transparent";
-    const txt = `×${String(hud.mult).replace(".", ",")}${hud.turbo ? " TURBO" : ""}`;
-    ctx.font = `900 12px ${POLICE}`;
-    const w = ctx.measureText(txt).width + 16;
-    ctx.fillStyle = JAUNE;
-    roundRect(ctx, cx - w / 2, top + PAD + taille * 0.9 + 18, w, 20, 3);
+  // --- Tout en haut : la barre du MORCEAU, comme les barres des stories ----
+  // (Instagram) : elle se remplit jusqu'au drapeau d'arrivée, rouge dans les
+  // dix dernières secondes.
+  if (hud.avance !== undefined) {
+    const a = Math.max(0, Math.min(1, hud.avance));
+    const fin = hud.restantS !== undefined && hud.restantS <= 10;
+    const bx = PAD, bw = width - 2 * PAD - 14, by = top + 4;
+    ctx.fillStyle = TXT_VIDE;
+    roundRect(ctx, bx, by, bw, 4, 2);
     ctx.fill();
-    ctx.fillStyle = "#4a3305";
-    ctx.textAlign = "center";
-    ctx.fillText(txt, cx, top + PAD + taille * 0.9 + 22);
-    ctx.shadowColor = "transparent"; ctx.shadowOffsetY = 2;
-  }
-
-  // Droite : cases, compte, jauge. Les aplats ne portent pas l'ombre du texte.
-  const sansOmbre = () => { ctx.shadowBlur = 0; ctx.shadowColor = "transparent"; };
-  const avecOmbre = () => { ctx.shadowColor = "transparent"; ctx.shadowOffsetY = 2; };
-  const ry = top + PAD + 2;
-  sansOmbre();
-  for (let i = 0; i < total; i++) {
-    ctx.fillStyle = i < hud.potes ? TXT : TXT_VIDE;
-    roundRect(ctx, rx + i * (cell + gap), ry, cell, cell, 2);
+    ctx.fillStyle = fin ? ROUGE : TXT;
+    roundRect(ctx, bx, by, Math.max(4, bw * a), 4, 2);
     ctx.fill();
+    const fx = bx + bw + 4, fy = by - 3;
+    ctx.fillStyle = TXT;
+    ctx.fillRect(fx, fy, 1.5, 11);
+    for (let k = 0; k < 3; k++) for (let l = 0; l < 2; l++) { ctx.fillStyle = (k + l) % 2 ? BLANC : NOIR; ctx.fillRect(fx + 1.5 + k * 2.5, fy + l * 2.5, 2.5, 2.5); }
   }
-  avecOmbre();
-  ctx.font = `700 11px ${POLICE}`;
-  ctx.textAlign = "right";
-  ctx.fillStyle = TXT;
-  ecrire(total === 0 ? "INVITE TES POTES" : hud.potes === 0 ? "TOUT SEUL" : hud.potes === 1 ? "1 POTE" : `${hud.potes} POTES`, width - PAD, ry + cell + 5, 11);
-  if (total > 0 && !hud.plein) {
-    sansOmbre();
-    const gy = ry + cell + 22;
-    ctx.fillStyle = "rgba(255,255,255,0.22)";
-    roundRect(ctx, rx, gy, rowW, 4, 2);
-    ctx.fill();
-    ctx.fillStyle = JAUNE;
-    roundRect(ctx, rx, gy, Math.max(4, rowW * Math.min(1, hud.gaugeT)), 4, 2);
-    ctx.fill();
-    avecOmbre();
-    fitFont(ctx, "700", 10, `PROCHAIN POTE : ${hud.restant}`, rowW + 30, 8);
-    ctx.fillStyle = JAUNE;
-    ecrire(`PROCHAIN POTE : ${hud.restant} PIÈCE${hud.restant > 1 ? "S" : ""}`, width - PAD, gy + 9, 10);
-  }
-
   ctx.restore();
 }
 

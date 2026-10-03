@@ -79,6 +79,13 @@ export const KINDS = {
   // nous, en ski de fond, quand on est dans le biome neige exclusivement ») :
   // il vient en face, lentement, skis compris dans la longueur.
   skieur:      { contresens: true, cout: 2, vitesse: 1.5, arme: 5.5, long: 1.9, larg: 0.7, h: 1.8, nom: "un skieur" },
+  // Les PIÉTONS (5 octobre 2026 : « il me reste 1 minute, je m'ennuie [...]
+  // sur la route, des piétons présents, tu vois vraiment que ça monte en
+  // difficulté ») : ils marchent vers le joueur — seuls d'abord, puis en
+  // GROUPES de 2, puis de 3 sur la fin (taillePietons) : une rafale de sauts
+  // tenus, au plus serré que permet la physique. Lents : pas de panneau
+  // d'alerte (on les voit venir).
+  pieton:      { contresens: true, cout: 1, vitesse: 0.9, arme: 5.5, long: 0.6, larg: 0.6, h: 1.75, sansAlerte: true, nom: "un piéton" },
   // En SENS INVERSE : elle roule sur la route, vers le joueur (20 septembre
   // 2026 : « une voiture qui roule en sens inverse, pour que ce soit vraiment
   // difficile »). Sa vitesse s'ajoute à celle du joueur.
@@ -112,6 +119,10 @@ export const KINDS = {
   // milieu avec une valise, qui fait des gestes dans tous les sens, de manière
   // statique. Il faut l'éviter, pareil »).
   costard: { cout: 2, long: 0.8, larg: 0.7, h: 1.9, nom: "un homme en costard" },
+  // Le BAIGNEUR de la plage (5 octobre 2026 : « des mecs en slip de bain au
+  // milieu de la route, au lieu de mettre un mec en costard quand on est sur
+  // la plage ») : planté là comme le costard, même gabarit, même geste.
+  baigneur: { cout: 2, long: 0.8, larg: 0.7, h: 1.9, nom: "un baigneur" },
   fermier: { cout: 2, long: 0.85, larg: 0.75, h: 2.2, nom: "un fermier" }, // plus grand le 29 septembre 2026
   // ⚠️ MONTABLE (20 septembre 2026, soir : « ça serait normal qu'on puisse
   // monter sur le toit d'une voiture ») : son toit devient un plancher dès
@@ -454,14 +465,24 @@ const PAQUETS = [
   ["poule", "poule", "voiture", "chat", "chat", "chien", "chien", "mouton", "mouton", "botte", "botte", "contresens"],
   // Ensuite : les gros animaux (appui maintenu) et les premiers véhicules.
   // + voitures EN FACE (29 septembre 2026 : « les voitures qui arrivent dans ta tête, faut en mettre beaucoup plus »).
-  ["poule", "chien", "mouton", "botte", "costard", "fermier", "cochon", "vache", "tracteur", "bus", "contresens", "contresens"],
-  // Fin : fermiers, voitures, et la voiture qui arrive en face.
-  ["poule", "mouton", "botte", "costard", "costard", "vache", "tracteur", "fermier", "voiture", "contresens", "bus", "contresens"],
+  // + le premier PIÉTON (5 octobre 2026), seul.
+  ["poule", "pieton", "mouton", "botte", "costard", "fermier", "cochon", "vache", "tracteur", "bus", "contresens", "contresens"],
+  // Fin : fermiers, voitures, la voiture qui arrive en face — et deux
+  // passages de piétons (seuls, puis par deux : taillePietons).
+  ["pieton", "mouton", "botte", "costard", "pieton", "vache", "tracteur", "fermier", "voiture", "contresens", "bus", "contresens"],
   // Finale (3 octobre 2026 : « à 30 secondes de la fin je me fais chier [...]
   // que ceux qui terminent soient vraiment les plus forts ») : presque tout
   // roule, et vite (armer : les véhicules en face accélèrent en fin de course).
-  ["contresens", "bus", "tracteur", "contresens", "costard", "fermier", "contresens", "bus", "vache", "voiture", "contresens", "tracteur"],
+  // + deux GROUPES DE TROIS piétons par paquet (5 octobre 2026).
+  ["contresens", "bus", "tracteur", "contresens", "pieton", "fermier", "contresens", "bus", "pieton", "voiture", "contresens", "tracteur"],
 ];
+// Taille d'un groupe de piétons selon le PAQUET (même numéro de paquet pour
+// toutes les graines : les quotas restent identiques d'une route à l'autre).
+// Seuls (~35 s), par deux (~75 s), par trois (~2 min), par quatre sur la
+// plage — la route se remplit à vue d'œil.
+function taillePietons(d) { return d < 3 ? 1 : d < 5 ? 2 : d < 6 ? 3 : 4; }
+// Écart DANS un groupe : la physique du saut, plus une rangée de grâce.
+const PIETONS_GRACE = 1;
 // Paquets avancés (30 septembre 2026 : « au bout de 40 secondes, ça doit devenir
 // difficile ») : 12 obstacles de départ, 12 intermédiaires, puis le dur.
 function paquetPour(d) { return PAQUETS[d < 1 ? 0 : d < 2 ? 1 : d < 5 ? 2 : 3]; }
@@ -543,7 +564,9 @@ export class Route {
       if (KINDS[kind].contresens && KINDS[kind].vitesse > 0 && this.chaine.r < rangAuTemps(20)) kind = "voiture";
       // … ni dans les 8 dernières secondes : aucun véhicule qui roule ne
       // traverse la ligne d'arrivée (3 octobre 2026).
-      if (KINDS[kind].contresens && this.chaine.r > rangAuTemps(dureeCourse() - 8)) kind = "vache";
+      // (Sur la plage — les 30 dernières secondes —, des baigneurs.)
+      if (KINDS[kind].contresens && this.chaine.r > rangAuTemps(dureeCourse() - 8)) kind = enPlage(this.chaine.r) ? "baigneur" : "vache";
+      const groupe = kind === "pieton" ? taillePietons(Math.floor(i / 12)) : 1;
       if (!this.evts) this.evts = { convoi: 0, convoiFait: false, bouchonFait: false };
       if (!this.evts.convoiFait && this.chaine.r >= rangAuTemps(T_CONVOI)) { this.evts.convoiFait = true; this.evts.convoi = CONVOI_N; }
       if (this.evts.convoi > 0) { kind = "bus"; this.evts.convoi -= 1; }
@@ -553,7 +576,8 @@ export class Route {
       // voitures garées, messieurs et grosses bêtes de la ferme deviennent, en
       // alternance, des bonshommes de neige et des SKIEURS qui viennent en face.
       if (enMontagne(this.chaine.r)) {
-        if (KINDS[kind].contresens && !KINDS[kind].lanceur) {
+        if (kind === "pieton") kind = "skieur"; // les piétons de la montagne sont à skis
+        else if (KINDS[kind].contresens && !KINDS[kind].lanceur) {
           this.nNeigeFace = (this.nNeigeFace || 0) + 1;
           kind = this.nNeigeFace === 2 ? "skieur" : "chasseneige"; // le 2e qui vient en face est TOUJOURS un skieur
         }
@@ -562,6 +586,8 @@ export class Route {
           kind = this.nNeige % 2 === 1 ? "bonhomme" : "skieur"; // en alternance : au moins un bonhomme par course
         }
       }
+      // La plage : le costard et le fermier y sont en slip de bain.
+      if (enPlage(this.chaine.r) && (kind === "costard" || kind === "fermier")) kind = "baigneur";
       const t = Math.min(1, Math.max(0, this.chaine.r / RAMP_ROWS));
       const mou = Math.round(MOU_DEBUT + (MOU_FIN - MOU_DEBUT) * t);
       const base = this.chaine.kind ? ecartMin(this.chaine.kind, kind, Math.min(vMaxRangees(), vitesseAuRang(this.chaine.r + 20) * 1.08)) : 6;
@@ -577,7 +603,17 @@ export class Route {
         this.chaine = { r: r + 2 * BOUCHON_PAS + 6, kind: "voiture", i: i + 1 };
         continue;
       }
-      this.chaine = { r, kind, i: i + 1 };
+      // Groupe de piétons : les suivants à l'écart physique du précédent (+
+      // une rangée de grâce), tant que la route le permet (réserves, halles,
+      // pentes : le groupe s'arrête là).
+      let dernier = r;
+      for (let g = 1; g < groupe; g++) {
+        const rg = dernier + ecartMin(kind, kind, Math.min(vMaxRangees(), vitesseAuRang(dernier + 20) * 1.08)) + PIETONS_GRACE;
+        if (estReservee(rg) || estReservee(rg - 1) || estReservee(rg + 1) || dansHalle(rg) || dansHalle(rg - 4) || dansHalle(rg + 4) || penteAutour(rg)) break;
+        this.dangers.set(rg, kind);
+        dernier = rg;
+      }
+      this.chaine = { r: dernier, kind, i: i + 1 };
     }
   }
 

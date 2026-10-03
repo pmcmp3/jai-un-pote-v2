@@ -333,6 +333,9 @@ const SCENES = {
   menuFin: async () => {
     await page.keyboard.press("KeyF"); await attendre(700); await photo("29-termine");
     await attendre(1600); await photo("30-fin");
+    // (Un tap d'une scène précédente a pu ouvrir le tiroir de partage.)
+    await course(() => { if (document.getElementById("partage-sheet").classList.contains("visible")) document.getElementById("partage-fermer").click(); });
+    await attendre(350);
     await page.click("#end-menu"); await attendre(800); await photo("31-menu-apres");
   },
   // Boîtes de collision contre dessins (27 septembre 2026 : « vérifiez bien la
@@ -343,12 +346,19 @@ const SCENES = {
       const scene = await import("/src/scene.js"), props = await import("/src/props.js"), rows = await import("/src/rows.js");
       const out = [];
       for (const [k, K] of Object.entries(rows.KINDS)) {
-        const b = scene.mesurerModele((c) => {
-          if (K.traverse) props.drawCrosser(c, k, 0, 0, -1, 0);
-          else if (k === "poulejetee") props.drawPouleJetee(c, 0, 0, 0);
-          else if (k === "contresens") props.drawVoiture(c, K, 0, 0, -1, 0);
-          else props.drawStatic(c, k, 0, 0, 0);
-        });
+        // Les personnages 2D (costard, fermier, baigneur) se peignent en
+        // pixels d'écran : la mesure en boîtes ne les voit pas.
+        let b;
+        try {
+          b = scene.mesurerModele((c) => {
+            if (K.traverse) props.drawCrosser(c, k, 0, 0, -1, 0);
+            else if (k === "poulejetee") props.drawPouleJetee(c, 0, 0, 0);
+            else if (k === "contresens") props.drawVoiture(c, K, 0, 0, -1, 0);
+            else if (k === "pieton") props.drawPieton(c, K, 0, 0, 0, 0);
+            else if (k === "skieur") props.drawSkieur(c, K, 0, 0, 0);
+            else props.drawStatic(c, k, 0, 0, 0);
+          });
+        } catch (e) { out.push(`${k.padEnd(11)} (dessin 2D, non mesuré)`); continue; }
         const longDessin = K.traverse ? b.u1 - b.u0 : b.v1 - b.v0;
         out.push(`${k.padEnd(11)} dessin : long ${longDessin.toFixed(2)} h ${b.h1.toFixed(2)}  |  collision : long ${(K.traverse ? K.long : K.long).toFixed(2)} (barre ${(K.traverse ? K.larg : K.long).toFixed(2)}) h ${K.h.toFixed(2)}`);
       }
@@ -574,6 +584,22 @@ const SCENES = {
     for (let k = 0; k < 30; k++) { await attendre(25); maxY = Math.max(maxY, await course(() => window.__pote.player.jumpY)); if (k === 8) await photo("48-plafond-halle"); }
     console.log("PLAFOND : hauteur max des roues", maxY.toFixed(2), "· plafond", await course((d) => window.__pote.rows.plafondA(d + 20), d));
   },
+  // HUD (5 octobre 2026) : points, barre du morceau, potes + multiplicateur.
+  hud: async () => {
+    // Les touches de debug ne marchent que calque AFFICHÉ : on l'allume pour
+    // agir, on l'éteint pour la photo.
+    await page.keyboard.press("KeyD");
+    await attendre(2500); await photo("59-hud-seul");
+    await page.keyboard.press("KeyD");
+    for (let i = 0; i < 2; i++) await page.keyboard.press("KeyP");
+    await page.keyboard.press("KeyD");
+    await attendre(2500); await photo("59b-hud-potes");
+    await page.keyboard.press("KeyD"); await page.keyboard.press("KeyL"); await page.keyboard.press("KeyD");
+    await attendre(600); await photo("59c-hud-turbo");
+    await page.keyboard.press("KeyD"); await page.keyboard.press("KeyN"); await page.keyboard.press("KeyD");
+    await attendre(5000); await photo("59d-hud-nuit");
+    await page.keyboard.press("KeyD");
+  },
   // PORTE de conversion (5 octobre 2026) : à lancer avec NEUF=1 PARTIES=0.
   // CONTINUER → abonnement ; REJOUER après la 1re partie → album.
   porte: async () => {
@@ -629,6 +655,59 @@ const SCENES = {
       await attendre(2600); await photo(nom);
     }
     console.log("PLAGE à partir de la rangée", r0);
+    await page.keyboard.press("KeyD");
+  },
+  // PIÉTONS et BAIGNEURS (5 octobre 2026) : vraie course en accéléré (mode
+  // vidéo + pilote automatique), photos aux moments où ils sont à l'écran.
+  pietons: async () => {
+    await page.keyboard.press("KeyD");
+    await course(() => {
+      const st = { plan: null, tenir: false, double: false, appuye: false };
+      const presser = () => { window.dispatchEvent(new KeyboardEvent("keydown", { code: "Space" })); st.appuye = true; };
+      const lacher = () => { if (st.appuye) window.dispatchEvent(new KeyboardEvent("keyup", { code: "Space" })); st.appuye = false; };
+      window.__pilote = () => {
+        const P = window.__pote, pl = P.player, R = P.rows, C = window.CONFIG;
+        if (st.plan && pl.auSol && pl.jumpVy <= 0 && st.plan.parti) { st.plan = null; lacher(); }
+        if (!st.plan && pl.auSol) {
+          const vit = P.vitesse();
+          for (let r = Math.floor(pl.v) + 1; r <= Math.floor(pl.v) + 14; r++) {
+            const row = R.rowAt(r);
+            if (row.type === "safe") continue;
+            const type = R.familleDe(row.kind);
+            if (r - pl.v <= vit * R.montee(type)) { st.plan = { type, parti: false }; presser(); st.tenir = type !== "tap"; if (!st.tenir) lacher(); st.double = false; }
+            break;
+          }
+        } else if (st.plan) {
+          if (pl.jumpY > R.solAt(pl.v) + 0.05) st.plan.parti = true;
+          if (st.tenir && pl.tHaut >= C.sautTenueMaxS) { lacher(); st.tenir = false; }
+          if (st.plan.type === "double" && !st.double && st.plan.parti && pl.jumpVy <= 0) { lacher(); presser(); lacher(); st.double = true; }
+        }
+      };
+      window.__pote.videoDemarrer();
+    });
+    // Le premier groupe d'au moins 3 piétons, un piéton sur la plage, un baigneur.
+    const cibles = await course(() => {
+      const P = window.__pote, o = {};
+      let debut = null, n = 0, dernier = -99;
+      for (let r = 100; r < 3000; r++) {
+        const k = P.rows.rowAt(r).kind;
+        if (k === "pieton") { if (r - dernier > 16) { debut = r; n = 0; } n += 1; dernier = r; if (n >= 3 && !o.groupe) o.groupe = debut; if (P.rows.enPlage(r) && !o.plage) o.plage = r; }
+        if (k === "baigneur" && !o.baigneur) o.baigneur = r;
+      }
+      return o;
+    });
+    console.log("PIÉTONS", JSON.stringify(cibles));
+    const allerA = (r, avance) => course(([r, avance]) => { const P = window.__pote; let g = 0; while (P.player.v < r - avance && g++ < 40000) window.__pote.videoAvance(P.clock.now() + 0.25); return P.player.v; }, [r, avance]);
+    const ordre = [["groupe", "60-pietons-groupe"], ["plage", "60b-pietons-plage"], ["baigneur", "60c-baigneur"]].filter(([c]) => cibles[c]).sort((a, b) => cibles[a[0]] - cibles[b[0]]);
+    for (const [cle, nom] of ordre) {
+      if (await course(() => window.__pote.player.v) > cibles[cle] - 4) continue;
+      await allerA(cibles[cle], 9);
+      for (let k = 0; k < 3; k++) {
+        await course(() => window.__pote.videoPas(1 / 30)); await photo(`${nom}-${k}`);
+        console.log(`  ${nom}-${k} devant :`, await course(() => { const P = window.__pote, v = P.player.v, out = []; for (let r = Math.floor(v); r < v + 45; r++) { const row = P.rows.rowAt(r); if (row.type !== "safe") out.push(`${r - Math.floor(v)}:${row.kind}${row.armed ? "*" : ""}`); } return out.join(" "); }));
+        await course(() => window.__pote.videoPas(0.32));
+      }
+    }
     await page.keyboard.press("KeyD");
   },
   // Montagne à bosses et bouchon de fin (4 octobre 2026).
