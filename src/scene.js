@@ -402,9 +402,13 @@ const ZONE_ROWS = 55;
 // France dans un des biomes premiers, et après un village typique du sud ».
 // Le village du Nord arrive tôt (3e tranche), celui du Sud en fin de boucle.
 const ZONES = ["ble", "prairie", "village", "tournesol", "foret", "vigne", "villageSud"];
-export function zoneAt(r) { return ZONES[Math.floor(Math.max(0, r) / ZONE_ROWS) % ZONES.length]; }
-const SOIL = { ble: "#c9a648", prairie: "#7aa63c", tournesol: "#6f8c2f", foret: "#3f5a2a", vigne: "#8a6a45", village: "#8fa864", villageSud: "#b9a06a" };
-const HERBE = { ble: "#6f8f34", prairie: "#7aa63c", tournesol: "#66852f", foret: "#4a6a30", vigne: "#6f8f34", village: "#8fa864", villageSud: "#9aa86a" };
+// Zone imposée par le parcours (4 octobre 2026 : le biome MONTAGNE de la fin,
+// posé par main.js à partir de rows.enMontagne).
+let zoneForcee = () => null;
+export function setZoneForcee(f) { zoneForcee = typeof f === "function" ? f : () => null; }
+export function zoneAt(r) { return zoneForcee(r) || ZONES[Math.floor(Math.max(0, r) / ZONE_ROWS) % ZONES.length]; }
+const SOIL = { ble: "#c9a648", prairie: "#7aa63c", tournesol: "#6f8c2f", foret: "#3f5a2a", vigne: "#8a6a45", village: "#8fa864", villageSud: "#b9a06a", montagne: "#7f8a63" };
+const HERBE = { ble: "#6f8f34", prairie: "#7aa63c", tournesol: "#66852f", foret: "#4a6a30", vigne: "#6f8f34", village: "#8fa864", villageSud: "#9aa86a", montagne: "#6c8a4a" };
 const DIRT = "#9a7a4e";
 const ROAD = "#55514d";
 const LINE = "#f2ead8";
@@ -501,6 +505,32 @@ function montagnes(ctx, u) {
   ctx.closePath(); ctx.fill();
 }
 
+// Montagnes PROCHES (biome montagne, 4 octobre 2026) : une chaîne rocheuse
+// devant les Alpes lointaines, qui apparaît en fondu (setMontagne).
+let montagneAlpha = 0;
+export function setMontagne(a) { montagneAlpha = Math.max(0, Math.min(1, a)); }
+function montagnesProches(ctx) {
+  const u = 170, s = echelle(u);
+  const pic = (v) => {
+    const a = Math.abs(((v / 52) % 1 + 1) % 1 - 0.5) * 2;
+    const b = Math.abs(((v / 21 + 0.37) % 1 + 1) % 1 - 0.5) * 2;
+    return 18 + 64 * (1 - a) * (0.7 + 0.3 * Math.sin(v * 0.017)) + 11 * (1 - b);
+  };
+  const pts = [];
+  for (let x = -10; x <= W + 10; x += 5) pts.push([x, pic(vCentre * 0.6 + (x - W * 0.5) / s)]);
+  ctx.fillStyle = rgbA(melange(parseColor("#6f7a86"), parseColor("#10142c"), night));
+  ctx.beginPath(); ctx.moveTo(-10, H);
+  for (const [x, hh] of pts) ctx.lineTo(x, horizonY + (camH - hh) * s);
+  ctx.lineTo(W + 10, H); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = rgbA(melange(parseColor("#f4f1ec"), parseColor("#3a4166"), night));
+  ctx.beginPath();
+  const seuil = 62;
+  ctx.moveTo(-10, horizonY + (camH - seuil) * s);
+  for (const [x, hh] of pts) ctx.lineTo(x, horizonY + (camH - Math.max(hh, seuil)) * s);
+  ctx.lineTo(W + 10, horizonY + (camH - seuil) * s);
+  ctx.closePath(); ctx.fill();
+}
+
 function nuages(ctx) {
   const u = 380, s = echelle(u);
   ctx.save();
@@ -558,6 +588,7 @@ export function renderGround(ctx, boueAt) {
   // Montagnes au loin (les villages du jeu sont en Isère : les Alpes en toile
   // de fond), neige sur les crêtes ; puis collines vertes, dans la brume.
   montagnes(ctx, 320);
+  if (montagneAlpha > 0.01) { ctx.save(); ctx.globalAlpha = montagneAlpha; montagnesProches(ctx); ctx.restore(); }
   collines(ctx, 150, 2, 26, teintes("#7c96a8", 14).plat, 1.7);
   collines(ctx, 62, 0.4, 9, teintes("#6d8c45", 12).plat, 4.1);
   // Champs lointains, jusqu'à la zone de décor.
@@ -627,12 +658,15 @@ function shadeHex(hex, a) {
 // passaient À TRAVERS son plancher et son toit).
 let masque = () => 0;
 export function setMasqueDecor(f) { masque = typeof f === "function" ? f : () => 0; }
-export const SANS_LAMPE = 1, DANS_HALLE = 2;
+export const SANS_LAMPE = 1, DANS_HALLE = 2, SANS_DECOR = 4;
 function lampeIci(r) { return r % 12 === 3 && !(masque(r) & (SANS_LAMPE | DANS_HALLE)); }
 function poteauIci(r) { return r % 5 === 0 && !(masque(r) & DANS_HALLE) && !(masque(r + 5) & DANS_HALLE); }
 
 export function rowDecor(ctx, r, clear) {
   const out = [];
+  // Le bowling est un INTÉRIEUR (4 octobre 2026 : « enlève les maisons
+  // derrière ») : son mur du fond remplace tout le décor.
+  if (masque(r) & SANS_DECOR) return out;
   const zone = zoneAt(r);
   const push = (u, v, draw) => out.push({ d: depth(u, v), draw: () => avecSaison("objet", draw) });
   const sway = (k) => Math.sin(decorT * 1.6 + k) * 0.05;
@@ -665,6 +699,9 @@ export function rowDecor(ctx, r, clear) {
         } else if (zone === "foret") {
           const h = 5.0 + a * 4.0;
           push(u, v, () => arbre(ctx, u, v, h, sway(k)));
+        } else if (zone === "montagne") {
+          const t = 0.5 + a * 0.9;
+          push(u, v, () => rocher(ctx, u, v, t));
         }
       }
       // Arbres ESPACÉS (29 septembre 2026 : l'ancien « une rangée sur deux »
@@ -673,7 +710,13 @@ export function rowDecor(ctx, r, clear) {
       if ((side > 0 ? r % 5 === 0 : r % 3 === 1) && !estVillage(zone)) {
         const a = hash(r * 13 + side * 7);
         const u = (side > 0 ? ROAD_HALF + 6.6 : ROAD_HALF + 11.2) + a * 0.8, v = r - 0.4, k = r * 2.3 + side * 5;
-        push(u, v, () => arbre(ctx, u, v, 5.5 + a * 3.0, sway(k) * 1.4));
+        if (zone === "montagne") push(u, v, () => sapin(ctx, u, v, 6.5 + a * 3.5));
+        else push(u, v, () => arbre(ctx, u, v, 5.5 + a * 3.0, sway(k) * 1.4));
+      }
+      // Montagne : une forêt de sapins plus serrée au fond.
+      if (zone === "montagne" && side < 0 && r % 3 === 0) {
+        const a = hash(r * 19 + 5), u = ROAD_HALF + 8.4 + a * 1.4, v = r + 0.6;
+        push(u, v, () => sapin(ctx, u, v, 7 + a * 4));
       }
     }
     // (Plus de bottes de foin sur le bas-côté : de profil, elles se
@@ -757,6 +800,24 @@ export function rowDecor(ctx, r, clear) {
 
 // Arbre : 1 unité ≈ 1 mètre ici aussi (un pommier de bord de route fait 5 à
 // 9 m, pas 2). Le tronc porte deux étages de feuillage.
+// Sapin (montagne) : un tronc, quatre étages qui rétrécissent, neige l'hiver.
+// Toujours vert sapin : les saisons ne le repeignent pas (il a sa neige à lui).
+function sapin(ctx, u, v, h) {
+  avecSaison(null, () => {
+    drawBox(ctx, u + 0.35, v + 0.35, 0.3, 0.3, h * 0.2, "#4a3828");
+    const neige = poidsHiver() > 0.5;
+    for (let i = 0; i < 4; i++) {
+      const w = 2.2 - i * 0.48, base = h * (0.16 + i * 0.2);
+      drawBox(ctx, u + 0.5 - w / 2, v + 0.5 - w / 2, w, w, h * 0.24, i % 2 ? "#24573a" : "#1f4d2c", base);
+      if (neige) drawBox(ctx, u + 0.5 - w / 2 + 0.05, v + 0.5 - w / 2 + 0.05, w - 0.1, w - 0.1, 0.08, "#f2f0ea", base + h * 0.24);
+    }
+  });
+}
+// Rocher : deux blocs gris décalés.
+function rocher(ctx, u, v, t) {
+  drawBox(ctx, u, v, 1.1 * t, 1.3 * t, 0.7 * t, "#8a8a86");
+  drawBox(ctx, u + 0.25 * t, v + 0.2 * t, 0.7 * t, 0.8 * t, 0.45 * t, "#a2a29c", 0.7 * t);
+}
 function arbre(ctx, u, v, h, sw) {
   drawBox(ctx, u + 0.3, v + 0.3, 0.45, 0.45, h * 0.42, "#5c4a3a");
   // Printemps : un arbre sur deux en fleurs (rose, jamais « végétal », donc
@@ -944,11 +1005,53 @@ export function drawHalle(ctx, rDebut, geo, rFrom = -Infinity, rTo = Infinity, c
     gare: { BOIS: "#5c6a66", BOIS_CLAIR: "#c4beb2", PIERRE: "#4f6a5e", TUILE: "#a9cfe0", POUTRE: "#3f564c", SOUS: "#7fa3b5", ENSEIGNE: "GARE", FOND: "#1f3a78", ENCRE: "#ffffff", CADRE: "#ffffff" },
   }[type];
   const { BOIS, BOIS_CLAIR, PIERRE, TUILE, POUTRE } = PAL;
-  const TOIT = haut + HALLE_TOIT_AU_DESSUS;
+  const TOIT = haut + (geo.toit || HALLE_TOIT_AU_DESSUS);
   const v1 = rDebut + montee, v2 = rDebut + montee + plat, vFin = rDebut + total;
   // Rampe : le tablier (fond) et le flanc côté caméra (devant) se projettent
   // exactement, la pente est lisse.
   const rampes = [[rDebut, v1, 0, haut], [v2, vFin, haut, 0]];
+  if (couche === "salle") {
+    // L'INTÉRIEUR du bowling (4 octobre 2026 : « il faut vraiment que tu mettes
+    // des pistes, enlève les maisons derrière, et que les quilles soient
+    // beaucoup plus grosses ») : derrière la route, les pistes filent vers le
+    // fond (la perspective les fait converger), des quilles en bout de piste,
+    // un mur violet à néons qui cache tout le décor (scene.SANS_DECOR).
+    const uW = ROAD_HALF + 6.2, a0 = rDebut - 0.5, a1 = vFin + 0.5, t = geo.t || 0;
+    if (!visible(a0, a1)) return;
+    drawBox(ctx, uD, a0, uW - uD, a1 - a0, haut - 0.04, "#2a2140");                 // socle sous les pistes
+    drawBox(ctx, uW, a0, 0.4, a1 - a0, TOIT + 0.5 - haut, "#3a2f5a", haut);         // mur du fond
+    poly(ctx, [project(uD, a0, haut), project(uW, a0, haut), project(uW, a1, haut), project(uD, a1, haut)], teintes("#181226", 0).plat); // gouttières
+    const LARGE = 1.1, PAS = 1.6;
+    for (let v = v1 + 0.6; v + LARGE < v2 - 0.4; v += PAS) {
+      if (!visible(v - 1, v + 2)) continue;
+      poly(ctx, [project(uD, v, haut + 0.01), project(uW - 0.1, v, haut + 0.01), project(uW - 0.1, v + LARGE, haut + 0.01), project(uD, v + LARGE, haut + 0.01)], teintes("#e3c48e", 0).plat);
+      for (const du of [1.4, 2.0]) poly(ctx, [project(uD + du, v + 0.5, haut + 0.02), project(uD + du + 0.25, v + 0.55, haut + 0.02), project(uD + du, v + 0.6, haut + 0.02)], "#ff5fa8"); // flèches de visée
+      // Quilles en bout de piste : GROSSES (1,8 u), une derrière, deux devant.
+      for (const [du, dv] of [[0.4, 0.34], [0.95, 0.08], [0.95, 0.6]]) {
+        const u = uW - 0.15 - du, vv = v + dv;
+        drawBox(ctx, u, vv, 0.44, 0.44, 1.1, "#f7f2e6", haut);
+        drawBox(ctx, u + 0.07, vv + 0.07, 0.3, 0.3, 0.45, "#f7f2e6", haut + 1.1);
+        drawBox(ctx, u - 0.005, vv - 0.005, 0.45, 0.45, 0.13, "#e13e26", haut + 0.82);
+        drawBox(ctx, u + 0.04, vv + 0.04, 0.36, 0.36, 0.26, "#f7f2e6", haut + 1.55);
+      }
+      // Une boule qui roule vers les quilles (peinte APRÈS elles : elle est devant).
+      const k = ((t * 0.42 + v * 0.37) % 1 + 1) % 1, ub = uD + 0.4 + k * (uW - uD - 1.9);
+      drawDisque(ctx, ub, v + LARGE / 2, haut + 0.26, 0.26, ["#ff5fa8", "#36e0e6", "#ffcf2e"][Math.abs(Math.round(v * 3)) % 3]);
+    }
+    // Néons sur le mur, et une quille géante en néon tous les ~10 rangs.
+    for (const [hh, col] of [[haut + 2.4, "#ff5fa8"], [haut + 2.7, "#36e0e6"]]) drawBox(ctx, uW - 0.06, a0, 0.06, a1 - a0, 0.07, col, hh);
+    ctx.save();
+    ctx.lineWidth = 3; ctx.lineJoin = "round"; ctx.strokeStyle = "#ff5fa8";
+    for (let v = v1 + 4; v < v2 - 2; v += 10) {
+      if (!visible(v - 2, v + 2)) continue;
+      const P = (dv, h) => project(uW - 0.05, v + dv, haut + 3.2 + h);
+      const contour = [[0, 0], [-0.35, 0.3], [-0.45, 1.0], [-0.22, 1.6], [-0.18, 1.9], [-0.28, 2.3], [0, 2.6], [0.28, 2.3], [0.18, 1.9], [0.22, 1.6], [0.45, 1.0], [0.35, 0.3]];
+      ctx.beginPath(); contour.forEach(([dv, h], k) => { const p = P(dv, h); if (k) ctx.lineTo(p.x, p.y); else ctx.moveTo(p.x, p.y); }); ctx.closePath(); ctx.stroke();
+    }
+    ctx.restore();
+    drawBox(ctx, uD, a0, uW - uD, a1 - a0, 0.3, "#181226", TOIT + 0.2);           // plafond
+    return;
+  }
   if (couche === "train") {
     // Rails derrière la gare, et un TER à quai, au niveau du plancher.
     const uR = ROAD_HALF + 1.6, a0 = rDebut - 8, a1 = vFin + 8;
@@ -977,18 +1080,6 @@ export function drawHalle(ctx, rDebut, geo, rFrom = -Infinity, rTo = Infinity, c
       if (!visible(v, v + 0.8)) continue;
       drawBox(ctx, ROAD_HALF + 0.5, v, 0.8, 0.8, TOIT, PIERRE);
       drawBox(ctx, ROAD_HALF + 0.35, v - 0.1, 1.1, 1.0, 0.45, PIERRE, TOIT);
-    }
-    if (type === "bowling") {
-      // Quilles et boules alignées au bout des pistes, côté fond.
-      for (let v = v1 + 3; v < v2 - 2; v += 7) {
-        if (!visible(v - 1, v + 1.5)) continue;
-        drawBox(ctx, uD, v - 0.9, 0.9, 2.2, 0.06, "#e3c48e", haut - 0.06);
-        for (const [du, dv] of [[0.55, 0], [0.35, -0.3], [0.35, 0.3], [0.15, -0.6], [0.15, 0], [0.15, 0.6]]) {
-          drawBox(ctx, uD + du, v + dv, 0.16, 0.16, 0.5, "#f7f2e6", haut);
-          drawBox(ctx, uD + du - 0.005, v + dv - 0.005, 0.17, 0.17, 0.06, "#e13e26", haut + 0.32);
-        }
-        drawDisque(ctx, uD + 0.4, v + 1.0, haut + 0.24, 0.24, ["#ff5fa8", "#36e0e6", "#ffcf2e"][Math.abs(Math.round(v)) % 3]);
-      }
     }
     for (const [a, b, h0, h1] of rampes) {
       if (!visible(Math.min(a, b), Math.max(a, b))) continue;
@@ -1023,16 +1114,18 @@ export function drawHalle(ctx, rDebut, geo, rFrom = -Infinity, rTo = Infinity, c
     // Quai : bande d'éveil jaune côté voies.
     drawBox(ctx, uD - 0.45, v1, 0.18, plat, 0.02, "#ffcf2e", haut);
   }
-  for (let i = 0; i <= plat; i += 6) {
+  if (haut > 1) for (let i = 0; i <= plat; i += 6) {
     const v = v1 + Math.min(i, plat - 0.3);
     if (visible(v, v + 0.3)) drawBox(ctx, uG + 0.05, v, 0.3, 0.3, haut - 0.42, POUTRE);
   }
   // Garde-corps : des montants et une lisse, ajourés (on voit le cycliste à travers).
-  for (let i = 0; i <= plat; i += 2) {
-    const v = v1 + i;
-    if (visible(v, v + 0.2)) drawBox(ctx, uG - 0.16, v, 0.12, 0.12, 0.8, POUTRE, haut);
+  if (haut > 1) {
+    for (let i = 0; i <= plat; i += 2) {
+      const v = v1 + i;
+      if (visible(v, v + 0.2)) drawBox(ctx, uG - 0.16, v, 0.12, 0.12, 0.8, POUTRE, haut);
+    }
+    drawBox(ctx, uG - 0.18, v1, 0.16, plat, 0.1, POUTRE, haut + 0.72);
   }
-  drawBox(ctx, uG - 0.18, v1, 0.16, plat, 0.1, POUTRE, haut + 0.72);
   // Charpente : les fermes en travers, puis le toit (masse, rive épaisse).
   for (let i = 0; i <= total; i += 6) {
     const v = rDebut + i;
@@ -1064,6 +1157,28 @@ export function drawHalle(ctx, rDebut, geo, rFrom = -Infinity, rTo = Infinity, c
     const txt = PAL.ENSEIGNE;
     while (ctx.measureText(txt).width > (B.x - A.x) * 0.84 && taille > 5) { taille -= 1; ctx.font = `900 ${taille}px "Helvetica Neue", Helvetica, Arial, sans-serif`; }
     ctx.fillText(txt, (A.x + B.x) / 2, (A.y + B.y) / 2 + 1);
+  }
+}
+
+// Bosse de montagne (4 octobre 2026) : la chaussée monte et redescend. Deux
+// couches comme la halle : « dessus » (la route, peinte avant le cycliste) et
+// « flanc » (le talus côté caméra, peint après lui).
+export function drawBosse(ctx, d, geo, rFrom = -Infinity, rTo = Infinity, couche = "dessus") {
+  const { long, sol } = geo;
+  const uG = -ROAD_HALF, uD = ROAD_HALF, PAS = 0.5;
+  for (let a = d; a < d + long; a += PAS) {
+    const b = Math.min(d + long, a + PAS);
+    if (b < rFrom - 2 || a > rTo + 2) continue;
+    const ha = sol(a), hb = sol(b), b2 = b + 0.03; // léger recouvrement : pas de fil clair entre deux tranches
+    if (couche === "dessus") {
+      poly(ctx, [project(uG, a, ha), project(uG, b2, hb), project(uD, b2, hb), project(uD, a, ha)], teintes(ROAD, 0).plat);
+      if (Math.floor(a) % 3 !== 0) for (const [u0, u1] of [[uD - 0.2, uD - 0.12], [uG + 0.12, uG + 0.2]]) {
+        poly(ctx, [project(u0, a, ha + 0.003), project(u0, b, hb + 0.003), project(u1, b, hb + 0.003), project(u1, a, ha + 0.003)], teintes(LINE, 0).plat);
+      }
+    } else {
+      poly(ctx, [project(uG, a, 0), project(uG, b2, 0), project(uG, b2, hb), project(uG, a, ha)], teintes("#7a6a4e", uG).avant);
+      poly(ctx, [project(uG, a, ha), project(uG, b2, hb), project(uG, b2, Math.max(0, hb - 0.12)), project(uG, a, Math.max(0, ha - 0.12))], teintes("#a08f6c", uG).avant);
+    }
   }
 }
 

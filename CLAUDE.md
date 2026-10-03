@@ -282,6 +282,43 @@ Code `TESTV2`, qui est aussi `config.ligueBeta` (menu simplifié + bouton « Lai
   - *Bâtiments* : halle 1 = marché, 2 = BOWLING (piste cirée, quilles,
     néons), 3 = GARE (quai, marquise vitrée, rails et TER à quai, couche
     « train »). `rows.typeHalle(d)`. Capture : `capture.mjs batiments`.
+- **4 octobre 2026, deuxième série de retours (trois lots)** :
+  - *Interface* : écran de chargement avec le cycliste qui pédale sur une route
+    qui défile (`renderSplash`/`dessinerCycliste`, main.js), `chargementMinS`
+    2,6. Menu CENTRÉ verticalement (`centrerMenu`, var CSS `--centre` animée)
+    et qui remonte quand un champ prend le focus (classe `clavier`) ; champs en
+    16 px (sinon Safari zoome à l'ouverture du clavier). Étape 1 : titre « Pour
+    aller plus loin » au-dessus des champs facultatifs, plus de phrase. Ligue :
+    « Plus tes potes jouent… Deviens le meilleur score de ta ligue de potes » ;
+    après création : « Ma ligue », code, bandeau jaune SOUS le code
+    (`#ligue-statut`), INVITER TES POTES en très gros (icônes 24 px), texte des
+    bots ; liens « Mon cycliste · Quitter la ligue » alignés. Explication :
+    l'étape 2 sans titre, 4e carte « Monte le son ! » 5 s avec deux klaxons
+    (le décompte ne répète plus le rappel : `game.sonAnnonce`). Triangle
+    d'alerte : grand et qui TREMBLE 1 s, puis petit et calme
+    (`alertesVues`). Pastilles toujours entières dans l'écran. Arrivée : plus
+    de texte « ARRIVÉE », damier au sol + drapeaux à damier sur les poteaux.
+  - *Physique* : le saut trop tôt du tuto PLANE au-dessus de l'obstacle
+    (`conseil.plane`) au lieu d'un double saut automatique. PLAFOND sous le
+    toit des halles (`rows.plafondA`, joueur et potes). Les potes refont le
+    saut à la même distance de L'OBSTACLE franchi (`refObstacle`/`centreRef`,
+    marques `{ id, ref }`), tiennent l'appui exactement comme le joueur
+    (`majTenue`), gardent un saut arrivé en l'air (`enAttente`), roulent sur
+    les toits (`phys.solSous`). Mesuré (`capture.mjs potesVehicules`,
+    IMPARFAIT=1) : ancien code 1-2 véhicules traversés par un pote par course,
+    nouveau 0. Difficulté : rachat d'un pote de 5 à 14 pièces entre 60 et
+    160 s (`poteRachatPiecesFin`), chaque choc coûte +1 pote passé la moitié
+    (`chocPlusUnApres`), `vitesseFinale` 4,4.
+  - *Moments de course* (VERSION_COURSE 15) : halles à 30 s (marché), 58 s
+    (BOWLING de plain-pied, 0,35 u, toit à 7,4 : la caméra voyait son plancher
+    par-dessous ; pistes en perspective, boules, grosses quilles, mur à néons,
+    `SANS_DECOR`) et 86 s (gare). CONVOI de 3 cars scolaires à 72 s. MONTAGNE
+    de fin −60 → −20 s : bosses en cosinus (`rows.bosseA`, 16 rangs, 1,3 u,
+    jamais d'obstacle dessus), zone « montagne » (sapins, rochers, sommets
+    proches `setMontagne`). BOUCHON à −15 s : 3 voitures garées tous les 3
+    rangs (toit continu), feux de détresse, pièces sur les toits, +6 rangs
+    après (un double saut lancé d'un toit vole plus loin). Les simulations
+    roulent sur les toits (`rows.toitGare`). Joueur idéal : 0 choc / 30 graines.
 - **Tuto au ralenti, deuxième version** (`conseilTap`/`conseilStep`) : approche
   ~1 s avant le bon moment (monde ×0,25), un tap donné pendant l'approche est
   GARDÉ et part pile au bon moment, gel ×0,06 s'il n'a rien fait ; reprise

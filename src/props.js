@@ -150,6 +150,14 @@ export function drawBus(ctx, K, uC, v, t) {
   });
 }
 
+// Feux de détresse (le bouchon, 4 octobre 2026) : les quatre coins de la
+// voiture garée clignotent orange.
+export function drawFeuxDetresse(ctx, K, uC, v, t) {
+  if (Math.floor(t * 2.4) % 2) return;
+  const L = K.long, x = uC - K.larg / 2;
+  for (const dv of [-L / 2 - 0.05, L / 2 - 0.01]) for (const b of [0.04, K.larg - 0.34]) drawBox(ctx, x + b, v + dv, 0.3, 0.06, 0.14, "#ff9a1a", 0.5);
+}
+
 // Voiture : même carrosserie pour celle garée sur la route et celle qui arrive
 // en face. `sens` = +1 si son capot pointe vers +v (elle s'éloigne), −1 si elle
 // vient vers le joueur.

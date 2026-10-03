@@ -6,7 +6,7 @@
 //      joueur immobile : touche TOUS les obstacles (la collision marche dans les deux sens).
 import { chargerConfig } from "./charger-config.mjs";
 const C = chargerConfig();
-const { Route, KINDS, armer, delaiArmement, familleDe, montee, solAt, ecartMin: ecartMinTheorique } = await import("../src/rows.js");
+const { Route, KINDS, armer, delaiArmement, familleDe, montee, solAt, toitGare, ecartMin: ecartMinTheorique } = await import("../src/rows.js");
 const { scoreParfait, recenser } = await import("../src/simulation.js");
 const { V_UNIT, targetSpeed, dureeCourse } = await import("../src/regles.js");
 
@@ -69,7 +69,7 @@ function course(seed, pilote) {
       const tArr = now + (r - v) / speed;
       if (tArr - now <= delaiArmement(row)) armer(row, now, tArr);
     }
-    const sol = solAt(v);
+    const sol = Math.max(solAt(v), toitGare(route, v, jumpY)); // le bouchon : on roule sur les toits
     if (pilote && jumpY <= sol + 0.02 && !plan) {
       for (let r = Math.floor(v) + 1; r <= Math.floor(v) + 12; r++) {
         const row = route.rowAt(r);

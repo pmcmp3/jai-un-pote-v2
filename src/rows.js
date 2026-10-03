@@ -271,7 +271,10 @@ const GROSSE_EVERY = 70;         // la grosse pièce dorée (ex-rouge)
 export const HALLE_HAUT = 4.2;
 const HALLE_MONTEE = 7, HALLE_PLAT = 26, HALLE_DESCENTE = 7;
 export const HALLE_ROWS = HALLE_MONTEE + HALLE_PLAT + HALLE_DESCENTE;
-const HALLE_TEMPS = [36, 76, 116];  // secondes de course (156 retirée le 3 octobre 2026 : 9 s sans danger juste avant l'arrivée)
+// 4 octobre 2026 (« ça manque de difficulté à partir de la moitié du morceau,
+// faut faire venir la gare un peu avant ») : marché 30 s, bowling 58 s, gare
+// 86 s (la mi-morceau) ; avant : 36, 76, 116 (156 retirée le 3 octobre).
+const HALLE_TEMPS = [30, 58, 86];  // secondes de course
 let HALLES = null;
 function halles() {
   if (!HALLES) HALLES = HALLE_TEMPS.map((t) => Math.round(rangAuTemps(t)));
@@ -282,6 +285,12 @@ function halles() {
 // première halle est le marché, la deuxième un bowling, la troisième la gare.
 export const TYPES_HALLE = ["marche", "bowling", "gare"];
 export function typeHalle(d) { const i = halles().indexOf(d); return TYPES_HALLE[Math.max(0, i) % TYPES_HALLE.length]; }
+// Hauteur du plancher et du toit (au-dessus du plancher) de chaque bâtiment.
+// Le BOWLING est de plain-pied (4 octobre 2026) : la caméra (3,6 u) était
+// SOUS son plancher à 4,2 u, on ne voyait pas ses pistes ; une marche de
+// 0,35 u, et un toit plus haut pour que le double saut y tienne.
+const GEO_TYPES = { marche: { haut: HALLE_HAUT, toit: HALLE_TOIT_AU_DESSUS }, gare: { haut: HALLE_HAUT, toit: HALLE_TOIT_AU_DESSUS }, bowling: { haut: 0.35, toit: 7.4 } };
+export function geoHalle(d) { return GEO_TYPES[typeHalle(d)]; }
 // Début de la halle qui couvre la rangée r, ou null.
 export function halleA(r) {
   for (const d of halles()) if (r >= d - 1 && r <= d + HALLE_ROWS + 1) return d;
@@ -290,14 +299,67 @@ export function halleA(r) {
 // Hauteur du SOL à l'avancement v (0 sur la route normale).
 export function solAt(v) {
   const d = halleA(Math.round(v));
-  if (d === null) return 0;
+  if (d === null) return hauteurBosse(v);
   const p = v - d;
   if (p <= 0 || p >= HALLE_ROWS) return 0;
-  if (p < HALLE_MONTEE) return HALLE_HAUT * (p / HALLE_MONTEE);
-  if (p < HALLE_MONTEE + HALLE_PLAT) return HALLE_HAUT;
-  return HALLE_HAUT * (1 - (p - HALLE_MONTEE - HALLE_PLAT) / HALLE_DESCENTE);
+  const H = geoHalle(d).haut;
+  if (p < HALLE_MONTEE) return H * (p / HALLE_MONTEE);
+  if (p < HALLE_MONTEE + HALLE_PLAT) return H;
+  return H * (1 - (p - HALLE_MONTEE - HALLE_PLAT) / HALLE_DESCENTE);
 }
 function dansHalle(r) { const d = halleA(r); return d !== null && r >= d && r <= d + HALLE_ROWS; }
+
+// --- La MONTAGNE (4 octobre 2026) ------------------------------------------------
+// « Un biome dans les montagnes où la route monte, descend, monte, descend un
+// peu, à une minute de la fin du morceau, parce que là c'est trop plat. » Des
+// bosses en cosinus (on y roule comme sur la rampe des halles : solAt),
+// séparées par des plats où se posent les obstacles — JAMAIS un obstacle sur
+// une bosse : la famille de saut d'un obstacle suppose un départ au même
+// niveau que lui. Décor (sapins, rochers) : scene.js, zone « montagne ».
+const MONTAGNE_DEBUT_AVANT_FIN = 60, MONTAGNE_FIN_AVANT_FIN = 20;
+const BOSSE_LONG = 16, BOSSE_HAUT = 1.3, BOSSE_ECART = 18;
+export const GEO_BOSSE = { long: BOSSE_LONG, haut: BOSSE_HAUT };
+let MONTAGNE = null, BOSSES = null;
+function montagne() {
+  if (!MONTAGNE) MONTAGNE = [Math.round(rangAuTemps(dureeCourse() - MONTAGNE_DEBUT_AVANT_FIN)), Math.round(rangAuTemps(dureeCourse() - MONTAGNE_FIN_AVANT_FIN))];
+  return MONTAGNE;
+}
+function bosses() {
+  if (!BOSSES) { BOSSES = []; const [a, b] = montagne(); for (let r = a; r + BOSSE_LONG <= b; r += BOSSE_LONG + BOSSE_ECART) BOSSES.push(r); }
+  return BOSSES;
+}
+// Rangées du biome (décor), un peu plus large que les bosses.
+export function enMontagne(r) { const [a, b] = montagne(); return r >= a - 45 && r <= b + 25; }
+// Début de la bosse qui couvre la rangée r, ou null.
+export function bosseA(r) { for (const d of bosses()) if (r >= d - 1 && r <= d + BOSSE_LONG + 1) return d; return null; }
+function hauteurBosse(v) {
+  const d = bosseA(Math.round(v));
+  if (d === null) return 0;
+  const p = (v - d) / BOSSE_LONG;
+  return p <= 0 || p >= 1 ? 0 : BOSSE_HAUT * (1 - Math.cos(2 * Math.PI * p)) / 2;
+}
+function dansBosse(r) { const d = bosseA(r); return d !== null && r >= d - 2 && r <= d + BOSSE_LONG + 2; }
+
+// --- Moments de course (4 octobre 2026) ----------------------------------------
+// « Il faut rajouter des difficultés de car scolaire à peu près à la moitié du
+// morceau » : trois cars d'affilée vers 72 s. « Vers la fin, trois voitures
+// arrêtées les unes après les autres, il faut sauter par-dessus et rouler sur
+// les voitures » : le BOUCHON, 15 s avant la fin — trois voitures garées
+// pare-chocs contre pare-chocs (2,8 de long tous les 3 rangs : le toit porte
+// d'une voiture à l'autre, toitSous), feux de détresse, pièces sur les toits.
+const T_CONVOI = 72, CONVOI_N = 3, T_BOUCHON_AVANT_FIN = 15;
+export const BOUCHON_PAS = 3;
+// Toit d'une voiture GARÉE sous v (les simulations : roule sur le bouchon).
+export function toitGare(route, v, jumpY) {
+  for (let r = Math.floor(v - 2); r <= Math.ceil(v + 2); r++) {
+    const row = route.rowAt(r);
+    if (row.type !== "statique" || !KINDS[row.kind].montable) continue;
+    if (Math.abs(v - r) >= KINDS[row.kind].long / 2 + VELO_DEMI) continue;
+    const toit = KINDS[row.kind].h + MARGE_H;
+    if (jumpY >= toit - 0.02) return toit;
+  }
+  return 0;
+}
 // Plafond du cycliste sous le toit d'une halle (4 octobre 2026 : « que le
 // personnage reste en dessous et n'ait pas la possibilité de dépasser le
 // toit ») : ses roues ne montent pas plus haut que le dessous des fermes
@@ -305,7 +367,8 @@ function dansHalle(r) { const d = halleA(r); return d !== null && r >= d && r <=
 export function plafondA(v) {
   const d = halleA(Math.round(v));
   if (d === null || v < d - 0.8 || v > d + HALLE_ROWS + 0.8) return Infinity;
-  return HALLE_HAUT + HALLE_TOIT_AU_DESSUS + 0.1 - 2.1;
+  const g = geoHalle(d);
+  return g.haut + g.toit + 0.1 - 2.1;
 }
 
 // Hauteur du toit d'un obstacle MONTABLE sous la position v, mais seulement si
@@ -368,12 +431,14 @@ export class Route {
     this.resolved = new Set();
     this.coins = new Set();
     this.blocs = new Set();
+    this.bouchons = new Set();   // rangées des voitures du bouchon
+    this.evts = null;
   }
   hash(n) {
     const x = Math.sin(n * 91.173 + this.seed * 0.731) * 43758.5453;
     return x - Math.floor(x);
   }
-  reset() { this.cache.clear(); this.resolved.clear(); this.coins.clear(); this.dangers.clear(); this.blocs.clear(); this.chaine = null; this.fenetreSure = null; }
+  reset() { this.cache.clear(); this.resolved.clear(); this.coins.clear(); this.dangers.clear(); this.blocs.clear(); this.bouchons.clear(); this.evts = null; this.chaine = null; this.fenetreSure = null; }
   dansFenetre(r) { return this.fenetreSure !== null && r >= this.fenetreSure[0] && r <= this.fenetreSure[1]; }
   // Rangée sûre (départ, turbo lait, tuto) : une ligne de pièces au sol — à la
   // hauteur du PLANCHER, qui n'est pas 0 sur une halle.
@@ -423,13 +488,26 @@ export class Route {
       // … ni dans les 8 dernières secondes : aucun véhicule qui roule ne
       // traverse la ligne d'arrivée (3 octobre 2026).
       if (KINDS[kind].contresens && this.chaine.r > rangAuTemps(dureeCourse() - 8)) kind = "vache";
+      if (!this.evts) this.evts = { convoi: 0, convoiFait: false, bouchonFait: false };
+      if (!this.evts.convoiFait && this.chaine.r >= rangAuTemps(T_CONVOI)) { this.evts.convoiFait = true; this.evts.convoi = CONVOI_N; }
+      if (this.evts.convoi > 0) { kind = "bus"; this.evts.convoi -= 1; }
+      const bouchon = !this.evts.bouchonFait && this.chaine.r >= rangAuTemps(dureeCourse() - T_BOUCHON_AVANT_FIN);
+      if (bouchon) kind = "voiture";
       const t = Math.min(1, Math.max(0, this.chaine.r / RAMP_ROWS));
       const mou = Math.round(MOU_DEBUT + (MOU_FIN - MOU_DEBUT) * t);
       const base = this.chaine.kind ? ecartMin(this.chaine.kind, kind, Math.min(vMaxRangees(), vitesseAuRang(this.chaine.r + 20) * 1.08)) : 6;
       let r = this.chaine.r + base + Math.floor(this.hash(i * 37 + 11) * (mou + 1));
       let garde = 0;
-      while (garde++ < 400 && (estReservee(r) || estReservee(r - 1) || estReservee(r + 1) || dansHalle(r) || dansHalle(r - 4) || dansHalle(r + 4))) r += 1;
+      while (garde++ < 400 && (estReservee(r) || estReservee(r - 1) || estReservee(r + 1) || dansHalle(r) || dansHalle(r - 4) || dansHalle(r + 4) || dansBosse(r))) r += 1;
       this.dangers.set(r, kind);
+      if (bouchon) {
+        this.evts.bouchonFait = true;
+        for (let k = 0; k < 3; k++) { this.dangers.set(r + k * BOUCHON_PAS, "voiture"); this.bouchons.add(r + k * BOUCHON_PAS); }
+        // + 6 rangées : un double saut lancé depuis un TOIT vole plus longtemps
+        // que l'écart physique (calculé pour un départ au sol) ne le prévoit.
+        this.chaine = { r: r + 2 * BOUCHON_PAS + 6, kind: "voiture", i: i + 1 };
+        continue;
+      }
       this.chaine = { r, kind, i: i + 1 };
     }
   }
@@ -474,7 +552,7 @@ export class Route {
         ? { type: "traverse", kind, dir: -1, armed: false, t0: 0, u0: 0, vitesse: K.vitesse, coins: [], boue: null }
         : K.contresens
           ? { type: "contresens", kind, armed: false, t0: 0, v0: 0, vitesse: K.vitesse, coins: [], boue: null }
-          : { type: "statique", kind, coins: [], boue: null };
+          : { type: "statique", kind, coins: [], boue: null, bouchon: this.bouchons.has(r0 + p) };
     }
     for (let p = 0; p < BLOC; p++) if (!rowsBloc[p]) rowsBloc[p] = { type: "safe", coins: [], boue: null };
     // 2. Les arcs de pièces (ils peuvent déborder du bloc : on garde ce qui
@@ -491,8 +569,9 @@ export class Route {
     };
     for (let p = -12; p < BLOC + 12; p++) {
       const kind = this.dangers.get(r0 + p);
-      if (!kind) continue;
-      for (const c of this.arcPieces(r0 + p, kind)) pose(c.r, c.h, false);
+      if (!kind || this.bouchons.has(r0 + p)) continue;
+      // Une pièce d'arc jamais DANS une bosse de montagne.
+      for (const c of this.arcPieces(r0 + p, kind)) if (c.h >= solAt(c.r) + PIECE_SOL - 0.3) pose(c.r, c.h, false);
     }
     // 3. Halle : plancher couvert de pièces (une rangée sur deux).
     for (let p = 0; p < BLOC; p++) {
@@ -511,7 +590,7 @@ export class Route {
       libre += 1;
       if (libre === TRAINEE_MIN) {
         const depart = p - TRAINEE_MIN + 2;
-        for (let i = 0; i < TRAINEE_LONGUEUR; i++) pose(r0 + depart + i * ESPACEMENT, PIECE_SOL, false);
+        for (let i = 0; i < TRAINEE_LONGUEUR; i++) pose(r0 + depart + i * ESPACEMENT, solAt(r0 + depart + i * ESPACEMENT) + PIECE_SOL, false);
         libre = 0;
       }
     }
@@ -521,6 +600,14 @@ export class Route {
     // par deux en même temps.
     let nPiece = 0;
     for (let p = 0; p < BLOC; p++) { const row = rowsBloc[p]; if (row.coins.length) { if (nPiece % 2 === 1) row.coins = []; nPiece += 1; } }
+    // 4 ter. Le bouchon : une pièce entre chaque paire de voitures, à hauteur
+    // de toit — elles disent « roule dessus ».
+    for (let p = -2 * BOUCHON_PAS; p < BLOC; p++) {
+      const rb = r0 + p;
+      if (!this.bouchons.has(rb) || this.bouchons.has(rb - BOUCHON_PAS)) continue;
+      const hToit = KINDS.voiture.h + MARGE_H + PIECE_SOL;
+      for (const k of [1, 2, 4, 5]) { const q = rb + k; const row = q - r0 >= 0 && q - r0 < BLOC ? rowsBloc[q - r0] : null; if (row) row.coins = []; pose(q, hToit, false); }
+    }
     // 5. Lait et grosse pièce sur leurs rangées réservées, sinon au plus près.
     // Le lait et la grosse pièce se posent sur une rangée LIBRE et à l'écart :
     // jamais sur un arc (ça y ferait un trou) ni collée à un obstacle (elle

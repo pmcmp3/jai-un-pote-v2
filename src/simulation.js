@@ -15,7 +15,7 @@
 // re-tap du salto part quand il reste le temps d'une montée avant la cible.
 // Jamais freiné par la boue, jamais un pote perdu. ~20 000 pas : quelques ms.
 
-import { Route, KINDS, CORPS_HAUT, familleDe, montee, solAt, armer, delaiArmement } from "./rows.js";
+import { Route, KINDS, CORPS_HAUT, familleDe, montee, solAt, toitGare, armer, delaiArmement } from "./rows.js";
 import { ROWS_AHEAD } from "./scene.js";
 import { V_UNIT, targetSpeed, multiplicateur, dureeCourse } from "./regles.js";
 
@@ -58,7 +58,7 @@ export function scoreParfait(seed, potesMax) {
     v += vitesse * dt;
     metres += vitesse * dt * C.metresParUnite * multiplicateur(potes, turbo > 0);
 
-    const sol = solAt(v);
+    const sol = Math.max(solAt(v), toitGare(route, v, jumpY)); // le bouchon : on roule sur les toits
     // Pilote : au sol, il vise la prochaine cible et part au bon moment.
     if (jumpY <= sol + 0.02 && !plan) {
       for (let r = Math.floor(v) + 1; r <= Math.floor(v) + REGARD; r++) {

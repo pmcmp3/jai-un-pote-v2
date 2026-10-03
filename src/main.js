@@ -469,7 +469,7 @@ function resetRun() {
   sparkles.length = 0; ghosts.length = 0;
   speed = V_UNIT * window.CONFIG.vitesseBase; nuitDebut = null;
   friends.reset();
-  klaxonne = new Set(); alertesVues.clear();
+  klaxonne = new Set(); alertesVues.clear(); montagneFondu = 0;
   popups.length = 0; pastilles.length = 0; banner = null; damageFlash = 0; shake.time = 0; hudAlpha = 0; hintTimer = 6;
   canvas.classList.remove("game-over-bw", "danger", "turbo");
   scene.setNight(0);
@@ -773,6 +773,9 @@ function step(dt) {
   if (nd !== undefined) scene.setNight(Math.max(0, Math.min(1, (now - nd) / 30)));
   // Le soleil traverse le ciel sur toute la durée du morceau.
   scene.setHeure(now / Math.max(1, window.CONFIG.dureeMorceau));
+  // Montagnes proches en fondu quand on entre dans le biome montagne.
+  montagneFondu += ((rows.enMontagne(Math.round(player.v)) ? 1 : 0) - montagneFondu) * Math.min(1, dt * 0.6);
+  scene.setMontagne(montagneFondu);
 
   // --- Saut : tap, maintien, double saut ---
   // ⚠️ Le sol n'est plus toujours 0 : sur une halle, le plancher monte
@@ -918,6 +921,7 @@ window.addEventListener("keydown", (e) => {
 
 // --- Rendu ---------------------------------------------------------------------
 const GEO_HALLE = { haut: rows.HALLE_HAUT, montee: 7, plat: 26, descente: 7, total: rows.HALLE_ROWS };
+const GEO_BOSSE = { ...rows.GEO_BOSSE, sol: rows.solAt };
 const SIGN_EVERY = 45;
 // Un seul panneau à la fois : celui d'entrée de village (la ville du joueur)
 // efface le panneau régulier voisin (20 septembre 2026 : « j'ai eu deux
@@ -948,11 +952,16 @@ scene.setMasqueDecor((r) => {
   m = 0;
   for (let d = -3; d <= 3; d++) if (signAt(r + d) || panneauVilleA(r + d)) { m |= scene.SANS_LAMPE; break; }
   if (prochDeHalle(r, 4)) m |= scene.DANS_HALLE;
+  // Le bowling est une salle fermée : aucun décor derrière (4 octobre 2026).
+  for (let k = -8; k <= 8; k += 2) { const dh = rows.halleA(r + k); if (dh !== null && rows.typeHalle(dh) === "bowling") { m |= scene.SANS_DECOR; break; } }
+  // Pas de lampadaire planté dans une bosse.
+  for (let k = -2; k <= 2; k++) if (rows.bosseA(r + k) !== null) { m |= scene.SANS_LAMPE; break; }
   if (masqueCache.size > 4000) masqueCache.clear();
   masqueCache.set(r, m);
   return m;
 });
 scene.setDessinVoiture((c, u, v) => props.drawVoiture(c, rows.KINDS.voiture, u, v, 1, 0));
+scene.setZoneForcee((r) => (rows.enMontagne(r) ? "montagne" : null));
 
 // Pièce, brique de lait ou pièce rouge, flottant à la hauteur `h` au-dessus
 // de la route (rangée r).
@@ -988,6 +997,7 @@ const PIECE_R = 0.3;
 // Avertisseur « ! » au bord droit (comme les missiles de Jetpack Joyride) :
 // une traversée est armée mais sa rangée n'est pas encore à l'écran.
 const alertesVues = new Map(); // rangée → instant (réel) où son panneau est apparu
+let montagneFondu = 0;
 function renderAlertes(now, vitesse) {
   if (!gameStarted || game.ended || now < 0) return;
   const devant = scene.unitesDevant();
@@ -1116,10 +1126,20 @@ function render(alpha) {
     if (d === null || hallesVues.has(d)) continue;
     hallesVues.add(d);
     // Deux couches : le fond avant le cycliste, le devant après (scene.drawHalle).
-    const geo = { ...GEO_HALLE, type: rows.typeHalle(d) };
+    const geo = { ...GEO_HALLE, ...rows.geoHalle(d), type: rows.typeHalle(d) };
     if (geo.type === "gare") items.push({ decor: true, d: scene.depth(scene.ROAD_HALF + 3.0, d), draw: () => scene.drawHalle(ctx, d, geo, from, to, "train") });
+    if (geo.type === "bowling") { geo.t = tAnim; items.push({ decor: true, d: scene.depth(scene.ROAD_HALF + 6.5, d), draw: () => scene.drawHalle(ctx, d, geo, from, to, "salle") }); }
     items.push({ decor: true, d: scene.depth(scene.ROAD_HALF + 0.5, d), draw: () => scene.drawHalle(ctx, d, geo, from, to, "fond") });
     items.push({ decor: true, d: scene.depth(-scene.ROAD_HALF - 0.3, d), draw: () => scene.drawHalle(ctx, d, geo, from, to, "devant") });
+  }
+  // Bosses de la montagne : la chaussée (avant le cycliste), le talus (après).
+  const bossesVues = new Set();
+  for (let r = from; r <= to; r++) {
+    const d = rows.bosseA(r);
+    if (d === null || bossesVues.has(d)) continue;
+    bossesVues.add(d);
+    items.push({ decor: true, d: scene.depth(scene.ROAD_HALF + 0.05, d), draw: () => scene.drawBosse(ctx, d, GEO_BOSSE, from, to, "dessus") });
+    items.push({ decor: true, d: scene.depth(-scene.ROAD_HALF - 0.05, d), draw: () => scene.drawBosse(ctx, d, GEO_BOSSE, from, to, "flanc") });
   }
   const vc = scene.getVCentre(), largeurRoute = scene.demiLargeurRoute() + 2;
   for (let r = from; r <= to; r++) {
@@ -1167,7 +1187,7 @@ function render(alpha) {
       const tombe = tombes.get(r);
       items.push({ d: scene.depth(0, r), draw: () => (tombe !== undefined
         ? props.drawStaticTombe(ctx, row.kind, 0, r, tAnim, Math.max(0, tm - tombe))
-        : props.drawStatic(ctx, row.kind, 0, r, tAnim)) });
+        : (props.drawStatic(ctx, row.kind, 0, r, tAnim), row.bouchon && props.drawFeuxDetresse(ctx, rows.KINDS[row.kind], 0, r, tAnim))) });
     }
   }
   if (game.arriveeR !== null && Math.abs(game.arriveeR - vc) < largeurRoute + 6) {

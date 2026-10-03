@@ -574,6 +574,23 @@ const SCENES = {
     for (let k = 0; k < 30; k++) { await attendre(25); maxY = Math.max(maxY, await course(() => window.__pote.player.jumpY)); if (k === 8) await photo("48-plafond-halle"); }
     console.log("PLAFOND : hauteur max des roues", maxY.toFixed(2), "· plafond", await course((d) => window.__pote.rows.plafondA(d + 20), d));
   },
+  // Montagne à bosses et bouchon de fin (4 octobre 2026).
+  montagne: async () => {
+    await page.waitForFunction(() => window.__pote.player.v > 2, null, { timeout: 15000 });
+    const d = await course(() => { const p = window.__pote; for (let r = 300; r < 3000; r++) if (p.rows.bosseA(r) !== null) return p.rows.bosseA(r); return 0; });
+    await page.keyboard.press("KeyD");
+    for (const [dv, nom] of [[-10, "49-montagne-approche"], [8, "49b-montagne-bosse"], [40, "49c-montagne-suite"]]) {
+      await course(([d, dv]) => { const p = window.__pote; p.player.v = d + dv; p.player.prevV = p.player.v; p.player.jumpY = p.rows.solAt(p.player.v); }, [d, dv]);
+      await attendre(1200); await photo(nom);
+    }
+    const rb = await course(() => { const p = window.__pote; for (let r = 300; r < 3000; r++) { const row = p.rows.rowAt(r); if (row.bouchon) return r; } return 0; });
+    await course((rb) => { const p = window.__pote; p.player.v = rb - 7; p.player.prevV = p.player.v; p.player.jumpY = 0; }, rb);
+    await attendre(300); await photo("49d-bouchon");
+    await course((rb) => { const p = window.__pote; p.player.v = rb + 3.5; p.player.prevV = p.player.v; p.player.jumpY = 1.49; p.player.jumpVy = 0; }, rb);
+    await attendre(250); await photo("49e-bouchon-toit");
+    console.log("BOUCHON rangée", rb, "· hauteur après", await course(() => window.__pote.player.jumpY.toFixed(2)));
+    await page.keyboard.press("KeyD");
+  },
   menus: async () => {
     // ⚠️ Pas de touche D ici : overlay masqué = touches de debug coupées (G, I…).
     await attendre(1200);
