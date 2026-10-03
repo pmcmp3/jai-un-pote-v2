@@ -86,8 +86,13 @@
       transition: opacity 0.45s ease, visibility 0s linear 0.45s;
     }
     #overlay.visible { opacity: 1; visibility: visible; transition: opacity 0.45s ease, visibility 0s, padding-top 0.35s ease; }
-    #overlay.clavier #menu-title { margin: 0 0 16px; }
-    #menu-title { transition: margin 0.35s ease; }
+    /* Clavier ouvert (4 octobre 2026, deuxième passe) : AUCUNE animation de mise
+       en page. La marge qui glissait en 0,35 s déplaçait le champ pendant que
+       Safari calculait son propre défilement vers lui : au premier tap, tout
+       partait de travers (« quand on clique une deuxième fois, ça va mieux »).
+       Le titre et le lien de l'album s'effacent net, la carte monte en haut. */
+    #overlay.visible.fige { transition: opacity 0.45s ease, visibility 0s; }
+    #overlay.clavier #menu-title, #overlay.clavier #beta-tag, #overlay.clavier #cta-link, #overlay.clavier ~ #mute-button { display: none; }
     #overlay .fade { opacity: 0; transform: translateY(10px); transition: opacity 0.5s ease, transform 0.5s ease; }
     #overlay.visible .fade { opacity: 1; transform: translateY(0); }
     #overlay.visible .fade:nth-child(2) { transition-delay: 0.12s; }
@@ -164,10 +169,9 @@
     .regle b { font-weight: 900; color: var(--noir); min-width: 62px; }
     #splash { position: fixed; inset: 0; z-index: 200; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; background: var(--rouge); transition: opacity 0.45s ease, visibility 0s linear 0.45s; }
     #splash.fini { opacity: 0; visibility: hidden; pointer-events: none; }
-    #splash-logo { perspective: 700px; animation: splash-flotte 2.4s ease-in-out infinite; }
-    #splash-logo img { display: block; width: 150px; height: auto; animation: splash-tour 2.4s cubic-bezier(.45,0,.55,1) infinite; backface-visibility: visible; }
-    @keyframes splash-tour { from { transform: rotateY(0deg); } to { transform: rotateY(360deg); } }
-    @keyframes splash-flotte { 0%, 100% { transform: translateY(-6px); } 50% { transform: translateY(6px); } }
+    /* Logo FIXE (4 octobre 2026 : « vu qu'il y a le petit bonhomme qui fait du
+       vélo, fais pas tourner la ville ») : c'est le cycliste qui bouge. */
+    #splash-logo img { display: block; width: 150px; height: auto; }
     #splash-velo { width: 200px; height: 110px; margin-top: -4px; }
     #loading { display: flex; flex-direction: column; align-items: center; gap: 8px; width: 200px; }
     #loading.failed #loading-track { display: none; }
@@ -206,6 +210,7 @@
     /* Boost de ligue (29 septembre 2026) : sticker jaune sous JOUER. */
     #explication { position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; padding: 24px; background: rgba(13,13,16,0.55); }
     #explication.hidden { display: none; }
+    #overlay.visible.estompe { opacity: 0.5; } /* « on voit encore ma ligue derrière, ça perturbe » */
     #expl-carte { position: relative; width: min(300px, 100%); box-sizing: border-box; padding: 30px 20px 16px; background: #fff; border: 1.5px solid var(--noir); border-radius: var(--rayon); text-align: center; animation: expl-in 0.35s ease-out both; }
     .expl-etape { display: none; }
     .expl-etape.on { display: block; animation: expl-in 0.3s ease-out both; }

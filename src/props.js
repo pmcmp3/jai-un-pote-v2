@@ -85,26 +85,30 @@ function drawTracteur(ctx, K, u, v, dir, t) {
 // dans le sens du joueur, on le rattrape). `bloc(a, da, b, db, h, lift)` : `a`
 // depuis l'ARRIÈRE le long de la route, `b` en travers — en fractions de la
 // boîte, pour que le dessin suive K.long / K.larg / K.h.
-export function drawTracteurRoute(ctx, K, uC, v, t) {
+export function drawTracteurRoute(ctx, K, uC, v, t, sens = -1) {
   groupe(ctx, () => {
     const L = K.long, W = K.larg, H = K.h;
-    const x = uC - W / 2, arr = v - L / 2;
-    const bloc = (a, da, b, db, h, lift, col) => drawBox(ctx, x + b * W, arr + a * L, db * W, da * L, h * H, col, lift * H);
+    const x = uC - W / 2;
+    // `a` part de l'ARRIÈRE, dans le sens de la marche (sens −1 : il vient vers le joueur).
+    const A = (a, da) => (sens > 0 ? v - L / 2 + a * L : v + L / 2 - (a + da) * L);
+    const bloc = (a, da, b, db, h, lift, col) => drawBox(ctx, x + b * W, A(a, da), db * W, da * L, h * H, col, lift * H);
+    const arr = sens > 0 ? v - L / 2 : v + L / 2;
     drawShadow(ctx, uC, v, W / 2, L / 2, 0.26);
     // Poussière derrière lui.
     for (let i = 0; i < 4; i++) {
       const ph = (t * 3 + i * 1.3) % 1, sz = 0.3 + ph * 0.5;
       ctx.save(); ctx.globalAlpha *= 0.35 * (1 - ph);
-      drawBox(ctx, uC - sz / 2 + Math.sin(i * 2.1) * 0.3, arr - 0.4 - i * 0.5 - ph * 0.8, sz, sz, sz * 0.8, "#d8c8a8", 0.08 + ph * 0.5);
+      drawBox(ctx, uC - sz / 2 + Math.sin(i * 2.1) * 0.3, arr - sens * (0.4 + i * 0.5 + ph * 0.8) - (sens > 0 ? 0 : sz), sz, sz, sz * 0.8, "#d8c8a8", 0.08 + ph * 0.5);
       ctx.restore();
     }
     // Grande roue arrière, petite roue avant, en disques comme la voiture.
     for (const b of [-0.02, 0.8]) {
       const u = x + b * W + 0.12;
-      drawDisque(ctx, u, arr + 0.24 * L, 0.62, 0.62, "#1a1a1e");
-      drawDisque(ctx, u - 0.002, arr + 0.24 * L, 0.62, 0.3, "#e0b02a");
-      drawDisque(ctx, u, arr + 0.84 * L, 0.34, 0.34, "#1a1a1e");
-      drawDisque(ctx, u - 0.002, arr + 0.84 * L, 0.34, 0.17, "#e0b02a");
+      const vAr = arr + sens * 0.24 * L, vAv = arr + sens * 0.84 * L;
+      drawDisque(ctx, u, vAr, 0.62, 0.62, "#1a1a1e");
+      drawDisque(ctx, u - 0.002, vAr, 0.62, 0.3, "#e0b02a");
+      drawDisque(ctx, u, vAv, 0.34, 0.34, "#1a1a1e");
+      drawDisque(ctx, u - 0.002, vAv, 0.34, 0.17, "#e0b02a");
     }
     bloc(0.02, 0.94, 0.12, 0.76, 0.18, 0.36, "#2f7a2f");     // châssis
     bloc(0.52, 0.46, 0.18, 0.64, 0.34, 0.42, "#3a8a3a");     // capot
@@ -115,7 +119,7 @@ export function drawTracteurRoute(ctx, K, uC, v, t) {
     bloc(0.8, 0.05, 0.48, 0.1, 0.36, 0.64, "#3a3a40");       // pot d'échappement
     const nuit = getNight() > 0.2;
     for (const b of [0.18, 0.7]) bloc(0.97, 0.03, b, 0.12, 0.08, 0.6, nuit ? "#fff6c8" : "#e8e2c8"); // phares
-    if (nuit) { ctx.save(); ctx.globalAlpha *= 0.45; drawFlat(ctx, x - 0.1, v + L / 2, W + 0.2, 3.6, "#fff2b0", true); ctx.restore(); }
+    if (nuit) { ctx.save(); ctx.globalAlpha *= 0.45; drawFlat(ctx, x - 0.1, sens > 0 ? v + L / 2 : v - L / 2 - 3.6, W + 0.2, 3.6, "#fff2b0", true); ctx.restore(); }
   });
 }
 
@@ -150,6 +154,44 @@ export function drawBus(ctx, K, uC, v, t) {
   });
 }
 
+// Chasse-neige (4 octobre 2026 : « au lieu de croiser un tracteur dans ce
+// biome, il faut qu'on croise un chasse-neige ») : camion orange des routes,
+// lame jaune et noire, gyrophare, sel dans la benne. Il arrive EN FACE (avant
+// côté −v) et rejette la neige sur le bas-côté du fond. Toit PLAT sur toute la
+// longueur, à K.h : on y roule comme sur le car (rows.toitSous).
+export function drawChasseNeige(ctx, K, uC, v, t) {
+  groupe(ctx, () => {
+    const L = K.long, W = K.larg, H = K.h;
+    const x = uC - W / 2, av = v - L / 2;   // l'avant est côté joueur
+    const bloc = (a, da, b, db, h, lift, col) => drawBox(ctx, x + b * W, av + a * L, db * W, da * L, h * H, col, lift * H);
+    drawShadow(ctx, uC, v, W / 2, L / 2, 0.26);
+    // La gerbe de neige que la lame repousse vers le fond.
+    for (let i = 0; i < 6; i++) {
+      const ph = (t * 2.2 + i / 6) % 1, sz = 0.16 + ph * 0.3;
+      ctx.save(); ctx.globalAlpha *= 0.85 * (1 - ph);
+      drawBox(ctx, x + W * 0.8 + ph * 2.4, av + 0.05 + Math.sin(i * 1.7) * 0.2 + ph * 0.6, sz, sz, sz, "#f6f8fa", 0.1 + Math.sin(Math.PI * ph) * 0.9);
+      ctx.restore();
+    }
+    for (const a of [0.25, 0.8]) for (const b of [-0.01, 0.84]) { drawDisque(ctx, x + b * W + 0.12, av + a * L, 0.46, 0.46, "#1a1a1e"); drawDisque(ctx, x + b * W + 0.118, av + a * L, 0.46, 0.22, "#5a5d66"); }
+    bloc(0.06, 0.94, 0.08, 0.84, 0.14, 0.18, "#2b2d33");      // châssis
+    bloc(0.1, 0.3, 0.04, 0.92, 0.68, 0.28, "#ee7a1a");        // cabine
+    bloc(0.1, 0.2, 0.02, 0.96, 0.26, 0.6, VITRE);             // vitres
+    bloc(0.1, 0.3, 0.04, 0.92, 0.04, 0.96, "#c95e0c");        // toit de cabine
+    bloc(0.42, 0.58, 0.02, 0.96, 0.64, 0.32, "#ee7a1a");      // benne à sel
+    bloc(0.42, 0.58, 0.0, 1.0, 0.07, 0.32, "#c95e0c");        // rebord bas
+    bloc(0.44, 0.54, 0.08, 0.84, 0.04, 0.96, "#e9ecef");      // le sel
+    bloc(0.03, 0.08, 0.1, 0.8, 0.07, 0.08, "#2b2d33");        // bras de lame
+    for (let i = 0; i < 6; i++) bloc(-0.02, 0.05, -0.06 + i * 0.187, 0.187, 0.34, 0.02, i % 2 ? "#1a1a1e" : "#f2c21c"); // la lame, à chevrons
+    const on = Math.floor(t * 4) % 2 === 0;                   // gyrophare
+    bloc(0.2, 0.07, 0.4, 0.2, 0.07, 1.0, on ? "#ffb21a" : "#a85a10");
+    const nuit = getNight() > 0.2;
+    for (const b of [0.1, 0.74]) bloc(0.08, 0.03, b, 0.16, 0.07, 0.42, nuit ? "#fff6c8" : "#f4eed6");
+    ctx.save(); ctx.globalAlpha *= nuit ? 0.55 : 0.2;
+    drawFlat(ctx, x - 0.1, av - 4.2, W + 0.2, 4.2, "#fff2b0", true);
+    ctx.restore();
+  });
+}
+
 // Feux de détresse (le bouchon, 4 octobre 2026) : les quatre coins de la
 // voiture garée clignotent orange.
 export function drawFeuxDetresse(ctx, K, uC, v, t) {
@@ -161,10 +203,15 @@ export function drawFeuxDetresse(ctx, K, uC, v, t) {
 // Voiture : même carrosserie pour celle garée sur la route et celle qui arrive
 // en face. `sens` = +1 si son capot pointe vers +v (elle s'éloigne), −1 si elle
 // vient vers le joueur.
-export function drawVoiture(ctx, K, uCenter, v, sens, t) {
-  groupe(ctx, () => voitureNue(ctx, K, uCenter, v, sens, t));
+export const COULEURS_BOUCHON = [
+  { caisse: "#e6e0d2", toit: "#d3cab8" },   // blanche
+  { caisse: "#c8301c", toit: "#a8261a" },   // rouge
+  { caisse: "#26262c", toit: "#3a3a42" },   // noire
+];
+export function drawVoiture(ctx, K, uCenter, v, sens, t, couleur = null) {
+  groupe(ctx, () => voitureNue(ctx, K, uCenter, v, sens, t, couleur));
 }
-function voitureNue(ctx, K, uCenter, v, sens, t) {
+function voitureNue(ctx, K, uCenter, v, sens, t, couleur = null) {
   // Refaite le 28 septembre 2026 (« refais une repasse de tous les éléments
   // 3D qui ont trop de soucis ») : plus de passages de roue ni de pare-chocs
   // noirs sur toute la largeur (vus de biais, ils faisaient de grandes bandes
@@ -175,7 +222,7 @@ function voitureNue(ctx, K, uCenter, v, sens, t) {
   const x = uCenter - Wd / 2;
   const A = (a) => (sens > 0 ? v - L / 2 + a : v + L / 2 - a);
   const bloc = (a, da, b, db, h, hh, col) => drawBox(ctx, x + b, sens > 0 ? A(a) : A(a) - da, db, da, h, col, hh);
-  const CAISSE = "#e6e0d2", TOIT = "#d3cab8", GRIS = "#8a8a92", LIGNE = "#bdb4a0";
+  const CAISSE = couleur ? couleur.caisse : "#e6e0d2", TOIT = couleur ? couleur.toit : "#d3cab8", GRIS = "#8a8a92", LIGNE = couleur ? couleur.toit : "#bdb4a0";
   const nuit = getNight() > 0.2;
   drawShadow(ctx, uCenter, v, Wd / 2, L / 2, 0.26);
   const rRoue = 0.34;
@@ -354,6 +401,35 @@ function staticNu(ctx, kind, uCenter, r, t) {
     B(0.3 + 0.22 * f, -0.22, 0.36, 0.08, 0.15, "#6b3a1a", 0.36 + 0.22 * f); // mallette
     B(0.4 - 0.22 * g, 1.0, 0.16, 0.14, 0.3, "#2b2d38", 0.52 + 0.24 * g);
     B(0.4 - 0.22 * g, 1.0, 0.16, 0.14, 0.05, "#d69a68", 0.82 + 0.24 * g);
+  } else if (kind === "bonhomme") {
+    // Le gros bonhomme de neige de la montagne (4 octobre 2026 : « un
+    // bonhomme de neige [...] gros, presque de la taille d'un bus ») : trois
+    // boules arrondies (deux boîtes croisées chacune), regard et nez carotte
+    // vers le joueur (−v), écharpe rouge au cou, chapeau, bras en branches.
+    const NEIGE = "#f4f7fa", BRANCHE = "#5a3f26", ROUGE = "#d33a2a";
+    const boule = (a, w, h, lift) => {
+      const m = (1 - w) / 2;
+      B(a + w * 0.125, m, w * 0.75, w, h, NEIGE, lift);
+      B(a, m + w * 0.125, w, w * 0.75, h * 0.86, NEIGE, lift + h * 0.07);
+    };
+    boule(0, 1, 0.38, 0);
+    boule(0.14, 0.72, 0.28, 0.38);
+    B(0.43, 0.12, 0.05, 0.02, 0.035, BLACK, 0.45);                     // boutons
+    B(0.43, 0.12, 0.05, 0.02, 0.035, BLACK, 0.54);
+    B(0.22, 0.22, 0.56, 0.56, 0.06, ROUGE, 0.64);                      // écharpe
+    B(0.3, 0.2, 0.1, 0.03, 0.2, ROUGE, 0.46);                          // son pan
+    boule(0.25, 0.5, 0.24, 0.68);
+    B(0.62, 0.23, 0.06, 0.02, 0.05, BLACK, 0.8);                       // les yeux
+    B(0.745, 0.32, 0.02, 0.08, 0.05, BLACK, 0.8);
+    B(0.745, 0.6, 0.02, 0.08, 0.05, BLACK, 0.8);
+    B(0.75, 0.45, 0.2, 0.1, 0.05, "#f08a1c", 0.75);                    // la carotte
+    B(0.22, 0.22, 0.56, 0.56, 0.03, BLACK, 0.9);                       // chapeau
+    B(0.31, 0.31, 0.38, 0.38, 0.13, BLACK, 0.93);
+    B(0.3, 0.3, 0.4, 0.4, 0.03, ROUGE, 0.94);
+    B(0.8, 0.47, 0.18, 0.05, 0.03, BRANCHE, 0.54);                     // bras
+    B(0.93, 0.47, 0.05, 0.05, 0.1, BRANCHE, 0.57);
+    B(0.02, 0.47, 0.18, 0.05, 0.03, BRANCHE, 0.56);
+    B(0.02, 0.47, 0.05, 0.05, 0.1, BRANCHE, 0.59);
   } else if (kind === "botte") {
     B(0, 0, 1, 1, 1, "#d0a84a");
     // Liens de ficelle en SAILLIE (29 septembre 2026 : « on voit les trois

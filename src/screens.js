@@ -226,14 +226,45 @@ function centrerMenu() {
   overlay.style.setProperty("--centre", `${Math.max(0, Math.round(libre / 2))}px`);
 }
 let clavierT = 0;
+// iOS : le clavier ne redimensionne pas la page, il RÉDUIT la zone visible
+// (visualViewport) et Safari la décale pour montrer le champ. Pendant la
+// saisie, l'overlay épouse exactement cette zone (hauteur ET décalage) : rien
+// ne saute, quoi que fasse Safari, et le champ actif est ramené en vue DANS
+// l'overlay, avec le bouton Continuer quand il y a la place.
+function montrerChamp() {
+  const a = document.activeElement;
+  if (!a || !overlay.contains(a) || !a.matches("input")) return;
+  const r = a.getBoundingClientRect(), o = overlay.getBoundingClientRect();
+  const bouton = $("step1-next");
+  const rb = bouton && bouton.getClientRects().length ? bouton.getBoundingClientRect() : null;
+  let haut = r.top - 14, bas = Math.max(r.bottom, rb ? rb.bottom : 0) + 14;
+  if (bas - haut > o.height) bas = r.bottom + 14;
+  if (bas > o.bottom) overlay.scrollTop += bas - o.bottom;
+  else if (haut < o.top) overlay.scrollTop -= o.top - haut;
+}
+function calerSurZoneVisible() {
+  const vv = window.visualViewport;
+  if (!vv || !overlay.classList.contains("clavier")) return;
+  overlay.style.height = `${Math.round(vv.height)}px`;
+  overlay.style.transform = `translateY(${Math.round(vv.offsetTop)}px)`;
+  montrerChamp();
+}
 function brancherCentrage() {
   try { new ResizeObserver(() => centrerMenu()).observe(onboardingEl); } catch (e) { /* vieux navigateur : centrage au resize seulement */ }
   window.addEventListener("resize", () => requestAnimationFrame(centrerMenu));
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener("resize", calerSurZoneVisible);
+    window.visualViewport.addEventListener("scroll", calerSurZoneVisible);
+  }
   onboardingEl.addEventListener("focusin", (e) => {
     if (!e.target.matches("input")) return;
     clearTimeout(clavierT);
-    overlay.classList.add("clavier");
+    // Mise en page « clavier » SYNCHRONE, avant que Safari ne mesure où est
+    // le champ : il le trouve déjà en haut et n'a plus rien à décaler.
+    overlay.classList.add("fige", "clavier");
     centrerMenu();
+    calerSurZoneVisible();
+    requestAnimationFrame(montrerChamp);
   });
   onboardingEl.addEventListener("focusout", () => {
     clearTimeout(clavierT);
@@ -241,8 +272,11 @@ function brancherCentrage() {
       const a = document.activeElement;
       if (a && onboardingEl.contains(a) && a.matches("input")) return; // on passe d'un champ à l'autre
       overlay.classList.remove("clavier");
+      overlay.style.height = ""; overlay.style.transform = "";
+      overlay.scrollTop = 0;
       window.scrollTo(0, 0); // Safari laisse parfois la page décalée après le clavier
       centrerMenu();
+      clavierT = setTimeout(() => overlay.classList.remove("fige"), 450);
     }, 120);
   });
 }
@@ -963,7 +997,7 @@ function montrerExplication(ensuite) {
   const mult = $("expl-mult"), barre = box.querySelector("#expl-barre i"), eyebrow = $("expl-eyebrow");
   let minuteurs = [], idx = -1, fini = false;
   const vider = () => { minuteurs.forEach(clearTimeout); minuteurs = []; };
-  const finir = () => { if (fini) return; fini = true; vider(); box.classList.add("hidden"); annonceSon = idx >= 3; ensuite(); };
+  const finir = () => { if (fini) return; fini = true; vider(); box.classList.add("hidden"); overlay.classList.remove("estompe"); annonceSon = idx >= 3; ensuite(); };
   const etape = (i) => {
     vider();
     if (i >= etapes.length) { finir(); return; }
@@ -992,6 +1026,7 @@ function montrerExplication(ensuite) {
     ["touchstart", "mousedown", "touchend", "mouseup"].forEach((t) => box.addEventListener(t, (e) => e.stopPropagation()));
   }
   box.onpointerdown = (e) => { e.stopPropagation(); etape(idx + 1); };
+  overlay.classList.add("estompe");
   box.classList.remove("hidden");
   etape(0);
 }

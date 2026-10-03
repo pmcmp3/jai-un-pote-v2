@@ -81,10 +81,17 @@ export function scale() { return K; }
 export function horizon() { return horizonY; }
 
 export function echelle(u) { return K * camD / Math.max(0.35, camD + u); }
-export function project(u, v, h = 0) {
+// Sol surélevé (4 octobre 2026, les collines de la montagne) : tout ce qui est
+// dessiné dans avecLift(h, …) est posé h plus haut. Les primitives l'ajoutent
+// dès l'ENTRÉE (hauteurs absolues dans les opérations triées), `project`
+// l'ajoute pour les dessins 2D des modèles (personnages, etc.).
+let liftSol = 0;
+export function avecLift(h, fn) { const a = liftSol; liftSol = a + h; try { fn(); } finally { liftSol = a; } }
+function projectAbs(u, v, h) {
   const s = echelle(u);
   return { x: W * 0.5 + (v - vCentre) * s, y: horizonY + (camH - h) * s };
 }
+export function project(u, v, h = 0) { return projectAbs(u, v, h + liftSol); }
 export function depth(u, v) { return camD + u + Math.abs(v - vCentre) * 0.002; }
 function ySol(u) { return horizonY + camH * echelle(u); }
 // Profondeur (négative) où le sol atteint le bas de l'écran.
@@ -300,6 +307,7 @@ function peindreGroupe(ctx, ops) {
 // l'avant (u = u_min, toujours), le dessus (sous la caméra), et UN côté selon
 // que le cube est à gauche ou à droite du centre de l'écran.
 export function drawBox(ctx, u, v, du, dv, h, color, lift = 0) {
+  lift += liftSol;
   if (groupeOps) { pousser(ctx, { u0: u, u1: u + du, v0: v, v1: v + dv, h0: lift, h1: lift + h, f: () => boxNu(ctx, u, v, du, dv, h, color, lift) }); return; }
   boxNu(ctx, u, v, du, dv, h, color, lift);
 }
@@ -335,6 +343,7 @@ function boxNu(ctx, u, v, du, dv, h, color, lift) {
 // largeur au cosinus donnait une boîte écrasée, jamais une boîte qui tourne.
 // Sert aussi au mouton qui fait un 360.
 export function drawBoxR(ctx, cu, cv, du, dv, h, color, lift = 0, angle = 0) {
+  lift += liftSol;
   const t = teintes(color, cu);
   const ca = Math.cos(angle), sa = Math.sin(angle);
   const hu = du / 2, hv = dv / 2;
@@ -363,14 +372,17 @@ export function drawBoxR(ctx, cu, cv, du, dv, h, color, lift = 0, angle = 0) {
 }
 
 export function drawFlat(ctx, u, v, du, dv, color, raw = false) {
-  if (groupeOps) { pousser(ctx, { sol: true, f: () => poly(ctx, [project(u, v), project(u, v + dv), project(u + du, v + dv), project(u + du, v)], raw ? color : teintes(color, u).plat) }); return; }
-  poly(ctx, [project(u, v), project(u, v + dv), project(u + du, v + dv), project(u + du, v)], raw ? color : teintes(color, u).plat);
+  const h = liftSol;
+  const f = () => poly(ctx, [projectAbs(u, v, h), projectAbs(u, v + dv, h), projectAbs(u + du, v + dv, h), projectAbs(u + du, v, h)], raw ? color : teintes(color, u).plat);
+  if (groupeOps) { pousser(ctx, { sol: true, f }); return; }
+  f();
 }
 
 // Ombre au sol : une ellipse douce, légèrement à gauche (soleil à droite).
 export function drawShadow(ctx, u, v, ru, rv, alpha = 0.26) {
-  if (groupeOps) { pousser(ctx, { sol: true, f: () => drawShadow(ctx, u, v, ru, rv, alpha) }); return; }
-  const a = project(u - ru, v - 0.1, 0), b = project(u + ru, v - 0.1, 0);
+  const h = liftSol;
+  if (groupeOps) { pousser(ctx, { sol: true, f: () => avecLift(h - liftSol, () => drawShadow(ctx, u, v, ru, rv, alpha)) }); return; }
+  const a = projectAbs(u - ru, v - 0.1, h), b = projectAbs(u + ru, v - 0.1, h);
   const s = echelle(u);
   ctx.save();
   ctx.globalAlpha = alpha * (1 - night * 0.5);
@@ -383,8 +395,12 @@ export function drawShadow(ctx, u, v, ru, rv, alpha = 0.26) {
 
 // Disque DEBOUT face à la caméra (roue vue de profil), centré en (u, v, h).
 export function drawDisque(ctx, u, v, h, R, couleur) {
-  if (groupeOps) { pousser(ctx, { u0: u, u1: u + 0.002, v0: v - R, v1: v + R, h0: h - R, h1: h + R, f: () => drawDisque(ctx, u, v, h, R, couleur) }); return; }
-  const p = project(u, v, h), s = echelle(u);
+  h += liftSol;
+  if (groupeOps) { pousser(ctx, { u0: u, u1: u + 0.002, v0: v - R, v1: v + R, h0: h - R, h1: h + R, f: () => disqueNu(ctx, u, v, h, R, couleur) }); return; }
+  disqueNu(ctx, u, v, h, R, couleur);
+}
+function disqueNu(ctx, u, v, h, R, couleur) {
+  const p = projectAbs(u, v, h), s = echelle(u);
   ctx.fillStyle = teintes(couleur, u).avant;
   ctx.beginPath();
   ctx.arc(p.x, p.y, Math.max(1, R * s), 0, Math.PI * 2);
@@ -407,8 +423,12 @@ const ZONES = ["ble", "prairie", "village", "tournesol", "foret", "vigne", "vill
 let zoneForcee = () => null;
 export function setZoneForcee(f) { zoneForcee = typeof f === "function" ? f : () => null; }
 export function zoneAt(r) { return zoneForcee(r) || ZONES[Math.floor(Math.max(0, r) / ZONE_ROWS) % ZONES.length]; }
-const SOIL = { ble: "#c9a648", prairie: "#7aa63c", tournesol: "#6f8c2f", foret: "#3f5a2a", vigne: "#8a6a45", village: "#8fa864", villageSud: "#b9a06a", montagne: "#7f8a63" };
-const HERBE = { ble: "#6f8f34", prairie: "#7aa63c", tournesol: "#66852f", foret: "#4a6a30", vigne: "#6f8f34", village: "#8fa864", villageSud: "#9aa86a", montagne: "#6c8a4a" };
+const SOIL = { ble: "#c9a648", prairie: "#7aa63c", tournesol: "#6f8c2f", foret: "#3f5a2a", vigne: "#8a6a45", village: "#8fa864", villageSud: "#b9a06a", montagne: "#e4e9ee" };
+const HERBE = { ble: "#6f8f34", prairie: "#7aa63c", tournesol: "#66852f", foret: "#4a6a30", vigne: "#6f8f34", village: "#8fa864", villageSud: "#9aa86a", montagne: "#dfe5eb" };
+// La route de la montagne est ENNEIGÉE (4 octobre 2026 : « il faudrait que la
+// route soit un peu pleine de neige ») : neige tassée et deux ornières.
+const NEIGE_ROUTE = "#dde3e9", ORNIERE = "#b9c2cc", BORD_NEIGE = "#cfd7df";
+function routeNeige(r) { return zoneForcee(r) === "montagne"; }
 const DIRT = "#9a7a4e";
 const ROAD = "#55514d";
 const LINE = "#f2ead8";
@@ -603,17 +623,20 @@ export function renderGround(ctx, boueAt) {
     bande(ctx, u0, u, (r) => zSol(r, u0, kk));
   }
   bande(ctx, ROAD_HALF + 0.22, ROAD_HALF + 1.0, (r) => teintes(HERBE[zoneAt(r)], 1).plat);
-  bande(ctx, ROAD_HALF, ROAD_HALF + 0.22, () => teintes(DIRT, 1).plat);
+  bande(ctx, ROAD_HALF, ROAD_HALF + 0.22, (r) => teintes(routeNeige(r) ? BORD_NEIGE : DIRT, 1).plat);
   // La route : asphalte et lignes de rive en tirets (repère de vitesse). Plus
   // de flaques de boue depuis le 20 septembre 2026 (« enlève les trucs de
   // terre par terre, les gens comprennent pas, je pense »).
   modeSaison = null;
-  bande(ctx, -ROAD_HALF, ROAD_HALF, (r) => teintes(r % 2 ? ROAD : shadeHex(ROAD, 3), 0).plat);
-  const rive = (r) => (r % 3 === 0 ? teintes(ROAD, 0).plat : teintes(LINE, 0).plat);
+  bande(ctx, -ROAD_HALF, ROAD_HALF, (r) => (routeNeige(r) ? teintes(r % 2 ? NEIGE_ROUTE : shadeHex(NEIGE_ROUTE, -3), 0).plat : teintes(r % 2 ? ROAD : shadeHex(ROAD, 3), 0).plat));
+  const rive = (r) => (routeNeige(r) ? teintes(NEIGE_ROUTE, 0).plat : r % 3 === 0 ? teintes(ROAD, 0).plat : teintes(LINE, 0).plat);
   bande(ctx, ROAD_HALF - 0.2, ROAD_HALF - 0.12, rive);
   bande(ctx, -ROAD_HALF + 0.12, -ROAD_HALF + 0.2, rive);
+  const orniere = (r) => (routeNeige(r) ? teintes(ORNIERE, 0).plat : teintes(r % 2 ? ROAD : shadeHex(ROAD, 3), 0).plat);
+  bande(ctx, -0.58, -0.4, orniere);
+  bande(ctx, 0.4, 0.58, orniere);
   modeSaison = "sol";
-  bande(ctx, -ROAD_HALF - 0.22, -ROAD_HALF, () => teintes(DIRT, 0).plat);
+  bande(ctx, -ROAD_HALF - 0.22, -ROAD_HALF, (r) => teintes(routeNeige(r) ? BORD_NEIGE : DIRT, 0).plat);
   bande(ctx, -ROAD_HALF - 1.3, -ROAD_HALF - 0.22, (r) => teintes(HERBE[zoneAt(r)], 0).plat);
   // Champ du premier plan, jusqu'au bas de l'écran : des sillons parallèles
   // à la route, bien marqués — la perspective les épaissit vers le bas.
@@ -719,6 +742,13 @@ export function rowDecor(ctx, r, clear) {
         push(u, v, () => sapin(ctx, u, v, 7 + a * 4));
       }
     }
+    // Hiver et montagne (4 octobre 2026 : « rajoute des bonshommes de neige
+    // sur le côté, dans le décor [...] tu peux mettre un sapin de Noël dans
+    // le fond ») : de petits bonshommes près de la route, un sapin décoré au fond.
+    if ((zone === "montagne" || poidsHiver() > 0.5) && !estVillage(zone)) {
+      if (hash(r * 61 + 7) < 0.07) { const a = hash(r * 67 + 3), u = ROAD_HALF + 1.6 + a * 2.2, v = r - 0.3; push(u, v, () => bonhommeDecor(ctx, u, v, 0.55 + a * 0.25)); }
+      if (r % 37 === 5) { const u = ROAD_HALF + 7.2, v = r; push(u, v, () => sapinNoel(ctx, u, v, 6.5)); }
+    }
     // (Plus de bottes de foin sur le bas-côté : de profil, elles se
     // confondaient avec la botte-obstacle posée sur la route.) Des buissons
     // bas, ronds et verts, à la place.
@@ -811,6 +841,31 @@ function sapin(ctx, u, v, h) {
       drawBox(ctx, u + 0.5 - w / 2, v + 0.5 - w / 2, w, w, h * 0.24, i % 2 ? "#24573a" : "#1f4d2c", base);
       if (neige) drawBox(ctx, u + 0.5 - w / 2 + 0.05, v + 0.5 - w / 2 + 0.05, w - 0.1, w - 0.1, 0.08, "#f2f0ea", base + h * 0.24);
     }
+  });
+}
+// Petit bonhomme de neige du décor (échelle k) : trois boules, nez carotte
+// vers le joueur (−v), écharpe rouge, chapeau noir.
+function bonhommeDecor(ctx, u, v, k) {
+  avecSaison(null, () => {
+    drawBox(ctx, u, v, 1.1 * k, 1.1 * k, 0.75 * k, "#f4f7fa");
+    drawBox(ctx, u + 0.15 * k, v + 0.15 * k, 0.8 * k, 0.8 * k, 0.6 * k, "#f4f7fa", 0.75 * k);
+    drawBox(ctx, u + 0.13 * k, v + 0.13 * k, 0.84 * k, 0.84 * k, 0.12 * k, "#d33a2a", 1.3 * k);
+    drawBox(ctx, u + 0.25 * k, v + 0.25 * k, 0.6 * k, 0.6 * k, 0.45 * k, "#f4f7fa", 1.42 * k);
+    drawBox(ctx, u + 0.45 * k, v + 0.05 * k, 0.12 * k, 0.25 * k, 0.1 * k, "#f08a1c", 1.6 * k);
+    drawBox(ctx, u + 0.18 * k, v + 0.18 * k, 0.74 * k, 0.74 * k, 0.05 * k, "#1a1a1e", 1.87 * k);
+    drawBox(ctx, u + 0.32 * k, v + 0.32 * k, 0.46 * k, 0.46 * k, 0.32 * k, "#1a1a1e", 1.92 * k);
+  });
+}
+// Sapin de Noël : le sapin, des boules de couleur et une étoile.
+function sapinNoel(ctx, u, v, h) {
+  sapin(ctx, u, v, h);
+  avecSaison(null, () => {
+    const boules = ["#e13e26", "#ffcf2e", "#3f63b4", "#f2f0ea"];
+    for (let i = 0; i < 4; i++) {
+      const w = 2.2 - i * 0.48, base = h * (0.16 + i * 0.2);
+      for (let j = 0; j < 2; j++) drawBox(ctx, u + 0.5 - w / 2 - 0.08, v + 0.5 - w / 2 + (j + 0.3) * w * 0.45, 0.16, 0.16, 0.16, boules[(i + j) % 4], base + 0.08);
+    }
+    drawBox(ctx, u + 0.32, v + 0.32, 0.36, 0.36, 0.36, "#ffd84a", h * 0.97);
   });
 }
 // Rocher : deux blocs gris décalés.
@@ -1163,22 +1218,87 @@ export function drawHalle(ctx, rDebut, geo, rFrom = -Infinity, rTo = Infinity, c
 // Bosse de montagne (4 octobre 2026) : la chaussée monte et redescend. Deux
 // couches comme la halle : « dessus » (la route, peinte avant le cycliste) et
 // « flanc » (le talus côté caméra, peint après lui).
+// Trois couches depuis les collines de 6,5 u (4 octobre 2026, deuxième passe) :
+// « dos » (le terrain derrière la route, soulevé jusqu'au fond du décor, où se
+// posent les sapins — mêmes sillons que les champs : aucune couture au pied),
+// « dessus » (la chaussée enneigée) et « flanc » (le versant côté caméra, qui
+// redescend jusqu'au sol — ou jusqu'en bas de l'écran).
+// Chaque bande est UN polygone qui suit la colline (points tous les 0,5 rang).
+const PENTE_VERSANT = 1.2; // le versant avant recule de 1,2 u par unité de hauteur
 export function drawBosse(ctx, d, geo, rFrom = -Infinity, rTo = Infinity, couche = "dessus") {
   const { long, sol } = geo;
-  const uG = -ROAD_HALF, uD = ROAD_HALF, PAS = 0.5;
-  for (let a = d; a < d + long; a += PAS) {
-    const b = Math.min(d + long, a + PAS);
-    if (b < rFrom - 2 || a > rTo + 2) continue;
-    const ha = sol(a), hb = sol(b), b2 = b + 0.03; // léger recouvrement : pas de fil clair entre deux tranches
-    if (couche === "dessus") {
-      poly(ctx, [project(uG, a, ha), project(uG, b2, hb), project(uD, b2, hb), project(uD, a, ha)], teintes(ROAD, 0).plat);
-      if (Math.floor(a) % 3 !== 0) for (const [u0, u1] of [[uD - 0.2, uD - 0.12], [uG + 0.12, uG + 0.2]]) {
-        poly(ctx, [project(u0, a, ha + 0.003), project(u0, b, hb + 0.003), project(u1, b, hb + 0.003), project(u1, a, ha + 0.003)], teintes(LINE, 0).plat);
+  const uG = -ROAD_HALF, uD = ROAD_HALF;
+  const a0 = Math.max(d - 0.5, rFrom - 2), a1 = Math.min(d + long + 0.5, rTo + 2);
+  if (a1 - a0 < 0.1) return;
+  const vs = [];
+  for (let v = a0; v < a1; v += 0.5) vs.push(v);
+  vs.push(a1);
+  const hs = vs.map(sol);
+  const bande = (u0, u1, col, dh = 0) => {
+    const pts = [];
+    for (let i = 0; i < vs.length; i++) pts.push(project(u0, vs[i], hs[i] + dh));
+    for (let i = vs.length - 1; i >= 0; i--) pts.push(project(u1, vs[i], hs[i] + dh));
+    poly(ctx, pts, col);
+  };
+  if (couche === "dos") {
+    avecSaison("sol", () => {
+      const soil = SOIL.montagne;
+      let k = 0;
+      for (let u = U_DECOR; u > ROAD_HALF + 1.0; u -= 1.25, k++) {
+        const u0 = Math.max(ROAD_HALF + 1.0, u - 1.25);
+        bande(u0, u, teintes(k % 2 ? shadeHex(soil, -9) : soil, u0).plat);
       }
-    } else {
-      poly(ctx, [project(uG, a, 0), project(uG, b2, 0), project(uG, b2, hb), project(uG, a, ha)], teintes("#7a6a4e", uG).avant);
-      poly(ctx, [project(uG, a, ha), project(uG, b2, hb), project(uG, b2, Math.max(0, hb - 0.12)), project(uG, a, Math.max(0, ha - 0.12))], teintes("#a08f6c", uG).avant);
+      bande(ROAD_HALF + 0.22, ROAD_HALF + 1.0, teintes(HERBE.montagne, 1).plat);
+      bande(ROAD_HALF, ROAD_HALF + 0.22, teintes(BORD_NEIGE, 1).plat);
+    });
+  } else if (couche === "dessus") {
+    bande(uG, uD, teintes(NEIGE_ROUTE, 0).plat);
+    // Une rangée sur deux un ton plus sombre, comme sur le plat (repère de vitesse).
+    const sombre = teintes(shadeHex(NEIGE_ROUTE, -3), 0).plat;
+    for (let r = Math.round(a0); r <= Math.round(a1); r++) {
+      if (r % 2) continue;
+      const va = Math.max(a0, r - 0.5), vb = Math.min(a1, r + 0.5);
+      if (vb <= va) continue;
+      poly(ctx, [project(uG, va, sol(va)), project(uG, vb, sol(vb)), project(uD, vb, sol(vb)), project(uD, va, sol(va))], sombre);
     }
+    for (const [u0, u1] of [[-0.58, -0.4], [0.4, 0.58]]) bande(u0, u1, teintes(ORNIERE, 0).plat, 0.003);
+  } else {
+    // Le bord haut suit le bord de la chaussée — ou son AXE quand la route
+    // passe au-dessus de l'œil de la caméra (on la voit alors par en
+    // dessous) : les roues posent toujours pile sur l'arête.
+    const s = echelle(uG);
+    const haut = vs.map((v, i) => { const p = project(uG, v, hs[i]), q = project(0, v, hs[i]); return { x: p.x, y: Math.max(p.y, q.y) }; });
+    const pied = vs.map((v, i) => ({ x: haut[i].x, y: Math.min(H + 4, project(uG - hs[i] * PENTE_VERSANT, v, 0).y) }));
+    const ruban = (f0, f1, col) => {
+      const y = (i, f) => (f < 1 ? haut[i].y + f * s * Math.min(1, hs[i] / 0.6) : haut[i].y + (pied[i].y - haut[i].y) * (f - 1));
+      const pts = [];
+      for (let i = 0; i < vs.length; i++) pts.push({ x: haut[i].x, y: y(i, f0) });
+      for (let i = vs.length - 1; i >= 0; i--) pts.push({ x: haut[i].x, y: y(i, f1) });
+      poly(ctx, pts, col);
+    };
+    avecSaison("sol", () => {
+      // Le versant : la neige du champ du premier plan (même teinte moyenne).
+      ruban(0, 2, teintes(shadeHex(SOIL.montagne, -2), 0).plat);
+      // Des courbes de niveau (hauteur constante sur le versant) : elles
+      // naissent sous la crête quand la route monte, comme des terrasses.
+      ctx.save();
+      ctx.strokeStyle = teintes(shadeHex(SOIL.montagne, -16), 0).plat;
+      ctx.lineWidth = Math.max(1, s * 0.07);
+      ctx.lineJoin = "round";
+      for (const hc of [1.3, 2.7, 4.1, 5.5]) {
+        ctx.beginPath();
+        let dedans = false;
+        for (let i = 0; i < vs.length; i++) {
+          if (hs[i] <= hc + 0.05) { dedans = false; continue; }
+          const p = project(uG - (hs[i] - hc) * PENTE_VERSANT, vs[i], hc);
+          if (dedans) ctx.lineTo(p.x, p.y); else { ctx.moveTo(p.x, p.y); dedans = true; }
+        }
+        ctx.stroke();
+      }
+      ctx.restore();
+      ruban(0, 0.42, teintes("#c9d2dc", 0).plat);
+      ruban(0, 0.3, teintes("#f6f8fa", 0).plat);
+    });
   }
 }
 

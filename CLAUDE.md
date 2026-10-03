@@ -319,6 +319,50 @@ Code `TESTV2`, qui est aussi `config.ligueBeta` (menu simplifié + bouton « Lai
     rangs (toit continu), feux de détresse, pièces sur les toits, +6 rangs
     après (un double saut lancé d'un toit vole plus loin). Les simulations
     roulent sur les toits (`rows.toitGare`). Joueur idéal : 0 choc / 30 graines.
+- **4 octobre 2026, troisième série (montagne d'hiver, tracteur en face, clavier)**
+  — `VERSION_COURSE` 16, SW `jp2-v23` :
+  - *Montagne* : déplacée en HIVER (46 → 80 s, `MONTAGNE_DEBUT_S`/`MONTAGNE_FIN_S`),
+    collines 5× plus hautes (6,5 u — « qu'on soit quasiment tout en haut de
+    l'écran ») : montée 28 rangs, plateau 22, descente, en cosinus
+    (`rows.hauteurBosse`). Obstacles permis sur le PLAT seulement
+    (`penteAutour`). Route ENNEIGÉE (neige tassée, deux ornières, bas-côtés
+    blancs : `routeNeige`). Trois couches (`scene.drawBosse`) : « dos » (le
+    terrain derrière la route soulevé jusqu'à `U_DECOR`, mêmes sillons que les
+    champs : aucune couture au pied), « dessus » (chaussée), « flanc » (versant
+    qui redescend vers la caméra, courbes de niveau). ⚠️ Au-dessus de l'œil de
+    la caméra (3,6 u), on voit la route PAR EN DESSOUS : le bord haut du flanc
+    suit alors l'AXE de la chaussée, et le flanc est peint AVANT ce qui roule
+    (sinon il coupe les roues). Tout ce qui se tient sur la chaussée monte avec
+    elle : `scene.avecLift(h, fn)` soulève drawBox/drawBoxR/drawFlat/
+    drawShadow/drawDisque, via `surSol()` (main.js) — véhicules inclinés sur la
+    pente ; décor des rangées de colline soulevé de `hauteurBosse(r)`. Les
+    potes ne projettent plus d'ombre au sol quand ils roulent au-dessus.
+  - *Hiver* : CHASSE-NEIGE à la place des véhicules en face dans la montagne
+    (`props.drawChasseNeige` : toit plat montable, lame à chevrons,
+    gyrophare), gros BONHOMME DE NEIGE à la place des voitures, costards et
+    fermiers (2,1 u, saut appuyé), petits bonshommes et SAPIN DE NOËL dans le
+    décor (`bonhommeDecor`/`sapinNoel`, hiver ou montagne).
+  - *Tracteur* : arrive EN FACE (plus jamais dans notre sens : « beaucoup plus
+    difficile à passer ») et est MONTABLE (plancher « double ») — atterrir
+    dessus ne coûte plus 3 potes.
+  - *Moments* : marché 25 s, gare 88 s, bowling 116 s ; convoi de cars à 100 s ;
+    bouchon en voitures blanche, rouge, noire (`props.COULEURS_BOUCHON`).
+  - *Fausse alerte après la gare* : le turbo lait (`ouvrirFenetreSure`) écrasait
+    des véhicules DÉJÀ ARMÉS — le panneau restait, le véhicule disparaissait.
+    Les rangées armées sont conservées. Mesuré : 0 alerte fantôme sur 3 × 110 s
+    (`capture.mjs alertes`).
+  - *Tuto* : plus d'« appui gratuit » (chaque tap passait pour un appui long :
+    saut énorme sur les petites bêtes) ; l'étape « haut » ne réussit que sur
+    un vrai appui.
+  - *Interface* : logo de chargement fixe ; menu à 50 % d'opacité pendant
+    « comment jouer » (`estompe`) ; « ! » du triangle dessiné en formes, centré.
+  - *Clavier iOS* : plus AUCUNE animation au focus — la marge qui glissait en
+    0,35 s déplaçait le champ pendant que Safari calculait son propre
+    défilement (« ça a très, très mal réagi », mieux au deuxième tap). Mise en
+    page « clavier » SYNCHRONE (titre, lien album et bouton son masqués, carte
+    en haut), overlay calé sur `visualViewport` (hauteur + décalage), champ
+    actif ramené en vue dans l'overlay (`montrerChamp`). Vérifié en simulation
+    (fenêtre réduite, `premiere.mjs`) ; ⚠️ pas vérifiable sans un vrai iPhone.
 - **Tuto au ralenti, deuxième version** (`conseilTap`/`conseilStep`) : approche
   ~1 s avant le bon moment (monde ×0,25), un tap donné pendant l'approche est
   GARDÉ et part pile au bon moment, gel ×0,06 s'il n'a rien fait ; reprise
@@ -414,7 +458,7 @@ Code `TESTV2`, qui est aussi `config.ligueBeta` (menu simplifié + bouton « Lai
 
 - L'écart entre deux obstacles vient de la PHYSIQUE du saut (`ecartMin` : retombée du premier +
   élan du second), jamais d'un nombre fixe, et jamais deux « double saut » d'affilée. Un joueur
-  idéal scripté ne touche **aucun** obstacle sur 20 graines (1 531 franchis) ; un joueur immobile
+  idéal scripté ne touche **aucun** obstacle sur 20 graines (1 643 franchis, 4 octobre 2026) ; un joueur immobile
   les touche tous. À re-mesurer après toute modification du saut ou du générateur.
 - ⚠️ La fenêtre de franchissement se calcule à la vitesse MINIMALE, pas maximale : un obstacle
   est long en rangées, donc c'est en roulant lentement qu'on reste le plus longtemps dessus.

@@ -175,6 +175,20 @@ function solSous(v, jumpY) { return Math.max(rows.solAt(v), rows.toitSous(rows.r
 // corps penché légèrement en arrière »). Nez en l'air à la montée, et tout le
 // cycliste tourne avec le vélo : le buste part en arrière.
 function penteSol(v) { return -Math.atan2(rows.solAt(v + 0.6) - rows.solAt(v - 0.6), 1.2); }
+// Collines de 6,5 u (4 octobre 2026, deuxième passe) : ce qui se tient ou
+// roule sur la chaussée MONTE avec elle (scene.avecLift : toute la géométrie
+// est soulevée, ombre comprise) et un véhicule s'incline sur la pente, autour
+// de son point de contact.
+function surSol(v, fn, incliner = false, h = rows.solAt(v)) {
+  if (h < 0.01) { fn(); return; }
+  scene.avecLift(h, () => {
+    const a = incliner ? penteSol(v) : 0;
+    if (Math.abs(a) < 0.01) { fn(); return; }
+    const c = scene.project(0, v, 0);
+    ctx.save(); ctx.translate(c.x, c.y); ctx.rotate(a); ctx.translate(-c.x, -c.y);
+    try { fn(); } finally { ctx.restore(); }
+  });
+}
 function palierPrecedent() {
   const p = window.CONFIG.potesPaliers;
   if (game.cibleRachat !== null && game.cibleRachat !== undefined) return game.cibleRachat - (game.coutRachat || window.CONFIG.poteRachatPieces || 10);
@@ -312,7 +326,8 @@ function conseilGeste(ev) {
   const f = conseil.famille;
   // Tap et appui long : réussis dès le décollage (la tenue est offerte). Le
   // double attend encore son re-tap, au sommet.
-  if (ev === "jump") { if (f !== "double") conseilReussi(); else { conseil.phase = "enl_air"; conseil.tampon = false; } }
+  if (ev === "jump") { if (f === "tap") conseilReussi(); else { conseil.phase = "enl_air"; conseil.tampon = false; } }
+  else if (ev === "haut" && f === "haut") conseilReussi(); // l'appui a tenu (> 0,12 s)
   else if (ev === "salto") conseilReussi(); // un double saut passe tout
 }
 function conseilStep(dt, tm, vitesse) {
@@ -328,8 +343,7 @@ function conseilStep(dt, tm, vitesse) {
     else if (conseil.phase === "enl_air") {
       // Double : ralenti jusqu'au sommet, puis gel en attendant le re-tap.
       cible = conseil.famille === "double" && player.jumpVy <= APEX_VY ? RALENTI_MIN : 1;
-      // Appui long : le ralenti tient jusqu'à la pleine hauteur (ou au doigt levé).
-      if (conseil.famille === "haut" && (player.tHaut >= window.CONFIG.sautTenueMaxS * 0.9 || !isHolding())) conseilReussi();
+      // (Appui long : réussi par conseilGeste("haut"), quand l'appui a tenu.)
     }
     // Obstacle dépassé : appris s'il n'a pas été touché (quel que soit le geste).
     if (player.v > conseil.r + 1.5) {
@@ -621,7 +635,7 @@ function gagnerRouge(u, v) {
 // l'instant, le rendu la fait basculer pendant 1,6 s.
 const tombes = new Map();
 function marquerTombe(ev, now) { if (ev.r !== undefined && !KINDS_ROULANTS.has(ev.kind)) tombes.set(ev.r, now); }
-const KINDS_ROULANTS = new Set(["tracteur", "bus", "voiture", "contresens", "poulejetee"]);
+const KINDS_ROULANTS = new Set(["tracteur", "bus", "chasseneige", "voiture", "contresens", "poulejetee"]);
 
 const chocs = []; // debug : les derniers chocs (auto-audit)
 function toucherJoueur(ev) {
@@ -695,7 +709,7 @@ function armerTraversees(now, vitesse) {
     const tArr = now + (r - player.v) / Math.max(0.5, vitesse);
     if (tArr - now > rows.delaiArmement(row)) continue;
     rows.armer(row, now, tArr);
-    if ((row.kind === "tracteur" || row.kind === "contresens" || row.kind === "bus") && !klaxonne.has(r)) { klaxonne.add(r); sfx.klaxon(); }
+    if ((row.kind === "tracteur" || row.kind === "contresens" || row.kind === "bus" || row.kind === "chasseneige") && !klaxonne.has(r)) { klaxonne.add(r); sfx.klaxon(); }
   }
 }
 
@@ -795,10 +809,11 @@ function step(dt) {
   }
   if (player.jumpY > solIci) {
     // Tant que le doigt reste appuyé et qu'on monte, la pesanteur est réduite.
-    // Pendant un conseil « appui long » ou « double », la tenue est offerte :
-    // le tuto doit réussir dès que le joueur a fait le bon geste, même un peu court.
-    const aide = conseil.r !== null && (conseil.famille !== "tap" || conseil.plane) && (conseil.phase === "enl_air" || conseil.phase === "fini" || conseil.phase === "attente");
-    const tenu = (isHolding() || aide) && player.jumpVy > 0 && player.tHaut < phys.tenueMax;
+    // ⚠️ Plus AUCUN appui offert pendant les tutos (4 octobre 2026 : « un petit
+    // saut pour les petites bêtes, ça m'a fait sauter hyper haut tout seul [...]
+    // à chaque fois que j'appuie, tu considères que c'est un appui lent ») :
+    // le saut est celui que fait le doigt.
+    const tenu = isHolding() && player.jumpVy > 0 && player.tHaut < phys.tenueMax;
     if (tenu) player.tHaut += dt;
     player.jumpVy -= (tenu ? phys.gTenu : phys.g) * dt;
     player.jumpY += player.jumpVy * dt;
@@ -976,7 +991,7 @@ function drawPiece(r, h, now, kind) {
     // les axes, donc la brique s'écrasait au lieu de tourner (20 septembre
     // 2026 : « ça ne marche toujours pas en 3D, il faut que tu voies la logique »).
     const bas = h - 0.42 + bob;
-    scene.drawShadow(ctx, 0, r, 0.22, 0.22, 0.18);
+    scene.avecLift(rows.solAt(r), () => scene.drawShadow(ctx, 0, r, 0.22, 0.22, 0.18));
     scene.drawBoxR(ctx, 0, r, 0.42, 0.42, 0.74, "#f8f8f4", bas, spin);
     scene.drawBoxR(ctx, 0, r, 0.44, 0.44, 0.2, "#2f7fd6", bas + 0.2, spin);
     scene.drawBoxR(ctx, 0, r, 0.16, 0.16, 0.14, "#e8e8e2", bas + 0.74, spin);   // le bec
@@ -997,6 +1012,7 @@ const PIECE_R = 0.3;
 // Avertisseur « ! » au bord droit (comme les missiles de Jetpack Joyride) :
 // une traversée est armée mais sa rangée n'est pas encore à l'écran.
 const alertesVues = new Map(); // rangée → instant (réel) où son panneau est apparu
+let debugAlertes = null; // harnais : rangée → { alerte, vu } (panneau affiché / véhicule à l'écran)
 let montagneFondu = 0;
 function renderAlertes(now, vitesse) {
   if (!gameStarted || game.ended || now < 0) return;
@@ -1030,11 +1046,12 @@ function renderAlertes(now, vitesse) {
     // sa largeur réelle, 2 × taille, avec une marge franche.
     const x = width - 14 - taille * 2 + tremble;
     projoLancer("alerte", x + taille, y, 70); projoSuivre("alerte", x + taille, y);
+    if (debugAlertes) { const e = debugAlertes.get(r) || { kind: row.kind, alerte: 0, vu: 0 }; e.alerte += 1; debugAlertes.set(r, e); }
     ctx.save();
     // Halo puis panneau plein, contour blanc : il doit sauter aux yeux
     // (20 septembre 2026 : « le panneau d'attention n'est pas du tout assez visible »).
     const halo = ctx.createRadialGradient(x + taille, y, 0, x + taille, y, taille * 2.4);
-    const grave = row.kind === "tracteur" || row.kind === "contresens" || row.kind === "bus";
+    const grave = row.kind === "tracteur" || row.kind === "contresens" || row.kind === "bus" || row.kind === "chasseneige";
     const teinte = grave ? "225,62,38" : "255,207,46";
     halo.addColorStop(0, `rgba(${teinte},${(0.5 * urgence + 0.2) * (1 - reduit * 0.75)})`);
     halo.addColorStop(1, `rgba(${teinte},0)`);
@@ -1051,10 +1068,16 @@ function renderAlertes(now, vitesse) {
     ctx.closePath();
     ctx.stroke();
     ctx.fill();
+    // « ! » DESSINÉ (4 octobre 2026 : « le point d'exclamation n'est pas très
+    // bien centré ») : une barre et un point, centrés sur l'axe du triangle et
+    // posés dans son tiers bas — plus de dépendance aux métriques de la police.
     ctx.fillStyle = grave ? "#ffffff" : "#0d0d10";
-    ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    ctx.font = `900 ${Math.round(taille * 1.15)}px "Helvetica Neue", Helvetica, Arial, sans-serif`;
-    ctx.fillText("!", x + taille, y + taille * 0.22);
+    const cx = x + taille, bw = taille * 0.22;
+    ctx.beginPath();
+    ctx.moveTo(cx - bw / 2, y - taille * 0.42); ctx.lineTo(cx + bw / 2, y - taille * 0.42);
+    ctx.lineTo(cx + bw * 0.32, y + taille * 0.28); ctx.lineTo(cx - bw * 0.32, y + taille * 0.28);
+    ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx, y + taille * 0.52, bw * 0.55, 0, Math.PI * 2); ctx.fill();
     ctx.restore();
     break;
   }
@@ -1132,21 +1155,30 @@ function render(alpha) {
     items.push({ decor: true, d: scene.depth(scene.ROAD_HALF + 0.5, d), draw: () => scene.drawHalle(ctx, d, geo, from, to, "fond") });
     items.push({ decor: true, d: scene.depth(-scene.ROAD_HALF - 0.3, d), draw: () => scene.drawHalle(ctx, d, geo, from, to, "devant") });
   }
-  // Bosses de la montagne : la chaussée (avant le cycliste), le talus (après).
+  // Collines de la montagne : le versant du fond (sous le décor qu'il porte),
+  // la chaussée, puis la masse côté caméra — peinte AVANT ce qui roule sur la
+  // route : au-dessus de l'œil de la caméra, le bord de la chaussée couperait
+  // sinon les roues (on voit la colline par en dessous).
   const bossesVues = new Set();
   for (let r = from; r <= to; r++) {
     const d = rows.bosseA(r);
     if (d === null || bossesVues.has(d)) continue;
     bossesVues.add(d);
+    items.push({ decor: true, d: scene.depth(17, d), draw: () => scene.drawBosse(ctx, d, GEO_BOSSE, from, to, "dos") });
     items.push({ decor: true, d: scene.depth(scene.ROAD_HALF + 0.05, d), draw: () => scene.drawBosse(ctx, d, GEO_BOSSE, from, to, "dessus") });
-    items.push({ decor: true, d: scene.depth(-scene.ROAD_HALF - 0.05, d), draw: () => scene.drawBosse(ctx, d, GEO_BOSSE, from, to, "flanc") });
+    items.push({ decor: true, d: scene.depth(scene.ROAD_HALF + 0.04, d), draw: () => scene.drawBosse(ctx, d, GEO_BOSSE, from, to, "flanc") });
   }
   const vc = scene.getVCentre(), largeurRoute = scene.demiLargeurRoute() + 2;
   for (let r = from; r <= to; r++) {
     const row = r >= 0 ? rows.rowAt(r) : null;
     const clear = row && row.type === "traverse";
-    for (const it of scene.rowDecor(ctx, r, clear)) { it.decor = true; items.push(it); }
-    const sg = signAt(r);
+    const hb = rows.hauteurBosse(r);
+    for (const it of scene.rowDecor(ctx, r, clear)) {
+      it.decor = true;
+      if (hb > 0.01) { const f = it.draw; it.draw = () => scene.avecLift(hb, f); }
+      items.push(it);
+    }
+    const sg = rows.bosseA(r) === null ? signAt(r) : null;
     if (sg) items.push({ decor: true, d: scene.depth(scene.ROAD_HALF + 0.55, r), draw: () => scene.drawSign(ctx, r, sg) });
     // Entrée du biome village : le panneau porte la ville du joueur.
     if (panneauVilleA(r + 1)) items.push({ d: scene.depth(scene.ROAD_HALF + 0.55, r + 1), draw: () => scene.drawSign(ctx, r + 1, [scene.villeDuJoueur(), "chez toi"]) });
@@ -1162,13 +1194,15 @@ function render(alpha) {
         // Le fermier qui jette la poule : sur le bas-côté du fond, face au joueur.
         const fu = scene.ROAD_HALF + 0.45, fv = r + K.lanceur;
         const lance = row.armed ? Math.max(0, t - row.t0) : null;
-        items.push({ d: scene.depth(fu, fv), draw: () => props.drawLanceurFace(ctx, fu, fv, tAnim, lance) });
-        if (inst) items.push({ d: scene.depth(0, inst.v), draw: () => props.drawPouleJetee(ctx, 0, inst.v, t) });
+        items.push({ d: scene.depth(fu, fv), draw: () => surSol(fv, () => props.drawLanceurFace(ctx, fu, fv, tAnim, lance)) });
+        if (inst) items.push({ d: scene.depth(0, inst.v), draw: () => surSol(inst.v, () => props.drawPouleJetee(ctx, 0, inst.v, t)) });
       } else if (inst) {
         const dessin = row.kind === "tracteur" ? () => props.drawTracteurRoute(ctx, inst.K, 0, inst.v, t)
           : row.kind === "bus" ? () => props.drawBus(ctx, inst.K, 0, inst.v, t)
+          : row.kind === "chasseneige" ? () => props.drawChasseNeige(ctx, inst.K, 0, inst.v, t)
           : () => props.drawVoiture(ctx, inst.K, 0, inst.v, -1, t);
-        items.push({ d: scene.depth(0, inst.v), draw: dessin });
+        items.push({ d: scene.depth(0, inst.v), draw: () => surSol(inst.v, dessin, true) });
+        if (debugAlertes) { const px = scene.project(0, inst.v, 0).x; if (px > 0 && px < width) { const e = debugAlertes.get(r) || { kind: row.kind, alerte: 0, vu: 0 }; e.vu += 1; debugAlertes.set(r, e); } }
       }
     }
     // Les traversants se voient de loin (ils arrivent du fond) : tout l'intervalle.
@@ -1185,9 +1219,11 @@ function render(alpha) {
     if (row.grosse !== undefined && !rows.bonusTaken(r, "grosse")) items.push({ d: scene.depth(-0.3, r), draw: () => drawPiece(r, row.grosse, now, "grosse") });
     if (row.type === "statique") {
       const tombe = tombes.get(r);
-      items.push({ d: scene.depth(0, r), draw: () => (tombe !== undefined
+      items.push({ d: scene.depth(0, r), draw: () => surSol(r, () => (tombe !== undefined
         ? props.drawStaticTombe(ctx, row.kind, 0, r, tAnim, Math.max(0, tm - tombe))
-        : (props.drawStatic(ctx, row.kind, 0, r, tAnim), row.bouchon && props.drawFeuxDetresse(ctx, rows.KINDS[row.kind], 0, r, tAnim))) });
+        : row.bouchon !== undefined
+          ? (props.drawVoiture(ctx, rows.KINDS[row.kind], 0, r, 1, tAnim, props.COULEURS_BOUCHON[row.bouchon % 3]), props.drawFeuxDetresse(ctx, rows.KINDS[row.kind], 0, r, tAnim))
+          : props.drawStatic(ctx, row.kind, 0, r, tAnim))) });
     }
   }
   if (game.arriveeR !== null && Math.abs(game.arriveeR - vc) < largeurRoute + 6) {
@@ -1471,6 +1507,8 @@ if (debugOverlay.isEnabled()) {
     projo: () => projo.type,
     tMonde: () => tMonde(),
     vitesse: () => speed,
+    suivreAlertes: () => { debugAlertes = new Map(); },
+    alertes: () => [...(debugAlertes || new Map())].map(([r, e]) => ({ r, ...e })),
     fps: () => perf.fps,
     frameMs: () => perf.frameMs,
     tombes: () => tombes.size,

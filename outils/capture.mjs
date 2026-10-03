@@ -467,12 +467,12 @@ const SCENES = {
   // Véhicules (3 octobre 2026) : tracteur dans le sens du joueur, car scolaire en face.
   vehicules: async () => {
     const vus = new Set();
-    for (let i = 0; i < 1400 && vus.size < 2; i++) {
+    for (let i = 0; i < 2600 && vus.size < 3; i++) {
       const k = await course(() => {
         const P = window.__pote, v = P.player.v;
         for (let r = Math.floor(v) + 1; r < v + 30; r++) {
           const row = P.rows.rowAt(r);
-          if (row.type === "contresens" && row.armed && (row.kind === "bus" || row.kind === "tracteur")) {
+          if (row.type === "contresens" && row.armed && (row.kind === "bus" || row.kind === "tracteur" || row.kind === "chasseneige")) {
             const o = P.rows.contresensAt ? null : null;
             const centre = r + row.v0 - row.vitesse * (P.tMonde() - row.t0);
             if (centre > v + 3.5 && centre < v + 8) return row.kind;
@@ -579,9 +579,19 @@ const SCENES = {
     await page.waitForFunction(() => window.__pote.player.v > 2, null, { timeout: 15000 });
     const d = await course(() => { const p = window.__pote; for (let r = 300; r < 3000; r++) if (p.rows.bosseA(r) !== null) return p.rows.bosseA(r); return 0; });
     await page.keyboard.press("KeyD");
-    for (const [dv, nom] of [[-10, "49-montagne-approche"], [8, "49b-montagne-bosse"], [40, "49c-montagne-suite"]]) {
-      await course(([d, dv]) => { const p = window.__pote; p.player.v = d + dv; p.player.prevV = p.player.v; p.player.jumpY = p.rows.solAt(p.player.v); }, [d, dv]);
+    for (let i = 0; i < 4; i++) { await page.keyboard.press("KeyS"); await attendre(60); } // hiver forcé
+    const aller = (v) => course((v) => { const p = window.__pote; p.player.v = v; p.player.prevV = v; p.player.jumpY = p.rows.solAt(v); p.player.jumpVy = 0; }, v);
+    for (const [dv, nom] of [[-16, "49-montagne-approche"], [12, "49b-montagne-montee"], [40, "49c-montagne-sommet"], [64, "49c2-montagne-descente"]]) {
+      await aller(d + dv);
       await attendre(1200); await photo(nom);
+    }
+    // Le chasse-neige et le gros bonhomme de neige sur la route.
+    const trouve = await course(() => { const p = window.__pote, o = {}; for (let r = 300; r < 3000; r++) { const row = p.rows.rowAt(r); if (!o[row.kind] && (row.kind === "chasseneige" || row.kind === "bonhomme")) o[row.kind] = r; } return o; });
+    console.log("MONTAGNE premiers", JSON.stringify(trouve), "· sol", JSON.stringify(await course((t) => Object.fromEntries(Object.entries(t).map(([k, r]) => [k, window.__pote.rows.solAt(r).toFixed(2)])), trouve)));
+    if (trouve.bonhomme) { await aller(trouve.bonhomme - 7); await attendre(400); await photo("49f-bonhomme"); }
+    if (trouve.chasseneige) {
+      await aller(trouve.chasseneige - 30);
+      for (let k = 0; k < 4; k++) { await attendre(900); await photo(`49g-chasseneige-${k}`); }
     }
     const rb = await course(() => { const p = window.__pote; for (let r = 300; r < 3000; r++) { const row = p.rows.rowAt(r); if (row.bouchon) return r; } return 0; });
     await course((rb) => { const p = window.__pote; p.player.v = rb - 7; p.player.prevV = p.player.v; p.player.jumpY = 0; }, rb);
@@ -590,6 +600,19 @@ const SCENES = {
     await attendre(250); await photo("49e-bouchon-toit");
     console.log("BOUCHON rangée", rb, "· hauteur après", await course(() => window.__pote.player.jumpY.toFixed(2)));
     await page.keyboard.press("KeyD");
+  },
+  // Panneaux « attention » sans véhicule (4 octobre 2026 : « je suis descendu
+  // de la gare, il y a eu attention, et il n'y a pas eu d'obstacle »).
+  alertes: async () => {
+    await page.waitForFunction(() => window.__pote.player.v > 2, null, { timeout: 15000 });
+    await course(() => window.__pote.suivreAlertes());
+    for (let i = 0; i < 5; i++) await page.keyboard.press("KeyP");
+    await attendre(Number(process.env.DUREE || 90) * 1000);
+    const a = await course(() => window.__pote.alertes());
+    const vFin = await course(() => window.__pote.player.v);
+    const fantomes = a.filter((e) => e.alerte > 0 && e.vu === 0 && e.r < vFin - 5); // ceux encore devant ne sont pas arrivés
+    console.log("ALERTES", a.length, "· sans véhicule vu :", JSON.stringify(fantomes), "· v", await course(() => Math.round(window.__pote.player.v)));
+    console.log("HALLES", JSON.stringify(await course(() => { const p = window.__pote, out = []; for (let r = 0; r < 2000; r++) { const d = p.rows.halleA(r); if (d !== null && !out.some((o) => o.d === d)) out.push({ d, type: p.rows.typeHalle(d) }); } return out; })));
   },
   menus: async () => {
     // ⚠️ Pas de touche D ici : overlay masqué = touches de debug coupées (G, I…).

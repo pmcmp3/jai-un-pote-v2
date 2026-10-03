@@ -30,9 +30,26 @@ await photo("49-premiere-chargement");
 await attendre(2600);
 console.log("url après chargement :", page.url(), "| pseudo :", await page.inputValue("#pseudo-input"));
 await photo("50-premiere-pseudo");
-await page.focus("#pseudo-input"); await attendre(500);
+// Clavier : pas d'animation au focus, l'overlay épouse la zone visible
+// (simulée ici en réduisant la fenêtre à ce qui reste au-dessus d'un clavier
+// d'iPhone), le champ actif reste en vue.
+const mesureChamp = (sel) => page.evaluate((sel) => {
+  const o = document.getElementById("overlay"), r = document.querySelector(sel).getBoundingClientRect(), ro = o.getBoundingClientRect();
+  return { champ: [Math.round(r.top), Math.round(r.bottom)], overlay: [Math.round(ro.top), Math.round(ro.bottom)], visible: r.top >= ro.top && r.bottom <= ro.bottom, clavier: o.classList.contains("clavier"), titre: getComputedStyle(document.getElementById("menu-title")).display, transition: getComputedStyle(o).transitionProperty };
+}, sel);
+const hauteur = petit ? 667 : 812;
+await page.focus("#pseudo-input"); await attendre(60);
+console.log("focus pseudo (60 ms) :", JSON.stringify(await mesureChamp("#pseudo-input")));
+await page.setViewportSize({ width: 375, height: hauteur - 336 - 44 }); await attendre(400);
 await photo("50b-premiere-clavier");
-console.log("centre au focus :", await page.evaluate(() => getComputedStyle(document.getElementById("overlay")).getPropertyValue("--centre")));
+console.log("clavier ouvert, pseudo :", JSON.stringify(await mesureChamp("#pseudo-input")));
+await page.focus("#ville-input"); await attendre(300);
+await photo("50c-premiere-clavier-ville");
+console.log("clavier ouvert, ville :", JSON.stringify(await mesureChamp("#ville-input")));
+await page.evaluate(() => document.activeElement.blur());
+await page.setViewportSize({ width: 375, height: hauteur }); await attendre(700);
+await photo("50d-premiere-clavier-ferme");
+console.log("clavier fermé :", JSON.stringify(await mesureChamp("#pseudo-input")), "centre", await page.evaluate(() => getComputedStyle(document.getElementById("overlay")).getPropertyValue("--centre")));
 await page.fill("#pseudo-input", "paul");
 await page.click("#step1-next"); await attendre(400);
 await photo("51a-premiere-cycliste");

@@ -62,11 +62,19 @@ export const KINDS = {
   // « contresens » avec une vitesse NÉGATIVE (il s'éloigne). Raccourci à 2,6 :
   // on le croise à (vitesse joueur − 0,8) rangées/s, la fenêtre de saut en
   // dépend (outils/mesurer.mjs : 0 choc pour le joueur idéal).
-  tracteur:    { contresens: true, cout: 3, vitesse: -0.8, arme: 5.5, long: 2.6, larg: 1.6, h: 1.7, plancher: "double", nom: "un tracteur" },
+  // ⚠️ 4 octobre 2026 : il arrive EN FACE (« fais en sorte que les tracteurs
+  // soient dans le sens opposé à nous, c'est beaucoup plus difficile à
+  // passer »), plus lentement qu'une voiture, et on peut ROULER dessus (« j'ai
+  // atterri sur le tracteur, j'ai perdu trois potes, pas très juste »).
+  tracteur:    { contresens: true, cout: 3, vitesse: 1.2, arme: 5.5, long: 2.6, larg: 1.6, h: 1.7, plancher: "double", montable: true, nom: "un tracteur" },
   // Le CAR SCOLAIRE de la Région (3 octobre 2026 : « rajoute un bus scolaire
   // de la région Auvergne-Rhône-Alpes ») : comme la voiture en face, en plus
   // long et plus haut. Montable aussi.
   bus:         { contresens: true, cout: 3, vitesse: 2.0, arme: 5.5, long: 3.6, larg: 1.8, h: 1.9, plancher: "double", montable: true, nom: "un car scolaire" },
+  // La MONTAGNE ENNEIGÉE (4 octobre 2026) : « au lieu de croiser un tracteur
+  // dans ce biome, il faut qu'on croise un chasse-neige ». Lame comprise dans
+  // la longueur ; on peut rouler dessus comme sur le tracteur.
+  chasseneige: { contresens: true, cout: 3, vitesse: 1.4, arme: 5.5, long: 3.6, larg: 1.9, h: 2.0, plancher: "double", montable: true, nom: "un chasse-neige" },
   // En SENS INVERSE : elle roule sur la route, vers le joueur (20 septembre
   // 2026 : « une voiture qui roule en sens inverse, pour que ce soit vraiment
   // difficile »). Sa vitesse s'ajoute à celle du joueur.
@@ -107,6 +115,10 @@ export const KINDS = {
   // saut rendu plus sec — « les voitures sont trop grandes, j'arrive pas à
   // les passer ». Deux façons de la franchir : par-dessus, ou en s'y posant.
   voiture: { cout: 2, long: 2.80, larg: 1.60, h: 1.45, plancher: "double", montable: true, nom: "une voiture" },
+  // Le BONHOMME DE NEIGE de la montagne (4 octobre 2026 : « un bonhomme de
+  // neige sur la route, ça fait un obstacle, mais faut qu'il soit gros,
+  // presque de la taille d'un bus »). Tête ronde : on ne roule pas dessus.
+  bonhomme: { cout: 2, long: 1.7, larg: 1.7, h: 2.1, nom: "un bonhomme de neige" },
 };
 
 // ⚠️ 27 septembre 2026 (« vérifiez bien la hitbox de tous les éléments ») :
@@ -271,10 +283,10 @@ const GROSSE_EVERY = 70;         // la grosse pièce dorée (ex-rouge)
 export const HALLE_HAUT = 4.2;
 const HALLE_MONTEE = 7, HALLE_PLAT = 26, HALLE_DESCENTE = 7;
 export const HALLE_ROWS = HALLE_MONTEE + HALLE_PLAT + HALLE_DESCENTE;
-// 4 octobre 2026 (« ça manque de difficulté à partir de la moitié du morceau,
-// faut faire venir la gare un peu avant ») : marché 30 s, bowling 58 s, gare
-// 86 s (la mi-morceau) ; avant : 36, 76, 116 (156 retirée le 3 octobre).
-const HALLE_TEMPS = [30, 58, 86];  // secondes de course
+// 4 octobre 2026 : marché 25 s, gare 88 s (la mi-morceau : « faut faire
+// venir la gare un peu avant »), bowling 116 s ; l'hiver (46 → 80 s) est
+// pris par la montagne enneigée. Avant : 30/58/86, 36/76/116, 156 retirée.
+const HALLE_TEMPS = [25, 88, 116];  // secondes de course
 let HALLES = null;
 function halles() {
   if (!HALLES) HALLES = HALLE_TEMPS.map((t) => Math.round(rangAuTemps(t)));
@@ -283,7 +295,7 @@ function halles() {
 // Trois bâtiments différents (3 octobre 2026 : « il faudrait traverser un
 // bowling et une gare, avec des rails de train, des trains à quai ») : la
 // première halle est le marché, la deuxième un bowling, la troisième la gare.
-export const TYPES_HALLE = ["marche", "bowling", "gare"];
+export const TYPES_HALLE = ["marche", "gare", "bowling"];
 export function typeHalle(d) { const i = halles().indexOf(d); return TYPES_HALLE[Math.max(0, i) % TYPES_HALLE.length]; }
 // Hauteur du plancher et du toit (au-dessus du plancher) de chaque bâtiment.
 // Le BOWLING est de plain-pied (4 octobre 2026) : la caméra (3,6 u) était
@@ -316,29 +328,50 @@ function dansHalle(r) { const d = halleA(r); return d !== null && r >= d && r <=
 // séparées par des plats où se posent les obstacles — JAMAIS un obstacle sur
 // une bosse : la famille de saut d'un obstacle suppose un départ au même
 // niveau que lui. Décor (sapins, rochers) : scene.js, zone « montagne ».
-const MONTAGNE_DEBUT_AVANT_FIN = 60, MONTAGNE_FIN_AVANT_FIN = 20;
-const BOSSE_LONG = 16, BOSSE_HAUT = 1.3, BOSSE_ECART = 18;
-export const GEO_BOSSE = { long: BOSSE_LONG, haut: BOSSE_HAUT };
+// ⚠️ 4 octobre 2026, deuxième passe (« fais cinq fois cette hauteur, une
+// grosse partie ultra vallonnée [...] fais le truc vallonné directement dans
+// le passage avec la neige ») : la montagne passe dans l'HIVER (46 → 80 s de
+// course) et ses bosses deviennent des collines de 6,5 u — montée en douceur
+// (28 rangs), plateau (22), descente (28), vallée (22). Les obstacles se posent
+// sur les plateaux et dans les vallées : sur PLAT tout autour de leur saut
+// (penteAutour), jamais dans une pente.
+const MONTAGNE_DEBUT_S = 46, MONTAGNE_FIN_S = 80;
+const COLLINE_MONTEE = 28, COLLINE_PLAT = 22, COLLINE_VALLEE = 22, COLLINE_HAUT = 6.5;
+const COLLINE_LONG = 2 * COLLINE_MONTEE + COLLINE_PLAT;
+export const GEO_BOSSE = { long: COLLINE_LONG, haut: COLLINE_HAUT };
 let MONTAGNE = null, BOSSES = null;
 function montagne() {
-  if (!MONTAGNE) MONTAGNE = [Math.round(rangAuTemps(dureeCourse() - MONTAGNE_DEBUT_AVANT_FIN)), Math.round(rangAuTemps(dureeCourse() - MONTAGNE_FIN_AVANT_FIN))];
+  if (!MONTAGNE) MONTAGNE = [Math.round(rangAuTemps(MONTAGNE_DEBUT_S)), Math.round(rangAuTemps(MONTAGNE_FIN_S))];
   return MONTAGNE;
 }
 function bosses() {
-  if (!BOSSES) { BOSSES = []; const [a, b] = montagne(); for (let r = a; r + BOSSE_LONG <= b; r += BOSSE_LONG + BOSSE_ECART) BOSSES.push(r); }
+  if (!BOSSES) {
+    BOSSES = [];
+    const [a, b] = montagne();
+    for (let r = a + 8; r + COLLINE_LONG <= b; r += COLLINE_LONG + COLLINE_VALLEE) BOSSES.push(r);
+  }
   return BOSSES;
 }
-// Rangées du biome (décor), un peu plus large que les bosses.
-export function enMontagne(r) { const [a, b] = montagne(); return r >= a - 45 && r <= b + 25; }
-// Début de la bosse qui couvre la rangée r, ou null.
-export function bosseA(r) { for (const d of bosses()) if (r >= d - 1 && r <= d + BOSSE_LONG + 1) return d; return null; }
-function hauteurBosse(v) {
+// Rangées du biome (décor, route enneigée), un peu plus large que les collines.
+export function enMontagne(r) { const [a, b] = montagne(); return r >= a - 30 && r <= b + 20; }
+// Début de la colline qui couvre la rangée r, ou null.
+export function bosseA(r) { for (const d of bosses()) if (r >= d - 1 && r <= d + COLLINE_LONG + 1) return d; return null; }
+export function hauteurBosse(v) {
   const d = bosseA(Math.round(v));
   if (d === null) return 0;
-  const p = (v - d) / BOSSE_LONG;
-  return p <= 0 || p >= 1 ? 0 : BOSSE_HAUT * (1 - Math.cos(2 * Math.PI * p)) / 2;
+  const p = v - d;
+  if (p <= 0 || p >= COLLINE_LONG) return 0;
+  if (p < COLLINE_MONTEE) return COLLINE_HAUT * (1 - Math.cos(Math.PI * p / COLLINE_MONTEE)) / 2;
+  if (p < COLLINE_MONTEE + COLLINE_PLAT) return COLLINE_HAUT;
+  return COLLINE_HAUT * (1 + Math.cos(Math.PI * (p - COLLINE_MONTEE - COLLINE_PLAT) / COLLINE_MONTEE)) / 2;
 }
-function dansBosse(r) { const d = bosseA(r); return d !== null && r >= d - 2 && r <= d + BOSSE_LONG + 2; }
+// Une pente là où l'obstacle se saute (de 9 rangs avant à 4 après) ?
+function penteAutour(r) {
+  if (bosseA(r - 9) === null && bosseA(r + 4) === null && bosseA(r) === null) return false;
+  const h = solAt(r);
+  for (let q = r - 9; q <= r + 4; q++) if (Math.abs(solAt(q) - h) > 0.02) return true;
+  return false;
+}
 
 // --- Moments de course (4 octobre 2026) ----------------------------------------
 // « Il faut rajouter des difficultés de car scolaire à peu près à la moitié du
@@ -347,7 +380,7 @@ function dansBosse(r) { const d = bosseA(r); return d !== null && r >= d - 2 && 
 // les voitures » : le BOUCHON, 15 s avant la fin — trois voitures garées
 // pare-chocs contre pare-chocs (2,8 de long tous les 3 rangs : le toit porte
 // d'une voiture à l'autre, toitSous), feux de détresse, pièces sur les toits.
-const T_CONVOI = 72, CONVOI_N = 3, T_BOUCHON_AVANT_FIN = 15;
+const T_CONVOI = 100, CONVOI_N = 3, T_BOUCHON_AVANT_FIN = 15;
 export const BOUCHON_PAS = 3;
 // Toit d'une voiture GARÉE sous v (les simulations : roule sur le bouchon).
 export function toitGare(route, v, jumpY) {
@@ -355,7 +388,7 @@ export function toitGare(route, v, jumpY) {
     const row = route.rowAt(r);
     if (row.type !== "statique" || !KINDS[row.kind].montable) continue;
     if (Math.abs(v - r) >= KINDS[row.kind].long / 2 + VELO_DEMI) continue;
-    const toit = KINDS[row.kind].h + MARGE_H;
+    const toit = KINDS[row.kind].h + MARGE_H + solAt(r);
     if (jumpY >= toit - 0.02) return toit;
   }
   return 0;
@@ -389,7 +422,7 @@ export function toitSous(route, v, jumpY, t = 0) {
     // demi-roue avant elle, le vélo retombait à l'arrière du toit ENCORE dans
     // la voiture, et l'atterrissage comptait comme un choc.
     if (centre === null || Math.abs(v - centre) >= K.long / 2 + VELO_DEMI) continue;
-    const toit = K.h + MARGE_H;
+    const toit = K.h + MARGE_H + solAt(centre); // sur une colline, le toit monte avec elle
     if (jumpY >= toit - 0.02) return toit;
   }
   return 0;
@@ -431,7 +464,7 @@ export class Route {
     this.resolved = new Set();
     this.coins = new Set();
     this.blocs = new Set();
-    this.bouchons = new Set();   // rangées des voitures du bouchon
+    this.bouchons = new Map();   // rangée d'une voiture du bouchon → son rang (0, 1, 2) : sa couleur
     this.evts = null;
   }
   hash(n) {
@@ -445,7 +478,15 @@ export class Route {
   rangeeSure(r) { return { type: "safe", coins: r % 6 === 1 ? [solAt(r) + PIECE_SOL] : [], boue: null }; }
   ouvrirFenetreSure(from, to) {
     this.fenetreSure = [from, to];
-    for (let r = from; r <= to; r++) this.cache.set(r, this.rangeeSure(r));
+    for (let r = from; r <= to; r++) {
+      // ⚠️ Un véhicule DÉJÀ ARMÉ reste (4 octobre 2026 : « il y a eu attention,
+      // et il n'y a pas eu d'obstacle ») : le turbo effaçait la voiture en face
+      // dont le panneau était déjà à l'écran. Le turbo rend invulnérable, elle
+      // passe sans dégât.
+      const avant = this.cache.get(r);
+      if (avant && (avant.type === "contresens" || avant.type === "traverse") && avant.armed) continue;
+      this.cache.set(r, this.rangeeSure(r));
+    }
   }
 
   melange(liste, k) {
@@ -493,16 +534,22 @@ export class Route {
       if (this.evts.convoi > 0) { kind = "bus"; this.evts.convoi -= 1; }
       const bouchon = !this.evts.bouchonFait && this.chaine.r >= rangAuTemps(dureeCourse() - T_BOUCHON_AVANT_FIN);
       if (bouchon) kind = "voiture";
+      // La montagne enneigée : tout ce qui arrive en face est un chasse-neige,
+      // les voitures garées et les messieurs deviennent des bonshommes de neige.
+      if (enMontagne(this.chaine.r)) {
+        if (KINDS[kind].contresens && !KINDS[kind].lanceur) kind = "chasseneige";
+        else if (kind === "voiture" || kind === "costard" || kind === "fermier") kind = "bonhomme";
+      }
       const t = Math.min(1, Math.max(0, this.chaine.r / RAMP_ROWS));
       const mou = Math.round(MOU_DEBUT + (MOU_FIN - MOU_DEBUT) * t);
       const base = this.chaine.kind ? ecartMin(this.chaine.kind, kind, Math.min(vMaxRangees(), vitesseAuRang(this.chaine.r + 20) * 1.08)) : 6;
       let r = this.chaine.r + base + Math.floor(this.hash(i * 37 + 11) * (mou + 1));
       let garde = 0;
-      while (garde++ < 400 && (estReservee(r) || estReservee(r - 1) || estReservee(r + 1) || dansHalle(r) || dansHalle(r - 4) || dansHalle(r + 4) || dansBosse(r))) r += 1;
+      while (garde++ < 400 && (estReservee(r) || estReservee(r - 1) || estReservee(r + 1) || dansHalle(r) || dansHalle(r - 4) || dansHalle(r + 4) || penteAutour(r))) r += 1;
       this.dangers.set(r, kind);
       if (bouchon) {
         this.evts.bouchonFait = true;
-        for (let k = 0; k < 3; k++) { this.dangers.set(r + k * BOUCHON_PAS, "voiture"); this.bouchons.add(r + k * BOUCHON_PAS); }
+        for (let k = 0; k < 3; k++) { this.dangers.set(r + k * BOUCHON_PAS, "voiture"); this.bouchons.set(r + k * BOUCHON_PAS, k); }
         // + 6 rangées : un double saut lancé depuis un TOIT vole plus longtemps
         // que l'écart physique (calculé pour un départ au sol) ne le prévoit.
         this.chaine = { r: r + 2 * BOUCHON_PAS + 6, kind: "voiture", i: i + 1 };
@@ -532,7 +579,7 @@ export class Route {
       if (((q - rObs) % ESPACEMENT + ESPACEMENT) % ESPACEMENT !== 0) continue;
       const h = hauteurArc(tier, (q - rDepart) / vit);
       if (h < seuil) continue;
-      out.push({ r: q, h: h + CORPS_CENTRE });
+      out.push({ r: q, h: h + CORPS_CENTRE + solAt(rObs) });
     }
     return out;
   }
@@ -552,7 +599,7 @@ export class Route {
         ? { type: "traverse", kind, dir: -1, armed: false, t0: 0, u0: 0, vitesse: K.vitesse, coins: [], boue: null }
         : K.contresens
           ? { type: "contresens", kind, armed: false, t0: 0, v0: 0, vitesse: K.vitesse, coins: [], boue: null }
-          : { type: "statique", kind, coins: [], boue: null, bouchon: this.bouchons.has(r0 + p) };
+          : { type: "statique", kind, coins: [], boue: null, bouchon: this.bouchons.get(r0 + p) };
     }
     for (let p = 0; p < BLOC; p++) if (!rowsBloc[p]) rowsBloc[p] = { type: "safe", coins: [], boue: null };
     // 2. Les arcs de pièces (ils peuvent déborder du bloc : on garde ce qui
