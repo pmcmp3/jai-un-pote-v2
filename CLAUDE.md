@@ -251,6 +251,37 @@ Code `TESTV2`, qui est aussi `config.ligueBeta` (menu simplifié + bouton « Lai
   CRÉER MA LIGUE en rouge ; seul dans sa ligue → INVITER en rouge ; en démo,
   Inviter ne partage rien : les 6 potes fictifs « jouent » un par un (1,5 s) et
   le boost monte. Lien à montrer : `?9&premiere`. Parcours : `outils/premiere.mjs`.
+- **3 octobre 2026, retours d'iPhone (quatre lots)** :
+  - *Menu* : écran de CHARGEMENT plein écran (`#splash`, logo LVEB qui tourne
+    en rotateY + flotte, barre dessous) ; ordre du premier passage pseudo →
+    CYCLISTE (bouton « Continuer ») → LIGUE (bouton « Jouer »), clé
+    `jp2LigueVue` ; ensuite le cycliste est l'accueil. Page ligue : une phrase
+    de pourquoi, CRÉER en rouge, « ou », code + Rejoindre, « Jouer sans ligue »
+    en petit. Ligue créée : message jaune EN HAUT, code en gros (tap = copie),
+    INVITER en gros, peloton en pastilles avec **BOTS** (`BOTS_LIGUE` = 3 :
+    toi + Bot 1..3, chaque vrai pote remplace un bot ; en jeu friends.js
+    complète aussi avec « bot N »). Bandeau boost : « N potes dans ta ligue ».
+    Fin : « Meilleur score · tu peux le battre », code de ligue soulignée
+    (tap = copie), liens Album / Menu / @pmc.mp3 sur une ligne.
+  - *Messages* : plus de grands bandeaux en course — PASTILLES au-dessus du
+    joueur (`pousserPastille`) et pastille jaune « LEA EST LÀ » au-dessus du
+    pote qui arrive (friends.js). PROJECTEUR (`projo`, une fois par joueur,
+    clés `lait`/`alerte` dans `jp2-conseils-vus`) : monde gelé, écran
+    assombri sauf un cercle autour de la brique de lait / du premier triangle,
+    tap pour repartir. Le doigt qui tape n'apparaît qu'après le GO et jamais
+    par-dessus une consigne. Explication : « 1 tap = 1 saut », « 1 partie =
+    1 morceau », « Touche pour continuer » en bas de l'écran.
+  - *Gameplay* (VERSION_COURSE 13) : le TRACTEUR ne traverse plus, il roule
+    dans le sens du joueur (contresens à vitesse −0,8, long 2,6, h 1,7) ;
+    CAR SCOLAIRE Région (`bus`, contresens, 3,6 × 1,9, montable) ; rien en
+    face avant 20 s ni dans les 8 dernières secondes ; paquet FINAL (index
+    ≥ 5) presque tout roulant ; véhicules d'en face +40 % entre 100 et 150 s ;
+    plus de lait dans les 55 dernières secondes ; halle de 156 s retirée.
+    Costard et fermier DE FACE en 2D (`personnage2D`, bras pivotant à
+    l'épaule). Premier plan nu, sillons adoucis. Joueur idéal : 0 choc.
+  - *Bâtiments* : halle 1 = marché, 2 = BOWLING (piste cirée, quilles,
+    néons), 3 = GARE (quai, marquise vitrée, rails et TER à quai, couche
+    « train »). `rows.typeHalle(d)`. Capture : `capture.mjs batiments`.
 - **Tuto au ralenti, deuxième version** (`conseilTap`/`conseilStep`) : approche
   ~1 s avant le bon moment (monde ×0,25), un tap donné pendant l'approche est
   GARDÉ et part pile au bon moment, gel ×0,06 s'il n'a rien fait ; reprise

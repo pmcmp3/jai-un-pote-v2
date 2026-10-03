@@ -1044,8 +1044,10 @@ function render(alpha) {
     if (d === null || hallesVues.has(d)) continue;
     hallesVues.add(d);
     // Deux couches : le fond avant le cycliste, le devant après (scene.drawHalle).
-    items.push({ decor: true, d: scene.depth(scene.ROAD_HALF + 0.5, d), draw: () => scene.drawHalle(ctx, d, GEO_HALLE, from, to, "fond") });
-    items.push({ decor: true, d: scene.depth(-scene.ROAD_HALF - 0.3, d), draw: () => scene.drawHalle(ctx, d, GEO_HALLE, from, to, "devant") });
+    const geo = { ...GEO_HALLE, type: rows.typeHalle(d) };
+    if (geo.type === "gare") items.push({ decor: true, d: scene.depth(scene.ROAD_HALF + 3.0, d), draw: () => scene.drawHalle(ctx, d, geo, from, to, "train") });
+    items.push({ decor: true, d: scene.depth(scene.ROAD_HALF + 0.5, d), draw: () => scene.drawHalle(ctx, d, geo, from, to, "fond") });
+    items.push({ decor: true, d: scene.depth(-scene.ROAD_HALF - 0.3, d), draw: () => scene.drawHalle(ctx, d, geo, from, to, "devant") });
   }
   const vc = scene.getVCentre(), largeurRoute = scene.demiLargeurRoute() + 2;
   for (let r = from; r <= to; r++) {

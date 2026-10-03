@@ -932,17 +932,43 @@ function decorVillage(ctx, push, r, side, sway, sud) {
 export const HALLE_TOIT_AU_DESSUS = 5.4;
 export function drawHalle(ctx, rDebut, geo, rFrom = -Infinity, rTo = Infinity, couche = "fond") {
   const { haut, montee, plat, descente, total } = geo;
+  const type = geo.type || "marche";
   const visible = (v0, v1) => v1 >= rFrom - 2 && v0 <= rTo + 2;
   const uG = -ROAD_HALF - 0.2, uD = ROAD_HALF + 0.2;
-  const BOIS = "#7a5632", BOIS_CLAIR = "#a9855a", PIERRE = "#ded3c0", TUILE = "#b8402c", POUTRE = "#5c4326";
+  // Palette par bâtiment (3 octobre 2026) : marché (bois, pierre, tuiles),
+  // bowling (piste cirée, violet nuit, néons), gare (quai béton, acier vert,
+  // marquise vitrée).
+  const PAL = {
+    marche: { BOIS: "#7a5632", BOIS_CLAIR: "#a9855a", PIERRE: "#ded3c0", TUILE: "#b8402c", POUTRE: "#5c4326", SOUS: "#4a3a2c", ENSEIGNE: "HALLES DU MARCHÉ", FOND: "#f7f2e6", ENCRE: "#0d0d10", CADRE: "#e13e26" },
+    bowling: { BOIS: "#3a2f5a", BOIS_CLAIR: "#e3c48e", PIERRE: "#4a3d72", TUILE: "#2a2140", POUTRE: "#2a2140", SOUS: "#181226", ENSEIGNE: "BOWLING", FOND: "#2a2140", ENCRE: "#ff5fa8", CADRE: "#36e0e6" },
+    gare: { BOIS: "#5c6a66", BOIS_CLAIR: "#c4beb2", PIERRE: "#4f6a5e", TUILE: "#a9cfe0", POUTRE: "#3f564c", SOUS: "#7fa3b5", ENSEIGNE: "GARE", FOND: "#1f3a78", ENCRE: "#ffffff", CADRE: "#ffffff" },
+  }[type];
+  const { BOIS, BOIS_CLAIR, PIERRE, TUILE, POUTRE } = PAL;
   const TOIT = haut + HALLE_TOIT_AU_DESSUS;
   const v1 = rDebut + montee, v2 = rDebut + montee + plat, vFin = rDebut + total;
   // Rampe : le tablier (fond) et le flanc côté caméra (devant) se projettent
   // exactement, la pente est lisse.
   const rampes = [[rDebut, v1, 0, haut], [v2, vFin, haut, 0]];
+  if (couche === "train") {
+    // Rails derrière la gare, et un TER à quai, au niveau du plancher.
+    const uR = ROAD_HALF + 1.6, a0 = rDebut - 8, a1 = vFin + 8;
+    drawBox(ctx, uR - 0.2, a0, 2.4, a1 - a0, haut - 0.05, "#8a8478");              // remblai
+    for (let v = Math.ceil(a0); v < a1; v += 1) if (visible(v, v + 0.3)) drawBox(ctx, uR, v, 2.0, 0.3, 0.06, "#6b4b2e", haut - 0.05); // traverses
+    for (const du of [0.35, 1.55]) drawBox(ctx, uR + du, a0, 0.1, a1 - a0, 0.1, "#b8bcc4", haut);   // rails
+    const tv0 = rDebut + 4, tv1 = vFin - 4, H = haut + 0.25;
+    if (visible(tv0, tv1)) {
+      drawBox(ctx, uR + 0.1, tv0, 1.8, tv1 - tv0, 2.4, "#e8e6e0", H);                // caisse
+      drawBox(ctx, uR + 0.08, tv0, 1.84, tv1 - tv0, 0.35, "#1f3a78", H + 0.25);      // bas de caisse bleu
+      drawBox(ctx, uR + 0.07, tv0, 1.86, tv1 - tv0, 0.08, "#21b3c6", H + 0.62);      // filet turquoise
+      drawBox(ctx, uR + 0.06, tv0 + 0.4, 1.88, tv1 - tv0 - 0.8, 0.7, "#2a3442", H + 1.1); // vitres
+      for (let v = tv0 + 1.6; v < tv1 - 1; v += 4.2) drawBox(ctx, uR + 0.05, v, 0.1, 0.7, 1.75, "#c8301c", H + 0.25); // portes (côté quai)
+      drawBox(ctx, uR + 0.1, tv0, 1.8, tv1 - tv0, 0.2, "#b8bcc4", H + 2.4);          // toit
+    }
+    return;
+  }
   if (couche === "fond") {
     if (visible(rDebut - 1.3, rDebut + 0.4)) {
-      drawBox(ctx, uG, rDebut - 0.55, uD - uG, 0.5, 0.02, "#e13e26", 0);
+      drawBox(ctx, uG, rDebut - 0.55, uD - uG, 0.5, 0.02, type === "bowling" ? "#ff5fa8" : type === "gare" ? "#ffcf2e" : "#e13e26", 0);
       drawBox(ctx, uG, rDebut - 1.15, uD - uG, 0.5, 0.02, "#f7f2e6", 0);
     }
     // Piliers de pierre, DERRIÈRE la route : ils portent le toit.
@@ -951,6 +977,18 @@ export function drawHalle(ctx, rDebut, geo, rFrom = -Infinity, rTo = Infinity, c
       if (!visible(v, v + 0.8)) continue;
       drawBox(ctx, ROAD_HALF + 0.5, v, 0.8, 0.8, TOIT, PIERRE);
       drawBox(ctx, ROAD_HALF + 0.35, v - 0.1, 1.1, 1.0, 0.45, PIERRE, TOIT);
+    }
+    if (type === "bowling") {
+      // Quilles et boules alignées au bout des pistes, côté fond.
+      for (let v = v1 + 3; v < v2 - 2; v += 7) {
+        if (!visible(v - 1, v + 1.5)) continue;
+        drawBox(ctx, uD, v - 0.9, 0.9, 2.2, 0.06, "#e3c48e", haut - 0.06);
+        for (const [du, dv] of [[0.55, 0], [0.35, -0.3], [0.35, 0.3], [0.15, -0.6], [0.15, 0], [0.15, 0.6]]) {
+          drawBox(ctx, uD + du, v + dv, 0.16, 0.16, 0.5, "#f7f2e6", haut);
+          drawBox(ctx, uD + du - 0.005, v + dv - 0.005, 0.17, 0.17, 0.06, "#e13e26", haut + 0.32);
+        }
+        drawDisque(ctx, uD + 0.4, v + 1.0, haut + 0.24, 0.24, ["#ff5fa8", "#36e0e6", "#ffcf2e"][Math.abs(Math.round(v)) % 3]);
+      }
     }
     for (const [a, b, h0, h1] of rampes) {
       if (!visible(Math.min(a, b), Math.max(a, b))) continue;
@@ -976,6 +1014,15 @@ export function drawHalle(ctx, rDebut, geo, rFrom = -Infinity, rTo = Infinity, c
   }
   // Le plancher, porté par des poteaux de bois côté caméra.
   drawBox(ctx, uG, v1, uD - uG, plat, 0.42, BOIS, haut - 0.42);
+  if (type === "bowling") {
+    // La piste cirée sur le plancher, gouttières sombres de part et d'autre.
+    drawBox(ctx, uG + 0.3, v1, uD - uG - 0.6, plat, 0.02, BOIS_CLAIR, haut);
+    for (const u of [uG + 0.1, uD - 0.3]) drawBox(ctx, u, v1, 0.2, plat, 0.02, "#181226", haut);
+    for (let v = v1 + 2; v < v2; v += 4) drawBox(ctx, -0.15, v, 0.3, 0.12, 0.03, "#ff5fa8", haut); // flèches de visée
+  } else if (type === "gare") {
+    // Quai : bande d'éveil jaune côté voies.
+    drawBox(ctx, uD - 0.45, v1, 0.18, plat, 0.02, "#ffcf2e", haut);
+  }
   for (let i = 0; i <= plat; i += 6) {
     const v = v1 + Math.min(i, plat - 0.3);
     if (visible(v, v + 0.3)) drawBox(ctx, uG + 0.05, v, 0.3, 0.3, haut - 0.42, POUTRE);
@@ -998,23 +1045,23 @@ export function drawHalle(ctx, rDebut, geo, rFrom = -Infinity, rTo = Infinity, c
   // le tiers haut de l'écran).
   const uT = -ROAD_HALF - 0.5, lT = ROAD_HALF * 2 + 1.9;
   drawBox(ctx, uT, rDebut - 0.5, lT, total + 1.0, 0.55, TUILE, TOIT + 0.5);
-  drawBox(ctx, uT + 0.02, rDebut - 0.45, lT - 0.04, total + 0.9, 0.05, "#4a3a2c", TOIT + 0.45);
+  drawBox(ctx, uT + 0.02, rDebut - 0.45, lT - 0.04, total + 0.9, 0.05, PAL.SOUS, TOIT + 0.45);
   // L'ENSEIGNE, suspendue sous la rive à l'entrée (remplace le bandeau
   // « LES HALLES ! » qui s'affichait par-dessus le jeu).
   const vE = rDebut + 3.2, lE = 6.2, hE = 1.15, basE = TOIT - 1.05;
   if (visible(vE - lE / 2, vE + lE / 2)) {
     const uE = uT - 0.05;
     for (const dv of [-lE / 2 + 0.5, lE / 2 - 0.6]) drawBox(ctx, uE + 0.02, vE + dv, 0.06, 0.1, TOIT + 0.45 - basE - hE, "#3a3a40", basE + hE);
-    drawBox(ctx, uE, vE - lE / 2, 0.1, lE, hE, "#f7f2e6", basE);
+    drawBox(ctx, uE, vE - lE / 2, 0.1, lE, hE, PAL.FOND, basE);
     const A = project(uE, vE - lE / 2, basE + hE), B = project(uE, vE + lE / 2, basE);
     const m = (B.y - A.y) * 0.1;
-    ctx.strokeStyle = "#e13e26"; ctx.lineWidth = Math.max(1.5, m * 0.6);
+    ctx.strokeStyle = PAL.CADRE; ctx.lineWidth = Math.max(1.5, m * 0.6);
     ctx.strokeRect(A.x + m, A.y + m, B.x - A.x - 2 * m, B.y - A.y - 2 * m);
-    ctx.fillStyle = "#0d0d10";
+    ctx.fillStyle = PAL.ENCRE;
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
     let taille = (B.y - A.y) * 0.5;
     ctx.font = `900 ${taille}px "Helvetica Neue", Helvetica, Arial, sans-serif`;
-    const txt = "HALLES DU MARCHÉ";
+    const txt = PAL.ENSEIGNE;
     while (ctx.measureText(txt).width > (B.x - A.x) * 0.84 && taille > 5) { taille -= 1; ctx.font = `900 ${taille}px "Helvetica Neue", Helvetica, Arial, sans-serif`; }
     ctx.fillText(txt, (A.x + B.x) / 2, (A.y + B.y) / 2 + 1);
   }

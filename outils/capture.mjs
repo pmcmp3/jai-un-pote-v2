@@ -102,6 +102,19 @@ const SCENES = {
     await attendre(1300); await photo("20b-halle-descente");
     await page.keyboard.press("KeyD");
   },
+  // Les trois bâtiments (3 octobre 2026) : marché, bowling, gare.
+  batiments: async () => {
+    const ds = await course(() => { const p = window.__pote, out = []; for (let r = 40; r < 1500; r++) { const d = p.rows.halleA(r); if (d !== null && !out.includes(d)) out.push(d); } return out; });
+    await page.keyboard.press("KeyD");
+    for (const d of ds) {
+      const type = await course((d) => window.__pote.rows.typeHalle(d), d);
+      await course((d) => { const p = window.__pote; p.player.v = d + 14; p.player.jumpY = p.rows.solAt(p.player.v); }, d);
+      await attendre(900); await photo(`47-batiment-${type}`);
+      await course((d) => { const p = window.__pote; p.player.v = d - 5; p.player.jumpY = 0; }, d);
+      await attendre(700); await photo(`47-batiment-${type}-entree`);
+    }
+    await page.keyboard.press("KeyD");
+  },
   // Choc : la bête percutée bascule (20 septembre 2026).
   choc: async () => {
     for (let i = 0; i < 4; i++) await page.keyboard.press("KeyP");

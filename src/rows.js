@@ -277,6 +277,11 @@ function halles() {
   if (!HALLES) HALLES = HALLE_TEMPS.map((t) => Math.round(rangAuTemps(t)));
   return HALLES;
 }
+// Trois bâtiments différents (3 octobre 2026 : « il faudrait traverser un
+// bowling et une gare, avec des rails de train, des trains à quai ») : la
+// première halle est le marché, la deuxième un bowling, la troisième la gare.
+export const TYPES_HALLE = ["marche", "bowling", "gare"];
+export function typeHalle(d) { const i = halles().indexOf(d); return TYPES_HALLE[Math.max(0, i) % TYPES_HALLE.length]; }
 // Début de la halle qui couvre la rangée r, ou null.
 export function halleA(r) {
   for (const d of halles()) if (r >= d - 1 && r <= d + HALLE_ROWS + 1) return d;
