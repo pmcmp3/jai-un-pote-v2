@@ -84,14 +84,6 @@ export function salto() {
   tone(o.ctx, o.dest, { f0: 520, f1: 1240, t0: o.ctx.currentTime, dur: 0.28, gain: 0.05 });
 }
 
-// Klaxon du tracteur : deux notes tenues.
-export function klaxon() {
-  const o = out(); if (!o) return;
-  const t0 = o.ctx.currentTime;
-  tone(o.ctx, o.dest, { type: "square", f0: 330, t0, dur: 0.32, gain: 0.05, curve: "lin" });
-  tone(o.ctx, o.dest, { type: "square", f0: 415, t0, dur: 0.32, gain: 0.05, curve: "lin" });
-}
-
 // Brique de lait : arpège rapide.
 export function lait() {
   const o = out(); if (!o) return;

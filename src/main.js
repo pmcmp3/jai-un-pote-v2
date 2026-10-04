@@ -17,6 +17,9 @@
 
 import * as audio from "./audio.js";
 import * as sfx from "./sfx.js";
+import * as bruitages from "./bruitages.js";
+import * as ambiance from "./ambiance.js";
+import { humain } from "./humains.js";
 import { clock } from "./clock.js";
 import * as scene from "./scene.js";
 import * as rows from "./rows.js";
@@ -517,7 +520,6 @@ const HUD_FADE = 0.6;
 let hintTimer = 0;
 let reviveShieldUntil = -Infinity;
 const JAUNE = "#ffcf2e", ROUGE = "#e13e26";
-let klaxonne = new Set();
 
 // --- Départ / rejeu -----------------------------------------------------------------
 let paletteJoueur = PALETTES.pmc;
@@ -604,7 +606,7 @@ function resetRun() {
   sparkles.length = 0; ghosts.length = 0;
   speed = V_UNIT * window.CONFIG.vitesseBase; nuitDebut = null;
   friends.reset();
-  klaxonne = new Set(); alertesVues.clear(); montagneFondu = 0; leveeCam = 0; scene.setLevee(0); plageFondu = 0; scene.setPlage(0);
+  ambiance.reinitialiser(); alertesVues.clear(); montagneFondu = 0; leveeCam = 0; scene.setLevee(0); plageFondu = 0; scene.setPlage(0);
   jet.r = null; jet.pris = false; jet.reste = 0; jet.pieces = []; jet.trace = []; jet.flamme = false; jet.enregistre = false;
   popups.length = 0; pastilles.length = 0; banner = null; damageFlash = 0; shake.time = 0; hudAlpha = 0; hintTimer = 6;
   canvas.classList.remove("game-over-bw", "danger", "turbo");
@@ -793,6 +795,9 @@ const chocs = []; // debug : les derniers chocs (auto-audit)
 function toucherJoueur(ev) {
   chocs.push({ r: ev.r, kind: ev.kind, conseil: conseil.r }); if (chocs.length > 20) chocs.shift();
   if (conseil.r !== null && ev.r === conseil.r) { conseil.touche = true; return; } // l'obstacle expliqué ne fait pas mal
+  // Le cri de ce qu'on a percuté (4 octobre 2026, nuit : « quand je prends une
+  // poule, je veux un bruit de poule ») — la voix suit la personne.
+  bruitages.choc(ev.kind, { pan: -0.15, femme: ev.r !== undefined && humain(Math.round(ev.r), { enfants: false }).femme });
   // Invulnérable (turbo lait, bouclier de reprise) : la bête est quand même
   // renversée, avec une gerbe d'étincelles — sinon on croit à un bug de
   // collision (27 septembre 2026 : « j'ai roulé sur une poule, j'ai pas eu
@@ -865,7 +870,6 @@ function armerTraversees(now, vitesse) {
     const tArr = now + (r - player.v) / Math.max(0.5, vitesse);
     if (tArr - now > rows.delaiArmement(row)) continue;
     rows.armer(row, now, tArr);
-    if ((row.kind === "tracteur" || row.kind === "contresens" || row.kind === "bus" || row.kind === "chasseneige") && !klaxonne.has(r)) { klaxonne.add(r); sfx.klaxon(); }
   }
 }
 
@@ -1058,7 +1062,7 @@ function step(dt) {
   // Une vraie marche (bout d'un toit de voiture, > 0,35 u) fait toujours tomber.
   if (player.auSol && player.jumpVy <= 0 && player.jumpY > solApres && player.jumpY - solApres < 0.35) player.jumpY = solApres;
   if (player.jumpY <= solApres) {
-    if (player.jumpVy < -0.5 && game.surHalle === false) sfx.saut();
+    if (player.jumpVy < -0.5 && (game.surHalle === false || player.jumpVy < -3)) ambiance.atterrir(-player.jumpVy, surfaceSous(solApres));
     player.jumpY = solApres; player.jumpVy = 0; player.doubled = false; player.flip = 0; player.tHaut = 0;
   }
   player.auSol = player.jumpY <= solApres + 0.001;
@@ -1384,7 +1388,7 @@ function render(alpha) {
     hallesVues.add(d);
     // Deux couches : le fond avant le cycliste, le devant après (scene.drawHalle).
     const geo = { ...GEO_HALLE, ...rows.geoHalle(d), type: rows.typeHalle(d) };
-    if (geo.type === "gare") items.push({ decor: true, d: scene.depth(scene.ROAD_HALF + 3.0, d), draw: () => scene.drawHalle(ctx, d, geo, from, to, "train") });
+    if (geo.type === "gare") { geo.trainDv = scene.decalageTrain(d, v); items.push({ decor: true, d: scene.depth(scene.ROAD_HALF + 3.0, d), draw: () => scene.drawHalle(ctx, d, geo, from, to, "train") }); }
     if (geo.type === "bowling") { geo.t = tAnim; items.push({ decor: true, d: scene.depth(scene.ROAD_HALF + 6.5, d), draw: () => scene.drawHalle(ctx, d, geo, from, to, "salle") }); }
     if (geo.type === "marche") items.push({ decor: true, d: scene.depth(scene.ROAD_HALF + 2.4, d), draw: () => scene.drawHalle(ctx, d, geo, from, to, "estrade") });
     items.push({ decor: true, d: scene.depth(scene.ROAD_HALF + 0.5, d), draw: () => scene.drawHalle(ctx, d, geo, from, to, "fond") });
@@ -1788,6 +1792,36 @@ if (document.fonts && document.fonts.load) {
   ]).catch(() => {});
 }
 
+// --- Le son du monde (ambiance.js, 4 octobre 2026, nuit) -----------------------
+// Ce que le vélo a sous les roues : un toit de voiture, les planches des
+// halles, la piste du bowling, la neige, le sable, le goudron.
+function surfaceSous(sol = player.jumpY) {
+  const ici = rows.solAt(player.v);
+  if (sol > ici + 0.3) return "toit";
+  const d = rows.halleA(Math.round(player.v));
+  if (d !== null && ici > 0.05) return rows.typeHalle(d) === "bowling" ? "piste" : "bois";
+  const b = rows.biomeDe(Math.round(player.v));
+  return b === "neige" ? "neige" : b === "plage" ? "sable" : "route";
+}
+let tAir = 0;
+function etatSon(dt) {
+  tAir = player.auSol ? 0 : tAir + dt;
+  const r = Math.round(player.v), d = rows.halleA(r);
+  const enCourse = gameStarted && !game.ended && !isPaused() && clock.now() >= 0;
+  return {
+    etat: enCourse ? "course" : game.ended && game.finAge >= 0 && !isPaused() ? "fin" : "arret",
+    finAge: game.finAge,
+    vitesse: speed * (game.turbo > 0 ? (window.CONFIG.laitVitesse || 1.2) : 1) * (game.ended ? 0.6 : 1),
+    vitesseMax: V_UNIT * (window.CONFIG.vitesseFinale || window.CONFIG.vitesseMax),
+    auSol: player.auSol, tAir, surface: enCourse && player.auSol ? surfaceSous() : "route",
+    turbo: game.turbo > 0, jetpack: jet.reste > 0, poussee: jet.flamme,
+    nuit: scene.getNight(), biome: rows.biomeDe(r), zone: scene.zoneAt(r), halle: d === null ? null : rows.typeHalle(d),
+    v: player.v, tm: tMonde(), tDecor: Math.max(0, clock.now()) + 30,
+    ecranX: (v) => scene.project(0, v, 0).x / Math.max(1, width),
+    ejectes,
+  };
+}
+
 function frame(nowMs) {
   try { frameInterne(nowMs); } finally { requestAnimationFrame(frame); }
 }
@@ -1804,6 +1838,7 @@ function frameInterne(nowMs) {
   accumulator += frameTime;
   while (accumulator >= STEP) { step(STEP); accumulator -= STEP; }
   render(accumulator / STEP);
+  ambiance.pas(frameTime, etatSon(frameTime));
   screens.syncLoadingUi();
   const ms = performance.now() - t0;
   perf.acc += frameTime; perf.n += 1; perf.frameMs = ms;
@@ -1843,7 +1878,7 @@ if (debugOverlay.isEnabled()) {
     conversion: () => screens.niveauConversionCourant(),
     videoDemarrer: () => { modeVideo = { t: clock.now() }; audioDrivesClock = false; clock.setTimeSource(() => modeVideo.t, true); },
     videoAvance: (jusque) => { while (clock.now() < jusque && !game.ended) { if (window.__pilote) window.__pilote(); modeVideo.t += STEP; step(STEP); } },
-    videoPas: (dt) => { const n = Math.max(1, Math.round(dt / STEP)); for (let i = 0; i < n && !game.ended; i++) { if (window.__pilote) window.__pilote(); modeVideo.t += STEP; step(STEP); } render(1); },
+    videoPas: (dt) => { const n = Math.max(1, Math.round(dt / STEP)); for (let i = 0; i < n && !game.ended; i++) { if (window.__pilote) window.__pilote(); modeVideo.t += STEP; step(STEP); } render(1); ambiance.pas(dt, etatSon(dt)); },
     positionMorceau: () => departMorceau + clock.now(),
     jetpack: () => ({ r: jet.r, pris: jet.pris, reste: jet.reste, pieces: jet.pieces.length, prises: jet.pieces.filter((c) => c.pris).length }),
     marchand: () => ({ etat: audio.marchandEtat(), milieu: marcheMilieu }),

@@ -648,6 +648,58 @@ Code `TESTV2`, qui est aussi `config.ligueBeta` (menu simplifié + bouton « Lai
     à prendre, le score n'en dépend pas.
   - *Emojis* 👆 🔊 remplacés par des icônes dessinées (main en gant blanc,
     manche rouge ; haut-parleur) : chaque téléphone dessinait les siens.
+- **4 octobre 2026 (nuit), dixième série (sound design « à fond », chacun dans
+  son décor)** — `VERSION_COURSE` 22, SW `jp2-v32` :
+  - ⚠️ *Chacun dans son décor* (« les gens en slip restent sur la plage, les
+    skieurs au ski ») : le personnage se choisissait sur la rangée de
+    l'obstacle PRÉCÉDENT, jusqu'à 25 rangs plus tôt. Mesuré sur 400 routes :
+    149 skieurs, 148 chasse-neige et 76 bonshommes sur le goudron, 83
+    fermiers et 15 tracteurs sur la plage, des cars et des costards dans la
+    neige. `rows.auDecor` l'habille pour SA rangée, et rien ne se pose à
+    cheval sur une frontière (`aCheval` : 3 rangs derrière, 8 devant pour ce
+    qui vient en face, 2 sinon) → 0 faute sur 400 routes. Coût : ~1 obstacle
+    de moins par course (une respiration à chaque changement de décor) ;
+    joueur idéal toujours à 0 choc. Les compteurs de la neige (`nNeige`,
+    `nNeigeFace`) sont remis à zéro par `reset()` (ils ne l'étaient pas).
+  - *Sound design, tout synthétisé, zéro fichier* (`bruitages.js` = les
+    sons, `ambiance.js` = ce qui sonne en continu) :
+    - le vélo « en pas fort » : roulement selon la surface (goudron, neige
+      qui crisse, planches des halles, piste du bowling, toit de voiture),
+      roue libre qui cliquette en l'air et après l'arrivée, vent de la
+      vitesse (plus fort au turbo), jetpack, atterrissage (tôle sur un toit) ;
+    - un cri par obstacle percuté (« quand je prends une poule, je veux un
+      bruit de poule ») : poule (« KRAAAK », ailes), vache, mouton, cochon,
+      chien, chat, botte, « ouf » (voix d'homme ou de femme selon la
+      personne), mallette et feuilles du costard, skis du skieur, bonhomme
+      qui s'effondre, tôle + verre + klaxon étranglé pour un véhicule ;
+      les bêtes crient aussi en nous voyant arriver (4 sur 5) ;
+    - ⚠️ un klaxon par véhicule quand il ENTRE à l'écran (avant : un seul
+      son pour tous, à l'armement, 5,5 s avant, hors champ) : voiture
+      « tut-tuuut », car grave, tracteur « pouet-pouet », chasse-neige
+      corne de camion, buggy « bip-bip » ; la sonnette du vélo pour les
+      piétons et les skieurs ; le moteur passe de droite à gauche (Doppler) ;
+    - la gare : le TER ENTRE EN GARE (il arrive de derrière, double le
+      joueur sur la rampe, freine le long du quai — `scene.decalageTrain`,
+      fonction de la position du joueur, ~2 s de mouvement à l'écran ; venu
+      d'en face il traversait l'écran en moins d'une seconde) : klaxon deux
+      tons de loin, roulement, « ta-dam » des rails, freins qui crissent,
+      souffle à l'arrêt, carillon sur le quai ;
+    - le bowling : les quilles TOMBENT quand la boule arrive
+      (`scene.phaseQuilles`, `QUILLES_IMPACT`), fracas au même instant ;
+    - les décors : oiseaux le jour, grillons + chouette la nuit, meuglement
+      au loin dans les prés, cloche au passage d'un clocher, blizzard dans
+      la montagne, vagues + mouettes sur la plage ;
+    - « Monte le son » joue le klaxon puis la sonnette du jeu.
+    - Niveaux calés sur le morceau (−9,9 LUFS) par `outils/bruitages.mjs` :
+      un choc ~12 LU sous la musique, un klaxon ~13, le train ~10, le vélo
+      et l'ambiance 20 à 25 (crête du niveau momentané). Réglages globaux :
+      `bruitagesVolume`, `veloVolume`, `ambianceVolume` (config.js).
+    - Mesuré : une course réelle = ~200 sons, 60 i/s, 0 erreur
+      (`outils/sons-course.mjs --reel`) ; +0,5 à 1 ms par image à CPU ×4
+      (`perf-plage.mjs`).
+    - ⚠️ Je n'ai pas d'oreilles : les sons sont vérifiés au niveau (LUFS) et
+      au spectrogramme (`outils/sorties/sons/*.png`), pas à l'écoute — c'est
+      au téléphone qu'on tranche ce qui sonne faux.
 - **Tuto au ralenti, deuxième version** (`conseilTap`/`conseilStep`) : approche
   ~1 s avant le bon moment (monde ×0,25), un tap donné pendant l'approche est
   GARDÉ et part pile au bon moment, gel ×0,06 s'il n'a rien fait ; reprise
@@ -767,6 +819,11 @@ Code `TESTV2`, qui est aussi `config.ligueBeta` (menu simplifié + bouton « Lai
 - `node outils/tap-android.mjs` (un tap = un saut sur Android), `node outils/menu-android.mjs`
   (choisir une puce ne fait rien bouger), `node outils/tuto-neuf.mjs` (route dégagée des tutos).
 - `./outils/voix-megaphone.sh <vocal.m4a> <sortie.mp3> [début] [fin]` — un mémo vocal → cri au mégaphone.
+- `node outils/bruitages.mjs [--brut] [noms]` — rend chaque bruitage hors ligne (le vrai code),
+  mesure son niveau (LUFS) contre la cible et conseille un gain ; spectrogrammes dans
+  `outils/sorties/sons/`. `node outils/sons-course.mjs [--reel]` — le journal des sons d'une
+  course entière (accélérée, ou `--reel` : temps réel, cadences et i/s). Scènes de capture
+  `train` (le TER entre en gare) et `quilles`.
 - `node outils/clavier.mjs` (6 téléphones, clavier simulé), `node outils/premiere.mjs`
   (première visite façon Instagram), `node outils/porte-echelle.mjs` (porte album/abonnement).
 - ⚠️ La preview de l'IDE ne peut pas jouer le jeu (l'`AudioContext` fige l'onglet) : passer par

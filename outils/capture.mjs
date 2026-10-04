@@ -115,6 +115,20 @@ const SCENES = {
     }
     await page.keyboard.press("KeyD");
   },
+  // Le TER qui entre en gare et les quilles qui tombent (4 octobre 2026, nuit).
+  train: async () => {
+    const d = await course(() => { const p = window.__pote; for (let r = 40; r < 1500; r++) { const d = p.rows.halleA(r); if (d !== null && p.rows.typeHalle(d) === "gare") return d; } return 0; });
+    await attendre(3500); // le menu finit de s'effacer
+    for (const k of [3, 6, 9, 14, 22]) {
+      await course(([d, k]) => { const p = window.__pote; p.player.v = d + k; p.player.prevV = p.player.v; p.player.jumpY = p.rows.solAt(p.player.v); p.player.prevJumpY = p.player.jumpY; }, [d, k]);
+      await attendre(60); await photo(`60-train-${k}`);
+    }
+  },
+  quilles: async () => {
+    const d = await course(() => { const p = window.__pote; for (let r = 40; r < 1500; r++) { const d = p.rows.halleA(r); if (d !== null && p.rows.typeHalle(d) === "bowling") return d; } return 0; });
+    await course((d) => { const p = window.__pote; p.player.v = d + 15; p.player.jumpY = p.rows.solAt(p.player.v); }, d);
+    for (let i = 0; i < 3; i++) { await attendre(380); await photo(`61-quilles-${i}`); }
+  },
   // Choc : la bête percutée bascule (20 septembre 2026).
   choc: async () => {
     for (let i = 0; i < 4; i++) await page.keyboard.press("KeyP");

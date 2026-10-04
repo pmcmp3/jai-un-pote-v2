@@ -37,6 +37,14 @@ window.CONFIG = {
   // de loin il descend à ~35 % de ça, étouffé. "" = marché muet.
   fichierMarchand: "assets/marchand-courgettes.mp3",
   marchandVolume: 0.34,     // 0,6 → 0,34 (−5 dB) le 4 octobre 2026, nuit : « beaucoup trop fort »
+  // Le SOUND DESIGN (4 octobre 2026, nuit : « un bruitage de bicyclette dans le
+  // fond, en pas fort », « un bruit de poule, un klaxon quand une voiture
+  // arrive, un klaxon de train à la gare, des quilles au bowling ») : tout est
+  // synthétisé (bruitages.js, ambiance.js), chaque son calé sur le morceau.
+  // 1 = le réglage d'origine ; 0,5 ≈ −6 dB ; 0 = coupé.
+  bruitagesVolume: 1,       // TOUS les nouveaux bruitages (cris, chocs, klaxons, train, quilles…)
+  veloVolume: 1,            // le vélo : roulement du pneu, roue libre en l'air, vent, atterrissages
+  ambianceVolume: 1,        // le décor : oiseaux, grillons, chouette, cloche, vent de montagne, vagues, mouettes
 
   // === VITESSE ===
   // Jeu d'endurance : montée plus douce que le premier (le but est d'aller

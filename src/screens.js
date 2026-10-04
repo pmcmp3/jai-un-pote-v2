@@ -7,6 +7,7 @@
 
 import * as audio from "./audio.js";
 import * as sfx from "./sfx.js";
+import * as bruitages from "./bruitages.js";
 import * as net from "./net.js";
 import * as friends from "./friends.js";
 import { COULEURS, CHAPEAUX, VELOS, SKIN_DEFAUT } from "./rider.js";
@@ -1282,7 +1283,9 @@ function montrerExplication(ensuite) {
     barre.style.transition = "none"; barre.style.width = "0";
     requestAnimationFrame(() => requestAnimationFrame(() => { barre.style.transition = `width ${duree}s linear`; barre.style.width = "100%"; }));
     if (nom === "potes") animerPeloton();
-    if (nom === "son") { annonceSon = true; [300, 1300].forEach((ms) => minuteurs.push(setTimeout(() => { try { sfx.klaxon(); } catch (e) { /* pas de son */ } }, ms))); }
+    // « Monte le son » : un klaxon puis la sonnette du vélo, les vrais bruitages
+    // du jeu (bruitages.js), un peu plus fort qu'en course.
+    if (nom === "son") { annonceSon = true; [[300, "klaxon_contresens"], [1300, "sonnette"]].forEach(([ms, son]) => minuteurs.push(setTimeout(() => { try { bruitages.jouer(son, { volume: 1.6, prioritaire: true }); } catch (e) { /* pas de son */ } }, ms))); }
     minuteurs.push(setTimeout(() => etape(i + 1), duree * 1000));
   };
   if (!box.dataset.branche) {

@@ -1537,6 +1537,36 @@ function produit(ctx, sorte, u, v, du, dv, h, graine) {
 // Le toit est monté assez haut pour qu'un double saut depuis le plancher ne
 // le traverse jamais (tête à ~9,6 u au plus haut, sous-face à 10,05).
 export const HALLE_TOIT_AU_DESSUS = 5.4;
+// --- La gare et le bowling VIVENT (4 octobre 2026, nuit : « à la gare je veux
+// un klaxon de train, au bowling un bruit de quilles ») -----------------------
+// Le TER ENTRE EN GARE : il arrive DE DERRIÈRE le joueur, le double pendant
+// qu'il monte la rampe, freine le long du quai et s'y arrête quand le joueur
+// est au milieu du quai — on le voit filer ~2 s puis s'immobiliser (un train
+// venu d'en face traversait l'écran en moins d'une seconde). Fonction de la
+// position du JOUEUR (pas du temps) : le ralenti d'un tuto ou une pause ne le
+// désynchronisent jamais, et ambiance.js en tire le son (klaxon, roulement,
+// freins) par la même formule. `arret` : où est le joueur quand il s'arrête
+// (rangs après le début de la halle) ; `approche` : sur combien de rangs du
+// joueur il freine ; `elan` : son retard au départ (il attend, hors champ) ;
+// `klaxon` : où est le joueur quand il klaxonne, de loin derrière.
+export const TRAIN = { arret: 22, approche: 22, elan: 60, klaxon: -8 };
+export function decalageTrain(rDebut, vJoueur) {
+  const s = Math.max(0, Math.min(1, (rDebut + TRAIN.arret - vJoueur) / TRAIN.approche));
+  return -TRAIN.elan * s * s;
+}
+// Les pistes : une boule part toutes les ~2,4 s sur chacune, et les quilles
+// TOMBENT quand elle arrive (QUILLES_IMPACT de son cycle), relevées au départ
+// de la suivante. ambiance.js joue le fracas au même instant.
+export const QUILLES_IMPACT = 0.72;
+export function pistesBowling(v1, v2) {
+  const out = [];
+  for (let v = v1 + 0.6; v + 1.1 < v2 - 0.4; v += 1.6) out.push(v);
+  return out;
+}
+export function phaseQuilles(t, v) { return ((t * 0.42 + v * 0.37) % 1 + 1) % 1; }
+// Le clocher (ou le beffroi) de la place d'un village : rangée de son monument.
+export function clocherA(r) { return ((r % ZONE_ROWS) + ZONE_ROWS) % ZONE_ROWS === 27 && estVillage(zoneAt(r)) && !(masque(r) & SANS_DECOR); }
+
 export function drawHalle(ctx, rDebut, geo, rFrom = -Infinity, rTo = Infinity, couche = "fond") {
   const { haut, montee, plat, descente, total } = geo;
   const type = geo.type || "marche";
@@ -1567,22 +1597,35 @@ export function drawHalle(ctx, rDebut, geo, rFrom = -Infinity, rTo = Infinity, c
     drawBox(ctx, uD, a0, uW - uD, a1 - a0, haut - 0.04, "#2a2140");                 // socle sous les pistes
     drawBox(ctx, uW, a0, 0.4, a1 - a0, TOIT + 0.5 - haut, "#3a2f5a", haut);         // mur du fond
     poly(ctx, [project(uD, a0, haut), project(uW, a0, haut), project(uW, a1, haut), project(uD, a1, haut)], teintes("#181226", 0).plat); // gouttières
-    const LARGE = 1.1, PAS = 1.6;
-    for (let v = v1 + 0.6; v + LARGE < v2 - 0.4; v += PAS) {
+    const LARGE = 1.1;
+    for (const v of pistesBowling(v1, v2)) {
       if (!visible(v - 1, v + 2)) continue;
       poly(ctx, [project(uD, v, haut + 0.01), project(uW - 0.1, v, haut + 0.01), project(uW - 0.1, v + LARGE, haut + 0.01), project(uD, v + LARGE, haut + 0.01)], teintes("#e3c48e", 0).plat);
       for (const du of [1.4, 2.0]) poly(ctx, [project(uD + du, v + 0.5, haut + 0.02), project(uD + du + 0.25, v + 0.55, haut + 0.02), project(uD + du, v + 0.6, haut + 0.02)], "#ff5fa8"); // flèches de visée
       // Quilles en bout de piste : GROSSES (1,8 u), une derrière, deux devant.
-      for (const [du, dv] of [[0.4, 0.34], [0.95, 0.08], [0.95, 0.6]]) {
-        const u = uW - 0.15 - du, vv = v + dv;
-        drawBox(ctx, u, vv, 0.44, 0.44, 1.1, "#f7f2e6", haut);
-        drawBox(ctx, u + 0.07, vv + 0.07, 0.3, 0.3, 0.45, "#f7f2e6", haut + 1.1);
-        drawBox(ctx, u - 0.005, vv - 0.005, 0.45, 0.45, 0.13, "#e13e26", haut + 0.82);
-        drawBox(ctx, u + 0.04, vv + 0.04, 0.36, 0.36, 0.26, "#f7f2e6", haut + 1.55);
+      // Debout tant que la boule roule ; couchées (après un petit envol) dès
+      // qu'elle les percute — c'est le moment du fracas (ambiance.js).
+      const k = phaseQuilles(t, v);
+      if (k < QUILLES_IMPACT) {
+        for (const [du, dv] of [[0.4, 0.34], [0.95, 0.08], [0.95, 0.6]]) {
+          const u = uW - 0.15 - du, vv = v + dv;
+          drawBox(ctx, u, vv, 0.44, 0.44, 1.1, "#f7f2e6", haut);
+          drawBox(ctx, u + 0.07, vv + 0.07, 0.3, 0.3, 0.45, "#f7f2e6", haut + 1.1);
+          drawBox(ctx, u - 0.005, vv - 0.005, 0.45, 0.45, 0.13, "#e13e26", haut + 0.82);
+          drawBox(ctx, u + 0.04, vv + 0.04, 0.36, 0.36, 0.26, "#f7f2e6", haut + 1.55);
+        }
+        // Une boule qui roule vers les quilles (peinte APRÈS elles : elle est devant).
+        const ub = uD + 0.4 + (k / QUILLES_IMPACT) * (uW - uD - 1.9);
+        drawDisque(ctx, ub, v + LARGE / 2, haut + 0.26, 0.26, ["#ff5fa8", "#36e0e6", "#ffcf2e"][Math.abs(Math.round(v * 3)) % 3]);
+      } else {
+        const vol = Math.max(0, 1 - (k - QUILLES_IMPACT) / 0.06) * 0.7;
+        const a = uW - 1.35;
+        drawBox(ctx, a + 0.15, v - 0.05, 0.4, 1.15, 0.36, "#f7f2e6", haut + vol);              // couchée en travers
+        drawBox(ctx, a + 0.16, v + 0.35, 0.38, 0.14, 0.37, "#e13e26", haut + vol);
+        drawBox(ctx, a - 0.25, v + 0.62, 1.15, 0.4, 0.36, "#f7f2e6", haut + vol * 0.6);        // couchée vers le fond
+        drawBox(ctx, a + 0.35, v + 0.6, 0.14, 0.42, 0.37, "#e13e26", haut + vol * 0.6);
+        drawBox(ctx, a + 0.75, v + 0.15, 0.4, 0.4, 0.36, "#f7f2e6", haut + vol * 1.3);         // la tête d'une troisième
       }
-      // Une boule qui roule vers les quilles (peinte APRÈS elles : elle est devant).
-      const k = ((t * 0.42 + v * 0.37) % 1 + 1) % 1, ub = uD + 0.4 + k * (uW - uD - 1.9);
-      drawDisque(ctx, ub, v + LARGE / 2, haut + 0.26, 0.26, ["#ff5fa8", "#36e0e6", "#ffcf2e"][Math.abs(Math.round(v * 3)) % 3]);
     }
     // Néons sur le mur, et une quille géante en néon tous les ~10 rangs.
     for (const [hh, col] of [[haut + 2.4, "#ff5fa8"], [haut + 2.7, "#36e0e6"]]) drawBox(ctx, uW - 0.06, a0, 0.06, a1 - a0, 0.07, col, hh);
@@ -1624,7 +1667,8 @@ export function drawHalle(ctx, rDebut, geo, rFrom = -Infinity, rTo = Infinity, c
     drawBox(ctx, uR - 0.2, a0, 2.4, a1 - a0, haut - 0.05, "#8a8478");              // remblai
     for (let v = Math.ceil(a0); v < a1; v += 1) if (visible(v, v + 0.3)) drawBox(ctx, uR, v, 2.0, 0.3, 0.06, "#6b4b2e", haut - 0.05); // traverses
     for (const du of [0.35, 1.55]) drawBox(ctx, uR + du, a0, 0.1, a1 - a0, 0.1, "#b8bcc4", haut);   // rails
-    const tv0 = rDebut + 4, tv1 = vFin - 4, H = haut + 0.25;
+    const dv = geo.trainDv || 0;
+    const tv0 = rDebut + 4 + dv, tv1 = vFin - 4 + dv, H = haut + 0.25;
     if (visible(tv0, tv1)) {
       drawBox(ctx, uR + 0.1, tv0, 1.8, tv1 - tv0, 2.4, "#e8e6e0", H);                // caisse
       drawBox(ctx, uR + 0.08, tv0, 1.84, tv1 - tv0, 0.35, "#1f3a78", H + 0.25);      // bas de caisse bleu
@@ -1632,6 +1676,12 @@ export function drawHalle(ctx, rDebut, geo, rFrom = -Infinity, rTo = Infinity, c
       drawBox(ctx, uR + 0.06, tv0 + 0.4, 1.88, tv1 - tv0 - 0.8, 0.7, "#2a3442", H + 1.1); // vitres
       for (let v = tv0 + 1.6; v < tv1 - 1; v += 4.2) drawBox(ctx, uR + 0.05, v, 0.1, 0.7, 1.75, "#c8301c", H + 0.25); // portes (côté quai)
       drawBox(ctx, uR + 0.1, tv0, 1.8, tv1 - tv0, 0.2, "#b8bcc4", H + 2.4);          // toit
+      // Les deux nez : pare-brise sombre et phares (il ENTRE en gare : on le
+      // voit arriver de face).
+      for (const vc of [tv0 - 0.05, tv1]) {
+        drawBox(ctx, uR + 0.25, vc, 1.5, 0.05, 0.75, "#2a3442", H + 1.15);
+        for (const du of [0.3, 1.48]) drawBox(ctx, uR + du, vc - 0.01, 0.22, 0.07, 0.16, "#fff3b0", H + 0.5);
+      }
     }
     return;
   }

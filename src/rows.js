@@ -313,7 +313,7 @@ const GROSSE_EVERY = 70;         // la grosse pièce dorée (ex-rouge)
 // pendant ce temps la route est vide et couverte de pièces. Le sol du jeu n'est
 // donc plus toujours 0 : voir solAt().
 export const HALLE_HAUT = 4.2;
-const HALLE_MONTEE = 7, HALLE_PLAT = 26, HALLE_DESCENTE = 7;
+export const HALLE_MONTEE = 7, HALLE_PLAT = 26, HALLE_DESCENTE = 7;
 export const HALLE_ROWS = HALLE_MONTEE + HALLE_PLAT + HALLE_DESCENTE;
 // 4 octobre 2026 : marché 25 s, gare 88 s (la mi-morceau : « faut faire
 // venir la gare un peu avant »), bowling 116 s ; l'hiver (46 → 80 s) est
@@ -501,6 +501,31 @@ const PIETONS_GRACE = 1;
 function paquetPour(d) { return PAQUETS[d < 1 ? 0 : d < 2 ? 1 : d < 5 ? 2 : 3]; }
 function estDouble(kind) { return familleDe(kind) === "double"; }
 
+// --- Chacun dans son décor (4 octobre 2026, nuit) ----------------------------------
+// « Attention, les gens en slip restent sur la plage, les skieurs au ski. »
+// Le personnage se choisissait sur la rangée de l'obstacle PRÉCÉDENT, jusqu'à
+// 25 rangs plus tôt : mesuré sur 400 routes, un skieur sur cinq finissait sur
+// le goudron à la sortie de la neige, des chasse-neige et des bonshommes
+// aussi, des fermiers et des tracteurs sur la plage. Il se choisit désormais
+// sur sa PROPRE rangée, et rien ne se pose à cheval sur une frontière : son
+// trajet à l'écran (3 rangs derrière, 8 devant pour ce qui vient en face)
+// reste dans un seul décor.
+export function biomeDe(r) { return enPlage(r) ? "plage" : enMontagne(r) ? "neige" : "route"; }
+function aCheval(r, kind) {
+  const b = biomeDe(r), devant = KINDS[kind].contresens ? 8 : 2;
+  for (let q = r - 3; q <= r + devant; q++) if (biomeDe(q) !== b) return true;
+  return false;
+}
+function rangeeLibre(r, kind) {
+  return !(estReservee(r) || estReservee(r - 1) || estReservee(r + 1) || dansHalle(r) || dansHalle(r - 4) || dansHalle(r + 4) || penteAutour(r) || aCheval(r, kind));
+}
+// La plage : messieurs et bêtes de la ferme y sont en slip de bain, les
+// tracteurs y deviennent des buggys.
+const EN_SLIP = new Set(["costard", "fermier", "vache", "mouton", "cochon", "poule", "botte"]);
+// La neige : voitures garées, messieurs et grosses bêtes deviennent, en
+// alternance, des bonshommes de neige et des skieurs.
+const SOUS_LA_NEIGE = new Set(["voiture", "costard", "fermier", "mouton", "vache", "baigneur"]);
+
 // --- La route ----------------------------------------------------------------------
 export class Route {
   constructor(seed) {
@@ -520,7 +545,7 @@ export class Route {
     const x = Math.sin(n * 91.173 + this.seed * 0.731) * 43758.5453;
     return x - Math.floor(x);
   }
-  reset() { this.cache.clear(); this.resolved.clear(); this.coins.clear(); this.dangers.clear(); this.blocs.clear(); this.bouchons.clear(); this.evts = null; this.chaine = null; this.fenetreSure = null; }
+  reset() { this.cache.clear(); this.resolved.clear(); this.coins.clear(); this.dangers.clear(); this.blocs.clear(); this.bouchons.clear(); this.evts = null; this.chaine = null; this.fenetreSure = null; this.nNeige = 0; this.nNeigeFace = 0; }
   dansFenetre(r) { return this.fenetreSure !== null && r >= this.fenetreSure[0] && r <= this.fenetreSure[1]; }
   // Rangée sûre (départ, turbo lait, tuto) : une ligne de pièces au sol — à la
   // hauteur du PLANCHER, qui n'est pas 0 sur une halle.
@@ -565,6 +590,24 @@ export class Route {
   }
   especeDanger(i) { return this.arrangement(Math.floor(i / 12))[i % 12]; }
 
+  // L'espèce `kind` habillée pour le décor `biome`. Ne consomme rien :
+  // `compte` dit quelle alternance avancer, une fois l'obstacle posé.
+  auDecor(kind, biome) {
+    const K = KINDS[kind];
+    if (biome === "neige") {
+      if (kind === "pieton") return { kind: "skieur", compte: null }; // les piétons de la montagne sont à skis
+      // Tout ce qui arrive en face est un chasse-neige — le 2e, TOUJOURS un skieur.
+      if (K.contresens && !K.lanceur) return { kind: (this.nNeigeFace || 0) + 1 === 2 ? "skieur" : "chasseneige", compte: "face" };
+      // En alternance : au moins un bonhomme par course.
+      if (SOUS_LA_NEIGE.has(kind)) return { kind: ((this.nNeige || 0) + 1) % 2 === 1 ? "bonhomme" : "skieur", compte: "neige" };
+    }
+    if (biome === "plage") {
+      if (EN_SLIP.has(kind)) return { kind: "baigneur", compte: null };
+      if (kind === "tracteur") return { kind: "buggy", compte: null };
+    }
+    return { kind, compte: null };
+  }
+
   // Chaîne de dangers : chacun posé à l'écart que la physique du saut impose
   // avec le précédent, plus une marge qui se resserre. Saute les rangées
   // réservées (lait, grosse pièce) et toute une halle.
@@ -576,39 +619,38 @@ export class Route {
       // Rien n'arrive en face avant ~20 s (3 octobre 2026) : une voiture garée à la place.
       if (KINDS[kind].contresens && KINDS[kind].vitesse > 0 && this.chaine.r < rangAuTemps(20)) kind = "voiture";
       // … ni dans les 8 dernières secondes : aucun véhicule qui roule ne
-      // traverse la ligne d'arrivée (3 octobre 2026).
-      // (Sur la plage — les 30 dernières secondes —, des baigneurs.)
-      if (KINDS[kind].contresens && this.chaine.r > rangAuTemps(dureeCourse() - 8)) kind = enPlage(this.chaine.r) ? "baigneur" : "vache";
+      // traverse la ligne d'arrivée (3 octobre 2026). (Sur la plage — les 30
+      // dernières secondes —, la vache devient un baigneur : auDecor.)
+      if (KINDS[kind].contresens && this.chaine.r > rangAuTemps(dureeCourse() - 8)) kind = "vache";
       const groupe = kind === "pieton" ? taillePietons(Math.floor(i / 12)) : 1;
       if (!this.evts) this.evts = { convoi: 0, convoiFait: false, bouchonFait: false };
       if (!this.evts.convoiFait && this.chaine.r >= rangAuTemps(T_CONVOI)) { this.evts.convoiFait = true; this.evts.convoi = CONVOI_N; }
       if (this.evts.convoi > 0) { kind = "bus"; this.evts.convoi -= 1; }
       const bouchon = !this.evts.bouchonFait && this.chaine.r >= rangAuTemps(dureeCourse() - T_BOUCHON_AVANT_FIN);
       if (bouchon) kind = "voiture";
-      // La montagne enneigée : tout ce qui arrive en face est un chasse-neige ;
-      // voitures garées, messieurs et grosses bêtes de la ferme deviennent, en
-      // alternance, des bonshommes de neige et des SKIEURS qui viennent en face.
-      if (enMontagne(this.chaine.r)) {
-        if (kind === "pieton") kind = "skieur"; // les piétons de la montagne sont à skis
-        else if (KINDS[kind].contresens && !KINDS[kind].lanceur) {
-          this.nNeigeFace = (this.nNeigeFace || 0) + 1;
-          kind = this.nNeigeFace === 2 ? "skieur" : "chasseneige"; // le 2e qui vient en face est TOUJOURS un skieur
-        }
-        else if (kind === "voiture" || kind === "costard" || kind === "fermier" || kind === "mouton" || kind === "vache") {
-          this.nNeige = (this.nNeige || 0) + 1;
-          kind = this.nNeige % 2 === 1 ? "bonhomme" : "skieur"; // en alternance : au moins un bonhomme par course
-        }
-      }
-      // La plage : le costard et le fermier y sont en slip de bain, et les
-      // tracteurs y deviennent des buggys.
-      if (enPlage(this.chaine.r) && (kind === "costard" || kind === "fermier")) kind = "baigneur";
-      if (enPlage(this.chaine.r) && kind === "tracteur") kind = "buggy";
       const t = Math.min(1, Math.max(0, this.chaine.r / RAMP_ROWS));
       const mou = Math.round(MOU_DEBUT + (MOU_FIN - MOU_DEBUT) * t);
-      const base = this.chaine.kind ? ecartMin(this.chaine.kind, kind, Math.min(vMaxRangees(), vitesseAuRang(this.chaine.r + 20) * 1.08)) : 6;
-      let r = this.chaine.r + base + Math.floor(this.hash(i * 37 + 11) * (mou + 1));
-      let garde = 0;
-      while (garde++ < 400 && (estReservee(r) || estReservee(r - 1) || estReservee(r + 1) || dansHalle(r) || dansHalle(r - 4) || dansHalle(r + 4) || penteAutour(r))) r += 1;
+      const jeu = Math.floor(this.hash(i * 37 + 11) * (mou + 1));
+      const placer = (k, plancher) => {
+        const base = this.chaine.kind ? ecartMin(this.chaine.kind, k, Math.min(vMaxRangees(), vitesseAuRang(this.chaine.r + 20) * 1.08)) : 6;
+        let r = Math.max(plancher, this.chaine.r + base + jeu);
+        let garde = 0;
+        while (garde++ < 400 && !rangeeLibre(r, k)) r += 1;
+        return r;
+      };
+      // Chacun dans son décor (voir auDecor) : posé avec l'espèce du paquet,
+      // adapté au décor de la rangée TROUVÉE, re-posé (jamais plus tôt) si
+      // l'adaptation change l'écart à tenir ou le trajet à l'écran.
+      let r = placer(kind, 0), choix = this.auDecor(kind, biomeDe(r));
+      for (let n = 0; n < 6; n++) {
+        const r2 = placer(choix.kind, r), choix2 = this.auDecor(kind, biomeDe(r2));
+        r = r2;
+        if (choix2.kind === choix.kind) break;
+        choix = choix2;
+      }
+      if (choix.compte === "face") this.nNeigeFace = (this.nNeigeFace || 0) + 1;
+      if (choix.compte === "neige") this.nNeige = (this.nNeige || 0) + 1;
+      kind = choix.kind;
       this.dangers.set(r, kind);
       if (bouchon) {
         this.evts.bouchonFait = true;
@@ -624,7 +666,7 @@ export class Route {
       let dernier = r;
       for (let g = 1; g < groupe; g++) {
         const rg = dernier + ecartMin(kind, kind, Math.min(vMaxRangees(), vitesseAuRang(dernier + 20) * 1.08)) + PIETONS_GRACE;
-        if (estReservee(rg) || estReservee(rg - 1) || estReservee(rg + 1) || dansHalle(rg) || dansHalle(rg - 4) || dansHalle(rg + 4) || penteAutour(rg)) break;
+        if (!rangeeLibre(rg, kind) || biomeDe(rg) !== biomeDe(r)) break;
         this.dangers.set(rg, kind);
         dernier = rg;
       }
