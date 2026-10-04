@@ -45,6 +45,7 @@
 
 import { ROAD_HALF, HALLE_TOIT_AU_DESSUS } from "./scene.js";
 import { V_UNIT, vitesseAuRang, rangAuTemps, dureeCourse } from "./regles.js";
+import { tailleObstacle } from "./humains.js";
 
 // --- Le bestiaire, à l'échelle : 1 unité ≈ 1 mètre --------------------------------
 // Le cycliste fait 1,8 u de haut et 1,24 u de long (VELO_DEMI × 2). Tout le
@@ -156,6 +157,12 @@ export const KINDS = {
 export const VELO_DEMI = 0.44;
 export const MARGE_H = 0.04;
 export function hauteurAFranchir(kind) { return KINDS[kind].h + MARGE_H; }
+// Les HUMAINS n'ont pas tous la même taille (4 octobre 2026, nuit, humains.js) :
+// la collision lit la vraie hauteur de celui de la rangée r — un petit se
+// saute plus bas, jamais plus haut que K.h. Le planificateur (simulation,
+// joueur idéal) garde hauteurAFranchir, le cas le plus haut.
+const HUMAINS = new Set(["pieton", "costard", "fermier", "baigneur", "skieur"]);
+export function hauteurObstacle(kind, r) { return HUMAINS.has(kind) ? KINDS[kind].h * tailleObstacle(r) + MARGE_H : hauteurAFranchir(kind); }
 // Demi-longueur d'un obstacle LE LONG DE LA ROUTE (un traversant barre la
 // route sur sa largeur, pas sur sa longueur).
 export function demiLongueurRoute(kind) {
@@ -328,6 +335,8 @@ export function typeHalle(d) { const i = halles().indexOf(d); return TYPES_HALLE
 // 0,35 u, et un toit plus haut pour que le double saut y tienne.
 const GEO_TYPES = { marche: { haut: HALLE_HAUT, toit: HALLE_TOIT_AU_DESSUS }, gare: { haut: HALLE_HAUT, toit: HALLE_TOIT_AU_DESSUS }, bowling: { haut: 0.35, toit: 7.4 } };
 export function geoHalle(d) { return GEO_TYPES[typeHalle(d)]; }
+// Première rangée de la halle d'un type donné (« marche »…), ou null.
+export function debutHalle(type) { const d = halles().find((h) => typeHalle(h) === type); return d === undefined ? null : d; }
 // Début de la halle qui couvre la rangée r, ou null.
 export function halleA(r) {
   for (const d of halles()) if (r >= d - 1 && r <= d + HALLE_ROWS + 1) return d;
@@ -820,7 +829,7 @@ export class Route {
       // le balayage protège d'un décrochage d'image).
       const proche = Math.max(Math.min(prevV, v), Math.min(Math.max(prevV, v), centre));
       if (Math.abs(proche - centre) >= demi) continue;
-      if (jumpY >= hauteurAFranchir(row.kind) + solAt(centre)) continue;
+      if (jumpY >= hauteurObstacle(row.kind, r) + solAt(centre)) continue;
       this.resolved.add(key);
       events.push({ type: "obstacle", kind: row.kind, cout: K.cout, franchir: familleDe(row.kind), r });
     }

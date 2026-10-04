@@ -22,6 +22,7 @@
 // l'écart au centre de l'écran.
 
 import { parseColor } from "./voxel.js";
+import { humain } from "./humains.js";
 
 // --- La route : UNE voie ------------------------------------------------------
 // COLS/COL_CENTRE/colU restent exportés pour les modules qui les lisaient
@@ -247,11 +248,111 @@ function poly(ctx, pts, color) {
 // départagés par un plan qui les sépare (celui qui est du côté de la caméra
 // passe devant). Les ombres et aplats au sol partent en premier.
 let groupeOps = null;
-export function groupe(ctx, fn) {
-  if (groupeOps) { fn(); return; }        // imbriqué : le groupe parent trie tout
+// `contour` ({ couleur, px }) : un liseré sombre autour du modèle entier (les
+// personnages, 4 octobre 2026, nuit : « il manque un peu de contraste [...]
+// sur la plage, c'est très difficile de distinguer des humains blancs sur un
+// fond blanc »). La silhouette de chaque cube, élargie, est peinte en encre
+// AVANT tous les cubes : une fois ceux-ci peints par-dessus, il ne reste que le
+// bord extérieur de la figure — jamais de trait entre ses morceaux.
+export const CONTOUR_PERSO = { couleur: "#17131c", px: 1.3 };
+export function groupe(ctx, fn, contour = null) {
+  if (groupeOps) {                         // imbriqué : le groupe parent trie tout
+    const debut = groupeOps.length;
+    fn();
+    if (contour) for (let i = debut; i < groupeOps.length; i++) groupeOps[i].contour = contour;
+    return;
+  }
   const ops = [];
   groupeOps = ops;
-  try { fn(); } finally { groupeOps = null; peindreGroupe(ctx, ops); }
+  try { fn(); if (contour) for (const o of ops) o.contour = contour; } finally { groupeOps = null; peindreGroupe(ctx, ops); }
+}
+// Tête en cubes d'une personne d'humains.js : peau, cheveux selon la coiffure,
+// barbe, œil (blanc + pupille sur les peaux foncées : un point noir y
+// disparaissait). La tête occupe u ∈ [uH, uH+td] (uH côté caméra), v ∈ [vH,
+// vH+tw], h ∈ [HT, HT+TE]. `face` : "profil" = le visage regarde −v (piéton,
+// skieur) ; "camera" = il regarde la caméra (marchands). `chapeau` : le dessus
+// est couvert, seuls la nuque et les côtés dépassent.
+export function teteVoxel(ctx, M, uH, vH, td, tw, HT, TE, { chapeau = false, face = "profil" } = {}) {
+  const C = M.cheveux, co = M.coiffure, profil = face === "profil";
+  drawBox(ctx, uH, vH, td, tw, TE, M.peau, HT);
+  if (co === "afro" && !chapeau) {
+    if (profil) drawBox(ctx, uH - 0.05, vH + 0.11, td + 0.1, tw - 0.07, TE * 0.68, C, HT + TE * 0.5);
+    else drawBox(ctx, uH + 0.07, vH - 0.05, td - 0.02, tw + 0.1, TE * 0.68, C, HT + TE * 0.5);
+  } else if (co === "rase") drawBox(ctx, uH - 0.005, vH + (profil ? 0.05 : -0.005), td + 0.01, tw + (profil ? -0.04 : 0.01), 0.025, C, HT + TE);
+  else if (co !== "chauve" && !chapeau) drawBox(ctx, uH - 0.01, vH + (profil ? 0.03 : -0.01), td + 0.02, tw + (profil ? -0.01 : 0.02), 0.06, C, HT + TE);
+  // Ce qui descend derrière la tête : [épaisseur, bas en fraction de TE].
+  const nuque = { court: [0.08, 0.55], long: [0.1, -0.85], chignon: [0.08, 0.5], afro: [0.12, 0.25], tresses: [0.07, -1.25], chauve: [0.05, 0.3] }[co];
+  if (nuque && !(co === "chauve" && M.age !== "vieux")) {
+    const [ep, bas] = nuque;
+    const h0 = HT + TE * bas, hh = Math.max(0.04, HT + TE * (co === "chauve" ? 0.62 : 0.98) - h0);
+    if (profil) drawBox(ctx, uH - 0.01, vH + tw - ep + 0.02, td + 0.02, ep, hh, C, h0);
+    else {
+      drawBox(ctx, uH + td - ep + 0.02, vH - 0.01, ep, tw + 0.02, hh, C, h0);
+      // De face, les cheveux longs encadrent le visage.
+      if (co === "long" || co === "tresses") for (const dv of [-0.02, tw - 0.03]) drawBox(ctx, uH + 0.03, vH + dv, td - 0.02, 0.05, HT + TE * 0.98 - h0, C, h0);
+    }
+  }
+  if (co === "chignon" && !chapeau) {
+    if (profil) drawBox(ctx, uH + td / 2 - 0.07, vH + tw - 0.02, 0.14, 0.13, 0.13, C, HT + TE * 0.78);
+    else drawBox(ctx, uH + td - 0.06, vH + tw / 2 - 0.07, 0.13, 0.14, 0.13, C, HT + TE * 0.78);
+  }
+  const yo = HT + TE * 0.56;
+  if (profil) {
+    if (M.barbe) drawBox(ctx, uH - 0.006, vH - 0.012, td + 0.012, 0.07, TE * 0.36, C, HT);
+    if (M.fonce) { drawBox(ctx, uH - 0.012, vH + 0.03, 0.012, 0.07, 0.055, "#f4efe4", yo); drawBox(ctx, uH - 0.016, vH + 0.03, 0.012, 0.035, 0.05, "#1a1a1e", yo); }
+    else drawBox(ctx, uH - 0.01, vH + 0.03, 0.01, 0.05, 0.05, "#1a1a1e", yo);
+  } else {
+    if (M.barbe) drawBox(ctx, uH - 0.008, vH + 0.02, 0.06, tw - 0.04, TE * 0.32, C, HT);
+    for (const f of [0.22, 0.6]) {
+      if (M.fonce) drawBox(ctx, uH - 0.012, vH + tw * f - 0.01, 0.012, 0.07, 0.055, "#f4efe4", yo);
+      drawBox(ctx, uH - 0.016, vH + tw * f, 0.012, 0.045, 0.05, "#1a1a1e", yo);
+    }
+  }
+}
+
+// Enveloppe convexe (chaîne monotone) de quelques points écran.
+function enveloppe(pts) {
+  pts.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  const croix = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+  const bas = [], haut = [];
+  for (const p of pts) { while (bas.length >= 2 && croix(bas[bas.length - 2], bas[bas.length - 1], p) <= 0) bas.pop(); bas.push(p); }
+  for (let i = pts.length - 1; i >= 0; i--) { const p = pts[i]; while (haut.length >= 2 && croix(haut[haut.length - 2], haut[haut.length - 1], p) <= 0) haut.pop(); haut.push(p); }
+  haut.pop(); bas.pop();
+  return bas.concat(haut);
+}
+function peindreContours(ctx, ops) {
+  ctx.save();
+  ctx.lineJoin = "round";
+  for (const o of ops) {
+    const { couleur, px } = o.contour;
+    ctx.globalAlpha = o.a;
+    ctx.fillStyle = couleur; ctx.strokeStyle = couleur; ctx.lineWidth = px * 2;
+    const pts = [];
+    for (const u of [o.u0, o.u1]) {
+      const s = echelle(u);
+      for (const v of [o.v0, o.v1]) for (const h of [o.h0, o.h1]) pts.push([W * 0.5 + (v - vCentre) * s, horizonY + (camH - h) * s]);
+    }
+    const env = enveloppe(pts);
+    ctx.beginPath();
+    env.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+  }
+  ctx.restore();
+}
+// Le même liseré pour les personnages dessinés À PLAT (costard, fermier,
+// baigneur) : la figure est d'abord peinte en encre, décalée dans huit
+// directions, puis normalement par-dessus. `dessin(c)` reçoit le contexte à
+// utiliser — en encre, toute couleur qu'il pose est remplacée par l'encre.
+export function contour2D(ctx, dessin, { couleur, px } = CONTOUR_PERSO) {
+  const encre = new Proxy(ctx, {
+    get(c, k) { const v = c[k]; return typeof v === "function" ? v.bind(c) : v; },
+    set(c, k, v) { c[k] = k === "fillStyle" || k === "strokeStyle" ? couleur : v; return true; },
+  });
+  const d = px * 0.71;
+  for (const [dx, dy] of [[px, 0], [-px, 0], [0, px], [0, -px], [d, d], [-d, d], [d, -d], [-d, -d]]) {
+    ctx.save(); ctx.translate(dx, dy); dessin(encre); ctx.restore();
+  }
+  dessin(ctx);
 }
 // Boîte englobante (u, v, h) de ce que dessine `fn(ctx)`, sans rien peindre :
 // sert à vérifier qu'un modèle ne ment pas sur sa boîte de collision.
@@ -291,6 +392,8 @@ function peindreGroupe(ctx, ops) {
   const jouer = (op) => { ctx.globalAlpha = op.a; op.f(); };
   const sols = ops.filter((o) => o.sol), pleins = ops.filter((o) => !o.sol);
   for (const o of sols) jouer(o);
+  const cernes = pleins.filter((o) => o.contour);
+  if (cernes.length) peindreContours(ctx, cernes);
   const n = pleins.length;
   const boites = pleins.map(boiteEcran);
   const entrants = new Array(n).fill(0), suivants = pleins.map(() => []);
@@ -607,32 +710,38 @@ function montagnesProches(ctx) {
 // Deux joueurs de raquettes face à face le long de la plage ; la balle fait
 // l'aller-retour en cloche, chacun lève sa raquette quand elle arrive.
 function raquettesPlage(ctx, u, v, t, k) {
-  const ECART = 3.4, PEAU = "#c98a5a";
+  const ECART = 3.4;
   const SLIPS = ["#e13e26", "#1f8fd6", "#f2c21c", "#ff5fa2"];
   const f = ((t * 0.5 + hash(k) * 3) % 1 + 1) % 1, aller = f < 0.5, p = aller ? f * 2 : (f - 0.5) * 2;
   const vA = v, vB = v + ECART;
-  const joueur = (vv, sens, slip, frappe) => {
-    drawBox(ctx, u, vv - 0.13, 0.14, 0.1, 0.62, PEAU);
-    drawBox(ctx, u, vv + 0.05, 0.14, 0.1, 0.62, PEAU);
-    drawBox(ctx, u - 0.02, vv - 0.15, 0.18, 0.32, 0.16, slip, 0.58);
-    drawBox(ctx, u - 0.02, vv - 0.15, 0.18, 0.32, 0.46, PEAU, 0.74);           // torse
-    drawBox(ctx, u, vv - 0.11, 0.16, 0.24, 0.24, PEAU, 1.2);                     // tête
-    drawBox(ctx, u - 0.01, vv - 0.12, 0.18, 0.26, 0.07, "#2a1a10", 1.38);        // cheveux
-    drawBox(ctx, u - 0.04, vv - 0.05 + sens * 0.16, 0.08, 0.1, 0.3, PEAU, 0.86 + frappe * 0.34); // le bras qui frappe
+  // Qui joue (humains.js) : souvent un parent et son enfant.
+  const joueur = (vv, sens, slip, frappe, graine) => {
+    const M = humain(graine), sy = M.taille, w = M.corpulence, PEAU = M.peau;
+    drawBox(ctx, u, vv - 0.13 * w, 0.14, 0.11, 0.62 * sy, PEAU);
+    drawBox(ctx, u, vv + 0.05 * w, 0.14, 0.11, 0.62 * sy, PEAU);
+    drawBox(ctx, u - 0.02, vv - 0.15 * w, 0.18, 0.32 * w, 0.16 * sy, slip, 0.58 * sy);
+    drawBox(ctx, u - 0.02, vv - 0.15 * w, 0.18, 0.32 * w, (M.femme ? 0.46 : 0.46) * sy, M.femme ? slip : PEAU, 0.74 * sy); // torse (maillot pour elle)
+    drawBox(ctx, u, vv - 0.11, 0.16, 0.24, 0.24 * sy, PEAU, 1.2 * sy);                // tête
+    if (M.coiffure === "afro") drawBox(ctx, u - 0.03, vv - 0.15, 0.22, 0.32, 0.14 * sy, M.cheveux, 1.36 * sy);
+    else if (M.coiffure !== "chauve") drawBox(ctx, u - 0.01, vv - 0.12, 0.18, 0.26, 0.07, M.cheveux, 1.38 * sy); // cheveux
+    drawBox(ctx, u - 0.04, vv - 0.05 + sens * 0.16, 0.08, 0.11, 0.3 * sy, PEAU, (0.86 + frappe * 0.34) * sy); // le bras qui frappe
   };
   // La balle arrive chez B pendant l'aller, chez A au retour : le bras se lève.
   const fA = !aller ? Math.max(0, p - 0.6) / 0.4 : Math.max(0, 0.25 - p) / 0.25;
   const fB = aller ? Math.max(0, p - 0.6) / 0.4 : Math.max(0, 0.25 - p) / 0.25;
-  joueur(vA, 1, SLIPS[Math.abs(k) % 4], fA);
-  joueur(vB, -1, SLIPS[(Math.abs(k) + 1) % 4], fB);
-  // Raquettes (vues de face) et balle, peintes après les corps.
-  const raquette = (vv, sens, frappe) => {
-    const c = project(u - 0.06, vv + sens * 0.26, 1.28 + frappe * 0.36), sc = echelle(u);
+  const gA = Math.abs(k) * 2 + 9000, gB = gA + 1, tA = humain(gA).taille, tB = humain(gB).taille;
+  joueur(vA, 1, SLIPS[Math.abs(k) % 4], fA, gA);
+  joueur(vB, -1, SLIPS[(Math.abs(k) + 1) % 4], fB, gB);
+  // Raquettes (vues de face) et balle, peintes après les corps, à la hauteur
+  // de chacun (un enfant tient la sienne plus bas).
+  const raquette = (vv, sens, frappe, sy) => {
+    const c = project(u - 0.06, vv + sens * 0.26, (1.28 + frappe * 0.36) * sy), sc = echelle(u);
     ctx.fillStyle = "#2f6fd0"; ctx.beginPath(); ctx.ellipse(c.x, c.y, 0.13 * sc, 0.16 * sc, 0, 0, Math.PI * 2); ctx.fill();
   };
-  raquette(vA, 1, fA); raquette(vB, -1, fB);
+  raquette(vA, 1, fA, tA); raquette(vB, -1, fB, tB);
   const vb = aller ? vA + 0.3 + (ECART - 0.6) * p : vB - 0.3 - (ECART - 0.6) * p;
-  const b = project(u - 0.06, vb, 1.45 + 1.1 * Math.sin(Math.PI * p));
+  const hDepart = 1.45 * (aller ? tA : tB), hArrivee = 1.45 * (aller ? tB : tA);
+  const b = project(u - 0.06, vb, hDepart + (hArrivee - hDepart) * p + 1.1 * Math.sin(Math.PI * p));
   ctx.fillStyle = "#f2e01c"; ctx.beginPath(); ctx.arc(b.x, b.y, Math.max(1.5, 0.08 * echelle(u)), 0, Math.PI * 2); ctx.fill();
 }
 
@@ -1140,11 +1249,15 @@ function arbre(ctx, u, v, h, sw) {
 // maison 1,0 — soit un bonhomme de 78 cm devant une maison de 1 m. Règle
 // désormais : 1 unité ≈ 1 mètre, comme le cycliste (1,8 u).
 const PERSO_H = 1.75, ETAGE_H = 2.9;
+// La personne vient d'humains.js (4 octobre 2026, nuit) : peau, taille —
+// enfants compris, c'est le décor —, carrure, cheveux.
 function personnage(ctx, u, v, lift, haut, bas) {
-  const l = 0.42;   // épaules
-  drawBox(ctx, u, v, 0.3, l * 0.8, PERSO_H * 0.46, bas, lift);                       // jambes
-  drawBox(ctx, u - 0.05, v - 0.05, 0.4, l, PERSO_H * 0.33, haut, lift + PERSO_H * 0.46); // buste
-  drawBox(ctx, u + 0.02, v + 0.04, 0.3, 0.3, PERSO_H * 0.21, "#d69a68", lift + PERSO_H * 0.79); // tête
+  const M = humain(Math.round(v * 13 + u * 7) + 3000);
+  const H = PERSO_H * M.taille, w = M.corpulence;
+  const l = 0.42 * w;   // épaules
+  drawBox(ctx, u, v, 0.3, l * 0.8, H * 0.46, bas, lift);                       // jambes
+  drawBox(ctx, u - 0.05, v - 0.05, 0.4, l, H * 0.33, haut, lift + H * 0.46);   // buste
+  teteVoxel(ctx, M, u + 0.02, v + 0.04, 0.3, 0.3, lift + H * 0.79, H * 0.21, { face: "camera" }); // tête
 }
 // Deux bourgs, deux régions. NORD : brique rouge, ardoise sombre, pignon à
 // redents, encadrements blancs. SUD : enduit ocre, tuile romaine, volets,
@@ -1281,7 +1394,7 @@ function decorVillage(ctx, push, r, side, sway, sud) {
 // Gazon synthétique sur la table, bâche rayée au-dessus du marchand, paniers
 // de fruits par terre, et le marchand qui harangue — bulle comprise.
 const BACHES = [["#e13e26", "#f7f2e6"], ["#2f8a4a", "#f7f2e6"], ["#1f5fb8", "#f7f2e6"]];
-const CRIS = ["Elle est belle ma courgette !", "Allez, 2 € le kilo !", "Tu veux voir ma grosse courge ?", "Pastèque bien sucrée !", "Qui veut des tomates ?", "Elles sont belles mes courgettes !", "Goûtez-moi ça !", "Le kilo, 1 € !"];
+const CRIS = ["4 € les belles courgettes !", "Elle est belle ma courgette !", "Allez, 2 € le kilo !", "Tu veux voir ma grosse courge ?", "Pastèque bien sucrée !", "Qui veut des tomates ?", "Elles sont belles mes courgettes !", "Goûtez-moi ça !", "Le kilo, 1 € !"];
 function etalMarche(ctx, u, v, n, t) {
   const sorte = ((n % 3) + 3) % 3;
   const L = 3.5;                        // longueur de l'étal le long de la route
@@ -1294,20 +1407,24 @@ function etalMarche(ctx, u, v, n, t) {
   // Le marchand (et parfois sa collègue) : tablier, marinière, béret ou casquette.
   const vendeurs = sorte === 1 ? [L * 0.3, L * 0.72] : [L * 0.5];
   vendeurs.forEach((dv, k) => {
+    // La personne (humains.js, 4 octobre 2026, nuit) : peau, carrure, taille,
+    // coiffure ; béret, casquette, ou tête nue.
+    const M = humain(n * 2 + k + 7000, { enfants: false });
+    const sy = M.taille, w = M.corpulence, chapeau = (n + k) % 3;
     const gest = Math.sin(t * 3.2 + n * 1.7 + k * 2.1);
     const vv = v + dv;
-    drawBox(ctx, uM, vv - 0.17, 0.26, 0.15, 0.8, "#2a2f3e");                         // jambes
-    drawBox(ctx, uM, vv + 0.04, 0.26, 0.15, 0.8, "#2a2f3e");
-    drawBox(ctx, uM - 0.04, vv - 0.22, 0.34, 0.44, 0.62, "#f7f2e6", 0.8);              // marinière
-    for (let i = 0; i < 3; i++) drawBox(ctx, uM - 0.05, vv - 0.23, 0.35, 0.46, 0.07, "#1f3a78", 0.88 + i * 0.18);
-    drawBox(ctx, uM - 0.08, vv - 0.2, 0.06, 0.4, 0.95, sorte === 2 ? "#7a3a1a" : "#2f6a3a", 0.42); // tablier
-    drawBox(ctx, uM + 0.02, vv - 0.14, 0.26, 0.28, 0.3, "#d69a68", 1.42);              // tête
-    if (k === 0) drawBox(ctx, uM, vv - 0.16, 0.3, 0.32, 0.09, "#1a1a1e", 1.72);         // béret
-    else drawBox(ctx, uM, vv - 0.16, 0.3, 0.32, 0.12, "#e13e26", 1.7);                 // casquette
+    drawBox(ctx, uM, vv - 0.17 * w, 0.26, 0.15 * w, 0.8 * sy, "#2a2f3e");                 // jambes
+    drawBox(ctx, uM, vv + 0.04 * w, 0.26, 0.15 * w, 0.8 * sy, "#2a2f3e");
+    drawBox(ctx, uM - 0.04, vv - 0.22 * w, 0.34, 0.44 * w, 0.62 * sy, "#f7f2e6", 0.8 * sy); // marinière
+    for (let i = 0; i < 3; i++) drawBox(ctx, uM - 0.05, vv - 0.23 * w, 0.35, 0.46 * w, 0.07 * sy, "#1f3a78", (0.88 + i * 0.18) * sy);
+    drawBox(ctx, uM - 0.08, vv - 0.2 * w, 0.06, 0.4 * w, 0.95 * sy, sorte === 2 ? "#7a3a1a" : "#2f6a3a", 0.42 * sy); // tablier
+    teteVoxel(ctx, M, uM + 0.02, vv - 0.14, 0.26, 0.28, 1.42 * sy, 0.3 * sy, { chapeau: chapeau < 2, face: "camera" });
+    if (chapeau === 0) drawBox(ctx, uM, vv - 0.16, 0.3, 0.32, 0.09, "#1a1a1e", 1.72 * sy);   // béret
+    else if (chapeau === 1) drawBox(ctx, uM, vv - 0.16, 0.3, 0.32, 0.12, "#e13e26", 1.7 * sy); // casquette
     // Bras : l'un sur la hanche, l'autre qui harangue (levé, il s'agite).
-    drawBox(ctx, uM + 0.06, vv + 0.22, 0.14, 0.12, 0.5, "#f7f2e6", 0.92);
-    drawBox(ctx, uM + 0.06, vv - 0.36 - 0.06 * gest, 0.14, 0.12, 0.5, "#f7f2e6", 1.2 + 0.08 * gest);
-    drawBox(ctx, uM + 0.07, vv - 0.36 - 0.06 * gest, 0.12, 0.11, 0.12, "#d69a68", 1.7 + 0.08 * gest);
+    drawBox(ctx, uM + 0.06, vv + 0.22 * w, 0.14, 0.13, 0.5 * sy, "#f7f2e6", 0.92 * sy);
+    drawBox(ctx, uM + 0.06, vv - 0.36 * w - 0.06 * gest, 0.14, 0.13, 0.5 * sy, "#f7f2e6", (1.2 + 0.08 * gest) * sy);
+    drawBox(ctx, uM + 0.07, vv - 0.36 * w - 0.06 * gest, 0.12, 0.12, 0.12, M.peau, (1.7 + 0.08 * gest) * sy);
   });
   // La toile, par-dessus le marchand (la caméra la voit d'en haut).
   const nb = 7;

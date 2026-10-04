@@ -111,6 +111,22 @@ function tempsRestant() {
   return duree - pos;
 }
 
+// --- Le marchand du marché (4 octobre 2026, nuit) ------------------------------
+// « Quatre euros les belles courgettes ! » au mégaphone (audio.js) : chargé dès
+// la course lancée, lancé pour que le milieu du vocal tombe quand le joueur
+// passe le milieu de la halle du marché, replacé à chaque pas (volume, filtre,
+// gauche/droite). Une fois par course.
+let marcheMilieu;
+function marchandPas() {
+  if (marcheMilieu === undefined) { const d = rows.debutHalle("marche"); marcheMilieu = d === null ? null : d + rows.HALLE_ROWS / 2; }
+  if (marcheMilieu === null) return;
+  const ecart = marcheMilieu - player.v;
+  if (ecart < -40 || ecart > 400) return;
+  audio.prechargerMarchand();
+  if (ecart <= Math.max(1, speed) * 3.25 && ecart > 0) audio.lancerMarchand();
+  audio.placerMarchand(ecart);
+}
+
 // --- Pause -------------------------------------------------------------------
 let manualPaused = false, hiddenPaused = false, revivePaused = false;
 let pauseStartedAt = 0;
@@ -118,6 +134,7 @@ function isPaused() { return manualPaused || hiddenPaused || revivePaused; }
 function applyPauseState() {
   const next = revivePaused ? "revive" : hiddenPaused ? "silent" : manualPaused ? "muffled" : "running";
   audio.setPlaybackMode(next);
+  if (next !== "running") audio.couperMarchand();
   if (next !== "running") {
     if (pauseStartedAt === 0) {
       pauseStartedAt = perfClock();
@@ -553,6 +570,7 @@ function resetRun() {
   game.metres = 0; game.points = 0; game.potesGagnes = 0; game.etoiles = 0;
   game.ended = false; game.endReason = null; game.reviveOffered = false; game.sansFaute = true;
   game.turbo = 0; game.finAge = -1; game.arriveeR = null; game.surHalle = false; tombes.clear(); ejectes.clear(); game.invincibleAnnonce = false;
+  audio.oublierMarchand();
   game.startedAt = perfClock();
   player.u = 0; player.prevU = 0; player.v = 0; player.prevV = 0; cameraX = null;
   player.jumpY = 0; player.prevJumpY = 0; player.jumpVy = 0; player.doubled = false; player.flip = 0; player.prevFlip = 0; player.tHaut = 0; player.roue = 0; player.prevRoue = 0;
@@ -646,6 +664,7 @@ function terminer() {
 
 function endGame(reason) {
   conseilCouper();
+  audio.couperMarchand();
   game.ended = true;
   game.endReason = reason;
   canvas.classList.add("game-over-bw");
@@ -904,6 +923,7 @@ function step(dt) {
   const dtReel = dt;
   if (now >= 0) { conseilStep(dtReel, tMonde(), speed); dt = dtReel * ralenti; retardMonde += dtReel - dt; }
   const tm = tMonde();
+  marchandPas();
 
   // Le boost de ligue s'annonce au « GO ».
   if (!game.boostAnnonce && now >= COUNT_IN_GO_LINGER_S) {
@@ -1387,7 +1407,7 @@ function render(alpha) {
         const dessinA = (u, vv) => (row.kind === "tracteur" ? props.drawTracteurRoute(ctx, inst.K, u, vv, t)
           : row.kind === "bus" ? props.drawBus(ctx, inst.K, u, vv, t)
           : row.kind === "chasseneige" ? props.drawChasseNeige(ctx, inst.K, u, vv, t)
-          : row.kind === "skieur" ? props.drawSkieur(ctx, inst.K, u, vv, t)
+          : row.kind === "skieur" ? props.drawSkieur(ctx, inst.K, u, vv, t, r)
           : row.kind === "buggy" ? props.drawBuggy(ctx, inst.K, u, vv, t, r)
           : row.kind === "pieton" ? props.drawPieton(ctx, inst.K, u, vv, t, r, rows.enPlage(r))
           : props.drawVoiture(ctx, inst.K, u, vv, -1, t));
@@ -1784,6 +1804,7 @@ if (debugOverlay.isEnabled()) {
     videoPas: (dt) => { const n = Math.max(1, Math.round(dt / STEP)); for (let i = 0; i < n && !game.ended; i++) { if (window.__pilote) window.__pilote(); modeVideo.t += STEP; step(STEP); } render(1); },
     positionMorceau: () => departMorceau + clock.now(),
     jetpack: () => ({ r: jet.r, pris: jet.pris, reste: jet.reste, pieces: jet.pieces.length, prises: jet.pieces.filter((c) => c.pris).length }),
+    marchand: () => ({ etat: audio.marchandEtat(), milieu: marcheMilieu }),
   };
 }
 requestAnimationFrame(frame);

@@ -572,6 +572,40 @@ Code `TESTV2`, qui est aussi `config.ligueBeta` (menu simplifié + bouton « Lai
   - *Ligne d'arrivée franchie en l'air* : le cycliste restait suspendu, la
     gravité s'appliquait plus après la fin. Elle s'applique jusqu'au sol,
     le salto en cours continue.
+- **5 octobre 2026, huitième série (vocal du marchand, humains)** — SW
+  `jp2-v30` (`VERSION_COURSE` inchangée : le parcours ne bouge pas) :
+  - *Le marchand* : un vocal de PMC au téléphone (« Quatre euros les belles
+    courgettes ! Allez-y, achetez mes courgettes… ») devenu un cri de
+    marchand au mégaphone dans une halle — `public/assets/marchand-
+    courgettes.mp3`, 6,5 s, 66 Ko, fabriqué par `outils/voix-megaphone.sh`
+    (chaîne documentée dans le script ; le relancer sur un autre mémo vocal
+    pour d'autres cris). Joué une fois par course (`audio.lancerMarchand`),
+    pas fort (`config.marchandVolume` 0,6 devant les étals, le fichier est
+    à −16 LUFS et le morceau à ~−14), lancé pour que le milieu du vocal
+    tombe au milieu de la halle du marché : mesuré (`node outils/
+    marchand.mjs`), il part à l'entrée (t 24,1 s, rangée 131) et finit à la
+    sortie (30,8 s, rangée 175). Volume, passe-bas et gauche/droite suivent
+    la distance (`placerMarchand`) : il arrive de la droite, étouffé,
+    s'éclaircit devant les étals, repart à gauche — c'est le fondu d'entrée
+    et de sortie demandé. Coupé net par la pause, la mort, l'onglet quitté.
+    La bulle « 4 € les belles courgettes ! » rejoint les cris des étals.
+  - *Les humains* (« trop fins », « humains blancs sur fond blanc », « on
+    n'a pas de métis, y a que des blancs… je veux tout ») : `src/humains.js`
+    tire pour chaque personnage (graine = sa rangée) une peau parmi huit
+    (très claire → très foncée, tirage uniforme), cheveux, coiffure (court,
+    rasé, long, chignon, afro, tresses, chauve), taille, carrure (1,05 /
+    1,12 / 1,38 × l'ancien gabarit), âge (vieux : cheveux gris, dos voûté,
+    canne). Appliqué partout : piétons, costard, fermier, baigneur, skieur,
+    lanceur de poules, conducteur de buggy, marchands, villageois, joueurs
+    de raquettes. Œil blanc + pupille sur les peaux foncées. Liseré sombre
+    autour des humains-obstacles (`groupe(…, CONTOUR_PERSO)` pour les cubes,
+    `contour2D` pour les personnages à plat). ⚠️ La TAILLE compte dans la
+    collision (`rows.hauteurObstacle`) : un petit se saute plus bas, jamais
+    plus haut que `K.h` — mesuré, joueur idéal toujours à 0 choc sur 1 841.
+    ⚠️ Jamais d'enfant sur la route (`enfants: false`) : ils sont dans le
+    décor (plage, village). Coût : +0,5 à 1,5 ms par image à la plage (CPU
+    ×4, `perf-plage.mjs`), rien au départ. Planche de contrôle : `node
+    outils/capture.mjs humains` → `outils/sorties/h*.png`.
 - **Tuto au ralenti, deuxième version** (`conseilTap`/`conseilStep`) : approche
   ~1 s avant le bon moment (monde ×0,25), un tap donné pendant l'approche est
   GARDÉ et part pile au bon moment, gel ×0,06 s'il n'a rien fait ; reprise
@@ -687,6 +721,8 @@ Code `TESTV2`, qui est aussi `config.ligueBeta` (menu simplifié + bouton « Lai
   `SERVIR=dist` teste le build, `PARTIES=0` le tuto ; scène `perf` = coût de rendu CPU ×4.
 - `node outils/collisions.mjs` — une course du VRAI jeu sans jamais sauter : chaque
   obstacle rencontré doit coûter (« traversés SANS choc : 0 »), sauf sous turbo/bouclier.
+- `node outils/marchand.mjs` — une vraie course jusqu'au marché : quand le vocal part et finit.
+- `./outils/voix-megaphone.sh <vocal.m4a> <sortie.mp3> [début] [fin]` — un mémo vocal → cri au mégaphone.
 - `node outils/clavier.mjs` (6 téléphones, clavier simulé), `node outils/premiere.mjs`
   (première visite façon Instagram), `node outils/porte-echelle.mjs` (porte album/abonnement).
 - ⚠️ La preview de l'IDE ne peut pas jouer le jeu (l'`AudioContext` fige l'onglet) : passer par

@@ -721,6 +721,93 @@ export function playVoiceClip() {
   return true;
 }
 
+// --- Le MARCHAND du marché (4 octobre 2026, nuit) ------------------------------
+// « Quatre euros les belles courgettes ! » : un vocal de PMC enregistré au
+// téléphone, nettoyé et passé au mégaphone dans une halle (fichier
+// config.fichierMarchand, traitement décrit dans CLAUDE.md). Joué pas fort, une
+// fois par course, au passage du marché. main.js le replace à chaque pas
+// (placerMarchand) : il arrive de la droite, étouffé, s'éclaircit devant les
+// étals et repart à gauche — c'est ça, le fondu d'entrée et de sortie. Passe
+// par volumeGain comme les bruitages (curseur du joueur, pause étouffée,
+// onglet quitté).
+let marchandBuf = null;
+let marchandChargement = false;
+let marchand = null; // { src, filtre, gain, pan, fini, maj } de la course en cours
+
+export function prechargerMarchand() {
+  if (marchandChargement) return;
+  marchandChargement = true;
+  const url = window.CONFIG.fichierMarchand;
+  if (!url) return;
+  fetch(url)
+    .then((res) => {
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.arrayBuffer();
+    })
+    .then((data) => {
+      const Offline = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+      return decodeWith(new Offline(1, 1, 44100), data);
+    })
+    .then((decoded) => { marchandBuf = decoded; })
+    .catch(() => { /* fichier absent ou illisible : le marché reste muet */ });
+}
+
+// Lance le vocal, une fois par course. false tant qu'il n'est pas prêt (main.js
+// retente au pas suivant) ou s'il a déjà joué.
+export function lancerMarchand() {
+  if (marchand || !audioCtx || !marchandBuf || audioCtx.state !== "running" || mode !== "running") return false;
+  const src = audioCtx.createBufferSource();
+  src.buffer = marchandBuf;
+  const filtre = audioCtx.createBiquadFilter();
+  filtre.type = "lowpass";
+  filtre.frequency.value = 1000;
+  const gain = audioCtx.createGain();
+  gain.gain.value = 0; // monte avec le premier placerMarchand : pas de clic
+  const pan = audioCtx.createStereoPanner ? audioCtx.createStereoPanner() : null;
+  src.connect(filtre);
+  filtre.connect(gain);
+  const sortie = volumeGain || audioCtx.destination;
+  if (pan) { gain.connect(pan); pan.connect(sortie); } else gain.connect(sortie);
+  marchand = { src, filtre, gain, pan, fini: false, maj: -1 };
+  src.onended = () => { if (marchand && marchand.src === src) marchand.fini = true; };
+  src.start(audioCtx.currentTime);
+  return true;
+}
+
+// ecart = position du marchand − position du joueur, en rangées (positif : il
+// est encore devant, à droite de l'écran).
+export function placerMarchand(ecart) {
+  if (!marchand || marchand.fini || !audioCtx) return;
+  const t = audioCtx.currentTime;
+  if (t - marchand.maj < 0.04) return; // ~25 retouches par seconde suffisent
+  marchand.maj = t;
+  const proche = 1 / (1 + (ecart / 16) ** 2); // 1 devant les étals, ~0,2 à 30 rangées
+  const vol = (window.CONFIG.marchandVolume ?? 0.6) * (0.35 + 0.65 * proche);
+  marchand.gain.gain.setTargetAtTime(vol, t, 0.1);
+  marchand.filtre.frequency.setTargetAtTime(900 + 5100 * proche, t, 0.1);
+  if (marchand.pan) marchand.pan.pan.setTargetAtTime(Math.max(-0.7, Math.min(0.7, ecart / 25)), t, 0.1);
+}
+
+// Pause, mort, onglet quitté : il se tait (fondu court) et ne reprend pas.
+export function couperMarchand() {
+  if (!marchand || marchand.fini || !audioCtx) return;
+  const t = audioCtx.currentTime;
+  marchand.gain.gain.cancelScheduledValues(t);
+  marchand.gain.gain.setTargetAtTime(0, t, 0.06);
+  try { marchand.src.stop(t + 0.4); } catch (e) { /* déjà arrêté */ }
+  marchand.fini = true;
+}
+
+// Nouvelle course : il pourra rejouer.
+export function oublierMarchand() {
+  couperMarchand();
+  marchand = null;
+}
+
+export function marchandEtat() {
+  return !marchand ? (marchandBuf ? "pret" : "attente") : marchand.fini ? "fini" : "joue";
+}
+
 // --- Modes de lecture (course / menu pause / onglet quitté) ------------------
 // Trois états, et un seul point d'entrée pour en changer : main.js calcule le
 // mode voulu à partir de ses deux drapeaux (menu pause ouvert, onglet caché)

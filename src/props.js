@@ -16,8 +16,9 @@
 // Le mouton fait un 360 sur lui-même (demandé) : vraie rotation 3D autour de
 // l'axe vertical, via scene.drawBoxR.
 
-import { drawBox, drawBoxR, drawShadow, drawFlat, drawDisque, getNight, project, groupe, echelle } from "./scene.js";
+import { drawBox, drawBoxR, drawShadow, drawFlat, drawDisque, getNight, project, groupe, echelle, CONTOUR_PERSO, contour2D, teteVoxel } from "./scene.js";
 import { KINDS } from "./rows.js";
+import { humain } from "./humains.js";
 
 const ROUSSE = "#b8612c", ROUSSE_AILE = "#8a4420";
 const WHITE = "#f4efe4", BLACK = "#1a1a1e", PINK = "#f0a0b0", ORANGE = "#e08a2a", VITRE = "#a8d8f0";
@@ -154,11 +155,13 @@ export function drawBuggy(ctx, K, uC, v, t, r = 0) {
     bloc(0.0, 0.26, 0.14, 0.72, 0.16, 0.42, COQUE);          // nez relevé (avant)
     bloc(0.72, 0.24, 0.12, 0.76, 0.24, 0.46, "#3a3a40");     // moteur à l'air (arrière)
     bloc(0.3, 0.4, 0.2, 0.6, 0.12, 0.5, "#2a2a30");          // sièges
-    // Le conducteur : torse bronzé, lunettes noires, cheveux au vent.
-    bloc(0.42, 0.16, 0.36, 0.3, 0.34, 0.62, "#c98a5a");
-    bloc(0.42, 0.16, 0.38, 0.26, 0.2, 0.96, "#c98a5a");
+    // Le conducteur (humains.js) : torse nu, lunettes noires, cheveux au vent.
+    const M = humain(r * 3 + 1, { enfants: false });
+    bloc(0.42, 0.16, 0.36, 0.3, 0.34, 0.62, M.peau);
+    bloc(0.42, 0.16, 0.38, 0.26, 0.2, 0.96, M.peau);
     bloc(0.4, 0.04, 0.36, 0.3, 0.05, 1.04, "#0d0d10");       // lunettes
-    bloc(0.46, 0.14, 0.36, 0.3, 0.06, 1.16, "#2a1a10");
+    if (M.coiffure === "afro") bloc(0.46, 0.2, 0.34, 0.34, 0.14, 1.12, M.cheveux);
+    else if (M.coiffure !== "chauve") bloc(0.46, 0.14, 0.36, 0.3, 0.06, 1.16, M.cheveux);
     // L'arceau : deux montants et la barre du haut.
     for (const b of [0.1, 0.84]) bloc(0.56, 0.05, b, 0.06, 0.62, 0.5, ARCEAU);
     bloc(0.56, 0.05, 0.1, 0.8, 0.06, 1.12, ARCEAU);
@@ -239,48 +242,58 @@ export function drawChasseNeige(ctx, K, uC, v, t) {
 // en ski de fond ») : il vient EN FACE (vers −v), en pas alternatif — un ski
 // glisse devant pendant que l'autre recule, le bras opposé plante son bâton
 // derrière lui. Combinaison rouge, bonnet jaune à pompon.
-export function drawSkieur(ctx, K, uC, v, t) {
+export function drawSkieur(ctx, K, uC, v, t, r = 0) {
+  // La personne sous la combinaison (humains.js, 4 octobre 2026, nuit) : sa
+  // peau, sa taille (la collision lit la même), sa carrure (+10 % de base).
+  const M = humain(r, { enfants: false });
+  const sy = M.taille, w = M.corpulence;
+  const b = (u, vv, du, dv, h, col, lift = 0) => drawBox(ctx, u, vv, du, dv, h * sy, col, lift * sy);
   const s = Math.sin(t * 5.4);
   groupe(ctx, () => {
     drawShadow(ctx, uC, v, 0.38, 0.95, 0.22);
     for (const [du, k] of [[-0.17, 1], [0.12, -1]]) {
       const dvJambe = -0.3 * s * k, dvBras = 0.3 * s * k;   // −v = vers le joueur
-      drawBox(ctx, uC + du - 0.05, v - 0.85 + dvJambe, 0.1, 1.7, 0.035, "#1f5fb8");        // ski
-      drawBox(ctx, uC + du - 0.05, v - 0.93 + dvJambe, 0.1, 0.1, 0.09, "#1f5fb8", 0.035);  // spatule
-      drawBox(ctx, uC + du - 0.07, v - 0.14 + dvJambe, 0.14, 0.3, 0.12, "#1a1a1e", 0.035); // chaussure
-      drawBox(ctx, uC + du - 0.07, v - 0.07 + dvJambe * 0.7, 0.14, 0.15, 0.42, "#23252e", 0.15); // tibia
-      drawBox(ctx, uC + du - 0.08, v - 0.08 + dvJambe * 0.3, 0.16, 0.17, 0.36, "#23252e", 0.55); // cuisse
+      b(uC + du - 0.05, v - 0.85 + dvJambe, 0.1, 1.7, 0.035, "#1f5fb8");        // ski
+      b(uC + du - 0.05, v - 0.93 + dvJambe, 0.1, 0.1, 0.09, "#1f5fb8", 0.035);  // spatule
+      b(uC + du - 0.07, v - 0.14 + dvJambe, 0.14, 0.3, 0.12, "#1a1a1e", 0.035); // chaussure
+      b(uC + du - 0.075, v - 0.08 + dvJambe * 0.7, 0.15, 0.17 * w, 0.42, "#23252e", 0.15); // tibia
+      b(uC + du - 0.085, v - 0.09 + dvJambe * 0.3, 0.17, 0.19 * w, 0.36, "#23252e", 0.55); // cuisse
       // Bras (épaule → main), puis le bâton, de la main jusqu'à la neige derrière.
-      const ub = uC + (k > 0 ? -0.27 : 0.2), vMain = v - 0.12 + dvBras;
-      drawBox(ctx, ub, v - 0.14 + dvBras * 0.4, 0.08, 0.12, 0.22, "#d8352a", 1.1);
-      drawBox(ctx, ub, vMain - 0.06, 0.08, 0.12, 0.2, "#d8352a", 0.92);
-      drawBox(ctx, ub, vMain - 0.05, 0.08, 0.1, 0.08, "#1a1a1e", 0.88);                   // gant
-      for (let i = 0; i < 8; i++) { const f = i / 7; drawBox(ctx, ub + 0.02, vMain + f * 0.6 - 0.02, 0.04, 0.05, 0.13, "#9aa0a8", 0.9 * (1 - f)); }
+      const ub = uC + (k > 0 ? -0.29 : 0.21), vMain = v - 0.12 + dvBras;
+      b(ub, v - 0.14 + dvBras * 0.4, 0.09, 0.13 * w, 0.22, "#d8352a", 1.1);
+      b(ub, vMain - 0.06, 0.09, 0.13 * w, 0.2, "#d8352a", 0.92);
+      b(ub, vMain - 0.05, 0.09, 0.11, 0.08, "#1a1a1e", 0.88);                   // gant
+      for (let i = 0; i < 8; i++) { const f = i / 7; b(ub + 0.02, vMain + f * 0.6 - 0.02, 0.04, 0.05, 0.13, "#9aa0a8", 0.9 * (1 - f)); }
     }
-    drawBox(ctx, uC - 0.2, v - 0.26, 0.4, 0.36, 0.5, "#d8352a", 0.88);                    // buste, penché vers l'avant
-    drawBox(ctx, uC - 0.21, v - 0.27, 0.42, 0.38, 0.06, "#ffffff", 1.18);                 // bande blanche
-    drawBox(ctx, uC - 0.13, v - 0.38, 0.26, 0.26, 0.24, "#e2a77a", 1.38);                 // tête
-    drawBox(ctx, uC - 0.14, v - 0.13 - 0.25, 0.01, 0.06, 0.05, BLACK, 1.5);               // œil (côté caméra)
-    drawBox(ctx, uC - 0.14, v - 0.39, 0.28, 0.28, 0.13, "#f2c21c", 1.58);                 // bonnet
-    drawBox(ctx, uC - 0.05, v - 0.3, 0.1, 0.1, 0.1, "#ffffff", 1.71);                      // pompon
-  });
+    b(uC - 0.21, v - 0.28 * w, 0.42, 0.4 * w, 0.5, "#d8352a", 0.88);           // buste, penché vers l'avant
+    b(uC - 0.22, v - 0.29 * w, 0.44, 0.42 * w, 0.06, "#ffffff", 1.18);         // bande blanche
+    b(uC - 0.14, v - 0.4, 0.28, 0.28, 0.24, M.peau, 1.38);                      // tête
+    if (M.fonce) b(uC - 0.152, v - 0.39, 0.012, 0.07, 0.055, "#f4efe4", 1.49);
+    b(uC - 0.156, v - 0.39, 0.012, 0.04, 0.05, BLACK, 1.5);                     // œil (côté caméra)
+    if (M.barbe) b(uC - 0.146, v - 0.41, 0.292, 0.07, 0.08, M.cheveux, 1.38);
+    b(uC - 0.15, v - 0.41, 0.3, 0.3, 0.13, "#f2c21c", 1.58);                    // bonnet
+    b(uC - 0.05, v - 0.31, 0.1, 0.1, 0.1, "#ffffff", 1.71);                     // pompon
+  }, CONTOUR_PERSO);
 }
 
 // Le PIÉTON qui marche vers le joueur (5 octobre 2026 : « sur la route, des
 // piétons présents »). Même grammaire que le skieur : jambes et bras qui
-// balancent le long de la route (−v = vers le joueur). Trois Parisiens selon
-// la rangée — la dame à la baguette, le gars rivé à son téléphone, le
-// joggeur —, et en slip de bain sur la plage, serviette sur l'épaule.
-const PIETONS = [
-  { haut: "#c8301c", bas: "#23252e", peau: "#e2a77a", tete: "#1a1a1e", objet: "baguette" },   // manteau rouge, béret
-  { haut: "#7a828e", bas: "#2f4f9a", peau: "#b9835a", tete: "#2a1a10", objet: "telephone" },  // sweat gris
-  { haut: "#2f9a6a", bas: "#1a1a1e", peau: "#e8b48a", tete: "#e8c66a", objet: "joggeur" },    // maillot vert
-];
+// balancent le long de la route (−v = vers le joueur). Ce qu'il porte selon
+// la rangée — la baguette sous le bras, le téléphone devant le nez, le
+// footing, le cabas —, et en maillot sur la plage.
+// ⚠️ Depuis le 4 octobre 2026 (nuit) la PERSONNE vient d'humains.js : peau,
+// cheveux, coiffure, taille, corpulence, âge (« je veux des métis, des gros,
+// des petits, des grands, des vieux… »). Gabarit +10 % (« ils sont trop
+// fins »), cerné d'un liseré sombre (« des humains blancs sur un fond blanc »).
+const HAUTS = ["#c8301c", "#7a828e", "#2f9a6a", "#1f5fb8", "#f2c21c", "#8a3fd4", "#2b2d38", "#e8742e", "#3f8a8a", "#d8d2c4"];
+const BAS = ["#23252e", "#2f4f9a", "#1a1a1e", "#5a4632", "#4a5260", "#7a2e3a"];
+const OBJETS_VILLE = ["baguette", "telephone", "joggeur", "cabas"];
 // Sur la plage (5 octobre 2026 : « il faudrait qu'ils tiennent un ballon
 // au-dessus de leur tête, qu'ils jouent avec des raquettes ») : ballon de
 // plage brandi à deux mains, raquette de plage avec la balle qui rebondit
 // dessus, ou serviette sur l'épaule.
 const OBJETS_PLAGE = ["ballon", "raquette", "serviette"];
+const MAILLOTS = ["#e13e26", "#1f8fd6", "#f2c21c", "#ff5fa2", "#2f9a6a", "#8a3fd4"];
 // Ballon de plage : un disque à six quartiers qui tourne doucement.
 export function ballonPlage(ctx, u, v, h, rayon, t) {
   const c = project(u, v, h), R = rayon * echelle(u);
@@ -295,68 +308,83 @@ export function balle(ctx, u, v, h, rayon = 0.07) {
   ctx.fillStyle = "#f2e01c"; ctx.beginPath(); ctx.arc(c.x, c.y, R, 0, Math.PI * 2); ctx.fill();
 }
 export function drawPieton(ctx, K, uC, v, t, r, plage = false) {
-  const P = plage
-    ? { haut: null, bas: ["#e13e26", "#1f8fd6", "#f2c21c"][Math.abs(r) % 3], peau: "#c98a5a", tete: "#2a1a10", objet: OBJETS_PLAGE[Math.abs(r) % 3] }
-    : PIETONS[Math.abs(r) % 3];
-  const cadence = P.objet === "joggeur" ? 9 : 6.2;
-  const s = Math.sin(t * cadence + r);
-  const amp = P.objet === "joggeur" ? 0.22 : 0.15;
-  const rebond = Math.abs(Math.cos(t * cadence + r)) * (P.objet === "joggeur" ? 0.06 : 0.025);
+  const M = humain(r, { enfants: false });
+  const ri = Math.abs(Math.round(r));
+  const objet = plage ? OBJETS_PLAGE[ri % 3] : M.age === "vieux" && ri % 2 === 0 ? "canne" : OBJETS_VILLE[ri % 4];
+  const haut = HAUTS[(ri * 7 + 3) % HAUTS.length], bas = BAS[(ri * 5 + 1) % BAS.length];
+  const maillot = MAILLOTS[(ri * 3) % MAILLOTS.length];
+  const jupe = !plage && M.femme && objet !== "joggeur" && ri % 5 < 2;
+  const sy = (K.h * M.taille) / 1.7;          // le modèle est dessiné pour 1,70 m
+  const w = M.corpulence;                     // 1,12 = l'ancien gabarit + 12 %
+  const vieux = M.age === "vieux";
+  const cadence = objet === "joggeur" ? 9 : vieux ? 4.6 : 6.2;
+  const ph = t * cadence + r;
+  const s = Math.sin(ph);
+  const amp = objet === "joggeur" ? 0.22 : vieux ? 0.09 : 0.15;
+  const rebond = Math.abs(Math.cos(ph)) * (objet === "joggeur" ? 0.06 : 0.025);
+  const pench = vieux ? -0.05 : 0;            // le dos un peu voûté, vers l'avant
+  const H0 = 0.84 * sy + rebond, T = 0.52 * sy, HT = H0 + T, TE = 0.27 * sy;
+  const peauBas = plage || jupe;
   groupe(ctx, () => {
-    drawShadow(ctx, uC, v, 0.3, 0.32, 0.22);
-    for (const [du, k] of [[-0.14, 1], [0.04, -1]]) {
+    drawShadow(ctx, uC, v, 0.3 * w, 0.32 * w, 0.22);
+    const dJ = 0.15 * Math.pow(w, 0.8), uJ = 0.12 * Math.pow(w, 0.5);
+    for (const [du, k] of [[-0.16 * w, 1], [0.05, -1]]) {
       const dv = -amp * s * k;
-      drawBox(ctx, uC + du, v - 0.12 + dv, 0.1, 0.24, 0.08, "#1a1a1e");                          // chaussure
-      drawBox(ctx, uC + du, v - 0.06 + dv * 0.8, 0.1, 0.13, 0.4, plage ? P.peau : P.bas, 0.08);    // tibia
-      drawBox(ctx, uC + du, v - 0.07 + dv * 0.4, 0.11, 0.15, 0.38, plage ? P.peau : P.bas, 0.46 + rebond);
+      drawBox(ctx, uC + du, v - 0.13 + dv, uJ, 0.26, 0.08 * sy, "#1a1a1e");                                  // chaussure
+      drawBox(ctx, uC + du, v - 0.07 + dv * 0.8, uJ, dJ * 0.9, 0.42 * sy, peauBas ? M.peau : bas, 0.08 * sy);  // tibia
+      drawBox(ctx, uC + du, v - 0.08 + dv * 0.4, uJ + 0.01, dJ, 0.38 * sy, peauBas ? M.peau : bas, 0.46 * sy + rebond);
     }
-    const H0 = 0.84 + rebond;
-    if (plage) drawBox(ctx, uC - 0.16, v - 0.1, 0.32, 0.22, 0.14, P.bas, H0);                    // slip de bain
-    drawBox(ctx, uC - 0.17, v - 0.11, 0.34, 0.24, 0.52, P.haut || P.peau, H0 + (plage ? 0.14 : 0)); // buste
-    const HT = H0 + (plage ? 0.66 : 0.52);
-    if (P.objet === "ballon") {
+    const dT = 0.26 * w, uT = 0.36 * Math.pow(w, 0.6);
+    const vT = v - dT / 2 + pench;
+    if (jupe) drawBox(ctx, uC - uT / 2 - 0.02, vT - 0.03, uT + 0.04, dT + 0.06, 0.3 * sy, bas, H0 - 0.26 * sy);
+    // Buste : maillot une pièce (elle) ou slip de bain (lui) sur la plage.
+    if (plage && !M.femme) drawBox(ctx, uC - uT / 2, vT, uT, dT, 0.15 * sy, maillot, H0);
+    drawBox(ctx, uC - uT / 2, vT, uT, dT, plage && !M.femme ? T - 0.15 * sy : T, plage ? (M.femme ? maillot : M.peau) : haut, plage && !M.femme ? H0 + 0.15 * sy : H0);
+    if (w > 1.25) drawBox(ctx, uC - uT / 2 + 0.03, vT - 0.07, uT - 0.06, 0.08, T * 0.5, plage && !M.femme ? M.peau : plage ? maillot : haut, H0 + T * 0.12); // le ventre
+    const dB = 0.11 * Math.pow(w, 0.5), uBc = uC - uT / 2 - 0.08, uBf = uC + uT / 2;
+    const manche = plage ? M.peau : haut;
+    if (objet === "ballon") {
       // Les deux bras levés, droits, qui tiennent le ballon au-dessus de la tête.
-      for (const du of [-0.24, 0.17]) drawBox(ctx, uC + du, v - 0.05, 0.08, 0.1, 0.62, P.peau, HT - 0.1);
-    } else if (P.objet === "raquette") {
+      for (const du of [uBc, uBf]) drawBox(ctx, du, v - 0.05 + pench, 0.09, dB, 0.62 * sy, M.peau, HT - 0.1 * sy);
+    } else if (objet === "raquette") {
       // Bras du fond qui balance, bras côté caméra tendu devant, raquette à plat.
       const dv = 0.18 * s;
-      drawBox(ctx, uC + 0.17, v - 0.05 + dv * 0.5, 0.08, 0.1, 0.26, P.peau, H0 + 0.36);
-      drawBox(ctx, uC + 0.17, v - 0.05 + dv, 0.08, 0.1, 0.24, P.peau, H0 + 0.14);
-      drawBox(ctx, uC - 0.24, v - 0.32, 0.08, 0.3, 0.09, P.peau, H0 + 0.5);                     // avant-bras tendu
-      drawBox(ctx, uC - 0.25, v - 0.42, 0.06, 0.1, 0.05, "#6b4b2e", H0 + 0.52);                 // manche
-      drawBox(ctx, uC - 0.32, v - 0.72, 0.22, 0.32, 0.04, "#2f6fd0", H0 + 0.53);                // la raquette
+      drawBox(ctx, uBf, v - 0.05 + dv * 0.5, 0.09, dB, 0.26 * sy, M.peau, H0 + 0.36 * sy);
+      drawBox(ctx, uBf, v - 0.05 + dv, 0.09, dB, 0.24 * sy, M.peau, H0 + 0.14 * sy);
+      drawBox(ctx, uBc, v - 0.32, 0.09, 0.3, 0.1, M.peau, H0 + 0.5 * sy);                        // avant-bras tendu
+      drawBox(ctx, uBc - 0.01, v - 0.42, 0.06, 0.1, 0.05, "#6b4b2e", H0 + 0.52 * sy);           // manche
+      drawBox(ctx, uBc - 0.08, v - 0.72, 0.22, 0.32, 0.04, "#2f6fd0", H0 + 0.53 * sy);          // la raquette
     } else {
       // Bras côté caméra (balancé) et bras du fond.
-      for (const [du, k] of [[-0.24, -1], [0.17, 1]]) {
-        const dv = 0.18 * s * k;
-        drawBox(ctx, uC + du, v - 0.05 + dv * 0.5, 0.08, 0.1, 0.26, P.haut || P.peau, H0 + 0.36);
-        drawBox(ctx, uC + du, v - 0.05 + dv, 0.08, 0.1, 0.24, P.haut || P.peau, H0 + 0.14);
-        drawBox(ctx, uC + du, v - 0.05 + dv, 0.08, 0.09, 0.08, P.peau, H0 + 0.06);              // main
+      for (const [du, k] of [[uBc, -1], [uBf, 1]]) {
+        const dv = (vieux ? 0.08 : 0.18) * s * k;
+        drawBox(ctx, du, v - 0.05 + dv * 0.5 + pench, 0.09, dB, 0.26 * sy, manche, H0 + 0.36 * sy);
+        drawBox(ctx, du, v - 0.05 + dv + pench, 0.09, dB, 0.24 * sy, manche, H0 + 0.14 * sy);
+        drawBox(ctx, du, v - 0.05 + dv + pench, 0.09, dB, 0.08, M.peau, H0 + 0.06 * sy);          // main
       }
     }
-    drawBox(ctx, uC - 0.12, v - 0.13, 0.24, 0.24, 0.26, P.peau, HT);                          // tête
-    drawBox(ctx, uC - 0.13, v - 0.14, 0.01, 0.05, 0.05, BLACK, HT + 0.14);                    // œil (côté caméra)
-    if (P.objet === "baguette") {
-      drawBox(ctx, uC - 0.13, v - 0.15, 0.26, 0.3, 0.07, P.tete, HT + 0.24);                  // béret
-      drawBox(ctx, uC - 0.27, v - 0.32, 0.07, 0.72, 0.08, "#d9a45a", H0 + 0.36);             // la baguette, sous le bras
-    } else if (P.objet === "telephone") {
-      drawBox(ctx, uC - 0.12, v - 0.12, 0.24, 0.24, 0.06, P.tete, HT + 0.24);                 // cheveux
-      drawBox(ctx, uC - 0.08, v - 0.27, 0.12, 0.03, 0.18, "#0d0d10", HT - 0.02);               // le téléphone, devant le nez
-      drawBox(ctx, uC - 0.07, v - 0.28, 0.1, 0.01, 0.15, "#7fd0ff", HT);                       // écran allumé
-    } else if (P.objet === "joggeur") {
-      drawBox(ctx, uC - 0.13, v - 0.13, 0.26, 0.26, 0.05, "#ffffff", HT + 0.16);              // bandeau
-      drawBox(ctx, uC - 0.12, v - 0.12, 0.24, 0.24, 0.05, P.tete, HT + 0.24);
-    } else {
-      drawBox(ctx, uC - 0.12, v - 0.12, 0.24, 0.24, 0.06, P.tete, HT + 0.24);                 // cheveux
-      drawBox(ctx, uC - 0.14, v - 0.15, 0.28, 0.04, 0.06, "#0d0d10", HT + 0.13);               // lunettes de soleil
-      if (P.objet === "serviette") drawBox(ctx, uC + 0.12, v - 0.12, 0.06, 0.3, 0.5, "#f4efe4", H0 + 0.4); // serviette sur l'épaule
-    }
-  });
+    // La tête (+ ce qu'on porte dessus).
+    const td = 0.26, tw = 0.26, uH = uC - td / 2, vH = v - 0.14 + pench * 1.4;
+    const chapeau = objet === "baguette" && ri % 8 < 4;
+    teteVoxel(ctx, M, uH, vH, td, tw, HT, TE, { chapeau });
+    if (chapeau) drawBox(ctx, uH - 0.01, vH - 0.02, td + 0.02, tw + 0.06, 0.07, "#1a1a1e", HT + TE - 0.02);  // béret
+    if (objet === "baguette") drawBox(ctx, uBc - 0.03, v - 0.32, 0.07, 0.72, 0.08, "#d9a45a", H0 + 0.36 * sy); // sous le bras
+    else if (objet === "telephone") {
+      drawBox(ctx, uH + 0.04, vH - 0.14, 0.12, 0.03, 0.18, "#0d0d10", HT - 0.02);              // le téléphone, devant le nez
+      drawBox(ctx, uH + 0.05, vH - 0.15, 0.1, 0.01, 0.15, "#7fd0ff", HT);                       // écran allumé
+    } else if (objet === "joggeur") drawBox(ctx, uH - 0.01, vH, td + 0.02, tw + 0.01, 0.05, "#ffffff", HT + TE * 0.6); // bandeau
+    else if (objet === "cabas") {
+      drawBox(ctx, uBf + 0.02, v - 0.12, 0.08, 0.3, 0.32, "#2f6a3a", H0 - 0.18 * sy);           // le cabas, au bout du bras du fond
+      drawBox(ctx, uBf + 0.03, v - 0.1, 0.06, 0.08, 0.1, "#e13e26", H0 + 0.12 * sy);           // une botte de poireaux qui dépasse
+    } else if (objet === "canne") drawBox(ctx, uBc + 0.02, v - 0.28 + pench, 0.04, 0.04, H0 + 0.1 * sy, "#5a3a22");
+    else if (plage) drawBox(ctx, uH - 0.02, vH - 0.015, td + 0.04, 0.04, 0.06, "#0d0d10", HT + TE * 0.5); // lunettes de soleil
+    if (objet === "serviette") drawBox(ctx, uBf - 0.02, v - 0.12, 0.06, 0.3, 0.5 * sy, "#f4efe4", H0 + 0.4 * sy); // serviette sur l'épaule
+  }, CONTOUR_PERSO);
   // Peints après le corps (hors du tri des boîtes) : ils sont devant/au-dessus.
-  if (P.objet === "ballon") ballonPlage(ctx, uC - 0.03, v, HT + 0.82 + 0.03 * Math.sin(t * 5 + r), 0.3, t + r);
-  else if (P.objet === "raquette") {
+  if (objet === "ballon") ballonPlage(ctx, uC - 0.03, v, HT + TE + 0.56 + 0.03 * Math.sin(t * 5 + r), 0.3, t + r);
+  else if (objet === "raquette") {
     const k = Math.abs(Math.sin(t * 4.2 + r));                                                      // la balle rebondit sur la raquette
-    balle(ctx, uC - 0.3, v - 0.56, H0 + 0.62 + k * 0.7);
+    balle(ctx, uC - 0.3, v - 0.56, H0 + 0.62 * sy + k * 0.7);
   }
 }
 
@@ -419,9 +447,46 @@ function voitureNue(ctx, K, uCenter, v, sens, t, couleur = null) {
 }
 
 // Statique centré sur (uCenter, r). `t` anime les animaux sur place.
-export function drawStatic(ctx, kind, uCenter, r, t) {
-  if (kind === "costard" || kind === "fermier" || kind === "baigneur") { drawShadow(ctx, uCenter, r, 0.4, 0.4, 0.22); personnage2D(ctx, kind, uCenter, r, t); return; }
+// `graine` : la rangée d'origine (drawStaticTombe recule la figure qui
+// bascule — la personne, elle, ne doit pas changer de tête en tombant).
+export function drawStatic(ctx, kind, uCenter, r, t, graine = Math.round(r)) {
+  if (kind === "costard" || kind === "fermier" || kind === "baigneur") {
+    drawShadow(ctx, uCenter, r, 0.42, 0.42, 0.22);
+    contour2D(ctx, (c) => personnage2D(c, kind, uCenter, r, t, graine));
+    return;
+  }
   groupe(ctx, () => staticNu(ctx, kind, uCenter, r, t));
+}
+
+// Tête de face, à plat (costard, fermier, baigneur) : cou, visage, cheveux
+// selon la coiffure, yeux (blancs sur les peaux foncées), barbe. Repère du
+// personnage : x en largeur, h en hauteur, pour 1,9 m (×k).
+function tete2D(ctx, M, X, Y, k, s, { chapeau = false, lunettes = false } = {}) {
+  const R = 0.18 * k * s, cx = X(0), cy = Y(1.6 * k);
+  const rond = (x, h, r, col) => { ctx.fillStyle = col; ctx.beginPath(); ctx.arc(X(x * k), Y(h * k), r * k * s, 0, Math.PI * 2); ctx.fill(); };
+  const rect = (x, h, w, hh, col) => { ctx.fillStyle = col; ctx.fillRect(X(x * k), Y((h + hh) * k), w * k * s, hh * k * s); };
+  const C = M.cheveux, co = M.coiffure;
+  // Derrière la tête : ce qui dépasse sous les épaules ou autour.
+  if (co === "long") rect(-0.21, 1.3, 0.42, 0.34, C);
+  if (co === "tresses") { rect(-0.2, 1.12, 0.07, 0.5, C); rect(0.13, 1.12, 0.07, 0.5, C); }
+  if (co === "afro") rond(0, 1.66, 0.25, C);
+  rect(-0.065, 1.38, 0.13, 0.08, M.peau);                                  // cou
+  ctx.fillStyle = M.peau; ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.fill();
+  if (!chapeau) {
+    if (co === "court" || co === "long" || co === "tresses" || co === "chignon") { ctx.fillStyle = C; ctx.beginPath(); ctx.arc(cx, Y(1.64 * k), R * 1.02, Math.PI * 1.02, Math.PI * 1.98); ctx.fill(); }
+    if (co === "rase") { ctx.fillStyle = C; ctx.beginPath(); ctx.arc(cx, Y(1.62 * k), R, Math.PI * 1.1, Math.PI * 1.9); ctx.fill(); }
+    if (co === "chignon") rond(0, 1.86, 0.08, C);
+    if (co === "chauve" && M.age === "vieux") { rect(-0.19, 1.58, 0.05, 0.1, C); rect(0.14, 1.58, 0.05, 0.1, C); }
+  }
+  if (lunettes) {
+    ctx.fillStyle = "#0d0d10";
+    ctx.fillRect(X(-0.15 * k), Y(1.66 * k), 0.13 * k * s, 0.07 * k * s); ctx.fillRect(X(0.02 * k), Y(1.66 * k), 0.13 * k * s, 0.07 * k * s);
+    ctx.fillRect(X(-0.02 * k), Y(1.645 * k), 0.04 * k * s, 0.02 * k * s);
+  } else {
+    if (M.fonce) { rect(-0.095, 1.585, 0.07, 0.065, "#f4efe4"); rect(0.025, 1.585, 0.07, 0.065, "#f4efe4"); }
+    rect(-0.08, 1.58, 0.04, 0.05, "#0d0d10"); rect(0.04, 1.58, 0.04, 0.05, "#0d0d10");
+  }
+  if (M.barbe) { ctx.fillStyle = C; ctx.beginPath(); ctx.arc(cx, Y(1.56 * k), R * 0.92, Math.PI * 0.08, Math.PI * 0.92); ctx.fill(); }
 }
 
 // Costard et fermier DE FACE, en 2D plat (3 octobre 2026 : « pour que ce soit
@@ -429,62 +494,63 @@ export function drawStatic(ctx, kind, uCenter, r, t) {
 // « ses bras, on dirait qu'ils sont désarticulés » ; « le paysan, pas assez
 // clair »). Dessinés en vrai à l'écran, à l'échelle du monde : les bras
 // PIVOTENT à l'épaule (plus de cubes qui glissent indépendamment du corps).
-function personnage2D(ctx, kind, uC, r, t) {
+// La personne (peau, coiffure, taille, carrure) vient d'humains.js depuis le
+// 4 octobre 2026 (nuit) ; la hauteur suit sa taille (la collision aussi).
+function personnage2D(ctx, kind, uC, r, t, graine) {
   const K = KINDS[kind];
+  const M = humain(graine, { enfants: false });
   const s = echelle(uC), pied = project(uC, r, 0);
   const X = (x) => pied.x + x * s, Y = (h) => pied.y - h * s;
-  const H = K.h;
   const costard = kind === "costard";
-  if (kind === "baigneur") { baigneur2D(ctx, K, X, Y, s, uC, r, t); return; }
+  const k = (K.h * M.taille) / 1.9; // tout est dessiné pour 1,9 m puis mis à l'échelle
+  if (kind === "baigneur") { baigneur2D(ctx, M, X, Y, s, k, r, t); return; }
+  const w = M.corpulence;           // carrure (1,1 = l'ancien gabarit + 10 %)
   const C = costard
-    ? { jambe: "#23252e", buste: "#2b2d38", peau: "#d69a68", haut: "#2a1a10", accent: "#e13e26" }
-    : { jambe: "#2f4f9a", buste: "#c8402c", peau: "#d69a68", haut: "#e8c66a", accent: "#2f4f9a" };
-  const k = H / 1.9; // tout est dessiné pour 1,9 m puis mis à l'échelle
-  const rect = (x, h, w, hh, col) => { ctx.fillStyle = col; ctx.fillRect(X(x * k), Y((h + hh) * k), w * k * s, hh * k * s); };
+    ? { jambe: "#23252e", buste: ["#2b2d38", "#3a3f5a", "#5a4632"][graine % 3], accent: ["#e13e26", "#1f8fd6", "#f2c21c"][graine % 3] }
+    : { jambe: "#2f4f9a", buste: "#c8402c", haut: "#e8c66a", accent: "#2f4f9a" };
+  const rect = (x, h, wd, hh, col) => { ctx.fillStyle = col; ctx.fillRect(X(x * k), Y((h + hh) * k), wd * k * s, hh * k * s); };
+  const ep = 0.33 * w;              // demi-largeur des épaules
   const bras = (sx, ang, len, main) => {
     // Bras d'une pièce, pivot à l'épaule (sx, 1.36) ; ang = 0 le long du corps.
+    const e = 0.085 * Math.sqrt(w);
     ctx.save();
     ctx.translate(X(sx * k), Y(1.36 * k)); ctx.rotate(ang);
-    ctx.fillStyle = C.buste; ctx.fillRect(-0.075 * k * s, 0, 0.15 * k * s, len * k * s);
-    ctx.fillStyle = C.peau; ctx.beginPath(); ctx.arc(0, (len + 0.05) * k * s, 0.08 * k * s, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = C.buste; ctx.fillRect(-e * k * s, 0, 2 * e * k * s, len * k * s);
+    ctx.fillStyle = M.peau; ctx.beginPath(); ctx.arc(0, (len + 0.05) * k * s, 0.09 * k * s, 0, Math.PI * 2); ctx.fill();
     if (main) main((len + 0.05) * k * s);
     ctx.restore();
   };
   ctx.save();
   ctx.lineJoin = "round";
   // Jambes et chaussures.
-  rect(-0.2, 0.06, 0.17, 0.74, C.jambe); rect(0.03, 0.06, 0.17, 0.74, C.jambe);
-  rect(-0.23, 0, 0.21, 0.08, "#0d0d10"); rect(0.02, 0, 0.21, 0.08, "#0d0d10");
+  const jl = 0.19 * Math.pow(w, 0.7), jx = 0.03 * w;
+  rect(-jx - jl, 0.06, jl, 0.74, C.jambe); rect(jx, 0.06, jl, 0.74, C.jambe);
+  rect(-jx - jl - 0.03, 0, jl + 0.04, 0.08, "#0d0d10"); rect(jx - 0.01, 0, jl + 0.04, 0.08, "#0d0d10");
   if (costard) {
     const f = Math.sin(t * 7 + r), g = Math.sin(t * 5.3 + r * 1.7);
     // Bras gauche levé qui s'agite (au-dessus de la tête), bras droit avec la mallette.
-    bras(-0.3, Math.PI - 0.5 + 0.35 * f, 0.6);
-    rect(-0.31, 0.78, 0.62, 0.62, C.buste);                       // veste
+    bras(-ep, Math.PI - 0.5 + 0.35 * f, 0.6);
+    rect(-ep - 0.01, 0.78, 2 * ep + 0.02, 0.62, C.buste);                  // veste
+    if (w > 1.25) { ctx.fillStyle = C.buste; ctx.beginPath(); ctx.ellipse(X(0), Y(1.0 * k), (ep + 0.05) * k * s, 0.24 * k * s, 0, 0, Math.PI * 2); ctx.fill(); } // le ventre
     ctx.fillStyle = "#f4efe4"; ctx.beginPath(); ctx.moveTo(X(-0.12 * k), Y(1.4 * k)); ctx.lineTo(X(0.12 * k), Y(1.4 * k)); ctx.lineTo(X(0), Y(1.1 * k)); ctx.fill(); // chemise
-    rect(-0.03, 1.02, 0.06, 0.34, C.accent);                      // cravate
-    bras(0.3, -0.25 + 0.3 * g, 0.6, (d) => { ctx.fillStyle = "#6b3a1a"; ctx.fillRect(-0.2 * k * s, d, 0.4 * k * s, 0.28 * k * s); ctx.fillStyle = "#3e2210"; ctx.fillRect(-0.06 * k * s, d - 0.04 * k * s, 0.12 * k * s, 0.05 * k * s); });
+    rect(-0.03, 1.02, 0.06, 0.34, C.accent);                                // cravate
+    bras(ep, -0.25 + 0.3 * g, 0.6, (d) => { ctx.fillStyle = "#6b3a1a"; ctx.fillRect(-0.2 * k * s, d, 0.4 * k * s, 0.28 * k * s); ctx.fillStyle = "#3e2210"; ctx.fillRect(-0.06 * k * s, d - 0.04 * k * s, 0.12 * k * s, 0.05 * k * s); });
+    tete2D(ctx, M, X, Y, k, s);
   } else {
     const f = Math.sin(t * 3 + r);
-    rect(-0.3, 0.78, 0.6, 0.62, C.buste);                         // chemise rouge
-    ctx.fillStyle = "rgba(0,0,0,0.18)";                           // carreaux
-    for (let i = 0; i < 3; i++) ctx.fillRect(X(-0.3 * k), Y((0.9 + i * 0.18) * k), 0.6 * k * s, 0.05 * k * s);
-    rect(-0.22, 0.78, 0.44, 0.4, C.jambe);                        // salopette
-    rect(-0.18, 1.18, 0.07, 0.22, C.jambe); rect(0.11, 1.18, 0.07, 0.22, C.jambe);
-    bras(-0.29, 0.25 + 0.1 * f, 0.58);
+    rect(-ep, 0.78, 2 * ep, 0.62, C.buste);                                 // chemise rouge
+    ctx.fillStyle = "rgba(0,0,0,0.18)";                                     // carreaux
+    for (let i = 0; i < 3; i++) ctx.fillRect(X(-ep * k), Y((0.9 + i * 0.18) * k), 2 * ep * k * s, 0.05 * k * s);
+    rect(-ep + 0.08, 0.78, 2 * ep - 0.16, 0.4, C.jambe);                    // salopette
+    rect(-ep + 0.12, 1.18, 0.07, 0.22, C.jambe); rect(ep - 0.19, 1.18, 0.07, 0.22, C.jambe);
+    bras(-ep + 0.01, 0.25 + 0.1 * f, 0.58);
     // Fourche tenue droite, levée.
-    bras(0.29, -0.35 - 0.1 * f, 0.58, (d) => {
+    bras(ep - 0.01, -0.35 - 0.1 * f, 0.58, (d) => {
       ctx.fillStyle = "#6b4b2e"; ctx.fillRect(-0.03 * k * s, d - 1.3 * k * s, 0.06 * k * s, 1.7 * k * s);
       ctx.fillStyle = "#8a8d98"; ctx.fillRect(-0.14 * k * s, d - 1.34 * k * s, 0.28 * k * s, 0.05 * k * s);
       for (const x of [-0.14, -0.035, 0.07]) ctx.fillRect(x * k * s, d - 1.6 * k * s, 0.05 * k * s, 0.28 * k * s);
     });
-  }
-  // Tête.
-  rect(-0.06, 1.38, 0.12, 0.08, C.peau);
-  ctx.fillStyle = C.peau; ctx.beginPath(); ctx.arc(X(0), Y(1.6 * k), 0.17 * k * s, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = "#0d0d10";
-  ctx.fillRect(X(-0.08 * k), Y(1.63 * k), 0.04 * k * s, 0.05 * k * s); ctx.fillRect(X(0.04 * k), Y(1.63 * k), 0.04 * k * s, 0.05 * k * s);
-  if (costard) { ctx.fillStyle = C.haut; ctx.beginPath(); ctx.arc(X(0), Y(1.64 * k), 0.175 * k * s, Math.PI, 0); ctx.fill(); }
-  else {
+    tete2D(ctx, M, X, Y, k, s, { chapeau: true });
     // Grand chapeau de paille : bord large + calotte.
     ctx.fillStyle = C.haut; ctx.fillRect(X(-0.36 * k), Y(1.76 * k), 0.72 * k * s, 0.07 * k * s);
     ctx.fillRect(X(-0.18 * k), Y(1.92 * k), 0.36 * k * s, 0.17 * k * s);
@@ -493,44 +559,52 @@ function personnage2D(ctx, kind, uC, r, t) {
   ctx.restore();
 }
 // Le BAIGNEUR de la plage (5 octobre 2026), de face en 2D comme le costard :
-// bronzé, slip de bain, lunettes de soleil, chaîne en or — très Vice City.
-// Deux poses selon la rangée : ballon de plage brandi à deux mains, ou
-// biceps gonflés (il frime, il ne bougera pas).
-function baigneur2D(ctx, K, X, Y, s, uC, r, t) {
-  const k = K.h / 1.9;
+// slip de bain (maillot une pièce pour elle), lunettes de soleil — très Vice
+// City. Trois poses selon la rangée : raquette levée, ballon de plage brandi à
+// deux mains, ou biceps gonflés (il frime, il ne bougera pas).
+function baigneur2D(ctx, M, X, Y, s, k, r, t) {
   const ri = Math.abs(Math.round(r));
-  const PEAU = "#c98a5a", OMBRE = "#a86f45";
+  const PEAU = M.peau, OMBRE = M.peauOmbre, w = M.corpulence;
   const SLIP = ["#e13e26", "#1f8fd6", "#f2c21c", "#ff5fa2"][ri % 4];
-  const rect = (x, h, w, hh, col) => { ctx.fillStyle = col; ctx.fillRect(X(x * k), Y((h + hh) * k), w * k * s, hh * k * s); };
+  const rect = (x, h, wd, hh, col) => { ctx.fillStyle = col; ctx.fillRect(X(x * k), Y((h + hh) * k), wd * k * s, hh * k * s); };
+  const ep = 0.33 * w;
   const membre = (sx, sh, ang, len, main) => {
+    const e = 0.085 * Math.sqrt(w);
     ctx.save();
     ctx.translate(X(sx * k), Y(sh * k)); ctx.rotate(ang);
-    ctx.fillStyle = PEAU; ctx.fillRect(-0.075 * k * s, 0, 0.15 * k * s, len * k * s);
-    ctx.beginPath(); ctx.arc(0, (len + 0.05) * k * s, 0.085 * k * s, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = PEAU; ctx.fillRect(-e * k * s, 0, 2 * e * k * s, len * k * s);
+    ctx.beginPath(); ctx.arc(0, (len + 0.05) * k * s, 0.09 * k * s, 0, Math.PI * 2); ctx.fill();
     if (main) main((len + 0.05) * k * s);
     ctx.restore();
   };
   const f = Math.sin(t * 4 + r);
   ctx.save();
   // Tongs, jambes, slip.
-  rect(-0.24, 0, 0.22, 0.05, "#1f8fd6"); rect(0.02, 0, 0.22, 0.05, "#1f8fd6");
-  rect(-0.2, 0.05, 0.17, 0.78, PEAU); rect(0.03, 0.05, 0.17, 0.78, PEAU);
-  rect(-0.23, 0.72, 0.46, 0.2, SLIP);
-  ctx.fillStyle = "rgba(255,255,255,0.55)"; ctx.fillRect(X(-0.23 * k), Y(0.9 * k), 0.46 * k * s, 0.025 * k * s); // ceinture
-  // Torse bronzé, pectoraux et abdos en ombre.
-  rect(-0.3, 0.92, 0.6, 0.48, PEAU);
-  ctx.fillStyle = OMBRE;
-  ctx.fillRect(X(-0.2 * k), Y(1.3 * k), 0.17 * k * s, 0.03 * k * s); ctx.fillRect(X(0.03 * k), Y(1.3 * k), 0.17 * k * s, 0.03 * k * s);
-  for (let i = 0; i < 3; i++) ctx.fillRect(X(-0.012 * k), Y((1.0 + i * 0.08) * k), 0.024 * k * s, 0.05 * k * s);
-  // Chaîne en or.
-  ctx.strokeStyle = "#f2c21c"; ctx.lineWidth = Math.max(1, 0.03 * k * s);
-  ctx.beginPath(); ctx.moveTo(X(-0.12 * k), Y(1.4 * k)); ctx.quadraticCurveTo(X(0), Y(1.22 * k), X(0.12 * k), Y(1.4 * k)); ctx.stroke();
+  const jl = 0.19 * Math.pow(w, 0.7), jx = 0.03 * w;
+  rect(-jx - jl - 0.04, 0, jl + 0.05, 0.05, "#1f8fd6"); rect(jx - 0.01, 0, jl + 0.05, 0.05, "#1f8fd6");
+  rect(-jx - jl, 0.05, jl, 0.78, PEAU); rect(jx, 0.05, jl, 0.78, PEAU);
+  // Torse : bronzé, pectoraux et abdos en ombre (lui) ; maillot une pièce (elle).
+  rect(-ep, 0.92, 2 * ep, 0.48, PEAU);
+  if (w > 1.25) { ctx.fillStyle = PEAU; ctx.beginPath(); ctx.ellipse(X(0), Y(1.02 * k), (ep + 0.04) * k * s, 0.22 * k * s, 0, 0, Math.PI * 2); ctx.fill(); }
+  rect(-ep + 0.06, 0.72, 2 * ep - 0.12, 0.2, SLIP);
+  if (M.femme) {
+    rect(-ep + 0.05, 0.9, 2 * ep - 0.1, 0.4, SLIP);
+    rect(-ep + 0.1, 1.28, 0.06, 0.12, SLIP); rect(ep - 0.16, 1.28, 0.06, 0.12, SLIP);   // bretelles
+  } else {
+    ctx.fillStyle = "rgba(255,255,255,0.55)"; ctx.fillRect(X((-ep + 0.06) * k), Y(0.9 * k), (2 * ep - 0.12) * k * s, 0.025 * k * s); // ceinture
+    ctx.fillStyle = OMBRE;
+    ctx.fillRect(X(-0.2 * k), Y(1.3 * k), 0.17 * k * s, 0.03 * k * s); ctx.fillRect(X(0.03 * k), Y(1.3 * k), 0.17 * k * s, 0.03 * k * s);
+    if (w < 1.25) for (let i = 0; i < 3; i++) ctx.fillRect(X(-0.012 * k), Y((1.0 + i * 0.08) * k), 0.024 * k * s, 0.05 * k * s);
+    // Chaîne en or.
+    ctx.strokeStyle = "#f2c21c"; ctx.lineWidth = Math.max(1, 0.03 * k * s);
+    ctx.beginPath(); ctx.moveTo(X(-0.12 * k), Y(1.4 * k)); ctx.quadraticCurveTo(X(0), Y(1.22 * k), X(0.12 * k), Y(1.4 * k)); ctx.stroke();
+  }
   if (ri % 3 === 2) {
     // Raquettes de plage : bras levé, raquette en l'air, la balle qui rebondit
     // dessus (le bras pointe en haut à droite : la raquette finit vers 0,7 ; 2,2).
     const rebond = Math.abs(Math.sin(t * 4 + r)), u = k * s;
-    membre(-0.3, 1.36, 0.35 + 0.08 * f, 0.6);
-    membre(0.3, 1.36, -(Math.PI - 0.45) + 0.06 * f, 0.6, (d) => {
+    membre(-ep, 1.36, 0.35 + 0.08 * f, 0.6);
+    membre(ep, 1.36, -(Math.PI - 0.45) + 0.06 * f, 0.6, (d) => {
       ctx.fillStyle = "#6b4b2e"; ctx.fillRect(-0.03 * u, d - 0.02 * u, 0.06 * u, 0.16 * u);
       ctx.fillStyle = "#2f6fd0"; ctx.beginPath(); ctx.ellipse(0, d + 0.3 * u, 0.17 * u, 0.2 * u, 0, 0, Math.PI * 2); ctx.fill();
     });
@@ -538,15 +612,15 @@ function baigneur2D(ctx, K, X, Y, s, uC, r, t) {
   } else if (ri % 3 === 0) {
     // Le ballon de plage, brandi au-dessus de la tête.
     const by = 2.12 + 0.05 * f;
-    membre(-0.3, 1.36, Math.PI - 0.35, 0.62);
-    membre(0.3, 1.36, -(Math.PI - 0.35), 0.62);
+    membre(-ep, 1.36, Math.PI - 0.35, 0.62);
+    membre(ep, 1.36, -(Math.PI - 0.35), 0.62);
     const cx = X(0), cy = Y(by * k), R = 0.26 * k * s;
     const quartiers = ["#ffffff", "#e13e26", "#ffffff", "#1f8fd6", "#ffffff", "#f2c21c"];
     for (let i = 0; i < 6; i++) { ctx.fillStyle = quartiers[i]; ctx.beginPath(); ctx.moveTo(cx, cy); ctx.arc(cx, cy, R, t * 0.6 + i * Math.PI / 3, t * 0.6 + (i + 1) * Math.PI / 3); ctx.closePath(); ctx.fill(); }
   } else {
     // Biceps gonflés : avant-bras levés, poings serrés.
     const p = 0.08 * f;
-    for (const [sx, sg] of [[-0.3, 1], [0.3, -1]]) {
+    for (const [sx, sg] of [[-ep, 1], [ep, -1]]) {
       membre(sx, 1.36, sg * (Math.PI / 2 + 0.15), 0.3, (d) => {
         ctx.fillStyle = OMBRE; ctx.beginPath(); ctx.arc(0, d * 0.45, 0.11 * k * s, 0, Math.PI * 2); ctx.fill();      // le biceps
         ctx.fillStyle = PEAU; ctx.save(); ctx.translate(0, d); ctx.rotate(-sg * (Math.PI / 2 + 0.3 + p));
@@ -556,14 +630,9 @@ function baigneur2D(ctx, K, X, Y, s, uC, r, t) {
       });
     }
   }
-  // Tête, cheveux, lunettes de soleil.
-  rect(-0.06, 1.38, 0.12, 0.08, PEAU);
-  ctx.fillStyle = PEAU; ctx.beginPath(); ctx.arc(X(0), Y(1.6 * k), 0.17 * k * s, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = "#2a1a10"; ctx.beginPath(); ctx.arc(X(0), Y(1.66 * k), 0.17 * k * s, Math.PI * 1.05, Math.PI * 1.95); ctx.fill();
-  ctx.fillStyle = "#0d0d10";
-  ctx.fillRect(X(-0.15 * k), Y(1.66 * k), 0.13 * k * s, 0.07 * k * s); ctx.fillRect(X(0.02 * k), Y(1.66 * k), 0.13 * k * s, 0.07 * k * s);
-  ctx.fillRect(X(-0.02 * k), Y(1.645 * k), 0.04 * k * s, 0.02 * k * s);
-  ctx.fillStyle = "#7a3a1a"; ctx.fillRect(X(-0.05 * k), Y(1.52 * k), 0.1 * k * s, 0.025 * k * s); // sourire
+  // Tête, cheveux, lunettes de soleil, sourire.
+  tete2D(ctx, M, X, Y, k, s, { lunettes: true });
+  ctx.fillStyle = "#7a3a1a"; ctx.fillRect(X(-0.05 * k), Y(1.52 * k), 0.1 * k * s, 0.025 * k * s);
   ctx.restore();
 }
 function staticNu(ctx, kind, uCenter, r, t) {
@@ -716,6 +785,7 @@ function staticNu(ctx, kind, uCenter, r, t) {
 // l'asphalte que le fermier-obstacle, et il a les bras en l'air : on ne le
 // confond pas avec quelqu'un qui barre la route.
 export function drawLanceurFace(ctx, u, v, t, lance) {
+  const M = humain(Math.round(v) * 5 + 2, { enfants: false });
   groupe(ctx, () => {
     // 0 → 1 pendant le lancer, puis bras baissés.
     const k = lance === null ? 0 : Math.min(1, lance / 0.35);
@@ -726,7 +796,8 @@ export function drawLanceurFace(ctx, u, v, t, lance) {
     drawBox(ctx, x + 0.14, y + 0.36, 0.22, 0.22, 0.8, "#2f4f9a");
     drawBox(ctx, x + 0.08, y + 0.04, 0.36, 0.6, 0.26, "#2f4f9a", 0.8);
     drawBox(ctx, x + 0.06, y + 0.02, 0.4, 0.64, 0.36, "#b8402c", 1.06);
-    drawBox(ctx, x + 0.12, y + 0.14, 0.28, 0.36, 0.28, "#d69a68", 1.42);
+    drawBox(ctx, x + 0.12, y + 0.14, 0.28, 0.36, 0.28, M.peau, 1.42);
+    if (M.fonce) drawBox(ctx, x + 0.11, y + 0.06, 0.32, 0.07, 0.07, "#f4efe4", 1.575);
     drawBox(ctx, x + 0.12, y + 0.06, 0.3, 0.06, 0.06, "#1a1a1e", 1.58);          // les yeux, côté joueur
     drawBox(ctx, x + 0.02, y - 0.06, 0.48, 0.76, 0.05, "#e8c66a", 1.7);
     drawBox(ctx, x + 0.12, y + 0.12, 0.28, 0.4, 0.12, "#e8c66a", 1.74);
@@ -773,6 +844,6 @@ export function drawStaticTombe(ctx, kind, uCenter, r, t, age) {
   ctx.translate(c.x, c.y);
   ctx.rotate(angle);
   ctx.translate(-c.x, -c.y);
-  drawStatic(ctx, kind, uCenter, r + recul, t);
+  drawStatic(ctx, kind, uCenter, r + recul, t, Math.round(r));
   ctx.restore();
 }

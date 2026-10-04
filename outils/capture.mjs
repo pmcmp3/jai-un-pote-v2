@@ -448,6 +448,45 @@ const SCENES = {
     console.log("  → galerie : outils/sorties/g*.png");
     await course(() => document.getElementById("galerie").remove());
   },
+  // Les HUMAINS (4 octobre 2026, nuit : peaux, gabarits, âges, liseré) : une
+  // planche par famille, dessinée par le vrai moteur sur un fond donné (sable
+  // pour juger le contraste « humains clairs sur fond clair »).
+  humains: async () => {
+    const planches = [
+      ["pieton", "#8a8a90", [11, 12, 13, 14, 15, 16]], ["pieton", "#ead7a8", [21, 22, 23, 24, 25, 26], true],
+      ["pieton", "#8a8a90", [31, 32, 33, 34, 35, 36]], ["costard", "#8a8a90", [41, 42, 43, 44]],
+      ["fermier", "#c9b58a", [51, 52, 53, 54]], ["baigneur", "#ead7a8", [61, 62, 63, 64]], ["skieur", "#eef3f8", [71, 72, 73]],
+    ];
+    for (let i = 0; i < planches.length; i++) {
+      await course(async ([kind, fond, graines, plage]) => {
+        const scene = await import("/src/scene.js"), props = await import("/src/props.js"), rows = await import("/src/rows.js");
+        let cv = document.getElementById("galerie");
+        if (!cv) { cv = document.createElement("canvas"); cv.id = "galerie"; cv.style.cssText = "position:fixed;left:0;top:0;width:375px;height:300px;z-index:999;background:#fff"; document.body.appendChild(cv); }
+        const W = 750, H = 600;
+        cv.width = W * 2; cv.height = H * 2;
+        const c = cv.getContext("2d");
+        c.setTransform(1, 0, 0, 1, 0, 0);
+        c.fillStyle = fond; c.fillRect(0, 0, W * 2, H * 2);
+        scene.setViewport(W * 2, H * 2); scene.setJoueurX(0.5); scene.setCamera(0); scene.setDecorTime(1);
+        const ZOOM = 1.9, ecart = graines.length > 4 ? 1.25 : 1.6;
+        const o = scene.project(0, scene.getVCentre(), 1.0);
+        c.translate(W, H * 1.1); c.scale(ZOOM, ZOOM); c.translate(-o.x, -o.y);
+        const K = rows.KINDS[kind], vc = scene.getVCentre();
+        const items = graines.map((g, k) => {
+          const v = vc + (k - (graines.length - 1) / 2) * ecart;
+          return { d: scene.depth(0, v), draw: () => kind === "pieton" ? props.drawPieton(c, K, 0, v, 0.3 + k, g, !!plage)
+            : kind === "skieur" ? props.drawSkieur(c, K, 0, v, 0.3 + k, g) : props.drawStatic(c, kind, 0, v, 0.3 + k, g) };
+        });
+        items.sort((a, b) => b.d - a.d);
+        for (const it of items) it.draw();
+        scene.setViewport(innerWidth, innerHeight);
+      }, planches[i]);
+      const el = await page.$("#galerie");
+      await el.screenshot({ path: `${sorties}h${String(i).padStart(2, "0")}-${planches[i][0]}.png` });
+    }
+    console.log("  → humains : outils/sorties/h*.png");
+    await course(() => document.getElementById("galerie").remove());
+  },
   // Atterrir sur le toit d'une voiture garée (28 septembre 2026) : on lâche le
   // cycliste au-dessus du toit en pleine chute, il doit s'y poser, pas passer au travers.
   toit: async () => {
