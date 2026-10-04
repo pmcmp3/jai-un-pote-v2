@@ -224,7 +224,9 @@
     .expl-titre { margin: 4px 0 12px; font: 900 27px/1.05 var(--titre); color: var(--noir); }
     .expl-texte { margin: 0 0 12px; font: 500 13.5px/1.45 var(--police); color: var(--noir); }
     #expl-main { position: relative; width: 96px; height: 96px; margin: 0 auto 10px; }
-    #expl-main .doigt { position: absolute; left: 30px; top: 18px; font-size: 44px; line-height: 1; animation: expl-tape 0.9s ease-in-out infinite; }
+    /* Main et haut-parleur DESSINÉS (4 octobre 2026, nuit) : les emojis 👆 🔊
+       changeaient de tête selon le téléphone (Samsung ≠ iPhone). */
+    #expl-main .doigt { position: absolute; left: 26px; top: 18px; width: 44px; height: 44px; animation: expl-tape 0.9s ease-in-out infinite; }
     #expl-main .onde { position: absolute; left: 30px; top: 6px; width: 36px; height: 36px; border: 3px solid var(--rouge); border-radius: 50%; animation: expl-onde 0.9s ease-out infinite; }
     @keyframes expl-tape { 0%, 100% { transform: translateY(14px); } 45% { transform: translateY(0); } 55% { transform: translateY(0) scale(0.92); } }
     @keyframes expl-onde { 0%, 45% { transform: scale(0.2); opacity: 0; } 55% { opacity: 1; } 100% { transform: scale(1.6); opacity: 0; } }
@@ -232,7 +234,7 @@
     #expl-arrivee span { padding: 5px 12px; background: var(--rouge); color: #fff; font: 900 16px var(--police); letter-spacing: 0.14em; }
     #expl-peloton { display: block; width: 260px; max-width: 100%; height: 124px; margin: 0 auto; }
     #expl-son { position: relative; width: 120px; height: 90px; margin: 0 auto 10px; }
-    #expl-son .hp { position: absolute; left: 14px; top: 18px; font-size: 48px; line-height: 1; }
+    #expl-son .hp { position: absolute; left: 10px; top: 20px; width: 48px; height: 48px; }
     #expl-son .onde { position: absolute; left: 50px; top: 20px; width: 44px; height: 44px; border: 3px solid var(--rouge); border-left-color: transparent; border-bottom-color: transparent; border-radius: 50%; transform: rotate(45deg); opacity: 0; animation: expl-son 1.2s ease-out infinite; }
     #expl-son .o2 { animation-delay: 0.25s; } #expl-son .o3 { animation-delay: 0.5s; }
     @keyframes expl-son { 0% { opacity: 0; transform: rotate(45deg) scale(0.5); } 30% { opacity: 1; } 100% { opacity: 0; transform: rotate(45deg) scale(1.5); } }
@@ -622,12 +624,12 @@
            en tout premier, et après 2, 3, 4 »). -->
       <div class="expl-etape" data-e="son">
         <p class="expl-titre">Monte le son&nbsp;!</p>
-        <div id="expl-son"><span class="hp">🔊</span><span class="onde o1"></span><span class="onde o2"></span><span class="onde o3"></span></div>
+        <div id="expl-son"><svg class="hp" viewBox="0 0 48 48" width="48" height="48" aria-hidden="true"><path d="M6 18h10l13-10v32L16 30H6z" fill="#0d0d10" stroke="#0d0d10" stroke-width="2" stroke-linejoin="round"/></svg><span class="onde o1"></span><span class="onde o2"></span><span class="onde o3"></span></div>
         <p class="expl-texte"><b>Les klaxons t'annoncent les voitures.</b> Écoute-les, ils arrivent avant elles.</p>
       </div>
       <div class="expl-etape" data-e="tap">
         <p class="expl-titre">1 tap = 1 saut</p>
-        <div id="expl-main"><span class="onde"></span><span class="doigt">👆</span></div>
+        <div id="expl-main"><span class="onde"></span><svg class="doigt" viewBox="0 0 48 48" width="44" height="44" aria-hidden="true"><g fill="#fff" stroke="#0d0d10" stroke-width="2.4" stroke-linejoin="round"><rect x="8" y="25" width="9" height="14" rx="4.5" transform="rotate(-28 12.5 32)"/><rect x="14" y="23" width="27" height="19" rx="7"/><rect x="25" y="18" width="8" height="12" rx="4"/><rect x="31" y="20" width="7" height="11" rx="3.5"/><rect x="17" y="3" width="9" height="27" rx="4.5"/><rect x="17" y="40" width="21" height="6" rx="1.5" fill="#e13e26"/></g></svg></div>
         <p class="expl-texte">Tape n'importe où sur l'écran, <b>pas besoin de glisser.</b> Re-tape en l'air = double saut.</p>
       </div>
       <div class="expl-etape" data-e="arrivee">

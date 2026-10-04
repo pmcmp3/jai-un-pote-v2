@@ -148,7 +148,16 @@ export function getSkin() {
   if (!skin) { try { skin = { ...SKIN_DEFAUT, ...(JSON.parse(lsGet(CLE_SKIN) || "{}")) }; } catch (e) { skin = { ...SKIN_DEFAUT }; } if (skin.velo === "roller") skin.velo = "enfant"; }
   return skin;
 }
-function setSkin(cle, val) { getSkin()[cle] = val; lsSet(CLE_SKIN, JSON.stringify(skin)); construireSkinUi(); }
+function setSkin(cle, val) { getSkin()[cle] = val; lsSet(CLE_SKIN, JSON.stringify(skin)); majSkinUi(); }
+// Choisir une puce ne RECONSTRUIT plus la rangée (4 octobre 2026, nuit) : on
+// bascule seulement l'état actif — le bouton touché reste en place, rien ne
+// bouge à l'écran, rien ne perd le focus.
+function majSkinUi() {
+  const sk = getSkin();
+  document.querySelectorAll("#skin-options .chips").forEach((box) => {
+    for (const b of box.children) b.classList.toggle("actif", sk[box.dataset.cle] === b.dataset.val);
+  });
+}
 function construireSkinUi() {
   const sk = getSkin();
   // Menu réduit le 20 septembre 2026 (« il faut réduire : si on choisit le
@@ -164,6 +173,7 @@ function construireSkinUi() {
       b.type = "button";
       const couleur = cle === "c1" || cle === "short" || cle === "chaussures";
       b.className = `chip${couleur ? " couleur" : ""}${sk[cle] === val ? " actif" : ""}`;
+      b.dataset.val = val;
       if (couleur) { b.style.background = val; b.title = label; b.setAttribute("aria-label", label); } else b.textContent = label;
       b.addEventListener("click", (e) => {
         e.stopPropagation();
@@ -325,6 +335,7 @@ function entrerSaisie(champ) {
   placerSaisie(zoneSaisie());
 }
 function sortirSaisie() {
+  if (!overlay.classList.contains("clavier")) return; // aucun clavier à refermer
   const carte = carteActive();
   const avant = carte ? carte.getBoundingClientRect().top : 0;
   overlay.classList.add("fige", "retour");
@@ -380,7 +391,14 @@ function brancherCentrage() {
     entrerSaisie(e.target);
   });
   if (!TACTILE) return;
-  onboardingEl.addEventListener("focusout", () => {
+  // ⚠️ Seulement quand un CHAMP perd le focus, clavier ouvert (4 octobre 2026,
+  // nuit, Samsung dans Instagram : « dès qu'on sélectionne un carreau, une
+  // couleur, un choix, la fenêtre réapparaît du bas et remonte »). Sur
+  // Android, toucher un BOUTON lui donne le focus (pas sur iPhone) ; quand il
+  // le perdait, on « refermait le clavier » : retour en haut du menu et
+  // carte rejouée depuis le bas, à chaque choix.
+  onboardingEl.addEventListener("focusout", (e) => {
+    if (!(e.target instanceof Element) || !e.target.matches("input") || !overlay.classList.contains("clavier")) return;
     clearTimeout(clavierT);
     clavierT = setTimeout(() => {
       const a = document.activeElement;

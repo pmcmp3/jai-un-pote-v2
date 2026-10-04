@@ -36,7 +36,7 @@ window.CONFIG = {
   // les étals (1 = le fichier tel quel, à −16 LUFS ; le morceau est à ~−14) ;
   // de loin il descend à ~35 % de ça, étouffé. "" = marché muet.
   fichierMarchand: "assets/marchand-courgettes.mp3",
-  marchandVolume: 0.6,
+  marchandVolume: 0.34,     // 0,6 → 0,34 (−5 dB) le 4 octobre 2026, nuit : « beaucoup trop fort »
 
   // === VITESSE ===
   // Jeu d'endurance : montée plus douce que le premier (le but est d'aller

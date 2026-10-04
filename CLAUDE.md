@@ -606,6 +606,48 @@ Code `TESTV2`, qui est aussi `config.ligueBeta` (menu simplifié + bouton « Lai
     décor (plage, village). Coût : +0,5 à 1,5 ms par image à la plage (CPU
     ×4, `perf-plage.mjs`), rien au départ. Planche de contrôle : `node
     outils/capture.mjs humains` → `outils/sorties/h*.png`.
+- **5 octobre 2026, neuvième série (essai en direct sur un Samsung, navigateur
+  d'Instagram)** — `VERSION_COURSE` 21, SW `jp2-v31` :
+  - ⚠️ *UN tap = un double saut sur Android* : Android rejoue chaque toucher
+    en événements souris (mousedown/mouseup) juste après le touchend ; le
+    mousedown arrivait quand le cycliste venait de décoller, donc comptait
+    comme le re-tap. Sur iPhone, ces souris de compatibilité n'atteignent pas
+    le canvas. `input.js` ignore toute souris qui suit un toucher de moins
+    d'une seconde. Reproduit puis corrigé : `node outils/tap-android.mjs`
+    (ancien code 5/5 doubles sauts avec salto, corrigé 5/5 sauts simples —
+    ⚠️ il faut un vrai appui de ~120 ms, `page.tap` pose et lève dans la même
+    milliseconde et ne montre rien).
+  - ⚠️ *Menu « mon cycliste » qui remontait à chaque choix* : sur Android un
+    BOUTON prend le focus (pas sur iPhone) ; en le perdant il déclenchait le
+    « clavier refermé » (`sortirSaisie` : retour en haut, carte rejouée
+    depuis le bas). `focusout` ne réagit plus qu'à un champ, clavier
+    ouvert ; les puces ne sont plus reconstruites (`majSkinUi` bascule
+    l'état actif). `node outils/menu-android.mjs` : 6/6 choix bougeaient la
+    carte de 131 px, 0/6 maintenant.
+  - *Marchand* −5 dB (`marchandVolume` 0,6 → 0,34).
+  - *Tuto* : la route est DÉGAGÉE autour du premier obstacle de chaque
+    famille à expliquer (`rows.degagerTutos` : rien 2,4 s avant, rien 1,6 s
+    après, deux tutos jamais plus proches que ces deux fenêtres) —
+    seulement pour qui a encore un tuto à voir. Avant : un autre obstacle
+    1,4 à 2,7 s avant le tuto (« il devait sauter un bus et il s'est pris
+    un mec en costard qui était avant »). Un turbo de brique de lait peut
+    effacer l'obstacle réservé (fenêtre sûre) : on en réserve un autre plus
+    loin. L'obstacle réservé ne file jamais (tuto lancé même en l'air), et
+    le projecteur de la brique de lait ne tombe jamais juste avant un tuto.
+    `node outils/tuto-neuf.mjs` (joueur neuf, course accélérée) : 8/8
+    courses, chaque tuto sur sa route dégagée, ≥ 3 s sans rien avant.
+  - *Textes du tuto plus gros* (consigne 31 px, sous-titre 16 px gras ;
+    projecteur 32/18 px) ; la brique de lait dit ce qu'elle fait :
+    « BRIQUE DE LAIT = TURBO — pendant 5 s, tu fonces, rien ne peut te
+    toucher et tes points comptent double ».
+  - *Panneaux de commune +50 %* (`scene.drawSign`).
+  - *Pièces à travers un bus* : le générateur n'en pose plus non plus sur
+    le passage des piétons et des skieurs (−2,8 % de pièces, score parfait
+    6 544 → 6 509), et une pièce qu'un véhicule ou un piéton traverse
+    encore est CACHÉE le temps qu'il passe (`cachee`, main.js) — elle reste
+    à prendre, le score n'en dépend pas.
+  - *Emojis* 👆 🔊 remplacés par des icônes dessinées (main en gant blanc,
+    manche rouge ; haut-parleur) : chaque téléphone dessinait les siens.
 - **Tuto au ralenti, deuxième version** (`conseilTap`/`conseilStep`) : approche
   ~1 s avant le bon moment (monde ×0,25), un tap donné pendant l'approche est
   GARDÉ et part pile au bon moment, gel ×0,06 s'il n'a rien fait ; reprise
@@ -722,6 +764,8 @@ Code `TESTV2`, qui est aussi `config.ligueBeta` (menu simplifié + bouton « Lai
 - `node outils/collisions.mjs` — une course du VRAI jeu sans jamais sauter : chaque
   obstacle rencontré doit coûter (« traversés SANS choc : 0 »), sauf sous turbo/bouclier.
 - `node outils/marchand.mjs` — une vraie course jusqu'au marché : quand le vocal part et finit.
+- `node outils/tap-android.mjs` (un tap = un saut sur Android), `node outils/menu-android.mjs`
+  (choisir une puce ne fait rien bouger), `node outils/tuto-neuf.mjs` (route dégagée des tutos).
 - `./outils/voix-megaphone.sh <vocal.m4a> <sortie.mp3> [début] [fin]` — un mémo vocal → cri au mégaphone.
 - `node outils/clavier.mjs` (6 téléphones, clavier simulé), `node outils/premiere.mjs`
   (première visite façon Instagram), `node outils/porte-echelle.mjs` (porte album/abonnement).

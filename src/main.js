@@ -362,7 +362,7 @@ function tempsAvant(r, row, tm, vitesse) {
 }
 function momentIdeal(f) { return rows.montee(f) + 0.03; } // le moment du joueur idéal (outils/mesurer.mjs), un poil avant
 function conseilCherche(tm, vitesse) {
-  if (conseil.r !== null || projo.type || game.sprint || !player.auSol) return;
+  if (conseil.r !== null || projo.type || game.sprint) return;
   const deja = appris();
   if (deja.size >= 3) return;
   const vus = lireJson(CLE_VUS, {});
@@ -372,8 +372,14 @@ function conseilCherche(tm, vitesse) {
     if (row.type !== "statique" && row.type !== "traverse" && row.type !== "contresens") continue;
     const f = rows.familleDe(row.kind);
     if (deja.has(f) || (vus[f] || 0) >= 1) continue; // UNE seule fois (30 septembre 2026 : « faut pas 2 fois le même tuto »)
+    // L'obstacle RÉSERVÉ au tuto (route dégagée, rows.degagerTutos) ne file
+    // jamais (4 octobre 2026, nuit, mesuré : en l'air au mauvais moment, ou
+    // la brique de lait expliquée juste avant, et le tuto partait sur
+    // l'obstacle suivant — sans route dégagée). Les autres attendent le sol.
+    const reserve = (game.tutos || []).includes(r);
+    if (!player.auSol && !reserve) return;
     const t = tempsAvant(r, row, tm, vitesse);
-    if (t !== null && t > momentIdeal(f) && t <= momentIdeal(f) + APPROCHE_S) {
+    if (t !== null && t > (reserve ? 0.1 : momentIdeal(f)) && t <= momentIdeal(f) + APPROCHE_S) {
       conseil.r = r; conseil.famille = f; conseil.phase = "approche"; conseil.ok = 0; conseil.tampon = false; conseil.touche = false; conseil.plane = false;
       vus[f] = (vus[f] || 0) + 1; ecrireJson(CLE_VUS, vus);
       audio.setRalenti(true);
@@ -464,12 +470,17 @@ function conseilVue() {
 // triangle d'alerte. Une fois par joueur (jp2-conseils-vus), le monde gèle,
 // l'écran s'assombrit sauf autour de l'objet, et un tap fait repartir.
 const PROJECTEURS = {
-  lait: { titre: "BRIQUE DE LAIT", sous: "Attrape-la : turbo et ×2 sur tes points pendant 5 s" },
+  // 4 octobre 2026, nuit : un joueur l'avait vue sans comprendre — on dit ce
+  // qu'elle FAIT (l'invincibilité surtout, c'est ce qui se voit en jeu).
+  lait: { titre: "BRIQUE DE LAIT = TURBO", sous: "Attrape-la : pendant 5 s, tu fonces, rien ne peut te toucher et tes points comptent double" },
   alerte: { titre: "ATTENTION !", sous: "Ce panneau annonce un danger qui arrive : prépare-toi à sauter" },
 };
 const projo = { type: null, x: 0, y: 0, r: 40, age: 0 };
 function projoLancer(type, x, y, r) {
   if (projo.type || game.sprint || game.ended || conseil.r !== null || !gameStarted || clock.now() < 1) return;
+  // Jamais juste avant un tuto (4 octobre 2026, nuit) : deux explications qui
+  // se marchent dessus, et ni l'une ni l'autre ne rentre.
+  if ((game.tutos || []).some((r) => r > player.v - 2 && r - player.v < 30)) return;
   const vus = lireJson(CLE_VUS, {});
   if ((vus[type] || 0) >= 1) return;
   vus[type] = 1; ecrireJson(CLE_VUS, vus);
@@ -535,8 +546,23 @@ function semerCourse() {
   game.scoreMax = game.ligueCourse ? Math.round(scoreParfait(seed, friends.max()).score * game.boost) : null;
   fantome.demarrerEnregistrement();
   ghost = null;
+  game.tutos = [];
+  degagerTutos(0);
   // Fantôme retiré de l'écran (29 septembre 2026 : « le cycliste fantôme, pour
   // l'instant, tu l'enlèves ») — la trace part toujours, pour pouvoir le rebrancher.
+}
+// Le tuto garde la route pour lui (4 octobre 2026, nuit, rows.degagerTutos) :
+// rien juste avant ni juste après l'obstacle qu'on va expliquer — seulement
+// pour qui a encore une famille à voir, jamais en sprint. Rappelé après un
+// turbo de brique de lait : sa fenêtre sûre a pu effacer l'obstacle réservé
+// (mesuré, outils/tuto-neuf.mjs) — on en réserve alors un autre plus loin.
+function degagerTutos(depuis) {
+  if (game.sprint) { game.tutos = []; return; }
+  const deja = appris(), vus = lireJson(CLE_VUS, {});
+  const aVoir = ["tap", "haut", "double"].filter((f) => !deja.has(f) && !((vus[f] || 0) >= 1));
+  const gardes = (game.tutos || []).filter((r) => r >= depuis && rows.rowAt(r).type !== "safe");
+  const familles = aVoir.filter((f) => !gardes.some((r) => rows.familleDe(rows.rowAt(r).kind) === f));
+  game.tutos = familles.length ? rows.degagerTutos(familles, depuis, gardes) : gardes;
 }
 let ghost = null; // { graine, pseudo, palette, trace } — le meilleur de la ligue
 async function chargerFantome(l, seed) {
@@ -722,7 +748,9 @@ function gagnerLait(u, v) {
   // Pas d'obstacles pendant le turbo : la route devient sûre au-delà de
   // l'écran (les rangées déjà visibles sont couvertes par l'invulnérabilité).
   const r0 = Math.floor(player.v + 0.5) + scene.ROWS_AHEAD + 1;
-  rows.ouvrirFenetreSure(r0, r0 + Math.ceil(speed * (window.CONFIG.laitVitesse || 1.2) * (window.CONFIG.laitDureeS || 5)) + 12);
+  const finFenetre = r0 + Math.ceil(speed * (window.CONFIG.laitVitesse || 1.2) * (window.CONFIG.laitDureeS || 5)) + 12;
+  rows.ouvrirFenetreSure(r0, finFenetre);
+  if ((game.tutos || []).length) degagerTutos(finFenetre + 1);
 }
 function gagnerRouge(u, v) {
   sfx.rouge();
@@ -1376,6 +1404,20 @@ function render(alpha) {
     items.push({ decor: true, d: scene.depth(scene.ROAD_HALF + 0.04, d), draw: () => scene.drawBosse(ctx, d, GEO_BOSSE, from, to, "flanc") });
   }
   const vc = scene.getVCentre(), largeurRoute = scene.demiLargeurRoute() + 2;
+  // Ce qui vient en face CACHE la pièce sur laquelle il passe, le temps de
+  // passer (4 octobre 2026, nuit : « on voyait une pièce à travers un bus »,
+  // « ne mets pas des pièces à travers les véhicules et les personnages qui
+  // passent ») : comme une pièce derrière lui. Elle reste à prendre ensuite —
+  // rien ne change pour le score (le générateur, lui, n'en pose plus dans ce
+  // qu'un véhicule ou un piéton balaie à l'écran : rows.js, genererBloc).
+  const enFace = [];
+  for (let r = Math.max(0, from); r <= to; r++) {
+    const row = rows.rowAt(r);
+    if (row.type !== "contresens" || rows.KINDS[row.kind].lanceur) continue;
+    const o = rows.contresensAt(r, row, gameStarted ? tm : perfClock());
+    if (o) enFace.push({ v: o.v, demi: rows.demiLongueurRoute(row.kind) + 0.15, h: o.K.h });
+  }
+  const cachee = (q, h) => enFace.length > 0 && enFace.some((o) => Math.abs(q - o.v) <= o.demi && h - rows.solAt(q) < o.h + 0.3);
   for (let r = from; r <= to; r++) {
     const row = r >= 0 ? rows.rowAt(r) : null;
     const clear = row && row.type === "traverse";
@@ -1426,9 +1468,9 @@ function render(alpha) {
     }
     // Ce qui est sur la route : seulement à proximité de l'écran.
     if (Math.abs(r - vc) > largeurRoute) continue;
-    row.coins.forEach((h, i) => { if (!rows.coinTaken(r, i)) items.push({ d: scene.depth(-0.3, r), draw: () => drawPiece(r, h, now, row.double ? "grosse" : "piece") }); });
-    if (row.lait !== undefined && !rows.bonusTaken(r, "lait")) items.push({ d: scene.depth(-0.3, r), draw: () => drawPiece(r, row.lait, now, "lait") });
-    if (row.grosse !== undefined && !rows.bonusTaken(r, "grosse")) items.push({ d: scene.depth(-0.3, r), draw: () => drawPiece(r, row.grosse, now, "grosse") });
+    row.coins.forEach((h, i) => { if (!rows.coinTaken(r, i) && !cachee(r, h)) items.push({ d: scene.depth(-0.3, r), draw: () => drawPiece(r, h, now, row.double ? "grosse" : "piece") }); });
+    if (row.lait !== undefined && !rows.bonusTaken(r, "lait") && !cachee(r, row.lait)) items.push({ d: scene.depth(-0.3, r), draw: () => drawPiece(r, row.lait, now, "lait") });
+    if (row.grosse !== undefined && !rows.bonusTaken(r, "grosse") && !cachee(r, row.grosse)) items.push({ d: scene.depth(-0.3, r), draw: () => drawPiece(r, row.grosse, now, "grosse") });
     if (r === jet.r && !jet.pris) items.push({ d: scene.depth(-0.3, r), draw: () => dessinerJetpackObjet(r, now) });
     if (row.type === "statique" && ejectes.has(r)) {
       // La voiture garée percutée en turbo s'envole aussi.
@@ -1805,6 +1847,7 @@ if (debugOverlay.isEnabled()) {
     positionMorceau: () => departMorceau + clock.now(),
     jetpack: () => ({ r: jet.r, pris: jet.pris, reste: jet.reste, pieces: jet.pieces.length, prises: jet.pieces.filter((c) => c.pris).length }),
     marchand: () => ({ etat: audio.marchandEtat(), milieu: marcheMilieu }),
+    tutos: () => game.tutos || [],
   };
 }
 requestAnimationFrame(frame);

@@ -47,11 +47,21 @@ function end() {
   holding = false;
 }
 
-window.addEventListener("touchstart", (e) => { if (activeId !== null) return; const t = e.changedTouches[0]; begin(t.clientX, t.clientY, t.identifier, e.target); }, { passive: true });
+// ⚠️ UN tap = DEUX appuis sur Android (4 octobre 2026, nuit : « quand il
+// appuie une fois, ça fait directement un double saut », Samsung, navigateur
+// d'Instagram) : après touchstart/touchend, Android rejoue le geste en
+// événements souris (mousedown, mouseup) pour les vieux sites. Le mousedown
+// arrivait quand le cycliste venait de décoller, donc comptait comme le
+// re-tap du double saut. Sur iPhone, ces souris de compatibilité ne sont pas
+// envoyées au canvas : le bug n'existait que sur Android. Toute souris qui
+// suit un toucher de moins d'une seconde est donc ignorée.
+let dernierToucher = -1e9;
+const toucher = () => { dernierToucher = performance.now(); };
+window.addEventListener("touchstart", (e) => { toucher(); if (activeId !== null) return; const t = e.changedTouches[0]; begin(t.clientX, t.clientY, t.identifier, e.target); }, { passive: true });
 window.addEventListener("touchmove", (e) => { for (const t of e.changedTouches) if (t.identifier === activeId) move(t.clientX, t.clientY); }, { passive: true });
-window.addEventListener("touchend", (e) => { for (const t of e.changedTouches) if (t.identifier === activeId) end(); }, { passive: true });
-window.addEventListener("touchcancel", () => { activeId = null; holding = false; }, { passive: true });
-window.addEventListener("mousedown", (e) => begin(e.clientX, e.clientY, "mouse", e.target));
+window.addEventListener("touchend", (e) => { toucher(); for (const t of e.changedTouches) if (t.identifier === activeId) end(); }, { passive: true });
+window.addEventListener("touchcancel", () => { toucher(); activeId = null; holding = false; }, { passive: true });
+window.addEventListener("mousedown", (e) => { if (performance.now() - dernierToucher < 1000) return; begin(e.clientX, e.clientY, "mouse", e.target); });
 window.addEventListener("mousemove", (e) => { if (activeId === "mouse") move(e.clientX, e.clientY); });
 window.addEventListener("mouseup", () => { if (activeId === "mouse") end(); });
 

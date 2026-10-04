@@ -128,6 +128,11 @@ const SCENES = {
     await course(() => { const p = window.__pote; let r = Math.ceil(p.player.v); while (Math.floor(r / 55) % 6 !== 3) r++; p.player.v = r + 20; });
     await attendre(900); await photo("08-village");
   },
+  // Panneau de commune (4 octobre 2026, nuit : +50 %) : joueur posé 5 rangées avant.
+  panneau: async () => {
+    await course(() => { const p = window.__pote; let r = Math.ceil(p.player.v) + 30; while (r % 45 !== 20) r++; p.player.v = r - 5; p.player.prevV = r - 5; });
+    await attendre(500); await photo("08b-panneau");
+  },
   turbo: async () => { await page.keyboard.press("KeyL"); await attendre(300); await photo("09-turbo"); await attendre(5000); },
   nuit: async () => { await page.keyboard.press("KeyN"); await attendre(1500); await photo("10-nuit"); },
   // Le roller (20 septembre 2026) : on l'équipe depuis le menu.

@@ -770,7 +770,10 @@ export class Route {
         const kind = this.dangers.get(r);
         if (!kind) continue;
         const K = KINDS[kind];
-        if (!K.contresens || !(K.vitesse >= 1.2) || K.lanceur) continue; // les piétons, lents, ne balaient presque rien
+        // Tout ce qui vient en face, piétons compris (4 octobre 2026, nuit :
+        // « ne mets pas des pièces à travers les véhicules et les personnages
+        // qui passent »). Seule la poule jetée part d'ailleurs (le fermier).
+        if (!K.contresens || K.lanceur) continue;
         const d = q - r, demi = demiLongueurRoute(kind);
         if (d <= demi + 0.4 || d > balayageVisible(r, kind)) continue;
         if (row.coins[0] - solAt(q) < K.h + 0.3) { row.coins = []; row.double = false; break; }
@@ -788,6 +791,40 @@ export class Route {
     return this.cache.get(r) || this.rangeeSure(r);
   }
 
+  // Le TUTO (4 octobre 2026, nuit : « quand tu mets un tutoriel, il ne faut
+  // pas que tu mettes un autre obstacle avant. Il devait sauter un bus et il
+  // s'est pris un mec en costard qui était avant » ; « beaucoup plus d'espace
+  // […] quand les gens doivent taper deux fois, il faut que tu laisses la
+  // place »). Pour chaque famille qu'on va expliquer, son premier obstacle
+  // garde la route pour lui : rien TUTO_AVANT_S avant, rien TUTO_APRES_S
+  // après. Deux tutos ne se suivent jamais de plus près que ces deux fenêtres
+  // réunies — un obstacle de la famille trop tôt est retiré, c'est le suivant
+  // qu'on expliquera. Seulement pour qui a encore un tuto à voir (main.js).
+  // `depuis` / `gardes` : après un turbo (sa fenêtre sûre a pu effacer
+  // l'obstacle réservé), main.js en réserve un autre plus loin, en gardant
+  // ceux qui tiennent toujours.
+  degagerTutos(familles, depuis = GRACE_ROWS, gardes = []) {
+    const reste = new Set(familles), reserves = gardes.slice();
+    for (let r = Math.max(GRACE_ROWS, depuis); r < 2000 && reste.size; r++) {
+      const row = this.rowAt(r);
+      if (row.type !== "statique" && row.type !== "traverse" && row.type !== "contresens") continue;
+      const f = familleDe(row.kind);
+      if (!reste.has(f)) continue;
+      const v = Math.max(1, vitesseAuRang(r));
+      const avant = Math.round(v * TUTO_AVANT_S), apres = Math.round(v * TUTO_APRES_S);
+      if (reserves.some((q) => Math.abs(r - q) < avant + apres)) { this.rendreSure(r); continue; }
+      reste.delete(f); reserves.push(r);
+      for (let q = r - avant; q <= r + apres; q++) if (q !== r && q >= GRACE_ROWS && !reserves.includes(q)) this.rendreSure(q);
+    }
+    return reserves;
+  }
+  // L'obstacle part, les pièces restent. La brique de lait aussi s'en va :
+  // son explication (le projecteur) tomberait sur celle du tuto.
+  rendreSure(r) {
+    const row = this.rowAt(r);
+    if (row.type === "safe" && row.lait === undefined) return;
+    this.cache.set(r, { type: "safe", coins: row.coins, double: row.double, grosse: row.grosse, boue: null });
+  }
   coinTaken(r, i) { return this.coins.has(`${r}:${i}`); }
   bonusTaken(r, kind) { return this.coins.has(`${r}:${kind}`); }
 
@@ -889,6 +926,8 @@ export function armer(row, now, tArrivee) {
 }
 
 // Position d'une voiture en sens inverse à l'instant t (null si pas armée).
+export const TUTO_AVANT_S = 2.4, TUTO_APRES_S = 1.6;
+export function degagerTutos(familles, depuis, gardes) { return live.degagerTutos(familles, depuis, gardes); }
 export function contresensAt(r, row, t) {
   if (row.type !== "contresens" || !row.armed) return null;
   const v = r + row.v0 - row.vitesse * (t - row.t0);

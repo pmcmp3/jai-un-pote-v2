@@ -55,7 +55,7 @@ for (const seed of graines) {
     // Une pièce que traverse, À L'ÉCRAN, un véhicule venu d'en face (plus bas que son toit).
     for (let r = Math.floor(v); r <= Math.floor(v) + 40; r++) {
       const row = route.rowAt(r);
-      if (row.type !== "contresens" || !row.armed || KINDS[row.kind].lanceur || KINDS[row.kind].vitesse < 1.2) continue; // véhicules (les piétons, lents, à part)
+      if (row.type !== "contresens" || !row.armed || KINDS[row.kind].lanceur) continue; // tout ce qui vient en face, piétons compris (4 octobre 2026, nuit)
       const c = r + row.v0 - row.vitesse * (now - row.t0), demi = demiLongueurRoute(row.kind);
       if (c - demi > v + DEVANT || c < v + 1) continue;
       for (let q = Math.ceil(c - demi); q <= Math.floor(c + demi); q++) {

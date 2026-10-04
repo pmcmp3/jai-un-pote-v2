@@ -1828,9 +1828,11 @@ export function lampsIn(from, to) {
 export function drawSign(ctx, r, village) {
   const [nom] = village;   // le département ne sert à rien (20 septembre 2026)
   const u = ROAD_HALF + 0.55, v = r;
-  const w = 2.3, hb = 0.85, base = 1.2;
-  drawBox(ctx, u, v - w / 2 + 0.2, 0.12, 0.12, base, "#8a8d98");
-  drawBox(ctx, u, v + w / 2 - 0.32, 0.12, 0.12, base, "#8a8d98");
+  // +50 % le 4 octobre 2026, nuit (« il faut que les panneaux de commune
+  // soient 50 % plus gros ») : 2,3 × 0,85 → 3,45 × 1,28, poteaux plus hauts.
+  const w = 3.45, hb = 1.28, base = 1.5;
+  drawBox(ctx, u, v - w / 2 + 0.3, 0.15, 0.15, base, "#8a8d98");
+  drawBox(ctx, u, v + w / 2 - 0.45, 0.15, 0.15, base, "#8a8d98");
   drawBox(ctx, u - 0.05, v - w / 2, 0.1, w, hb, "#e13e26", base);
   const A = project(u - 0.05, v - w / 2, base + hb), B = project(u - 0.05, v + w / 2, base);
   const s = echelle(u - 0.05), m = 0.08 * s;
@@ -1839,7 +1841,7 @@ export function drawSign(ctx, r, village) {
   ctx.fillStyle = "#0d0d10";
   ctx.textAlign = "center"; ctx.textBaseline = "middle";
   const cx = (A.x + B.x) / 2, hh = B.y - A.y;
-  let taille = s * 0.34;
+  let taille = s * 0.5;
   ctx.font = `900 ${taille}px "Helvetica Neue", Helvetica, Arial, sans-serif`;
   while (ctx.measureText(nom).width > (B.x - A.x) - 4 * m && taille > 5) { taille -= 1; ctx.font = `900 ${taille}px "Helvetica Neue", Helvetica, Arial, sans-serif`; }
   ctx.fillText(nom, cx, A.y + hh * 0.5);

@@ -133,6 +133,23 @@ export function renderHud(ctx, width, height, hud) {
   ctx.restore();
 }
 
+// La main qui tape, DESSINÉE (4 octobre 2026, nuit) : l'emoji 👆 changeait de
+// tête selon le téléphone (Samsung ≠ iPhone). Mêmes formes que le SVG de la
+// carte « 1 tap = 1 saut » (index.html), repère 48 × 48.
+function dessinerMain(ctx, x, y, k) {
+  ctx.save();
+  ctx.translate(x, y); ctx.scale(k, k);
+  ctx.lineWidth = 2.4; ctx.lineJoin = "round"; ctx.strokeStyle = NOIR;
+  const bloc = (bx, by, w, h, r, col = BLANC) => { ctx.fillStyle = col; roundRect(ctx, bx, by, w, h, r); ctx.fill(); roundRect(ctx, bx, by, w, h, r); ctx.stroke(); };
+  ctx.save(); ctx.translate(12.5, 32); ctx.rotate((-28 * Math.PI) / 180); bloc(-4.5, -7, 9, 14, 4.5); ctx.restore(); // pouce
+  bloc(14, 23, 27, 19, 7);   // paume
+  bloc(25, 18, 8, 12, 4);    // doigts repliés
+  bloc(31, 20, 7, 11, 3.5);
+  bloc(17, 3, 9, 27, 4.5);   // l'index
+  bloc(17, 40, 21, 6, 1.5, ROUGE); // la manche
+  ctx.restore();
+}
+
 // Doigt qui tape, au départ des premières parties, jusqu'au premier saut
 // (1er octobre 2026 : « il faut mettre un logo, un GIF de quelqu'un qui tape,
 // pour dire qu'il faut taper sur l'écran, il n'y a pas besoin de slider »).
@@ -148,8 +165,8 @@ export function renderTapHint(ctx, width, height, t, alpha) {
     ctx.beginPath(); ctx.arc(x, y, 10 + k * 34, 0, Math.PI * 2); ctx.stroke();
   }
   const dy = ph < 0.45 ? 14 * (1 - ph / 0.45) : 0;
-  ctx.font = "44px sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "top";
-  ctx.fillText("👆", x + 4, y - 6 + dy);
+  dessinerMain(ctx, x - 18, y - 6 + dy, 44 / 48);
+  ctx.textAlign = "center";
   const msg = "TAPE L'ÉCRAN POUR SAUTER · PAS BESOIN DE GLISSER";
   fitFont(ctx, "800", 11, msg, width - 50, 8);
   const w = ctx.measureText(msg).width + 20;
@@ -375,7 +392,9 @@ export function renderBestiaire(ctx, width, height, alpha, groupes, safeTop = 0,
 export function renderTuto(ctx, width, height, tuto) {
   if (!tuto) return;
   ctx.save();
-  const w = Math.min(width - 32, 330), h = tuto.sous ? 92 : 70;
+  // Plus gros le 4 octobre 2026, nuit (« dans les tutos, il faut écrire
+  // vraiment un peu plus gros » : un joueur avait vu la consigne sans la lire).
+  const w = Math.min(width - 24, 350), h = tuto.sous ? 118 : 84;
   const x = width / 2 - w / 2, y = tuto.y !== undefined ? tuto.y : height * 0.3; // en HAUT, sous le score (29 septembre 2026)
   ctx.globalAlpha = tuto.alpha;
   ctx.fillStyle = "#ffffff";
@@ -387,23 +406,23 @@ export function renderTuto(ctx, width, height, tuto) {
   ctx.translate(x + 16 + 50, y);
   ctx.rotate(-0.035);
   ctx.fillStyle = tuto.ok ? JAUNE : ROUGE;
-  ctx.fillRect(-50, -8, 100, 16);
+  ctx.fillRect(-50, -10, 100, 20);
   ctx.strokeStyle = NOIR; ctx.lineWidth = 1.2;
-  ctx.strokeRect(-50, -8, 100, 16);
+  ctx.strokeRect(-50, -10, 100, 20);
   ctx.fillStyle = tuto.ok ? NOIR : BLANC;
-  ctx.font = `800 9px ${POLICE}`;
+  ctx.font = `800 11px ${POLICE}`;
   ctx.textAlign = "center"; ctx.textBaseline = "middle";
   ctx.fillText(onglet, 0, 0.5);
   ctx.restore();
   ctx.textAlign = "center"; ctx.textBaseline = "top";
-  let t = 24; ctx.font = `900 ${t}px ${POLICE_TITRE}`;
-  while (ctx.measureText(tuto.titre).width > w - 28 && t > 14) { t -= 1; ctx.font = `900 ${t}px ${POLICE_TITRE}`; }
+  let t = 31; ctx.font = `900 ${t}px ${POLICE_TITRE}`;
+  while (ctx.measureText(tuto.titre).width > w - 24 && t > 16) { t -= 1; ctx.font = `900 ${t}px ${POLICE_TITRE}`; }
   ctx.fillStyle = NOIR;
-  ctx.fillText(tuto.titre, width / 2, y + 22);
+  ctx.fillText(tuto.titre, width / 2, y + 24);
   if (tuto.sous) {
-    fitFont(ctx, "500", 12, tuto.sous, w - 28, 9);
-    ctx.fillStyle = "rgba(13,13,16,0.6)";
-    ctx.fillText(tuto.sous, width / 2, y + 58);
+    fitFont(ctx, "700", 16, tuto.sous, w - 24, 11);
+    ctx.fillStyle = "rgba(13,13,16,0.82)";
+    ctx.fillText(tuto.sous, width / 2, y + 72);
   }
   ctx.restore();
 }
@@ -482,16 +501,17 @@ export function renderProjecteur(ctx, width, height, p, info, t) {
   ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.stroke();
   // Texte sous l'objet, ou au-dessus s'il est bas dans l'écran.
   const dessous = p.y < height * 0.55;
-  const y0 = dessous ? p.y + r + 34 : p.y - r - 70;
+  ctx.font = `700 18px ${POLICE}`;
+  const lignes = couper(ctx, info.sous, Math.min(320, width - 40));
+  const y0 = dessous ? p.y + r + 40 : p.y - r - 52 - lignes.length * 25;
   ctx.textAlign = "center"; ctx.textBaseline = "middle";
-  fitFont(ctx, "900", 24, info.titre, width - 40, 14);
+  fitFont(ctx, "900", 32, info.titre, width - 32, 16);
   ctx.fillStyle = JAUNE; ctx.fillText(info.titre, width / 2, y0);
-  ctx.font = `600 14px ${POLICE}`; ctx.fillStyle = BLANC;
-  const lignes = couper(ctx, info.sous, Math.min(300, width - 48));
-  lignes.forEach((l, i) => ctx.fillText(l, width / 2, y0 + 28 + i * 19));
+  ctx.font = `700 18px ${POLICE}`; ctx.fillStyle = BLANC;
+  lignes.forEach((l, i) => ctx.fillText(l, width / 2, y0 + 36 + i * 25));
   if (p.age > 0.5) {
     ctx.globalAlpha = a * (0.6 + 0.4 * Math.sin(t * 5));
-    ctx.font = `900 13px ${POLICE}`; ctx.fillStyle = BLANC;
+    ctx.font = `900 15px ${POLICE}`; ctx.fillStyle = BLANC;
     ctx.fillText("TOUCHE POUR CONTINUER", width / 2, height - 60);
   }
   ctx.restore();
