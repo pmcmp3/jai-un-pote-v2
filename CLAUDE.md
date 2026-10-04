@@ -700,6 +700,65 @@ Code `TESTV2`, qui est aussi `config.ligueBeta` (menu simplifié + bouton « Lai
     - ⚠️ Je n'ai pas d'oreilles : les sons sont vérifiés au niveau (LUFS) et
       au spectrogramme (`outils/sorties/sons/*.png`), pas à l'écoute — c'est
       au téléphone qu'on tranche ce qui sonne faux.
+- **4 octobre 2026 (nuit), onzième série (gamme, voix, volumes, train,
+  personnages debout)** — SW `jp2-v33` (parcours inchangé, `VERSION_COURSE` 22) :
+  - *La gamme du morceau* (« analyse la gamme [...] que tous les bruitages
+    soient sur la gamme, pour pas qu'il y ait des fausses notes ») : mesurée
+    sur le MP3 (chromagramme accordé, profils de Krumhansl) → **mi mineur /
+    sol majeur**, La 440 (+3 cents) ; notes dominantes mi do si sol ré la,
+    basse do-si-la-sol. Tout ce qui a une hauteur joue la **pentatonique de
+    sol** (sol la si ré mi : aucun demi-ton, rien ne frotte quel que soit
+    l'accord) — `bruitages.n("E5")`, `surGamme(f)` pour les tirages au
+    hasard. Cris des bêtes, klaxons, train (ré puis la, sans Doppler qui
+    désaccorderait), cloche (en mi : tous ses partiels sur la gamme),
+    carillon, sonnette, oiseaux, grillons, chouette, mouettes, quilles,
+    tôle, lattes, roue libre, freins, moteurs (note de base choisie pour que
+    l'approche ×1,06 et l'éloignement ×0,94 tombent tous deux sur la gamme),
+    et `sfx.js` (pièces, lait, pièce rouge, salto, pote perdu, fin).
+    ⚠️ La fanfare des potes (`audio.playComboJingle`) jouait encore en **ré♭
+    majeur**, la tonalité de « La ville est belle » : réaccordée (ré mi sol
+    si ré mi). Vérifié au spectre : toutes les fondamentales sur la gamme.
+  - *La voix du joueur* (« dès que tu te prends un objet, tu prends cet
+    audio-là, pour que les gens fassent « pfff » ») : le mémo de PMC
+    (`public/assets/pff-aie.mp3`, 8,5 Ko) coupé à 0,78 s, passe-haut 110 Hz
+    ×2 (le « p » qui claque), débruitage léger (`afftdn` 4 dB — plus fort, il
+    mangeait le « fff »), égaliseur (−2 dB à 320 Hz, +3 dB à 3,2 kHz, +2 dB
+    d'air), compresseur 4:1 seuil −20 dB, limiteur −1 dB ; −17 LUFS.
+    `bruitages.aie()` à chaque choc qui fait mal (pas sous turbo), jamais
+    deux fois en 0,55 s, trois prises : tout (50 %), « aïe » seul, « pfff »
+    seul. Son « aïe » descend de mi à ré : déjà sur la gamme, laissé tel quel.
+    Réglages `fichierAie`, `aieVolume` (config.js).
+  - *Les bêtes* (« rajoute les miaulements du chat ») : chaque bête crie en
+    nous voyant arriver (avant : 4 sur 5), et ~3 LU plus fort qu'au premier
+    essai.
+  - *Deux curseurs* (« un réglage pour la musique et un réglage pour les
+    effets sonores ») : menu pause (Musique / Effets) et bouton ♪ du menu
+    (même panneau, titre « Son », bouton OK). `audio.musiqueGain` (morceau +
+    boucle de mort) et `audio.effetsGain` (TOUS les bruitages, le marchand, la
+    voix) avant `volumeGain` ; effetsGain est persistant et rebranché sur
+    chaque nouveau graphe. Retenus dans `jp2VolMusique` / `jp2VolEffets`.
+    `node outils/volumes.mjs` : chaque curseur ne règle que le sien, le
+    réglage survit au rechargement.
+  - ⚠️ *Le train qui flottait* (« le train apparaissait un peu dans le
+    vide, au milieu de nulle part, avant même que j'arrive dans la gare ») :
+    il arrivait de derrière à hauteur de quai au bord gauche de l'écran
+    pendant qu'on montait la rampe, là où il n'y a pas encore de quai. Il sort
+    maintenant d'un TUNNEL au bout du quai (`TRAIN.tunnel`, mur de pierre et
+    bouche sombre) et n'est dessiné que sur ses rails, sorti du tunnel. À
+    l'arrêt il longe tout le quai (`TRAIN.corps`).
+  - ⚠️ *Les personnages debout en cubes* (« l'apparence des personnages qui
+    attendent debout est globalement la même que moi [...] il faut que ça
+    soit dans le même univers ») : costard, fermier et baigneur abandonnent
+    les silhouettes plates DE FACE du 3 octobre pour le corps du piéton (de
+    profil, tournés vers le joueur, liseré) — `props.debout()`. Bras en
+    chaîne de cubes qui pivote à l'épaule (`brasCubes`), jamais
+    « désarticulés ». Costard : veste, col, cravate, mallette, bras qui
+    s'agite ; fermier : bottes, salopette, chemise à carreaux, chapeau de
+    paille, fourche tenue coude plié ; baigneur : tongs, slip ou maillot,
+    lunettes, chaîne en or, ballon / raquette / biceps. Hauteur = K.h ×
+    taille, chapeau compris. `node outils/capture.mjs humains`.
+  - Le titre affiché sur l'écran verrouillé (Media Session) disait encore
+    « La ville est belle » : « J'ai un pote ».
 - **Tuto au ralenti, deuxième version** (`conseilTap`/`conseilStep`) : approche
   ~1 s avant le bon moment (monde ×0,25), un tap donné pendant l'approche est
   GARDÉ et part pile au bon moment, gel ×0,06 s'il n'a rien fait ; reprise
@@ -823,7 +882,10 @@ Code `TESTV2`, qui est aussi `config.ligueBeta` (menu simplifié + bouton « Lai
   mesure son niveau (LUFS) contre la cible et conseille un gain ; spectrogrammes dans
   `outils/sorties/sons/`. `node outils/sons-course.mjs [--reel]` — le journal des sons d'une
   course entière (accélérée, ou `--reel` : temps réel, cadences et i/s). Scènes de capture
-  `train` (le TER entre en gare) et `quilles`.
+  `train` (le TER entre en gare ; `TRAIN_K="-8,2,5"` choisit les positions) et `quilles`.
+- `node outils/volumes.mjs` — les deux curseurs Musique / Effets (menu ♪ et pause).
+- `python3 outils/gamme.py [mp3]` — la tonalité d'un morceau (accordage, notes, tonalité,
+  basse par mesure) : c'est sur elle que les bruitages s'accordent (`bruitages.js`, GAMME).
 - `node outils/clavier.mjs` (6 téléphones, clavier simulé), `node outils/premiere.mjs`
   (première visite façon Instagram), `node outils/porte-echelle.mjs` (porte album/abonnement).
 - ⚠️ La preview de l'IDE ne peut pas jouer le jeu (l'`AudioContext` fige l'onglet) : passer par

@@ -54,7 +54,7 @@ const gateLater = $("gate-later");
 const muteButton = $("mute-button");
 const pauseButton = $("pause-button");
 const pauseScreen = $("pause-screen");
-const pauseVolumeSlider = $("pause-volume-slider");
+const volMusique = $("volume-musique"), volEffets = $("volume-effets");
 const resumeButton = $("resume-button");
 const pauseReplayButton = $("pause-replay-button");
 
@@ -1210,10 +1210,16 @@ function appliquerModeBeta() {
 // --- Pause / son -------------------------------------------------------------
 export function showPauseButton() { pauseButton.hidden = false; muteButton.hidden = true; }
 export function hidePauseButton() { pauseButton.hidden = true; muteButton.hidden = false; if (deps.isManuallyPaused()) closePauseMenu(); }
+function syncVolumes() {
+  volMusique.value = String(Math.round(audio.getVolumeMusique() * 100));
+  volEffets.value = String(Math.round(audio.getVolumeEffets() * 100));
+}
 function openPauseMenu() {
   if (deps.isManuallyPaused() || pauseButton.hidden) return;
   deps.openPause();
-  pauseVolumeSlider.value = String(Math.round(audio.getVolume() * 100));
+  syncVolumes();
+  pauseScreen.classList.remove("reglages");
+  pauseScreen.querySelector(".step-eyebrow").textContent = "Pause";
   pauseScreen.classList.add("visible");
 }
 function closePauseMenu() {
@@ -1221,11 +1227,27 @@ function closePauseMenu() {
   deps.closePause();
   pauseScreen.classList.remove("visible");
 }
+// Le bouton ♪ du menu : le même panneau, réduit aux deux curseurs.
+function openSonMenu() {
+  syncVolumes();
+  pauseScreen.classList.add("reglages");
+  pauseScreen.querySelector(".step-eyebrow").textContent = "Son";
+  pauseScreen.classList.add("visible");
+}
+function closeSonMenu() {
+  if (!pauseScreen.classList.contains("reglages")) return;
+  pauseScreen.classList.remove("visible", "reglages");
+}
 function syncMuteIcon() {
-  const coupe = audio.getVolume() <= 0;
+  const coupe = audio.getVolume() <= 0 || (audio.getVolumeMusique() <= 0 && audio.getVolumeEffets() <= 0);
   muteButton.classList.toggle("muted", coupe);
   muteButton.textContent = coupe ? "✕" : "♪";
 }
+// Les deux curseurs sont retenus d'une visite à l'autre.
+function lireVolume(cle) {
+  try { const v = parseFloat(localStorage.getItem(cle)); return Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : 1; } catch (e) { return 1; }
+}
+function ecrireVolume(cle, v) { try { localStorage.setItem(cle, String(v)); } catch (e) { /* stockage indisponible */ } }
 
 // --- Démarrage ---------------------------------------------------------------
 // Explication au lancement, en QUATRE temps depuis (son, tap, arrivée, potes),
@@ -1400,12 +1422,19 @@ export function init(d) {
     if (gateEtat.phase === "absence") gatePhasePret();
   });
 
+  audio.setVolumeMusique(lireVolume("jp2VolMusique"));
+  audio.setVolumeEffets(lireVolume("jp2VolEffets"));
   syncMuteIcon();
-  muteButton.addEventListener("click", (e) => { e.stopPropagation(); audio.setVolume(audio.getVolume() > 0 ? 0 : 1); syncMuteIcon(); });
+  muteButton.addEventListener("click", (e) => { e.stopPropagation(); openSonMenu(); });
+  $("son-fermer").addEventListener("click", (e) => { e.stopPropagation(); closeSonMenu(); });
+  pauseScreen.addEventListener("click", (e) => { if (e.target === pauseScreen) closeSonMenu(); });
   pauseButton.addEventListener("click", (e) => { e.stopPropagation(); openPauseMenu(); });
   resumeButton.addEventListener("click", (e) => { e.stopPropagation(); closePauseMenu(); });
   pauseReplayButton.addEventListener("click", (e) => { e.stopPropagation(); closePauseMenu(); deps.restartGame(); });
-  pauseVolumeSlider.addEventListener("input", () => { audio.setVolume(Number(pauseVolumeSlider.value) / 100); syncMuteIcon(); });
+  volMusique.addEventListener("input", () => { const v = Number(volMusique.value) / 100; audio.setVolumeMusique(v); ecrireVolume("jp2VolMusique", v); syncMuteIcon(); });
+  volEffets.addEventListener("input", () => { const v = Number(volEffets.value) / 100; audio.setVolumeEffets(v); ecrireVolume("jp2VolEffets", v); syncMuteIcon(); });
+  // En lâchant le curseur des effets : un bruitage, pour entendre le réglage.
+  volEffets.addEventListener("change", () => { try { bruitages.jouer("sonnette", { prioritaire: true }); } catch (e) { /* pas de son */ } });
   ["pointerdown", "pointerup", "touchstart", "touchmove", "touchend", "mousedown"].forEach((t) => {
     pauseScreen.addEventListener(t, (e) => e.stopPropagation());
     [muteButton, pauseButton].forEach((b) => b.addEventListener(t, (e) => e.stopPropagation()));

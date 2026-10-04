@@ -3,6 +3,11 @@
 // l'instrumental »). Zéro fichier : oscillateurs et bruit filtré sur le
 // contexte du morceau, via audio.sfxOutput() (donc derrière le curseur de
 // volume). Gains bas : présents, jamais devant la musique.
+// ⚠️ Réaccordés le 4 octobre 2026 (nuit, « tous les bruitages sur la gamme ») :
+// le morceau est en mi mineur / sol majeur ; toutes les notes ci-dessous sont
+// dans la PENTATONIQUE de sol (sol la si ré mi — voir bruitages.js, GAMME).
+// Avant : do majeur (lait, fin), mi majeur (pièce rouge), des glissés qui
+// finissaient entre deux notes (salto, pote perdu).
 
 import * as audio from "./audio.js";
 
@@ -34,15 +39,15 @@ function tone(ctx, dest, { type = "sine", f0, f1 = f0, t0, dur, gain, curve = "e
 // Pièce : petit blip clair.
 export function piece() {
   const o = out(); if (!o) return;
-  tone(o.ctx, o.dest, { f0: 880, f1: 1320, t0: o.ctx.currentTime, dur: 0.09, gain: 0.05 });
+  tone(o.ctx, o.dest, { f0: 880, f1: 1318.51, t0: o.ctx.currentTime, dur: 0.09, gain: 0.05 }); // la5 → mi6
 }
 
 // Pièce DOUBLE (5 octobre 2026) : deux blips qui montent.
 export function pieceDouble() {
   const o = out(); if (!o) return;
   const t0 = o.ctx.currentTime;
-  tone(o.ctx, o.dest, { f0: 880, f1: 1320, t0, dur: 0.08, gain: 0.05 });
-  tone(o.ctx, o.dest, { f0: 1320, f1: 1980, t0: t0 + 0.07, dur: 0.11, gain: 0.05 });
+  tone(o.ctx, o.dest, { f0: 880, f1: 1318.51, t0, dur: 0.08, gain: 0.05 });            // la5 → mi6
+  tone(o.ctx, o.dest, { f0: 1318.51, f1: 1975.53, t0: t0 + 0.07, dur: 0.11, gain: 0.05 }); // mi6 → si6
 }
 
 // Pote qui arrive : souffle d'herbe (bruit filtré) + montée douce.
@@ -63,7 +68,7 @@ export function pote() {
 // Pote perdu : choc mat.
 export function potePerdu() {
   const o = out(); if (!o) return;
-  tone(o.ctx, o.dest, { type: "square", f0: 180, f1: 80, t0: o.ctx.currentTime, dur: 0.22, gain: 0.07 });
+  tone(o.ctx, o.dest, { type: "square", f0: 196, f1: 98, t0: o.ctx.currentTime, dur: 0.22, gain: 0.07 }); // sol3 → sol2
 }
 
 // Saut : souffle court. Salto : souffle + montée.
@@ -81,26 +86,26 @@ export function saut() {
 export function salto() {
   saut();
   const o = out(); if (!o) return;
-  tone(o.ctx, o.dest, { f0: 520, f1: 1240, t0: o.ctx.currentTime, dur: 0.28, gain: 0.05 });
+  tone(o.ctx, o.dest, { f0: 493.88, f1: 1174.66, t0: o.ctx.currentTime, dur: 0.28, gain: 0.05 }); // si4 → ré6
 }
 
 // Brique de lait : arpège rapide.
 export function lait() {
   const o = out(); if (!o) return;
   const t0 = o.ctx.currentTime;
-  [523, 659, 784, 1046].forEach((f, i) => tone(o.ctx, o.dest, { f0: f, t0: t0 + i * 0.06, dur: 0.18, gain: 0.05 }));
+  [392, 493.88, 587.33, 783.99].forEach((f, i) => tone(o.ctx, o.dest, { f0: f, t0: t0 + i * 0.06, dur: 0.18, gain: 0.05 })); // sol si ré sol
 }
 
 // Pièce rouge : accord qui brille.
 export function rouge() {
   const o = out(); if (!o) return;
   const t0 = o.ctx.currentTime;
-  [659, 830, 1108, 1318].forEach((f, i) => tone(o.ctx, o.dest, { f0: f, t0: t0 + i * 0.05, dur: 0.5, gain: 0.05 }));
+  [659.26, 783.99, 987.77, 1318.51].forEach((f, i) => tone(o.ctx, o.dest, { f0: f, t0: t0 + i * 0.05, dur: 0.5, gain: 0.05 })); // mi sol si mi
 }
 
 // Fin du morceau = fin de la course : accord long.
 export function fin() {
   const o = out(); if (!o) return;
   const t0 = o.ctx.currentTime;
-  [261, 329, 392, 523].forEach((f) => tone(o.ctx, o.dest, { f0: f, t0, dur: 1.2, gain: 0.04 }));
+  [196, 293.66, 392, 493.88].forEach((f) => tone(o.ctx, o.dest, { f0: f, t0, dur: 1.2, gain: 0.04 })); // sol ré sol si
 }

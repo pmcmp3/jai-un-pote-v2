@@ -49,6 +49,27 @@ let envelopeGain = null;
 let volumeGain = null;
 let focusGain = null;
 let pendingVolume = 1; // valeur demandée avant que le graphe audio existe
+// Deux curseurs dans les options (4 octobre 2026, nuit : « un réglage pour la
+// musique et un réglage pour les effets sonores ») : musiqueGain porte le
+// morceau et la boucle de mort ; effetsGain TOUS les bruitages (sfx.js,
+// bruitages.js, ambiance.js, le marchand, la voix « pfff, aïe »). Les deux
+// arrivent sur volumeGain (volume général). effetsGain est PERSISTANT (créé au
+// premier bruitage, même avant le morceau) et rebranché sur chaque nouveau
+// volumeGain : playNow recrée tout le graphe à chaque reprise.
+let musiqueGain = null;
+let effetsGain = null, effetsBranche = null;
+let pendingMusique = 1, pendingEffets = 1;
+function sortieEffets() {
+  if (!audioCtx) return null;
+  if (!effetsGain) { effetsGain = audioCtx.createGain(); effetsGain.gain.value = pendingEffets; effetsBranche = null; }
+  const cible = volumeGain || audioCtx.destination;
+  if (effetsBranche !== cible) {
+    try { effetsGain.disconnect(); } catch (e) { /* jamais branché */ }
+    effetsGain.connect(cible);
+    effetsBranche = cible;
+  }
+  return effetsGain;
+}
 let currentSource = null; // nœud en cours de lecture, pour pouvoir l'arrêter au rejeu
 
 // Filtre passe-bas inséré en bout de chaîne, transparent en temps normal
@@ -142,7 +163,7 @@ function startReviveLoop() {
   // volumeGain peut ne pas exister si la partie a démarré sans morceau décodé
   // (horloge de secours) : dans ce cas il n'y a de toute façon pas de buffer,
   // on n'arrive jamais ici. Repli défensif quand même.
-  loopGain.connect(volumeGain || audioCtx.destination);
+  loopGain.connect(musiqueGain || volumeGain || audioCtx.destination);
   loopSource.start(t, r.debut);
 }
 
@@ -343,6 +364,8 @@ function playNow(offset = 0) {
   envelopeGain = audioCtx.createGain();
   volumeGain = audioCtx.createGain();
   volumeGain.gain.value = pendingVolume;
+  musiqueGain = audioCtx.createGain();
+  musiqueGain.gain.value = pendingMusique;
   focusGain = audioCtx.createGain();
   focusGain.gain.value = mode === "silent" ? 0 : 1; // repart coupé si on est déjà en pause silencieuse
   lowpass = audioCtx.createBiquadFilter();
@@ -356,7 +379,8 @@ function playNow(offset = 0) {
   analyser.smoothingTimeConstant = 0.75;
 
   sourceNode.connect(envelopeGain);
-  envelopeGain.connect(volumeGain);
+  envelopeGain.connect(musiqueGain);
+  musiqueGain.connect(volumeGain);
   volumeGain.connect(lowpass);
   lowpass.connect(focusGain);
   focusGain.connect(analyser);
@@ -382,6 +406,7 @@ function playNow(offset = 0) {
     envelopeGain.gain.linearRampToValueAtTime(1, now + fonduEntree);
   }
 
+  sortieEffets(); // les bruitages suivent le nouveau volumeGain (pause étouffée, onglet quitté)
   sourceNode.start(0, audioOffset);
   startCtxTime = now - offset; // now() doit renvoyer `offset` à cet instant précis
   clockShift = 0;              // la lecture repart calée sur la course : plus aucun retard à traîner
@@ -394,7 +419,7 @@ function playNow(offset = 0) {
   if ("mediaSession" in navigator) {
     try {
       navigator.mediaSession.metadata = new MediaMetadata({
-        title: "La ville est belle",
+        title: "J'ai un pote",
         artist: "PMC",
         artwork: [{ src: "assets/cover-ep.webp", sizes: "480x480", type: "image/webp" }],
       });
@@ -585,6 +610,15 @@ export function setVolume(v) {
 export function getVolume() {
   return pendingVolume;
 }
+// Les deux curseurs des options (0..1), retenus avant même que le son existe.
+function regler(gainNode, v) {
+  if (!gainNode || !audioCtx) return;
+  gainNode.gain.setTargetAtTime(v, audioCtx.currentTime, 0.03); // glisser le curseur ne grésille pas
+}
+export function setVolumeMusique(v) { pendingMusique = Math.max(0, Math.min(1, v)); regler(musiqueGain, pendingMusique); }
+export function getVolumeMusique() { return pendingMusique; }
+export function setVolumeEffets(v) { pendingEffets = Math.max(0, Math.min(1, v)); regler(effetsGain, pendingEffets); }
+export function getVolumeEffets() { return pendingEffets; }
 
 // Niveaux de l'equalizer de l'écran de fin : `n` bandes 0→1, des BASSES (index
 // 0, à gauche) vers les AIGUS (à droite) — le modèle demandé est l'equalizer
@@ -615,16 +649,17 @@ export function getEqLevels(n) {
 
 // --- Jingle de combo (demandé le 20 août 2026 : « quand y'a un combo, un
 // bruit de pixels dans la tonalité du morceau ») ------------------------------
-// Tonalité MESURÉE du morceau : Ré bémol majeur (chromagramme + corrélation de
-// Krumhansl sur le MP3, corrélation 0,89 — les trois classes de hauteur
-// dominantes sont exactement Ré♭/Fa/La♭, l'accord parfait de Ré♭ majeur).
-// L'arpège ne joue QUE ces trois notes (sur deux octaves) : quel que soit le
-// moment du morceau où le palier tombe, il reste consonant avec le fond.
+// ⚠️ Réaccordé le 4 octobre 2026 (nuit) : il jouait encore en RÉ BÉMOL MAJEUR,
+// la tonalité de « La ville est belle » (le jeu n°1) — fausse sur « J'ai un
+// pote », qui est en MI MINEUR / SOL MAJEUR (mesuré : chromagramme du MP3,
+// notes dominantes mi, do, si, sol, ré, la). Il ne joue plus que la
+// PENTATONIQUE de sol (sol, la, si, ré, mi — voir bruitages.js, GAMME) : pas un
+// demi-ton, rien ne frotte, quel que soit l'accord du moment.
 // Onde carrée = le timbre « console 8 bits » demandé. L'arpège s'allonge d'une
 // note par palier (4 notes au ×1,5, puis 5, puis 6) : le son lui-même dit que
 // ça monte. Branché sur volumeGain (donc le slider et le mute s'appliquent),
 // jamais sur envelopeGain (réservé au fondu du morceau).
-const JINGLE_NOTES = [554.37, 698.46, 830.61, 1108.73, 1396.91, 1661.22]; // Ré♭5 Fa5 La♭5 Ré♭6 Fa6 La♭6
+const JINGLE_NOTES = [587.33, 659.26, 783.99, 987.77, 1174.66, 1318.51]; // Ré5 Mi5 Sol5 Si5 Ré6 Mi6
 const JINGLE_PAS_S = 0.066;   // écart entre deux notes — débit « pièce de Mario »
 // 0,16 → 0,09 le 21 août 2026 (« baisse de 5 dB le bruit des bruitages ») :
 // −5 dB = ×10^(−5/20) ≈ ×0,562, soit 0,16 × 0,562 ≈ 0,09.
@@ -639,10 +674,9 @@ export function playComboJingle(palier) {
   // Repli sur la destination si le graphe du morceau n'existe pas encore
   // (partie lancée avant la fin du décodage) : le volume est alors appliqué
   // à la main, pendingVolume étant la valeur que volumeGain aurait portée.
-  const versGraphe = Boolean(volumeGain);
   const master = audioCtx.createGain();
-  master.gain.value = versGraphe ? 1 : pendingVolume;
-  master.connect(versGraphe ? volumeGain : audioCtx.destination);
+  master.gain.value = volumeGain ? 1 : pendingVolume;
+  master.connect(sortieEffets());
   for (let i = 0; i < nNotes; i++) {
     const osc = audioCtx.createOscillator();
     osc.type = "square";
@@ -707,7 +741,7 @@ export function playVoiceClip() {
 
   const src = audioCtx.createBufferSource();
   src.buffer = voiceBuffer;
-  src.connect(volumeGain || audioCtx.destination);
+  src.connect(sortieEffets());
 
   if (envelopeGain) {
     envelopeGain.gain.cancelScheduledValues(t);
@@ -766,7 +800,7 @@ export function lancerMarchand() {
   const pan = audioCtx.createStereoPanner ? audioCtx.createStereoPanner() : null;
   src.connect(filtre);
   filtre.connect(gain);
-  const sortie = volumeGain || audioCtx.destination;
+  const sortie = sortieEffets();
   if (pan) { gain.connect(pan); pan.connect(sortie); } else gain.connect(sortie);
   marchand = { src, filtre, gain, pan, fini: false, maj: -1 };
   src.onended = () => { if (marchand && marchand.src === src) marchand.fini = true; };
@@ -994,5 +1028,27 @@ export function setPlaybackMode(next) {
 // les fondus de pause du morceau.
 export function sfxOutput() {
   if (!audioCtx || audioCtx.state !== "running") return null;
-  return { ctx: audioCtx, dest: volumeGain || audioCtx.destination };
+  return { ctx: audioCtx, dest: sortieEffets() };
+}
+
+// --- Échantillons (4 octobre 2026, nuit) ---------------------------------------
+// Un fichier son court (la voix « pfff, aïe » du joueur qui se prend un
+// obstacle) : chargé et décodé hors-ligne à la première demande, comme le
+// marchand. null tant qu'il n'est pas prêt (ou s'il manque : le jeu s'en passe).
+const echantillons = new Map(); // url → AudioBuffer | "charge" | "echec"
+export function echantillon(url) {
+  if (!url) return null;
+  const e = echantillons.get(url);
+  if (e && typeof e.getChannelData === "function") return e;
+  if (e) return null;
+  echantillons.set(url, "charge");
+  fetch(url)
+    .then((res) => { if (!res.ok) throw new Error(`HTTP ${res.status}`); return res.arrayBuffer(); })
+    .then((data) => {
+      const Offline = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+      return decodeWith(new Offline(1, 1, 44100), data);
+    })
+    .then((b) => { echantillons.set(url, b); })
+    .catch(() => { echantillons.set(url, "echec"); });
+  return null;
 }

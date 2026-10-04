@@ -119,9 +119,9 @@ const SCENES = {
   train: async () => {
     const d = await course(() => { const p = window.__pote; for (let r = 40; r < 1500; r++) { const d = p.rows.halleA(r); if (d !== null && p.rows.typeHalle(d) === "gare") return d; } return 0; });
     await attendre(3500); // le menu finit de s'effacer
-    for (const k of [3, 6, 9, 14, 22]) {
+    for (const k of (process.env.TRAIN_K || "3,6,9,14,22").split(",").map(Number)) {
       await course(([d, k]) => { const p = window.__pote; p.player.v = d + k; p.player.prevV = p.player.v; p.player.jumpY = p.rows.solAt(p.player.v); p.player.prevJumpY = p.player.jumpY; }, [d, k]);
-      await attendre(60); await photo(`60-train-${k}`);
+      await attendre(60); await photo(`60-train-${k < 0 ? "m" + -k : k}`);
     }
   },
   quilles: async () => {

@@ -29,13 +29,15 @@ await page.goto(`http://localhost:${port}/?debug`);
 const rendus = await page.evaluate(async ({ noms, brut }) => {
   const B = await import("/src/bruitages.js");
   const out = {};
+  // La voix « pfff, aïe » est un fichier : décodée une fois pour le rendu.
+  const voix = await new OfflineAudioContext(1, 1, 44100).decodeAudioData(await (await fetch("/" + window.CONFIG.fichierAie)).arrayBuffer());
   for (const nom of noms.length ? noms : B.NOMS) {
     const sr = 44100;
     const ctx = new OfflineAudioContext(1, sr * 6, sr);
     const g = ctx.createGain();
     g.gain.value = brut ? 1 : (B.NIVEAUX[nom] ?? 1);
     g.connect(ctx.destination);
-    B.rendre(nom, ctx, g, 0.05, { graine: 42, force: 8, surface: "route", doppler: 1 });
+    B.rendre(nom, ctx, g, 0.05, { graine: 42, force: 8, surface: "route", doppler: 1, buffer: voix, prise: 0 });
     const d = (await ctx.startRendering()).getChannelData(0);
     let fin = d.length - 1;
     while (fin > 0 && Math.abs(d[fin]) < 1e-4) fin--;

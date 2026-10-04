@@ -121,14 +121,15 @@ function velo(E, t) {
   if (roule && S.grain) {
     C.gSol.gain.setTargetAtTime(NIV(S.grain === "latte" ? "planches" : "neigeRoule") * V, t, 0.05);
     const cadence = S.grain === "latte" ? E.vitesse : S.cadence * (0.6 + 0.6 * vit);
-    rafale("sol", t, cadence, (tt) => B.jouerGrain(ctx, C.gSol, S.grain, tt, 0.85 + alea() * 0.3));
+    // (Les lattes sonnent une note : rejouées à la seconde près, ré-sol ou mi-la, sur la gamme.)
+    rafale("sol", t, cadence, (tt) => B.jouerGrain(ctx, C.gSol, S.grain, tt, S.grain === "latte" ? (alea() < 0.5 ? 1 : 1.1225) : 0.85 + alea() * 0.3));
   } else rafales.sol = 0;
   // La roue libre : « tic-tic-tic » en l'air, et après l'arrivée.
   const roueLibre = (!E.auSol && E.tAir > 0.12) || E.etat === "fin";
   if (roueLibre) {
     C.gTic.gain.setTargetAtTime(NIV("roueLibre") * V * fin, t, 0.04);
     const cadence = E.etat === "fin" ? Math.max(6, 22 - E.finAge * 4) : 26 - 8 * Math.min(1, E.tAir / 1.6);
-    rafale("roue", t, cadence, (tt) => B.jouerGrain(ctx, C.gTic, "tic", tt, 0.95 + alea() * 0.1));
+    rafale("roue", t, cadence, (tt) => B.jouerGrain(ctx, C.gTic, "tic", tt, alea() < 0.75 ? 1 : 0.8909)); // mi8, parfois ré8
   } else rafales.roue = 0;
   // Le vent de la vitesse : plus fort en l'air, au turbo, en jetpack.
   const souffle = vit * vit * (1 + (E.auSol ? 0 : 0.5) + (E.turbo ? 1.2 : 0) + (E.jetpack ? 0.8 : 0)) * fin;
@@ -184,9 +185,8 @@ function betes(E, t) {
     const x = E.ecranX(r);
     if (x > 1.02) continue;
     appels.add(r);
-    // Quatre sur cinq, jamais deux d'affilée trop vite.
-    const h = Math.abs(Math.sin(r * 12.9898 + 4.1) * 43758.5453) % 1;
-    if (h < 0.8 && t - dernier.appel > 1) { dernier.appel = t; B.jouer(B.APPELS[row.kind], { pan: clamp(2 * x - 1, -0.2, 0.85) }); }
+    // Toutes (« rajoute les miaulements du chat »), jamais deux d'affilée trop vite.
+    if (t - dernier.appel > 1) { dernier.appel = t; B.jouer(B.APPELS[row.kind], { pan: clamp(2 * x - 1, -0.2, 0.85) }); }
   }
 }
 
@@ -207,7 +207,7 @@ function gare(E, t) {
   if (!C.freins) C.freins = B.couche(ctx, bus, "freins");
   const brut = (d + T.arret - p) / T.approche, s = Math.max(0, Math.min(1, brut));
   const vTrain = brut >= 1 ? 0 : 2 * T.elan * s * E.vitesse / T.approche; // rangées/s (immobile tant qu'il attend, hors champ)
-  const off = scene.decalageTrain(d, p), arriere = d + 4 + off, nez = d + rows.HALLE_ROWS - 4 + off;
+  const off = scene.decalageTrain(d, p), arriere = d + T.corps[0] + off, nez = d + T.corps[1] + off;
   const dist = p < arriere ? arriere - p : p > nez ? p - nez : 0;
   const pres = 1 / (1 + (dist / 15) ** 2), pan = clamp(2 * E.ecranX(Math.max(arriere, Math.min(nez, p + 6))) - 1);
   // Le klaxon d'abord, de loin derrière nous.
@@ -276,8 +276,9 @@ function nature(E, t) {
   C.blizzard.gain.setTargetAtTime(neige ? NIV("couche_blizzard") * A : 0, t, 1.2);
   if (neige && t > (prochain.rafale || 0)) {
     prochain.rafale = t + 2 + alea() * 2.5;
-    C.blizzard.f.setTargetAtTime(380 + alea() * 600, t, 0.9);
-    C.blizzard.f2.setTargetAtTime(1000 + alea() * 900, t, 1.1);
+    // Le vent siffle des notes de la gamme (sol4 à la5, si5 à la6).
+    C.blizzard.f.setTargetAtTime(B.n(["G4", "A4", "B4", "D5", "E5", "G5", "A5"][Math.floor(alea() * 7)]), t, 0.9);
+    C.blizzard.f2.setTargetAtTime(B.n(["B5", "D6", "E6", "G6", "A6"][Math.floor(alea() * 5)]), t, 1.1);
   }
   // La mer : une vague toutes les ~7 s, qui monte, se brise et se retire.
   const plage = E.biome === "plage";

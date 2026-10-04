@@ -24,6 +24,31 @@
 
 import * as audio from "./audio.js";
 
+// --- La GAMME du morceau (4 octobre 2026, nuit : « analyse la gamme du
+// morceau [...] et fais en sorte que tous les bruitages soient sur la gamme,
+// pour pas qu'il y ait des fausses notes ») -----------------------------------
+// Mesurée sur le MP3 (python3 outils/gamme.py : chromagramme, profils de Krumhansl) :
+// MI MINEUR / SOL MAJEUR — une seule altération, fa♯ —, accordé sur le La 440
+// (+3 cents). Notes dominantes mi, do, si, sol, ré, la ; la basse descend
+// do-si-la-sol. Tout ce qui a une hauteur ici joue la PENTATONIQUE de sol :
+// sol, la, si, ré, mi. Pas un demi-ton (ni do contre si, ni fa♯ contre sol) :
+// rien ne frotte, quel que soit l'accord qui sonne à ce moment-là. Les
+// glissés (cris, sirènes, Doppler) partent et arrivent sur ces notes.
+const DEGRES = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
+export const PENTATONIQUE = [7, 9, 11, 2, 4]; // sol la si ré mi (classes de hauteur)
+// n("E5") = 659,26 Hz.
+export function n(nom) {
+  const m = 12 * (Number(nom.slice(1)) + 1) + DEGRES[nom[0]];
+  return 440 * Math.pow(2, (m - 69) / 12);
+}
+// La note de la pentatonique la plus proche (tirages au hasard : quilles, verre…).
+export function surGamme(f) {
+  const m = 69 + 12 * Math.log2(f / 440);
+  let best = null;
+  for (let k = Math.floor(m) - 2; k <= Math.ceil(m) + 2; k++) if (PENTATONIQUE.includes(((k % 12) + 12) % 12) && (best === null || Math.abs(k - m) < Math.abs(best - m))) best = k;
+  return 440 * Math.pow(2, (best - 69) / 12);
+}
+
 // --- Briques -------------------------------------------------------------------
 const BRUITS = new WeakMap();
 // 2 s de bruit blanc par contexte, déterministe (rendus hors ligne stables).
@@ -198,25 +223,23 @@ const SONS = {};
 // ===== La ferme =====
 // Poule percutée : « KRAAAK ! bok-bok », et ça bat des ailes.
 SONS.poule = (ctx, out, t0, o) => {
-  const k = 0.94 + o.alea() * 0.12;
-  voix(ctx, out, t0, { hauteur: [[0, 640 * k], [0.05, 1020 * k], [0.18, 900 * k], [0.3, 720 * k]], duree: 0.32, attaque: 0.012, relache: 0.09,
+  voix(ctx, out, t0, { hauteur: [[0, n("E5")], [0.05, n("B5")], [0.18, n("A5")], [0.3, n("E5")]], duree: 0.32, attaque: 0.012, relache: 0.09,
     formants: [[1150, 5, 1], [2500, 6, 0.8], [3700, 7, 0.35]], rugosite: { f: 62, prof: 70 }, grain: 3, souffle: 0.3, alea: o.alea });
-  voix(ctx, out, t0 + 0.4, { hauteur: [[0, 560 * k], [0.07, 440 * k]], duree: 0.08, attaque: 0.006, relache: 0.04,
+  voix(ctx, out, t0 + 0.4, { hauteur: [[0, n("D5")], [0.07, n("A4")]], duree: 0.08, attaque: 0.006, relache: 0.04,
     formants: [[950, 4, 1], [2200, 5, 0.6]], rugosite: { f: 50, prof: 30 }, grain: 2, volume: 0.75 });
-  voix(ctx, out, t0 + 0.55, { hauteur: [[0, 520 * k], [0.07, 410 * k]], duree: 0.08, attaque: 0.006, relache: 0.04,
+  voix(ctx, out, t0 + 0.55, { hauteur: [[0, n("B4")], [0.07, n("G4")]], duree: 0.08, attaque: 0.006, relache: 0.04,
     formants: [[950, 4, 1], [2200, 5, 0.6]], rugosite: { f: 50, prof: 30 }, grain: 2, volume: 0.6 });
   ailes(ctx, out, t0 + 0.02, 0.6, 13, 0.55, o.alea);
 };
 // Poule qui glousse en nous voyant arriver : « bok… bok-bok ».
 SONS.glousse = (ctx, out, t0, o) => {
-  const k = 0.92 + o.alea() * 0.16;
-  [[0, 520], [0.17, 500], [0.27, 560]].forEach(([dt, f], i) => voix(ctx, out, t0 + dt, { hauteur: [[0, f * k], [0.07, f * k * 0.8]], duree: 0.075, attaque: 0.006, relache: 0.035,
+  [[0, "B4", "G4"], [0.17, "B4", "G4"], [0.27, "D5", "A4"]].forEach(([dt, a, b], i) => voix(ctx, out, t0 + dt, { hauteur: [[0, n(a)], [0.07, n(b)]], duree: 0.075, attaque: 0.006, relache: 0.035,
     formants: [[950, 4, 1], [2100, 5, 0.5]], rugosite: { f: 45, prof: 25 }, grain: 1.5, volume: i === 2 ? 1 : 0.8 }));
 };
 // Vache : « MEUUUH » (fachee : plus aigu, plus court — on lui est rentré dedans).
 function meuh(ctx, out, t0, o, fache) {
-  const k = (fache ? 1.25 : 1) * (0.94 + o.alea() * 0.12), d = fache ? 0.75 : 1.15;
-  voix(ctx, out, t0, { hauteur: [[0, 98 * k], [0.22 * d, 128 * k], [0.7 * d, 120 * k], [d, 92 * k]], duree: d, attaque: 0.1, relache: 0.22,
+  const d = fache ? 0.75 : 1.15, [a, b, c, e] = fache ? ["B2", "D3", "D3", "A2"] : ["G2", "B2", "A2", "G2"];
+  voix(ctx, out, t0, { hauteur: [[0, n(a)], [0.22 * d, n(b)], [0.7 * d, n(c)], [d, n(e)]], duree: d, attaque: 0.1, relache: 0.22,
     formants: [[[[0, 300], [0.25 * d, 720], [0.75 * d, 620], [d, 320]], 2.2, 1], [[[0, 900], [0.25 * d, 1180], [d, 820]], 4, 0.45], [2500, 6, 0.08]],
     vibrato: { f: 5.5, prof: 2.5 }, souffle: 0.12, grain: 1.5, alea: o.alea });
 }
@@ -224,8 +247,8 @@ SONS.meuh = (ctx, out, t0, o) => meuh(ctx, out, t0, o, false);
 SONS.vache = (ctx, out, t0, o) => meuh(ctx, out, t0, o, true);
 // Mouton : « BÊÊÊÊ », chevrotant.
 function bee(ctx, out, t0, o, fache) {
-  const k = (fache ? 1.2 : 1) * (0.93 + o.alea() * 0.14), d = fache ? 0.6 : 0.8;
-  voix(ctx, out, t0, { hauteur: [[0, 300 * k], [0.1, 310 * k], [d, 255 * k]], duree: d, attaque: 0.03, relache: 0.15,
+  const d = fache ? 0.6 : 0.8, [a, b] = fache ? ["E4", "D4"] : ["D4", "B3"];
+  voix(ctx, out, t0, { hauteur: [[0, n(a)], [0.1, n(a)], [d, n(b)]], duree: d, attaque: 0.03, relache: 0.15,
     formants: [[[[0, 300], [0.05, 650], [d, 600]], 3, 1], [1850, 5, 0.6], [2700, 6, 0.25]],
     vibrato: { f: 7.2, prof: 22 }, tremolo: { f: 7.2, prof: 0.55 }, souffle: 0.2, grain: 1.2, alea: o.alea });
 }
@@ -233,27 +256,26 @@ SONS.bee = (ctx, out, t0, o) => bee(ctx, out, t0, o, false);
 SONS.mouton = (ctx, out, t0, o) => bee(ctx, out, t0, o, true);
 // Cochon : « groin-groin » quand il nous voit, « COUIIIC » quand on le percute.
 SONS.groin = (ctx, out, t0, o) => {
-  for (const dt of [0, 0.22]) voix(ctx, out, t0 + dt, { type: "square", hauteur: [[0, 95], [0.15, 78]], duree: 0.17, attaque: 0.01, relache: 0.06,
+  for (const dt of [0, 0.22]) voix(ctx, out, t0 + dt, { type: "square", hauteur: [[0, n("G2")], [0.15, n("E2")]], duree: 0.17, attaque: 0.01, relache: 0.06,
     formants: [[420, 2, 1], [1100, 4, 0.4]], tremolo: { f: 26, prof: 0.6 }, grain: 2, souffle: 0.4, alea: o.alea });
 };
 SONS.cochon = (ctx, out, t0, o) => {
-  const k = 0.95 + o.alea() * 0.1;
-  voix(ctx, out, t0, { hauteur: [[0, 750 * k], [0.1, 1350 * k], [0.32, 1150 * k], [0.45, 880 * k]], duree: 0.46, attaque: 0.015, relache: 0.1,
+  voix(ctx, out, t0, { hauteur: [[0, n("G5")], [0.1, n("E6")], [0.32, n("D6")], [0.45, n("A5")]], duree: 0.46, attaque: 0.015, relache: 0.1,
     formants: [[1500, 3, 1], [3000, 4, 0.5]], rugosite: { f: 70, prof: 120 }, grain: 3, souffle: 0.2, alea: o.alea });
 };
 // Chien : « OUAF OUAF » de loin, « kaï kaï kaï » percuté.
 SONS.ouaf = (ctx, out, t0, o) => {
-  for (const dt of [0, 0.22]) voix(ctx, out, t0 + dt, { hauteur: [[0, 420], [0.04, 520], [0.13, 330]], duree: 0.14, attaque: 0.004, relache: 0.05,
+  for (const dt of [0, 0.22]) voix(ctx, out, t0 + dt, { hauteur: [[0, n("A4")], [0.04, n("B4")], [0.13, n("E4")]], duree: 0.14, attaque: 0.004, relache: 0.05,
     formants: [[650, 2.5, 1], [1500, 3.5, 0.6], [2800, 5, 0.2]], grain: 4, souffle: 0.5, alea: o.alea });
 };
 SONS.chien = (ctx, out, t0, o) => {
-  [0, 0.12, 0.26].forEach((dt, i) => voix(ctx, out, t0 + dt, { hauteur: [[0, 1250 - i * 60], [0.07, 900 - i * 60]], duree: 0.09, attaque: 0.004, relache: 0.04,
+  [[0, "E6", "A5"], [0.12, "D6", "G5"], [0.26, "E6", "A5"]].forEach(([dt, a, b], i) => voix(ctx, out, t0 + dt, { hauteur: [[0, n(a)], [0.07, n(b)]], duree: 0.09, attaque: 0.004, relache: 0.04,
     formants: [[1300, 3, 1], [2600, 4, 0.5]], grain: 2, souffle: 0.15, alea: o.alea, volume: 1 - i * 0.15 }));
 };
 // Chat : « miaou », puis « MRAOU-hhhh » quand on lui roule dessus.
 function miaou(ctx, out, t0, o, fache) {
-  const k = fache ? 1.3 : 1, d = fache ? 0.42 : 0.55;
-  voix(ctx, out, t0, { hauteur: [[0, 520 * k], [0.27 * d, 760 * k], [0.76 * d, 600 * k], [d, 480 * k]], duree: d, attaque: 0.02, relache: 0.12,
+  const d = fache ? 0.42 : 0.55, [a, b, c, e] = fache ? ["E5", "B5", "G5", "D5"] : ["B4", "G5", "D5", "B4"];
+  voix(ctx, out, t0, { hauteur: [[0, n(a)], [0.27 * d, n(b)], [0.76 * d, n(c)], [d, n(e)]], duree: d, attaque: 0.02, relache: 0.12,
     formants: [[[[0, 500], [0.22 * d, 950], [0.73 * d, 700], [d, 420]], 3, 1], [[[0, 2600], [0.22 * d, 1600], [0.73 * d, 1100], [d, 900]], 5, 0.6], [3300, 7, 0.2]],
     vibrato: { f: 6, prof: 8 }, grain: fache ? 3 : 1.5, souffle: 0.1, alea: o.alea });
   if (fache) bouffee(ctx, out, t0 + d - 0.05, { type: "highpass", f: 2500, q: 0.7, crete: 0.35, attaque: 0.03, tau: 0.12, alea: o.alea });
@@ -270,21 +292,21 @@ SONS.botte = (ctx, out, t0, o) => {
 // ===== Les gens =====
 // « Ouf ! » (un souffle voisé) et le choc du corps ; la voix suit la personne.
 SONS.ouf = (ctx, out, t0, o) => {
-  const f0 = (o.femme ? 230 : 135) * (0.93 + o.alea() * 0.14);
-  voix(ctx, out, t0, { hauteur: [[0, f0 * 1.15], [0.05, f0 * 1.25], [0.2, f0 * 0.85]], duree: 0.22, attaque: 0.008, relache: 0.08,
+  const [a, b, c] = o.femme ? ["B3", "D4", "G3"] : ["D3", "E3", "A2"];
+  voix(ctx, out, t0, { hauteur: [[0, n(a)], [0.05, n(b)], [0.2, n(c)]], duree: 0.22, attaque: 0.008, relache: 0.08,
     formants: [[380, 4, 1], [900, 5, 0.5], [2400, 6, 0.12]], souffle: 0.35, grain: 1.5, alea: o.alea });
   coupSourd(ctx, out, t0, { f0: 110, f1: 55, duree: 0.12, crete: 0.7 });
 };
 // Le costard : en plus, la mallette qui claque et les feuilles qui volent.
 SONS.costard = (ctx, out, t0, o) => {
   SONS.ouf(ctx, out, t0, o);
-  partiels(ctx, out, t0 + 0.12, [[1900, 0.25, 0.012], [3100, 0.12, 0.008]], 0.0005);
+  partiels(ctx, out, t0 + 0.12, [[n("B6"), 0.25, 0.012], [n("G7"), 0.12, 0.008]], 0.0005);
   for (let i = 0; i < 10; i++) bouffee(ctx, out, t0 + 0.15 + o.alea() * 0.45, { f: 3500 + o.alea() * 2500, q: 1.2, crete: 0.1 + o.alea() * 0.1, attaque: 0.01, tau: 0.02, alea: o.alea });
 };
 // Le skieur : en plus, les skis et les bâtons qui s'entrechoquent dans la neige.
 SONS.skieur = (ctx, out, t0, o) => {
   SONS.ouf(ctx, out, t0, o);
-  for (const dt of [0.05, 0.11, 0.2]) { bouffee(ctx, out, t0 + dt, { f: 1100, q: 4, crete: 0.5, attaque: 0.001, tau: 0.012, alea: o.alea }); partiels(ctx, out, t0 + dt, [[1150, 0.15, 0.02]], 0.0005); }
+  for (const dt of [0.05, 0.11, 0.2]) { bouffee(ctx, out, t0 + dt, { f: n("D6"), q: 4, crete: 0.5, attaque: 0.001, tau: 0.012, alea: o.alea }); partiels(ctx, out, t0 + dt, [[n("D6"), 0.15, 0.02]], 0.0005); }
   bouffee(ctx, out, t0 + 0.02, { f: 2400, q: 0.8, crete: 0.3, attaque: 0.01, tau: 0.1, alea: o.alea });
 };
 // Le bonhomme de neige : « pouf », il s'effondre en crissant.
@@ -299,16 +321,16 @@ SONS.bonhomme = (ctx, out, t0, o) => {
 // chacun le sien. doppler > 1 : il fonce vers nous.
 const KLAXONS = {
   // La voiture : « tut-tuuut », double ton européen.
-  contresens: { notes: [415, 523], segments: [[0, 0.11], [0.17, 0.5]], f: 1700, q: 1.1, grain: 2.2, corps: 0.5 },
-  voiture: { notes: [415, 523], segments: [[0, 0.11], [0.17, 0.5]], f: 1700, q: 1.1, grain: 2.2, corps: 0.5 },
+  contresens: { notes: [n("G4"), n("B4")], segments: [[0, 0.11], [0.17, 0.5]], f: 1700, q: 1.1, grain: 2.2, corps: 0.5 },
+  voiture: { notes: [n("G4"), n("B4")], segments: [[0, 0.11], [0.17, 0.5]], f: 1700, q: 1.1, grain: 2.2, corps: 0.5 },
   // Le car scolaire : grave, long, le ton qui s'installe.
-  bus: { notes: [233, 294], type: "sawtooth", segments: [[0, 0.62]], f: 900, q: 0.9, grain: 2, bend: -0.04, attaque: 0.03, corps: 0.7 },
+  bus: { notes: [n("D3"), n("G3")], type: "sawtooth", segments: [[0, 0.62]], f: 900, q: 0.9, grain: 2, bend: -0.04, attaque: 0.03, corps: 0.7 },
   // Le tracteur : « pouet-pouet » nasillard.
-  tracteur: { notes: [349], segments: [[0, 0.13], [0.2, 0.34]], f: 1250, q: 3, grain: 3, corps: 0.3 },
+  tracteur: { notes: [n("E4")], segments: [[0, 0.13], [0.2, 0.34]], f: 1250, q: 3, grain: 3, corps: 0.3 },
   // Le chasse-neige : la corne de camion.
-  chasseneige: { notes: [165, 208, 247], type: "sawtooth", segments: [[0, 0.85]], f: 700, q: 0.8, grain: 1.8, bend: -0.05, attaque: 0.05, corps: 0.8 },
+  chasseneige: { notes: [n("E3"), n("G3"), n("B3")], type: "sawtooth", segments: [[0, 0.85]], f: 700, q: 0.8, grain: 1.8, bend: -0.05, attaque: 0.05, corps: 0.8 },
   // Le buggy : « bip-bip ! ».
-  buggy: { notes: [740], segments: [[0, 0.08], [0.13, 0.21]], f: 2200, q: 1.5, grain: 1.5, corps: 0.3 },
+  buggy: { notes: [n("G5")], segments: [[0, 0.08], [0.13, 0.21]], f: 2200, q: 1.5, grain: 1.5, corps: 0.3 },
 };
 for (const [kind, k] of Object.entries(KLAXONS)) SONS[`klaxon_${kind}`] = (ctx, out, t0, o) => klaxon(ctx, out, t0, { ...k, doppler: o.doppler || 1 });
 // Choc contre un véhicule : le coup, la tôle, le verre, et le klaxon qui
@@ -317,15 +339,18 @@ SONS.carambolage = (ctx, out, t0, o) => {
   const k = o.gros ? 0.7 : 1, a = o.alea;
   coupSourd(ctx, out, t0, { f0: 85 * k, f1: 36 * k, duree: 0.32, crete: 1 });
   bouffee(ctx, out, t0, { type: "lowpass", f: 2400, crete: 0.8, tau: 0.06, alea: a });
-  partiels(ctx, out, t0 + 0.005, [[370 * k, 0.3, 0.12], [912 * k, 0.22, 0.09], [1495 * k, 0.16, 0.07], [2210 * k, 0.12, 0.05], [3130 * k, 0.08, 0.04]]);
-  if (!o.gros) for (let i = 0; i < 6; i++) partiels(ctx, out, t0 + 0.04 + a() * 0.3, [[2800 + a() * 3600, 0.05 + a() * 0.05, 0.04]], 0.0005);
+  // La tôle : des partiels posés sur la gamme (une tôle n'a pas de note, mais
+  // ses résonances, si — et elles tombaient entre les notes du morceau).
+  const tole = o.gros ? ["B3", "E5", "B5", "G6", "D7"] : ["G4", "A5", "G6", "D7", "G7"];
+  partiels(ctx, out, t0 + 0.005, tole.map((nm, i) => [n(nm), [0.3, 0.22, 0.16, 0.12, 0.08][i], [0.12, 0.09, 0.07, 0.05, 0.04][i]]));
+  if (!o.gros) for (let i = 0; i < 6; i++) partiels(ctx, out, t0 + 0.04 + a() * 0.3, [[surGamme(2800 + a() * 3600), 0.05 + a() * 0.05, 0.04]], 0.0005);
   klaxon(ctx, out, t0 + 0.06, { ...KLAXONS[o.gros ? "bus" : "contresens"], segments: [[0, 0.14]], doppler: 0.96 });
 };
 
 // ===== Le vélo =====
 // La sonnette, pour les piétons qui arrivent (« dring-dring »).
 SONS.sonnette = (ctx, out, t0) => {
-  for (const dt of [0, 0.05, 0.1, 0.32, 0.37, 0.42]) partiels(ctx, out, t0 + dt, [[2650, 0.5, 0.22], [3950, 0.3, 0.16], [5350, 0.18, 0.1], [7100, 0.08, 0.07]], 0.001);
+  for (const dt of [0, 0.05, 0.1, 0.32, 0.37, 0.42]) partiels(ctx, out, t0 + dt, [[n("E7"), 0.5, 0.22], [n("B7"), 0.3, 0.16], [n("E8"), 0.18, 0.1], [n("A8"), 0.08, 0.07]], 0.001);
 };
 // L'atterrissage : le pneu qui écrase, la chaîne qui claque — et ce sur quoi
 // on retombe (neige, sable, planches, toit de voiture).
@@ -333,11 +358,11 @@ SONS.atterrissage = (ctx, out, t0, o) => {
   const f = Math.max(0.25, Math.min(1, (o.force || 6) / 10)), a = o.alea;
   coupSourd(ctx, out, t0, { f0: 120, f1: 55, duree: 0.1, crete: 0.6 + 0.4 * f });
   bouffee(ctx, out, t0, { type: "lowpass", f: 600, crete: 0.15 + 0.4 * f, tau: 0.03, alea: a });
-  for (let i = 0; i < 3; i++) partiels(ctx, out, t0 + 0.01 + i * 0.018 * (1 + a()), [[3200 + a() * 2400, 0.1 * f, 0.012]], 0.0005);
+  for (let i = 0; i < 3; i++) partiels(ctx, out, t0 + 0.01 + i * 0.018 * (1 + a()), [[surGamme(3200 + a() * 2400), 0.1 * f, 0.012]], 0.0005);
   if (o.surface === "neige") for (let i = 0; i < 6; i++) bouffee(ctx, out, t0 + a() * 0.08, { f: 1800 + a() * 1400, q: 1, crete: 0.3 * f, attaque: 0.002, tau: 0.008, alea: a });
   else if (o.surface === "sable") bouffee(ctx, out, t0, { type: "lowpass", f: 1200, crete: 0.5 * f, attaque: 0.006, tau: 0.08, alea: a });
-  else if (o.surface === "bois" || o.surface === "piste") { partiels(ctx, out, t0, [[180, 0.4 * f, 0.06], [420, 0.2 * f, 0.04]]); bouffee(ctx, out, t0, { f: 800, q: 3, crete: 0.5 * f, tau: 0.02, alea: a }); }
-  else if (o.surface === "toit") partiels(ctx, out, t0, [[176, 0.5 * f, 0.25], [412, 0.35 * f, 0.18], [688, 0.25 * f, 0.12], [1050, 0.15 * f, 0.08]]);
+  else if (o.surface === "bois" || o.surface === "piste") { partiels(ctx, out, t0, [[n("G3"), 0.4 * f, 0.06], [n("G4"), 0.2 * f, 0.04]]); bouffee(ctx, out, t0, { f: 800, q: 3, crete: 0.5 * f, tau: 0.02, alea: a }); }
+  else if (o.surface === "toit") partiels(ctx, out, t0, [[n("E3"), 0.5 * f, 0.25], [n("G4"), 0.35 * f, 0.18], [n("E5"), 0.25 * f, 0.12], [n("B5"), 0.15 * f, 0.08]]);
 };
 
 // ===== La gare =====
@@ -345,8 +370,10 @@ SONS.atterrissage = (ctx, out, t0, o) => {
 // comme une corne à air.
 SONS.train = (ctx, out, t0, o) => {
   const d = o.doppler || 1;
-  klaxon(ctx, out, t0, { notes: [554, 556, 277], type: "sawtooth", segments: [[0, 0.45]], f: 1100, q: 0.7, grain: 1.6, bend: -0.03, attaque: 0.05, corps: 0.6, doppler: d });
-  klaxon(ctx, out, t0 + 0.55, { notes: [440, 442, 220], type: "sawtooth", segments: [[0, 1.1]], f: 950, q: 0.7, grain: 1.6, bend: -0.03, attaque: 0.06, corps: 0.6, doppler: d * 0.985 });
+  // Ré puis La (une quarte qui descend), doublés d'un souffle de cents pour
+  // l'épaisseur. Pas de Doppler : il désaccorderait les deux tons.
+  klaxon(ctx, out, t0, { notes: [n("D5"), n("D5") * 1.003, n("D4")], type: "sawtooth", segments: [[0, 0.45]], f: 1100, q: 0.7, grain: 1.6, bend: -0.03, attaque: 0.05, corps: 0.6 });
+  klaxon(ctx, out, t0 + 0.55, { notes: [n("A4"), n("A4") * 1.003, n("A3")], type: "sawtooth", segments: [[0, 1.1]], f: 950, q: 0.7, grain: 1.6, bend: -0.03, attaque: 0.06, corps: 0.6 });
 };
 // « Ta-dam » : deux essieux sur un joint de rail.
 SONS.rail = (ctx, out, t0, o) => {
@@ -364,7 +391,7 @@ SONS.pschit = (ctx, out, t0, o) => {
 };
 // Le carillon des annonces (deux notes, rien de plus).
 SONS.carillon = (ctx, out, t0) => {
-  for (const [dt, f] of [[0, 880], [0.42, 698.5]]) partiels(ctx, out, t0 + dt, [[f, 0.7, 0.5], [f * 2, 0.15, 0.25], [f * 3, 0.06, 0.15]], 0.004);
+  for (const [dt, f] of [[0, n("B5")], [0.42, n("G5")]]) partiels(ctx, out, t0 + dt, [[f, 0.7, 0.5], [f * 2, 0.15, 0.25], [f * 4, 0.06, 0.15]], 0.004);
 };
 
 // ===== Le bowling =====
@@ -377,9 +404,9 @@ SONS.quilles = (ctx, out, t0, o) => {
   const n = 9 + Math.floor(a() * 4);
   for (let i = 0; i < n; i++) {
     const t = t0 + 0.004 + (i < 5 ? i * 0.011 : 0.05 + Math.min(0.45, -0.11 * Math.log(1 - a() * 0.98)));
-    const f = 900 + a() * 1900, cr = (i < 5 ? 0.9 : 0.55) * (0.5 + 0.5 * a());
+    const f = surGamme(900 + a() * 1900), cr = (i < 5 ? 0.9 : 0.55) * (0.5 + 0.5 * a());
     bouffee(ctx, out, t, { f, q: 7, crete: cr * 1.6, attaque: 0.001, tau: 0.03, alea: a });
-    partiels(ctx, out, t, [[f, cr * 0.25, 0.035], [f * 2.7, cr * 0.08, 0.02]], 0.001);
+    partiels(ctx, out, t, [[f, cr * 0.25, 0.035], [surGamme(f * 2.7), cr * 0.08, 0.02]], 0.001);
   }
 };
 
@@ -388,20 +415,20 @@ SONS.quilles = (ctx, out, t0, o) => {
 SONS.oiseau = (ctx, out, t0, o) => {
   const a = o.alea, espece = Math.floor(a() * 3);
   if (espece === 0) {
-    for (let i = 0; i < 3; i++) { sifflet(ctx, out, t0 + i * 0.22, 4300, 4100, 0.07, 1); sifflet(ctx, out, t0 + i * 0.22 + 0.09, 3300, 3200, 0.08, 0.8); }
+    for (let i = 0; i < 3; i++) { sifflet(ctx, out, t0 + i * 0.22, n("B7"), n("B7") * 0.995, 0.07, 1); sifflet(ctx, out, t0 + i * 0.22 + 0.09, n("G7"), n("G7") * 0.995, 0.08, 0.8); }
   } else if (espece === 1) {
     let t = t0;
-    const n = 2 + Math.floor(a() * 3);
-    for (let i = 0; i < n; i++) { sifflet(ctx, out, t, 3600 + a() * 900, 2900, 0.05, 0.9, 180); t += 0.12 + a() * 0.08; }
+    const nb = 2 + Math.floor(a() * 3), paires = [["B7", "G7"], ["D8", "B7"], ["A7", "E7"]];
+    for (let i = 0; i < nb; i++) { const [x, y] = paires[Math.floor(a() * 3)]; sifflet(ctx, out, t, n(x), n(y), 0.05, 0.9, 180); t += 0.12 + a() * 0.08; }
   } else {
     let t = t0;
-    const n = 3 + Math.floor(a() * 3);
-    for (let i = 0; i < n; i++) { const f0 = 1700 + a() * 1100, d = 0.08 + a() * 0.12; sifflet(ctx, out, t, f0, f0 * (0.85 + a() * 0.4), d, 0.9); t += d + 0.04 + a() * 0.08; }
+    const nb = 3 + Math.floor(a() * 3), notes = ["G6", "A6", "B6", "D7", "E7"];
+    for (let i = 0; i < nb; i++) { const d = 0.08 + a() * 0.12; sifflet(ctx, out, t, n(notes[Math.floor(a() * 5)]), n(notes[Math.floor(a() * 5)]), d, 0.9); t += d + 0.04 + a() * 0.08; }
   }
 };
 // Grillon (la nuit) : des paquets de trois impulsions, une seule source.
 SONS.grillon = (ctx, out, t0, o) => {
-  const f = 4300 + o.alea() * 700, s = osc(ctx, "sine", f), g = gain(ctx, 0);
+  const f = o.alea() < 0.5 ? n("B7") : n("D8"), s = osc(ctx, "sine", f), g = gain(ctx, 0);
   for (let k = 0; k < 6; k++) for (let i = 0; i < 3; i++) {
     const t = t0 + k * 0.34 + i * 0.026;
     g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(1, t + 0.003); g.gain.linearRampToValueAtTime(0, t + 0.016);
@@ -413,9 +440,9 @@ SONS.grillon = (ctx, out, t0, o) => {
 SONS.chouette = (ctx, out, t0) => {
   const lp = filtre(ctx, "lowpass", 1000, 0.7);
   lp.connect(out);
-  for (const [dt, f, d] of [[0, 420, 0.42], [0.75, 395, 0.2], [1.0, 400, 0.38]]) {
+  for (const [dt, f, d] of [[0, n("G4"), 0.42], [0.75, n("E4"), 0.2], [1.0, n("E4"), 0.38]]) {
     const s = osc(ctx, "sine", f), g = gain(ctx, 0);
-    s.frequency.setValueAtTime(f, t0 + dt); s.frequency.linearRampToValueAtTime(f * 0.94, t0 + dt + d);
+    s.frequency.setValueAtTime(f, t0 + dt); s.frequency.linearRampToValueAtTime(f * 0.985, t0 + dt + d);
     g.gain.setValueAtTime(0, t0 + dt); g.gain.linearRampToValueAtTime(1, t0 + dt + 0.06); g.gain.setValueAtTime(1, t0 + dt + d * 0.6); g.gain.linearRampToValueAtTime(0, t0 + dt + d);
     s.connect(g); g.connect(lp);
     s.start(t0 + dt); s.stop(t0 + dt + d + 0.02);
@@ -423,11 +450,12 @@ SONS.chouette = (ctx, out, t0) => {
 };
 // Mouettes : « kiaou kiaou ».
 SONS.mouette = (ctx, out, t0, o) => {
-  const a = o.alea, k = 0.9 + a() * 0.2;
+  // Mi-Ré-La-Mi, ou une quarte plus bas (Si-La-Mi-Si) : toujours sur la gamme.
+  const a = o.alea, k = a() < 0.5 ? 1 : 0.75;
   let t = t0;
-  const n = 2 + Math.floor(a() * 3);
-  for (let i = 0; i < n; i++) {
-    voix(ctx, out, t, { hauteur: [[0, 1250 * k], [0.06, 2150 * k], [0.18, 1700 * k], [0.27, 1350 * k]], duree: 0.28, attaque: 0.01, relache: 0.1,
+  const nb = 2 + Math.floor(a() * 3);
+  for (let i = 0; i < nb; i++) {
+    voix(ctx, out, t, { hauteur: [[0, n("E6") * k], [0.06, n("D7") * k], [0.18, n("A6") * k], [0.27, n("E6") * k]], duree: 0.28, attaque: 0.01, relache: 0.1,
       formants: [[2100, 3, 1], [3300, 5, 0.4], [1200, 3, 0.3]], rugosite: { f: 90, prof: 60 }, grain: 2.5, souffle: 0.15, alea: a, volume: 1 - i * 0.12 });
     t += 0.3 + a() * 0.12;
   }
@@ -436,10 +464,11 @@ SONS.mouette = (ctx, out, t0, o) => {
 SONS.cloche = (ctx, out, t0, o) => {
   const lp = filtre(ctx, "lowpass", 2600, 0.7);
   lp.connect(out);
-  const f = 196;
+  // Une cloche en MI : bourdon, fondamentale, tierce mineure (sol), quinte (si),
+  // octave, tierce et quinte du dessus — tous ses partiels tombent sur la gamme.
   for (let i = 0; i < (o.coups || 3); i++) {
     const t = t0 + i * 1.7;
-    partiels(ctx, lp, t, [[f * 0.5, 0.5, 1.6], [f, 0.8, 1.1], [f * 1.19, 0.6, 0.8], [f * 1.5, 0.35, 0.6], [f * 2, 0.55, 0.55], [f * 2.52, 0.22, 0.35], [f * 3.01, 0.15, 0.25]]);
+    partiels(ctx, lp, t, [[n("E2"), 0.5, 1.6], [n("E3"), 0.8, 1.1], [n("G3"), 0.6, 0.8], [n("B3"), 0.35, 0.6], [n("E4"), 0.55, 0.55], [n("G4"), 0.22, 0.35], [n("B4"), 0.15, 0.25]]);
     bouffee(ctx, lp, t, { type: "highpass", f: 1800, crete: 0.25, attaque: 0.001, tau: 0.01, alea: o.alea });
   }
 };
@@ -454,26 +483,27 @@ export function grain(ctx, nom) {
   let m = GRAINS.get(ctx);
   if (!m) { m = {}; GRAINS.set(ctx, m); }
   if (m[nom]) return m[nom];
-  const sr = ctx.sampleRate, n = Math.round(sr * ({ tic: 0.008, neige: 0.03, latte: 0.05 }[nom] || 0.02));
-  const b = ctx.createBuffer(1, n, sr), d = b.getChannelData(0);
+  const sr = ctx.sampleRate, nb = Math.round(sr * ({ tic: 0.008, neige: 0.03, latte: 0.05 }[nom] || 0.02));
+  const b = ctx.createBuffer(1, nb, sr), d = b.getChannelData(0);
   let s = 987654;
   const r = () => { s = (Math.imul(s, 1103515245) + 12345) & 0x7fffffff; return s / 0x40000000 - 1; };
-  if (nom === "tic") for (let i = 0; i < n; i++) { const t = i / sr; d[i] = 0.6 * Math.sin(2 * Math.PI * 5200 * t) * Math.exp(-t / 0.0012) + 0.5 * r() * Math.exp(-t / 0.0006); }
-  else if (nom === "latte") for (let i = 0; i < n; i++) { const t = i / sr; d[i] = 0.7 * Math.sin(2 * Math.PI * 620 * t) * Math.exp(-t / 0.009) + 0.35 * Math.sin(2 * Math.PI * 1480 * t) * Math.exp(-t / 0.005) + 0.3 * r() * Math.exp(-t / 0.0015); }
+  const fT = n("E8"), fL1 = n("D5"), fL2 = n("G6");
+  if (nom === "tic") for (let i = 0; i < nb; i++) { const t = i / sr; d[i] = 0.6 * Math.sin(2 * Math.PI * fT * t) * Math.exp(-t / 0.0012) + 0.5 * r() * Math.exp(-t / 0.0006); }
+  else if (nom === "latte") for (let i = 0; i < nb; i++) { const t = i / sr; d[i] = 0.7 * Math.sin(2 * Math.PI * fL1 * t) * Math.exp(-t / 0.009) + 0.35 * Math.sin(2 * Math.PI * fL2 * t) * Math.exp(-t / 0.005) + 0.3 * r() * Math.exp(-t / 0.0015); }
   else {
     // Neige : bruit dans un résonateur passe-bande (RBJ) vers 2,4 kHz.
-    const w = 2 * Math.PI * 2400 / sr, al = Math.sin(w) / 2.4, a0 = 1 + al;
+    const w = 2 * Math.PI * n("D7") / sr, al = Math.sin(w) / 2.4, a0 = 1 + al;
     const b0 = al / a0, b2 = -al / a0, a1 = -2 * Math.cos(w) / a0, a2 = (1 - al) / a0;
     let x1 = 0, x2 = 0, y1 = 0, y2 = 0;
-    for (let i = 0; i < n; i++) {
+    for (let i = 0; i < nb; i++) {
       const t = i / sr, x = r() * Math.exp(-t / 0.006) * Math.min(1, t / 0.002);
       const y = b0 * x + b2 * x2 - a1 * y1 - a2 * y2;
       x2 = x1; x1 = x; y2 = y1; y1 = y; d[i] = y;
     }
   }
   let crete = 0;
-  for (let i = 0; i < n; i++) crete = Math.max(crete, Math.abs(d[i]));
-  for (let i = 0; i < n; i++) d[i] *= 0.9 / (crete || 1);
+  for (let i = 0; i < nb; i++) crete = Math.max(crete, Math.abs(d[i]));
+  for (let i = 0; i < nb; i++) d[i] *= 0.9 / (crete || 1);
   m[nom] = b;
   return b;
 }
@@ -519,7 +549,7 @@ export function couche(ctx, out, nom) {
     // Le crissement des freins : deux sifflements qui battent + un souffle aigu.
     const bp = filtre(ctx, "bandpass", 3300, 8), bg = gain(ctx, 0.6), mix = gain(ctx, 0.5);
     src.connect(bp); bp.connect(bg); bg.connect(g);
-    for (const f of [3150, 3420]) { const o = osc(ctx, "sine", f); o.connect(mix); o.start(t); osc2.push(o); }
+    for (const f of [n("G7"), n("A7")]) { const o = osc(ctx, "sine", f); o.connect(mix); o.start(t); osc2.push(o); }
     mix.connect(g);
   } else if (nom === "boules") {
     const lp = filtre(ctx, "lowpass", 160, 0.8);
@@ -532,15 +562,19 @@ export function couche(ctx, out, nom) {
 // Les MOTEURS de ce qui arrive en face : une note de moteur (passe-bas),
 // modulée au rythme des cylindres, + un bruit (diesel, lame, skis). doppler
 // > 1 tant qu'il fonce vers nous, < 1 une fois passé.
+// ⚠️ Accordés (4 octobre 2026, nuit) : le Doppler fait ×1,06 en approche et
+// ×0,94 une fois passé — un ton d'écart. La note de base est choisie pour que
+// les deux tombent sur la gamme : voiture la1 → sol1, car mi1 → ré1,
+// chasse-neige si0 → la0, buggy mi2 → ré2.
 const MOTEURS = {
-  contresens: { f: 46, lp: 520, am: 23, prof: 0.25 },
-  bus: { f: 36, lp: 420, am: 18, prof: 0.4, bruit: { f: 1400, q: 1.5, g: 0.25 } },
+  contresens: { f: 51.9, lp: 520, am: 23, prof: 0.25 },
+  bus: { f: 38.9, lp: 420, am: 18, prof: 0.4, bruit: { f: 1400, q: 1.5, g: 0.25 } },
   // Le tracteur : « pof-pof-pof », un gros mono-cylindre.
   tracteur: { f: 11, lp: 380, am: 11, prof: 0.7, bruit: { f: 520, q: 1.2, g: 0.5 } },
   // Le chasse-neige : un gros diesel, et la lame qui racle.
-  chasseneige: { f: 30, lp: 380, am: 15, prof: 0.3, bruit: { f: 1000, q: 0.8, g: 0.45 } },
+  chasseneige: { f: 29.1, lp: 380, am: 15, prof: 0.3, bruit: { f: 1000, q: 0.8, g: 0.45 } },
   // Le buggy : un petit deux-temps qui bourdonne.
-  buggy: { f: 72, lp: 1200, bp: 800, am: 36, prof: 0.4 },
+  buggy: { f: 77.8, lp: 1200, bp: 800, am: 36, prof: 0.4 },
   // Le skieur : « chhh… chhh… », ses skis qui glissent à chaque poussée.
   skieur: { f: 0, am: 1.3, prof: 0.9, bruit: { f: 2600, q: 0.9, g: 1 } },
 };
@@ -607,7 +641,10 @@ export const APPELS = { poule: "glousse", vache: "meuh", mouton: "bee", cochon: 
 // Un choc ~12 LU sous la musique, un klaxon ~13, le train ~10, le vélo et
 // l'ambiance ~20-25 (« en pas fort »).
 export const CIBLES = {
-  poule: -22, glousse: -27, vache: -22, meuh: -28, mouton: -22, bee: -28, cochon: -22, groin: -28, chien: -22, ouaf: -27, chat: -22, miaou: -28,
+  // Les bêtes un peu plus fort qu'au premier essai (« rajoute les miaulements
+  // du chat ») : leurs cris d'approche passent de ~18 à ~15 LU sous la musique.
+  poule: -21, glousse: -24, vache: -21, meuh: -25, mouton: -21, bee: -25, cochon: -21, groin: -25, chien: -21, ouaf: -24, chat: -21, miaou: -24,
+  aie: -18, // la voix du joueur : ~8 LU sous la musique, on l'entend à chaque choc
   botte: -24, ouf: -23, costard: -23, skieur: -23, bonhomme: -24, carambolage: -21,
   klaxon_contresens: -23, klaxon_voiture: -23, klaxon_bus: -23, klaxon_tracteur: -24, klaxon_chasseneige: -23, klaxon_buggy: -24,
   sonnette: -25, atterrissage: -27, train: -20, rail: -29, pschit: -28, carillon: -28, quilles: -24,
@@ -618,11 +655,12 @@ export const CIBLES = {
   moteur_contresens: -30, moteur_bus: -29, moteur_tracteur: -29, moteur_chasseneige: -29, moteur_buggy: -30, moteur_skieur: -32,
 };
 export const NIVEAUX = {
-  poule: 0.279, glousse: 0.38, meuh: 0.245, vache: 0.437, bee: 0.285, mouton: 0.589, groin: 0.376, cochon: 0.168, ouaf: 0.143, chien: 0.309,
-  miaou: 0.095, chat: 0.15, botte: 0.676, ouf: 0.631, costard: 0.603, skieur: 0.575, bonhomme: 0.638, carambolage: 0.305, klaxon_contresens: 0.186,
-  klaxon_voiture: 0.186, klaxon_bus: 0.148, klaxon_tracteur: 0.248, klaxon_chasseneige: 0.151, klaxon_buggy: 0.229, sonnette: 0.141,
-  atterrissage: 0.624, train: 0.26, rail: 0.422, pschit: 0.09, carillon: 0.108, quilles: 0.484, oiseau: 0.037, grillon: 0.066, chouette: 0.039,
-  mouette: 0.052, cloche: 0.056,
+  aie: 0.861,
+  poule: 0.313, glousse: 0.549, meuh: 0.35, vache: 0.496, bee: 0.403, mouton: 0.646, groin: 0.513, cochon: 0.178, ouaf: 0.212, chien: 0.316,
+  miaou: 0.149, chat: 0.168, botte: 0.676, ouf: 0.631, costard: 0.603, skieur: 0.575, bonhomme: 0.638, carambolage: 0.305, klaxon_contresens: 0.186,
+  klaxon_voiture: 0.186, klaxon_bus: 0.162, klaxon_tracteur: 0.248, klaxon_chasseneige: 0.151, klaxon_buggy: 0.229, sonnette: 0.077,
+  atterrissage: 0.624, train: 0.26, rail: 0.422, pschit: 0.09, carillon: 0.108, quilles: 0.513, oiseau: 0.037, grillon: 0.066, chouette: 0.039,
+  mouette: 0.045, cloche: 0.052,
   couche_roulement: 0.182, roueLibre: 0.193, neigeRoule: 0.153, planches: 0.195, couche_vent: 0.074, couche_blizzard: 0.24, couche_vagues: 0.232,
   couche_jet: 0.211, couche_grondement: 0.589, couche_freins: 0.061, couche_boules: 0.417,
   moteur_contresens: 0.146, moteur_bus: 0.191, moteur_tracteur: 0.412, moteur_chasseneige: 0.197, moteur_buggy: 0.394, moteur_skieur: 0.129,
@@ -674,3 +712,32 @@ export function choc(kind, o = {}) {
   return jouer(nom, { ...o, gros: GROS.has(kind), prioritaire: true });
 }
 export function klaxonDe(kind) { return KLAXONS[kind] ? `klaxon_${kind}` : null; }
+
+// --- La VOIX du joueur : « Pfff… aïe ! » -------------------------------------------
+// (4 octobre 2026, nuit : « dès que tu te prends un objet, tu prends cet
+// audio-là, pour que les gens fassent « pfff » quand ils se prennent un
+// objet ».) Le vocal de PMC (config.fichierAie, 0,78 s) nettoyé et compressé —
+// voir CLAUDE.md. Trois façons de le jouer pour qu'il ne radote pas : en
+// entier, le « pfff » seul, le « aïe » seul (son « aïe » descend de mi à ré :
+// déjà sur la gamme, on n'y touche pas). Seulement quand le choc fait mal (pas
+// sous turbo), jamais deux fois en une demi-seconde.
+const PRISES_AIE = [[0, 0.78], [0.02, 0.31], [0.34, 0.78]];
+let derniereAie = -9;
+export function prechargerVoix() { audio.echantillon(window.CONFIG.fichierAie); }
+SONS.aie = (ctx, out, t0, o) => {
+  const buf = o.buffer || audio.echantillon(window.CONFIG.fichierAie);
+  if (!buf) return;
+  const [a, b] = PRISES_AIE[o.prise ?? 0], src = ctx.createBufferSource();
+  src.buffer = buf;
+  src.connect(out);
+  src.start(t0, a, b - a);
+};
+export function aie() {
+  const sortie = audio.sfxOutput();
+  if (!sortie || !audio.echantillon(window.CONFIG.fichierAie)) return false;
+  const t = sortie.ctx.currentTime;
+  if (t - derniereAie < 0.55) return false;
+  derniereAie = t;
+  const r = Math.random();
+  return jouer("aie", { prise: r < 0.5 ? 0 : r < 0.75 ? 2 : 1, volume: window.CONFIG.aieVolume ?? 1, prioritaire: true });
+}

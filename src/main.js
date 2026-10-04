@@ -591,6 +591,7 @@ function requestGameStart(opts = {}) {
   conseilReset();
   screens.compterPartie();
   poserJetpack();
+  bruitages.prechargerVoix();
 }
 function isGameStartRequested() { return startRequested; }
 
@@ -634,6 +635,7 @@ function restartGame(opts = {}) {
   conseilReset();
   screens.compterPartie();
   poserJetpack();
+  bruitages.prechargerVoix();
 }
 
 // --- Mort / fin ------------------------------------------------------------------
@@ -812,6 +814,7 @@ function toucherJoueur(ev) {
     return;
   }
   marquerTombe(ev, tMonde());
+  bruitages.aie(); // « Pfff… aïe ! » : la voix du joueur, à chaque choc qui fait mal
   if (friends.count() > 0) {
     // Deuxième moitié du morceau : chaque choc coûte un pote de plus.
     const cout = ev.cout + (clock.now() > dureeCourse() * (window.CONFIG.chocPlusUnApres || 2) ? 1 : 0);

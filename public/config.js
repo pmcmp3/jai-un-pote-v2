@@ -45,6 +45,10 @@ window.CONFIG = {
   bruitagesVolume: 1,       // TOUS les nouveaux bruitages (cris, chocs, klaxons, train, quilles…)
   veloVolume: 1,            // le vélo : roulement du pneu, roue libre en l'air, vent, atterrissages
   ambianceVolume: 1,        // le décor : oiseaux, grillons, chouette, cloche, vent de montagne, vagues, mouettes
+  // La voix du joueur qui se prend un obstacle (4 octobre 2026, nuit) : le
+  // vocal « Pfff… aïe ! » de PMC, nettoyé et compressé. "" = pas de voix.
+  fichierAie: "assets/pff-aie.mp3",
+  aieVolume: 1,
 
   // === VITESSE ===
   // Jeu d'endurance : montée plus douce que le premier (le but est d'aller

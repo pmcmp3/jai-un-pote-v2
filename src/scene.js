@@ -1549,7 +1549,10 @@ export const HALLE_TOIT_AU_DESSUS = 5.4;
 // (rangs après le début de la halle) ; `approche` : sur combien de rangs du
 // joueur il freine ; `elan` : son retard au départ (il attend, hors champ) ;
 // `klaxon` : où est le joueur quand il klaxonne, de loin derrière.
-export const TRAIN = { arret: 22, approche: 22, elan: 60, klaxon: -8 };
+// `corps` : la rame à l'arrêt (rangs depuis le début de la halle), le long du
+// quai ; elle sort d'un TUNNEL au bout du quai (`tunnel`, voir la couche
+// « train » de drawHalle) — jamais du vide.
+export const TRAIN = { arret: 22, approche: 22, elan: 60, klaxon: -8, corps: [7.2, 39.2], tunnel: 6 };
 export function decalageTrain(rDebut, vJoueur) {
   const s = Math.max(0, Math.min(1, (rDebut + TRAIN.arret - vJoueur) / TRAIN.approche));
   return -TRAIN.elan * s * s;
@@ -1662,26 +1665,42 @@ export function drawHalle(ctx, rDebut, geo, rFrom = -Infinity, rTo = Infinity, c
     return;
   }
   if (couche === "train") {
-    // Rails derrière la gare, et un TER à quai, au niveau du plancher.
-    const uR = ROAD_HALF + 1.6, a0 = rDebut - 8, a1 = vFin + 8;
+    // Rails derrière la gare, et un TER à quai, au niveau du plancher. Ils
+    // sortent d'un tunnel au bout du quai (a0) et filent au-delà de la halle.
+    const uR = ROAD_HALF + 1.6, a0 = rDebut + TRAIN.tunnel, a1 = vFin + 8;
     drawBox(ctx, uR - 0.2, a0, 2.4, a1 - a0, haut - 0.05, "#8a8478");              // remblai
     for (let v = Math.ceil(a0); v < a1; v += 1) if (visible(v, v + 0.3)) drawBox(ctx, uR, v, 2.0, 0.3, 0.06, "#6b4b2e", haut - 0.05); // traverses
     for (const du of [0.35, 1.55]) drawBox(ctx, uR + du, a0, 0.1, a1 - a0, 0.1, "#b8bcc4", haut);   // rails
+    // ⚠️ Le TER ne sort que du TUNNEL (4 octobre 2026, nuit : « le train
+    // apparaissait un peu dans le vide, au milieu de nulle part, avant même que
+    // j'arrive dans la gare ») : il arrivait de derrière à hauteur de quai, au
+    // bord gauche de l'écran, pendant qu'on montait la rampe — là où il n'y a
+    // pas encore de quai, rien sous lui. Il sort maintenant d'un tunnel au bout
+    // du quai : on ne dessine que la partie sortie (de a0 à a1).
     const dv = geo.trainDv || 0;
-    const tv0 = rDebut + 4 + dv, tv1 = vFin - 4 + dv, H = haut + 0.25;
-    if (visible(tv0, tv1)) {
+    const t0 = rDebut + TRAIN.corps[0] + dv, t1 = rDebut + TRAIN.corps[1] + dv, H = haut + 0.25;
+    const tv0 = Math.max(a0 + 1, t0), tv1 = Math.min(a1, t1);
+    if (tv1 - tv0 > 0.3 && visible(tv0, tv1)) {
       drawBox(ctx, uR + 0.1, tv0, 1.8, tv1 - tv0, 2.4, "#e8e6e0", H);                // caisse
       drawBox(ctx, uR + 0.08, tv0, 1.84, tv1 - tv0, 0.35, "#1f3a78", H + 0.25);      // bas de caisse bleu
       drawBox(ctx, uR + 0.07, tv0, 1.86, tv1 - tv0, 0.08, "#21b3c6", H + 0.62);      // filet turquoise
-      drawBox(ctx, uR + 0.06, tv0 + 0.4, 1.88, tv1 - tv0 - 0.8, 0.7, "#2a3442", H + 1.1); // vitres
-      for (let v = tv0 + 1.6; v < tv1 - 1; v += 4.2) drawBox(ctx, uR + 0.05, v, 0.1, 0.7, 1.75, "#c8301c", H + 0.25); // portes (côté quai)
+      if (tv1 - tv0 > 0.9) drawBox(ctx, uR + 0.06, tv0 + 0.4, 1.88, tv1 - tv0 - 0.8, 0.7, "#2a3442", H + 1.1); // vitres
+      for (let v = t0 + 1.6; v < t1 - 1; v += 4.2) if (v >= tv0 && v + 0.7 <= tv1) drawBox(ctx, uR + 0.05, v, 0.1, 0.7, 1.75, "#c8301c", H + 0.25); // portes (côté quai)
       drawBox(ctx, uR + 0.1, tv0, 1.8, tv1 - tv0, 0.2, "#b8bcc4", H + 2.4);          // toit
       // Les deux nez : pare-brise sombre et phares (il ENTRE en gare : on le
-      // voit arriver de face).
-      for (const vc of [tv0 - 0.05, tv1]) {
+      // voit arriver) — seulement s'ils sont sur les rails.
+      for (const vc of [t0 >= a0 + 1 ? t0 - 0.05 : null, t1 <= a1 ? t1 : null]) {
+        if (vc === null) continue;
         drawBox(ctx, uR + 0.25, vc, 1.5, 0.05, 0.75, "#2a3442", H + 1.15);
         for (const du of [0.3, 1.48]) drawBox(ctx, uR + du, vc - 0.01, 0.22, 0.07, 0.16, "#fff3b0", H + 0.5);
       }
+    }
+    // Le tunnel : un mur de pierre au bout du quai, haut comme la halle, et sa
+    // bouche sombre d'où sort la rame.
+    if (visible(a0 - 1, a0 + 1.5)) {
+      drawBox(ctx, uR - 0.35, a0, 2.7, 1.0, TOIT + 0.4, PIERRE);
+      drawBox(ctx, uR - 0.45, a0 - 0.1, 2.9, 1.2, 0.35, POUTRE, TOIT + 0.4);
+      drawBox(ctx, uR + 0.05, a0 + 0.99, 1.9, 0.03, 2.95, "#14161c", haut - 0.05);
     }
     return;
   }

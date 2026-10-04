@@ -458,8 +458,15 @@
       background: rgba(13,13,16,0.45); opacity: 0; visibility: hidden; transition: opacity 0.25s ease, visibility 0s linear 0.25s;
     }
     #pause-screen.visible { opacity: 1; visibility: visible; transition: opacity 0.25s ease, visibility 0s; }
-    #pause-volume-row { display: flex; align-items: center; gap: 10px; width: 240px; margin: 2px 0 22px; }
-    #pause-volume-row .icon { flex: none; display: flex; color: var(--noir); }
+    /* Deux curseurs (4 octobre 2026, nuit : « un réglage pour la musique et un
+       réglage pour les effets sonores ») ; le bouton ♪ du menu ouvre le même
+       panneau, sans Reprendre ni Recommencer (classe .reglages). */
+    #pause-volume { display: flex; flex-direction: column; gap: 14px; width: 250px; margin: 4px 0 24px; }
+    .volume-row { display: flex; align-items: center; gap: 12px; }
+    .volume-row .skin-label { width: 62px; }
+    #son-fermer { display: none; }
+    #pause-screen.reglages #resume-button, #pause-screen.reglages #pause-replay-button { display: none; }
+    #pause-screen.reglages #son-fermer { display: block; }
     #pause-actions { display: flex; flex-direction: column; align-items: center; gap: 16px; }
     .volume-range { height: 18px; margin: 0; -webkit-appearance: none; appearance: none; background: transparent; cursor: pointer; width: 100%; }
     .volume-range::-webkit-slider-runnable-track { height: 3px; background: rgba(0,0,0,0.15); border-radius: 2px; }
@@ -677,13 +684,14 @@
     <div class="panel">
       <div class="panel-header"><p class="step-eyebrow">Pause</p></div>
       <div class="panel-body">
-        <div id="pause-volume-row">
-          <span class="icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" focusable="false"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span>
-          <input type="range" id="pause-volume-slider" class="volume-range" min="0" max="100" value="100" aria-label="Volume" />
+        <div id="pause-volume">
+          <div class="volume-row"><span class="skin-label">Musique</span><input type="range" id="volume-musique" class="volume-range" min="0" max="100" value="100" aria-label="Volume de la musique" /></div>
+          <div class="volume-row"><span class="skin-label">Effets</span><input type="range" id="volume-effets" class="volume-range" min="0" max="100" value="100" aria-label="Volume des effets sonores" /></div>
         </div>
         <div id="pause-actions">
           <button id="resume-button" class="btn btn-primary" type="button">Reprendre</button>
           <button id="pause-replay-button" type="button" class="link-minimal">Recommencer la course</button>
+          <button id="son-fermer" class="btn btn-primary" type="button">OK</button>
         </div>
       </div>
     </div>
