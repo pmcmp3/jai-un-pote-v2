@@ -121,3 +121,9 @@ execFileSync("ffmpeg", [
 ], { stdio: "inherit" });
 rmSync(images, { recursive: true, force: true });
 console.log("→", sortie);
+// La même SANS SON (4 octobre 2026) : sur Instagram, le titre se pose depuis
+// la bibliothèque musicale (« J'ai un pote », PMC) pour que le Reel rejoigne la
+// page du son — un son importé avec la vidéo créerait un « audio original » à part.
+const muette = sortie.replace(/\.mp4$/, "-sans-son.mp4");
+execFileSync("ffmpeg", ["-y", "-loglevel", "error", "-i", sortie, "-an", "-c:v", "copy", "-movflags", "+faststart", muette], { stdio: "inherit" });
+console.log("→", muette);
