@@ -50,41 +50,10 @@ export function signaler(source, e) {
   window.__erreursJeu = erreurs;
 }
 
-export function getErreurs() {
-  return erreurs;
-}
-
 // Filet global : couvre ce qui échappe aux try/catch posés à la main
 // (handlers d'événements, promesses non attrapées).
 window.addEventListener("error", (ev) => signaler("window", ev.error || ev.message));
 window.addEventListener("unhandledrejection", (ev) => signaler("promesse", ev.reason));
-
-// Lignes de temps/mesure qui descendent vers le joueur au rythme du morceau.
-export function renderBeatGrid(ctx, width, height) {
-  return;
-  if (!enabled) return;
-
-  const now = clock.now();
-  const speed = getSpeed();
-  const firstBeat = Math.ceil(clock.beatIndexAt(now));
-
-  for (let n = firstBeat; n < firstBeat + VISIBLE_BEATS; n++) {
-    const deltaT = clock.timeOfBeat(n) - now;
-    const z = PLAYER_NEAR_Z + deltaT * speed;
-    if (z <= 0.05) continue;
-
-    const left = project(-ROAD_HALF_WIDTH, z, width, height);
-    const right = project(ROAD_HALF_WIDTH, z, width, height);
-    const isMeasure = n % 4 === 0; // début de mesure (4/4)
-
-    ctx.strokeStyle = isMeasure ? "#ffcf5c" : "rgba(255,255,255,0.45)";
-    ctx.lineWidth = isMeasure ? 3 : 1.5;
-    ctx.beginPath();
-    ctx.moveTo(left.x, left.y);
-    ctx.lineTo(right.x, right.y);
-    ctx.stroke();
-  }
-}
 
 // Panneau de stats (FPS + position). `stats` = { fps, frameMs, playerX }.
 export function renderStats(ctx, stats) {

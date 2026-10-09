@@ -18,7 +18,6 @@ export function consumeWheelie() { if (wheelie) { wheelie = false; return true; 
 // Vrai tant que le doigt (ou la barre d'espace) reste appuyé : main.js s'en
 // sert pour prolonger la montée du saut.
 export function isHolding() { return holding; }
-export function setAirborne() { /* plus utilisé : le tap part toujours au toucher */ }
 
 const overlayEl = document.getElementById("overlay");
 function onOverlay(target) { return overlayEl && target instanceof Node && overlayEl.contains(target); }

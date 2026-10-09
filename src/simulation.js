@@ -15,7 +15,7 @@
 // re-tap du salto part quand il reste le temps d'une montée avant la cible.
 // Jamais freiné par la boue, jamais un pote perdu. ~20 000 pas : quelques ms.
 
-import { Route, KINDS, CORPS_HAUT, familleDe, montee, solAt, toitGare, armer, delaiArmement } from "./rows.js";
+import { Route, CORPS_HAUT, familleDe, montee, solAt, toitGare, armer, delaiArmement } from "./rows.js";
 import { ROWS_AHEAD } from "./scene.js";
 import { V_UNIT, targetSpeed, multiplicateur, dureeCourse } from "./regles.js";
 

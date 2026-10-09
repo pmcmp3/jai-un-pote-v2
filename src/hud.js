@@ -229,24 +229,6 @@ export function renderCountIn(ctx, width, height, t, beatPeriod, beats, linger, 
   ctx.restore();
 }
 
-// Rappel des commandes, en bas, pendant les premières secondes de course.
-export function renderHint(ctx, width, height, alpha) {
-  if (alpha <= 0.01) return;
-  const txt = "TAP = SAUT  ·  RESTE APPUYÉ = PLUS HAUT  ·  RE-TAP = DOUBLE";
-  ctx.save();
-  ctx.globalAlpha = alpha;
-  // Ni panneau ni contour : texte blanc, ombre portée à 25 %, comme le score.
-  fitFont(ctx, "800", 12, txt, width - 40, 8);
-  ctx.shadowColor = "transparent";
-  ctx.shadowBlur = 4;
-  ctx.shadowOffsetY = 2;
-  ctx.fillStyle = BLANC;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillText(txt, width / 2, height * 0.845);
-  ctx.restore();
-}
-
 // Bandeau ponctuel (« +1 POTE », « −2 POTES », « SOBERLAND EST LÀ ! ») :
 // même vocabulaire que le bandeau de palier du premier jeu.
 export function renderBanner(ctx, width, height, banner, safeTop = 0, yForce = null) {
@@ -319,67 +301,6 @@ export function renderTurbo(ctx, width, height, t, force) {
     const len = 50 + (i * 37) % 110;
     const x = width - ((t * (1100 + i * 80) + i * 173) % (width + len));
     ctx.fillRect(x, y, len, 2);
-  }
-  ctx.restore();
-}
-
-// « Qui tu vas croiser » : le bestiaire du début de course (20 septembre
-// 2026 : « le mec qui lance ses poules, je connais le jeu mais les gens ne
-// vont pas le voir — il faudra mettre un panneau au tout début qui présente
-// tous les types d'ennemis »). Les vignettes sont dessinées par le VRAI
-// moteur (main.js les pré-rend une fois), le geste est écrit à côté.
-export function renderBestiaire(ctx, width, height, alpha, groupes, safeTop = 0, index = 0, restant = 0) {
-  if (alpha <= 0.01 || !groupes || !groupes.length) return;
-  const g = groupes[Math.min(index, groupes.length - 1)];
-  const w = Math.min(width - 32, 330), h = 150;
-  const x = width / 2 - w / 2, y = Math.max(safeTop + 104, height * 0.15);
-  ctx.save();
-  ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
-  // Même carte blanche à bord noir que le reste du jeu.
-  ctx.fillStyle = "#ffffff";
-  roundRect(ctx, x, y, w, h, 3); ctx.fill();
-  ctx.strokeStyle = NOIR; ctx.lineWidth = 1.5;
-  roundRect(ctx, x, y, w, h, 3); ctx.stroke();
-  // Onglet rouge de travers : « QUI TU VAS CROISER », plus le décompte.
-  ctx.save();
-  ctx.translate(x + 16 + 86, y);
-  ctx.rotate(-0.035);
-  ctx.fillStyle = ROUGE;
-  ctx.fillRect(-86, -8, 172, 16);
-  ctx.strokeStyle = NOIR; ctx.lineWidth = 1.2;
-  ctx.strokeRect(-86, -8, 172, 16);
-  ctx.fillStyle = "#ffffff";
-  ctx.font = `800 9px ${POLICE}`;
-  ctx.textAlign = "center"; ctx.textBaseline = "middle";
-  ctx.fillText("QUI TU VAS CROISER", 0, 0.5);
-  ctx.restore();
-  // Les vignettes de la famille en cours, dessinées par le vrai moteur.
-  const ih = 66;
-  let total = 0;
-  for (const img of g.images) total += ih * (img.width / img.height) + 6;
-  let vx = width / 2 - total / 2;
-  for (const img of g.images) {
-    const iw = ih * (img.width / img.height);
-    ctx.drawImage(img, vx, y + 22, iw, ih);
-    vx += iw + 6;
-  }
-  ctx.textAlign = "center";
-  ctx.textBaseline = "top";
-  ctx.fillStyle = NOIR;
-  fitFont(ctx, "900", 21, g.geste, w - 28, 12);
-  ctx.fillText(g.geste, width / 2, y + 94);
-  ctx.font = `500 12px ${POLICE}`;
-  ctx.fillStyle = "rgba(13,13,16,0.6)";
-  ctx.fillText(g.texte, width / 2, y + 120);
-  // Décompte de 10 et pastilles d'étape, en bas à droite de la carte.
-  ctx.font = `800 11px ${POLICE}`;
-  ctx.fillStyle = "rgba(13,13,16,0.45)";
-  ctx.textAlign = "right";
-  ctx.fillText(`${Math.max(0, restant)}`, x + w - 12, y + h - 18);
-  for (let i = 0; i < groupes.length; i++) {
-    ctx.fillStyle = i === index ? ROUGE : "rgba(13,13,16,0.2)";
-    roundRect(ctx, x + 12 + i * 12, y + h - 14, 8, 5, 2);
-    ctx.fill();
   }
   ctx.restore();
 }

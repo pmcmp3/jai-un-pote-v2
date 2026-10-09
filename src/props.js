@@ -16,7 +16,7 @@
 // Le mouton fait un 360 sur lui-même (demandé) : vraie rotation 3D autour de
 // l'axe vertical, via scene.drawBoxR.
 
-import { drawBox, drawBoxR, drawShadow, drawFlat, drawDisque, getNight, project, groupe, echelle, CONTOUR_PERSO, teteVoxel } from "./scene.js";
+import { drawBox, drawShadow, drawFlat, drawDisque, getNight, project, groupe, echelle, CONTOUR_PERSO, teteVoxel } from "./scene.js";
 import { KINDS } from "./rows.js";
 import { humain } from "./humains.js";
 

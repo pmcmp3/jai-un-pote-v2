@@ -10,7 +10,7 @@ import * as sfx from "./sfx.js";
 import * as bruitages from "./bruitages.js";
 import * as net from "./net.js";
 import * as friends from "./friends.js";
-import { COULEURS, CHAPEAUX, VELOS, SKIN_DEFAUT } from "./rider.js";
+import { COULEURS, CHAPEAUX, SKIN_DEFAUT } from "./rider.js";
 
 const pts = (n) => `${Math.floor(Number(n) || 0).toLocaleString("fr-FR")} pts`;
 
@@ -113,8 +113,6 @@ function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* naviga
 
 function morceauDejaOuvert() { return lsGet(CLE_MORCEAU_OUVERT) === "1"; }
 function pmcDejaSuivi() { return lsGet(CLE_PMC_SUIVI) === "1"; }
-let fanCache = morceauDejaOuvert();
-export function estFan() { return fanCache; }
 // Échelle de conversion (5 octobre 2026, précisée le soir même : « continuer
 // la course ou rejouer la première fois, c'est ajouter l'album ; et après,
 // rejouer après 1 partie : abonnement si déjà crash ; si pas de crash, rejouer
@@ -499,11 +497,6 @@ function plateformes() {
   const l = window.CONFIG.plateformesAlbum;
   return Array.isArray(l) ? l.filter((p) => p && p.url && p.nom) : [];
 }
-function texteGeste(liste) {
-  const pref = liste.find((p) => p.id === lsGet(CLE_PLATEFORME));
-  const geste = pref && pref.geste ? pref.geste : "appuie sur ＋ ou ♥";
-  return `Une fois dans l'app : ${geste} pour ajouter l'album à ta bibliothèque.`;
-}
 function construirePlateformes() {
   const liste = plateformes();
   gatePlatforms.textContent = "";
@@ -522,7 +515,6 @@ function construirePlateformes() {
       lsSet(CLE_PLATEFORME, p.id || p.nom);
       lsSet(CLE_MORCEAU_OUVERT, "1");
       suivi("clic_album", { plateforme: p.id || p.nom, action: gateEtat.action });
-      fanCache = true;
       setTimeout(gatePhaseAbsence, 0);
     });
     gatePlatforms.appendChild(a);
@@ -674,7 +666,6 @@ function simulerArrivees() {
     if (i === noms.length - 1) arriveesDemo = [];
   }, 1800 + i * 1500)));
 }
-export function estDemo() { return demo; }
 // Classement fake : les potes démo s'étagent SOUS une course terminée (on veut
 // voir « tu es premier »), au-dessus d'une course écourtée.
 function autresDemo() { const moi = getPseudo(); return ligue ? ligue.membres.map((m) => m.nom).filter((n) => n !== moi) : []; }
@@ -1239,7 +1230,7 @@ function closeSonMenu() {
   pauseScreen.classList.remove("visible", "reglages");
 }
 function syncMuteIcon() {
-  const coupe = audio.getVolume() <= 0 || (audio.getVolumeMusique() <= 0 && audio.getVolumeEffets() <= 0);
+  const coupe = audio.getVolumeMusique() <= 0 && audio.getVolumeEffets() <= 0;
   muteButton.classList.toggle("muted", coupe);
   muteButton.textContent = coupe ? "✕" : "♪";
 }
@@ -1410,7 +1401,7 @@ export function init(d) {
 
   gateCta.addEventListener("click", () => {
     if (!gateEtat || gateEtat.phase !== "demande") return;
-    if (gateEtat.niveau === "presave") { lsSet(CLE_MORCEAU_OUVERT, "1"); fanCache = true; suivi("clic_album", { plateforme: "lien", action: gateEtat.action }); }
+    if (gateEtat.niveau === "presave") { lsSet(CLE_MORCEAU_OUVERT, "1"); suivi("clic_album", { plateforme: "lien", action: gateEtat.action }); }
     else { lsSet(CLE_PMC_SUIVI, "1"); suivi("clic_suivre", { action: gateEtat.action }); }
     setTimeout(gatePhaseAbsence, 0);
   });

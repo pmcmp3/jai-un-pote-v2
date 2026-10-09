@@ -567,6 +567,9 @@ function degagerTutos(depuis) {
   game.tutos = familles.length ? rows.degagerTutos(familles, depuis, gardes) : gardes;
 }
 let ghost = null; // { graine, pseudo, palette, trace } — le meilleur de la ligue
+// ⚠️ EN SOMMEIL (fantôme retiré de l'écran le 29 septembre 2026) : la trace
+// part toujours avec le score ; pour le rallumer, appeler chargerFantome(l,
+// graine) dans requestGameStart une fois la base v2 branchée.
 async function chargerFantome(l, seed) {
   const f = await net.fantome(l.code, seed);
   if (!f || seed !== game.graine) return;

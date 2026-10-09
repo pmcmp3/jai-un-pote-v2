@@ -277,7 +277,7 @@ export function ecartMin(a, b, v = vMaxRangees()) {
 // pile à cette hauteur — suivre la trajectoire, c'est toutes les prendre.
 export const PRISE_V = 0.62;
 export const CORPS_CENTRE = 0.85, CORPS_DEMI = 1.0;
-export const CORPS_BAS = CORPS_CENTRE - CORPS_DEMI, CORPS_HAUT = CORPS_CENTRE + CORPS_DEMI;
+export const CORPS_HAUT = CORPS_CENTRE + CORPS_DEMI;
 export function dansLeCorps(h, jumpY) { return Math.abs(h - (jumpY + CORPS_CENTRE)) <= CORPS_DEMI; }
 export const PIECE_SOL = CORPS_CENTRE;      // 0,85 : ramassée en roulant
 export const H_LAIT = PIECE_SOL, H_ROUGE = PIECE_SOL;
@@ -991,7 +991,6 @@ export function crossersAt(r, row, t) {
 let live = new Route();
 // La Route en cours (la simulation, elle, crée les siennes).
 export function routeVivante() { return live; }
-export function getSeed() { return live.seed; }
 export function reseed(force) { live = new Route(force); }
 export function reset() { live.reset(); }
 export function ouvrirFenetreSure(from, to) { live.ouvrirFenetreSure(from, to); }

@@ -39,16 +39,14 @@ let loadError = null;
 // avec le bouton JOUER grisé pour toujours (voir isReadyToStart plus bas).
 let decodeDeferred = false;
 
-// Trois gains en série, chacun avec sa propre raison d'exister, pour qu'ils
-// ne se marchent jamais dessus : envelopeGain fait le fade in/out du morceau
-// tout seul (jamais touché par l'utilisateur), volumeGain reflète le slider
-// (jamais touché par un fondu), focusGain coupe/rétablit le son quand
-// l'onglet perd/reprend le focus (jamais touché par les deux autres). Le
-// volume final = les trois multipliés.
+// Des gains en série, chacun avec sa propre raison d'exister, pour qu'ils ne
+// se marchent jamais dessus : envelopeGain fait le fondu du morceau tout seul,
+// musiqueGain porte le curseur Musique, volumeGain est le point où le morceau
+// et les bruitages se rejoignent (gain 1), focusGain coupe/rétablit le son
+// quand l'onglet perd/reprend le focus. Le volume final = leur produit.
 let envelopeGain = null;
 let volumeGain = null;
 let focusGain = null;
-let pendingVolume = 1; // valeur demandée avant que le graphe audio existe
 // Deux curseurs dans les options (4 octobre 2026, nuit : « un réglage pour la
 // musique et un réglage pour les effets sonores ») : musiqueGain porte le
 // morceau et la boucle de mort ; effetsGain TOUS les bruitages (sfx.js,
@@ -209,24 +207,6 @@ function stopReviveLoop(immediat = false) {
   try { src.stop(t + LOOP_FONDU + 0.05); } catch (e) { /* déjà terminée */ }
 }
 
-export function isReviveLoopRunning() {
-  return loopSource !== null;
-}
-
-// Analyseur de spectre pour l'equalizer de l'écran de fin (20 août 2026 :
-// « un égaliseur dynamique qui marche par rapport à la musique [...] même
-// modèle que le Dynamic Island : les basses à gauche, les aigus à droite »).
-// ⚠️ Inséré DANS la chaîne (focusGain → analyser → destination), jamais en
-// dérivation : sur WebKit (Safari iOS, et donc le navigateur intégré
-// d'Instagram), un AnalyserNode qui n'est pas sur le chemin vers destination
-// peut ne jamais recevoir de données — constaté le 21 août 2026 (« le
-// visualiseur, il marche pas » dans Instagram). Un AnalyserNode est
-// transparent au signal, la chaîne sonne pareil. Il voit exactement ce qui
-// sort des haut-parleurs — slider, mute et filtre de pause compris : un
-// equalizer qui danserait sur un morceau coupé mentirait.
-let analyser = null;
-let spectrum = null; // Uint8Array, allouée au premier getEqLevels()
-
 // Safari a longtemps n'accepté que la forme à callbacks de decodeAudioData ;
 // les navigateurs récents renvoient une Promise. On accepte les deux.
 function decodeWith(ctx, data) {
@@ -363,7 +343,6 @@ function playNow(offset = 0) {
 
   envelopeGain = audioCtx.createGain();
   volumeGain = audioCtx.createGain();
-  volumeGain.gain.value = pendingVolume;
   musiqueGain = audioCtx.createGain();
   musiqueGain.gain.value = pendingMusique;
   focusGain = audioCtx.createGain();
@@ -372,19 +351,12 @@ function playNow(offset = 0) {
   lowpass.type = "lowpass";
   lowpass.frequency.value = mode === "muffled" ? window.CONFIG.pauseFiltreHz : FILTRE_OUVERT_HZ;
 
-  // Analyseur (equalizer de l'écran de fin) inséré dans la chaîne — voir le
-  // commentaire de déclaration : en dérivation, WebKit ne l'alimente pas.
-  analyser = audioCtx.createAnalyser();
-  analyser.fftSize = 512; // 256 bins ≈ 93 Hz de résolution : assez fin pour séparer basses et aigus
-  analyser.smoothingTimeConstant = 0.75;
-
   sourceNode.connect(envelopeGain);
   envelopeGain.connect(musiqueGain);
   musiqueGain.connect(volumeGain);
   volumeGain.connect(lowpass);
   lowpass.connect(focusGain);
-  focusGain.connect(analyser);
-  analyser.connect(audioCtx.destination);
+  focusGain.connect(audioCtx.destination);
 
   const { fonduEntree } = window.CONFIG;
   const now = audioCtx.currentTime;
@@ -530,18 +502,10 @@ export function restart() {
   playNow();
 }
 
-export function hasStarted() {
-  return started;
-}
-
 // Vrai uniquement si le son sort ET si l'horloge audio avance : c'est la
 // condition pour que now() soit une source de temps de jeu valable.
 export function isRunning() {
   return started && audioCtx !== null && audioCtx.state === "running";
-}
-
-export function isLoading() {
-  return !buffer && !loadError;
 }
 
 // Erreur fatale de chargement (téléchargement impossible, ou décodage en
@@ -594,22 +558,6 @@ export function now() {
   return started ? audioCtx.currentTime - startCtxTime - clockShift : 0;
 }
 
-export function getDuration() {
-  return buffer ? buffer.duration : window.CONFIG.dureeMorceau;
-}
-
-// Volume utilisateur (0..1), indépendant du fondu automatique. Peut être
-// appelé avant même que la lecture ait démarré (la valeur est retenue).
-export function setVolume(v) {
-  pendingVolume = Math.max(0, Math.min(1, v));
-  if (volumeGain) {
-    volumeGain.gain.value = pendingVolume;
-  }
-}
-
-export function getVolume() {
-  return pendingVolume;
-}
 // Les deux curseurs des options (0..1), retenus avant même que le son existe.
 function regler(gainNode, v) {
   if (!gainNode || !audioCtx) return;
@@ -619,33 +567,6 @@ export function setVolumeMusique(v) { pendingMusique = Math.max(0, Math.min(1, v
 export function getVolumeMusique() { return pendingMusique; }
 export function setVolumeEffets(v) { pendingEffets = Math.max(0, Math.min(1, v)); regler(effetsGain, pendingEffets); }
 export function getVolumeEffets() { return pendingEffets; }
-
-// Niveaux de l'equalizer de l'écran de fin : `n` bandes 0→1, des BASSES (index
-// 0, à gauche) vers les AIGUS (à droite) — le modèle demandé est l'equalizer
-// du Dynamic Island iOS. Bandes réparties en log entre ~93 Hz et ~9 kHz (là où
-// vit le morceau), avec un léger gain vers les aigus : en linéaire les hautes
-// fréquences d'un mix portent bien moins d'énergie que les basses et les
-// barres de droite resteraient collées au sol. Renvoie null si le graphe
-// n'existe pas ou ne tourne pas — l'appelant garde alors ses barres au repos.
-export function getEqLevels(n) {
-  if (!analyser || !audioCtx || audioCtx.state !== "running") return null;
-  if (!spectrum || spectrum.length !== analyser.frequencyBinCount) {
-    spectrum = new Uint8Array(analyser.frequencyBinCount);
-  }
-  analyser.getByteFrequencyData(spectrum);
-  const minBin = 1;
-  const maxBin = Math.min(spectrum.length, 96); // ≈ 9 kHz à 48 kHz d'échantillonnage
-  const out = [];
-  for (let i = 0; i < n; i++) {
-    const b0 = Math.floor(minBin * Math.pow(maxBin / minBin, i / n));
-    const b1 = Math.max(b0 + 1, Math.floor(minBin * Math.pow(maxBin / minBin, (i + 1) / n)));
-    let sum = 0;
-    for (let b = b0; b < b1; b++) sum += spectrum[b];
-    const brut = sum / (b1 - b0) / 255;
-    out.push(Math.min(1, brut * (0.9 + i * 0.35)));
-  }
-  return out;
-}
 
 // --- Jingle de combo (demandé le 20 août 2026 : « quand y'a un combo, un
 // bruit de pixels dans la tonalité du morceau ») ------------------------------
@@ -671,11 +592,7 @@ export function playComboJingle(palier) {
   if (!audioCtx || audioCtx.state !== "running" || mode !== "running") return;
   const nNotes = Math.min(3 + Math.max(1, palier), JINGLE_NOTES.length);
   const t0 = audioCtx.currentTime;
-  // Repli sur la destination si le graphe du morceau n'existe pas encore
-  // (partie lancée avant la fin du décodage) : le volume est alors appliqué
-  // à la main, pendingVolume étant la valeur que volumeGain aurait portée.
   const master = audioCtx.createGain();
-  master.gain.value = volumeGain ? 1 : pendingVolume;
   master.connect(sortieEffets());
   for (let i = 0; i < nNotes; i++) {
     const osc = audioCtx.createOscillator();
@@ -691,68 +608,6 @@ export function playComboJingle(palier) {
     osc.start(t);
     osc.stop(t + 0.18);
   }
-}
-
-// --- Easter egg 500 000 : vocal de PMC en sidechain --------------------------
-// « À 500 k tu mets un vocal de toi — la musique continue mais il y a un
-// sidechain avec ma voix par-dessus » (24 août 2026). Le fichier
-// (config.fichierEasterEgg) peut NE PAS EXISTER : il n'est chargé qu'à la
-// demande (main.js appelle prefetchVoiceClip à l'approche du seuil), jamais au
-// démarrage — pas de 404 pour les 99,9 % de visiteurs qui n'approcheront
-// jamais 500 000. Décodé hors-ligne comme le morceau (aucun geste requis).
-let voiceBuffer = null;
-let voiceFetchStarted = false;
-let voiceFailed = false;
-
-export function prefetchVoiceClip() {
-  if (voiceFetchStarted) return;
-  const url = window.CONFIG.fichierEasterEgg;
-  if (!url) { voiceFailed = true; voiceFetchStarted = true; return; }
-  voiceFetchStarted = true;
-  fetch(url)
-    .then((res) => {
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return res.arrayBuffer();
-    })
-    .then((data) => {
-      const Offline = window.OfflineAudioContext || window.webkitOfflineAudioContext;
-      return decodeWith(new Offline(1, 1, 44100), data);
-    })
-    .then((decoded) => { voiceBuffer = decoded; })
-    .catch(() => { voiceFailed = true; }); // fichier absent/illisible : easter egg simplement inactif
-}
-
-export function isVoiceClipUnavailable() {
-  return voiceFailed;
-}
-
-// Joue le vocal par-dessus le morceau, avec le sidechain demandé : le morceau
-// s'écarte (envelopeGain descend à ~25 %) le temps de la voix, puis remonte.
-// envelopeGain est le bon endroit : c'est le gain « du morceau seul » (le
-// slider et le mute, partagés, s'appliquent aussi à la voix — elle entre par
-// volumeGain, comme le jingle de combo). À 500 000 points, le fondu d'entrée
-// du morceau est passé depuis longtemps : rien d'autre n'est programmé sur ce
-// gain à cet instant. Renvoie false tant que le vocal n'est pas prêt — main.js
-// retente au tick suivant.
-export function playVoiceClip() {
-  if (!audioCtx || !voiceBuffer || audioCtx.state !== "running" || mode !== "running") return false;
-  const t = audioCtx.currentTime;
-  const fin = t + voiceBuffer.duration;
-
-  const src = audioCtx.createBufferSource();
-  src.buffer = voiceBuffer;
-  src.connect(sortieEffets());
-
-  if (envelopeGain) {
-    envelopeGain.gain.cancelScheduledValues(t);
-    envelopeGain.gain.setValueAtTime(envelopeGain.gain.value, t);
-    envelopeGain.gain.linearRampToValueAtTime(0.25, t + 0.2);
-    envelopeGain.gain.setValueAtTime(0.25, Math.max(t + 0.2, fin - 0.05));
-    envelopeGain.gain.linearRampToValueAtTime(1, fin + 0.5);
-  }
-
-  src.start(t);
-  return true;
 }
 
 // --- Le MARCHAND du marché (4 octobre 2026, nuit) ------------------------------

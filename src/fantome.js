@@ -29,7 +29,6 @@ export function enregistrer(now, u, v, h) {
   trace.push([u, v, h]);
   dernierT = k;
 }
-export function longueurEnregistree() { return trace.length; }
 
 // Texte : "hz:10|u,v,h;u,v,h;…" avec u et h en deltas entiers (petits), v absolu.
 export function encoder() {

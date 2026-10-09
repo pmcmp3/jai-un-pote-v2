@@ -1,13 +1,10 @@
-// voxel.js — Primitif de cube extrudé partagé entre les sprites "voxel"
-// (cyclists.js, player.js). Extrait de cyclists.js lors de l'unification de
-// la DA joueur/cycliste (voir ARCHITECTURE.md §11) : zéro logique
-// d'orientation ou de silhouette ici, seulement le rendu d'un rectangle
-// comme un bloc éclairé d'en haut.
+// voxel.js — Lecture des couleurs pour le rendu en cubes (scene.js) : hex ou
+// "rgb(...)" → [r, g, b].
 
-// Accepte hex ET "rgb(...)" : blk() ré-assombrit ce qu'on lui passe, donc une
-// couleur déjà passée par shade() lui revient sous forme rgb(). Ne gérer que
-// le hex donnait un parseInt NaN, un fillStyle invalide silencieusement
-// ignoré par Canvas, et donc un bloc peint avec la couleur précédente.
+// Accepte hex ET "rgb(...)" : une couleur déjà assombrie revient sous forme
+// rgb(). Ne gérer que le hex donnait un parseInt NaN, un fillStyle invalide
+// silencieusement ignoré par Canvas, et donc une face peinte avec la couleur
+// précédente.
 export function parseColor(c) {
   // Filet : une couleur manquante peint du gris au lieu de faire tomber tout
   // le rendu (et, avec lui, la pile de transformations du canvas).
@@ -18,29 +15,4 @@ export function parseColor(c) {
   }
   const m = c.match(/\d+/g);
   return m ? m.map(Number) : [136, 136, 136];
-}
-
-export function shade(color, amount) {
-  const [r, g, b] = parseColor(color);
-  const c = (v) => Math.max(0, Math.min(255, v + amount));
-  return `rgb(${c(r)},${c(g)},${c(b)})`;
-}
-
-// Rectangle rendu comme un cube extrudé. Arête haute éclaircie (la lumière
-// vient d'en haut), arêtes basse et droite assombries (faces dans l'ombre).
-// C'est ce seul détail qui fait la différence entre "pixel art plat" et
-// "voxel" à petite taille.
-export function blk(ctx, x, y, w, h, base) {
-  ctx.fillStyle = base;
-  ctx.fillRect(x, y, w, h);
-  if (h >= 3) {
-    ctx.fillStyle = shade(base, 30);
-    ctx.fillRect(x, y, w, 1);
-    ctx.fillStyle = shade(base, -34);
-    ctx.fillRect(x, y + h - 1, w, 1);
-  }
-  if (w >= 3) {
-    ctx.fillStyle = shade(base, -22);
-    ctx.fillRect(x + w - 1, y, 1, h);
-  }
 }

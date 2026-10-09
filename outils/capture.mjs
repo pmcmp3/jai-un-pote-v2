@@ -848,6 +848,8 @@ const stats = await course(() => ({ v: Math.round(window.__pote.player.v), potes
 console.log("État :", JSON.stringify(stats));
 if (erreurs.length) console.log("ERREURS :", erreurs.slice(0, 8));
 const toutes = [...erreurs, ...stats.erreurs];
-verdict(!toutes.length && (stats.fps === null || stats.fps >= 50), `${surBuild ? "build" : "sources"} : ${stats.fps ?? "?"} i/s, ${toutes.length} erreur(s)`);
+// Les i/s d'un Chrome sans écran suivent la charge de la machine : indicatifs
+// seulement (la fluidité, c'est perf-plage.mjs qui la garde, en ms par image).
+verdict(!toutes.length && stats.v > 0, `${surBuild ? "build" : "sources"} : la course avance (rangée ${stats.v}), ${toutes.length} erreur(s), ${stats.fps ?? "?"} i/s indicatifs`);
 await navigateur.close();
 await (surBuild ? serveur.httpServer.close() : serveur.close());

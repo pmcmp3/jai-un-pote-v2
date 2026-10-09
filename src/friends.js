@@ -101,7 +101,6 @@ export function majTenue(t) {
 export function marquerTenue() {
   for (let i = marques.length - 1; i >= 0; i--) { if (marques[i].type === "saut") { marques[i].type = "haut"; return; } if (marques[i].type === "double") return; }
 }
-export function enLigue() { return nomsLigue !== null; }
 function potesParDefaut() { return window.CONFIG.potesDefaut || (window.CONFIG.potesNoms || ["paul"]).map((n) => ({ nom: n, skin: null })); }
 // Le peloton de la course : le tirage ci-dessus (membres de la ligue d'abord,
 // complétés par les potes par défaut), sinon la ligue de démo.

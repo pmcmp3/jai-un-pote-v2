@@ -15,7 +15,6 @@ window.CONFIG = {
   boucleMorceau: false,     // contre-la-montre : la fin du morceau = la fin de la partie (6 septembre 2026)
   chargementMinS: 2.6,      // 5 → 1,8 le 20 septembre 2026 (« le démarrage est vraiment extrêmement lent ») → 2,6 le 4 octobre (« un tout petit peu plus, pour tous les appareils »)
   fonduEntree: 1.2,
-  fonduSortie: 2.0,
   pauseFiltreHz: 800,
   pauseFondu: 0.5,
   pauseDeriveMax: 0,        // 25 → 0 le 5 octobre 2026 : ici le morceau EST le chrono — à la reprise il repart là où la course s'était arrêtée (avec 25 s de dérive tolérée, il finissait avant la course : « à la fin, il y a du vide »)
@@ -26,10 +25,6 @@ window.CONFIG = {
   loopMortFiltreMin: 170,
   loopMortFiltreMax: 16000,
   loopMortVolumeMin: 0.32,
-  loopMortRetour: 5,
-  // Pas d'easter egg vocal sur ce jeu (clés lues par audio.js, laissées vides).
-  fichierEasterEgg: "",
-  easterEggScore: Infinity,
   // Le MARCHAND du marché (4 octobre 2026, nuit) : vocal de PMC enregistré au
   // téléphone, nettoyé, passé au mégaphone dans une halle. Joué une fois par
   // course au passage du marché, pas fort. `marchandVolume` = volume devant
@@ -101,9 +96,6 @@ window.CONFIG = {
   sautGravite: 54,          // pesanteur normale
   sautGraviteTenue: 26,     // pesanteur tant qu'on monte ET qu'on reste appuyé
   sautTenueMaxS: 0.28,      // au-delà, l'appui ne fait plus monter
-
-  // === GRILLE ===
-  cadenceSpawnBeats: 1.5, // un créneau tous les 1,5 temps = 1,06 s à 85 BPM
 
   // === SCORE (en « pts » depuis le 9 septembre 2026 : tout le monde fait la
   // même distance sur la même course, ce qui départage c'est les potes gardés
@@ -179,12 +171,6 @@ window.CONFIG = {
   relaisDistance: 30000,    // mètres cumulés d'une ligue pour gagner le relais
   sprintDureeS: 60,         // le sprint du dimanche : 60 s, même route pour tous
 
-  // === DOUBLE SAUT ===
-  // Plus de barre d'élan depuis le 20 septembre 2026 (« mets pas de barre de
-  // chargement de saltos ») : le double saut est toujours disponible, une
-  // fois par saut. Les deux clés restent lues par d'anciens réglages.
-  elanRechargeS: 0,
-  elanParPiece: 0,
   piecesLogo: false,        // « mets juste des pièces jaunes pour l'instant, enlève les dessins »
   laitDureeS: 5,            // brique de lait : ×2 sur les mètres pendant 5 s
   laitVitesse: 1.2,         // et seulement +20 % de vitesse (« pas ×2, c'est n'importe quoi »)
@@ -198,7 +184,6 @@ window.CONFIG = {
   jetpackGravite: 15,       // u/s² vers le bas, doigt levé (moins qu'un saut : on plane)
   alerteAvanceS: 1.8,      // le panneau « attention » s'allume 1,8 s avant que le véhicule n'entre dans l'écran (5 octobre 2026 : 5 s → 3 s, puis 3 → 1,8 le soir — « à la limite 2-3 secondes à l'écran [...] j'ai tout le temps le panneau sur la droite » : mesuré 2,6 s par véhicule et 56 % de la dernière minute, outils/alertes.mjs)
   nuitDebutS: 50,           // la nuit tombe à partir de cet instant du morceau (30 s de transition) — 95 → 50 le 27 septembre 2026 (« le biome de nuit, il faudrait qu'il arrive beaucoup plus tôt dans la chanson »)
-  tutoParties: 2,           // inutilisé depuis le 28 septembre 2026 (tuto contextuel au ralenti, main.js)
 
   // === PANNEAUX DE VILLAGE (nom, département) ===
   villages: [
@@ -235,8 +220,6 @@ window.CONFIG = {
   // Base des liens de ligue (?ligue=CODE). L'adresse github.io reste valable
   // quand le sous-domaine sera branché : GitHub la redirige alors (301).
   lienJeu: "https://pmcmp3.github.io/jai-un-pote-v2/",
-  apiScores: "",
-  apiScoresKey: "",
 
   toucheDebug: "d",
 };

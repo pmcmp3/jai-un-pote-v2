@@ -24,18 +24,11 @@
 import { parseColor } from "./voxel.js";
 import { humain } from "./humains.js";
 
-// --- La route : UNE voie ------------------------------------------------------
-// COLS/COL_CENTRE/colU restent exportés pour les modules qui les lisaient
-// (rows, friends, simulation) : il n'y a plus qu'une colonne, en u = 0.
-export const COLS = 1;
-export const COL_CENTRE = 0;
-export const COL_W = 2.4;
+// --- La route : UNE voie, en u = 0 ---------------------------------------------
 export const ROAD_HALF = 1.2;
-export function colU() { return 0; }
 // Rangées ouvertes devant l'écran pour le turbo lait et le tuto (fenêtre
 // sûre posée au-delà de ce que voit le joueur).
 export const ROWS_AHEAD = 14;
-export const ROWS_BEHIND = 5;
 
 const U_DECOR = 16;   // au-delà : champs lointains unis, puis collines
 // Hauteurs réelles du mobilier de bord de route (1 unité ≈ 1 mètre).
@@ -74,17 +67,13 @@ export function setLevee(d) { levee = Math.max(0, d); appliquerLevee(); }
 // Hauteur (u) qui s'affiche à la ligne d'écran y, dans le plan de la route
 // (u = 0). Indépendante de la levée de caméra (le plan u = 0 ne bouge pas).
 export function hauteurA(y) { return camH + (horizonY - y) / K; }
-export function getLevee() { return levee; }
 function majCentre() { vCentre = camV + (0.5 - joueurX) * W / K; }
 // La caméra suit le joueur ; `setJoueurX` règle où il est à l'écran (fraction
 // de la largeur) — main.js l'avance quand la vitesse monte.
 export function setCamera(v) { camV = v; majCentre(); }
 export function setJoueurX(f) { joueurX = f; majCentre(); }
-export function getJoueurX() { return joueurX; }
-export function getCamV() { return camV; }
 export function getVCentre() { return vCentre; }
 export function unitesDevant() { return (1 - joueurX) * W / K; }
-export function unitesDerriere() { return joueurX * W / K; }
 export function setNight(n) { night = Math.max(0, Math.min(1, n)); }
 // Avancement de la journée (20 septembre 2026, demandé : « le soleil qui
 // tourne de gauche à droite de l'écran jusqu'à la nuit, où la lune fait
@@ -93,7 +82,6 @@ export function setHeure(t) { heure = Math.max(0, Math.min(1, t)); }
 export function getNight() { return night; }
 export function setDecorTime(t) { decorT = t; }
 export function scale() { return K; }
-export function horizon() { return horizonY; }
 
 export function echelle(u) { return K * camD / Math.max(0.35, camD + u); }
 // Sol surélevé (4 octobre 2026, les collines de la montagne) : tout ce qui est
@@ -148,7 +136,6 @@ function teintes(color, u) {
   cache.set(cle, t);
   return t;
 }
-export function teinte(color, u = 0) { return teintes(color, u).plat; }
 let eclaireActif = false;
 export function eclaire(fn) { const e = eclaireActif; eclaireActif = true; try { fn(); } finally { eclaireActif = e; } }
 
@@ -168,7 +155,6 @@ export function setSaison(a, b, t) {
   const q = Math.round(Math.max(0, Math.min(1, t)) * 6) / 6;
   saisonA = a; saisonB = b; saisonT = q; saisonCle = `${a}-${b}-${q}`;
 }
-export function saisonCourante() { return SAISONS[saisonT < 0.5 ? saisonA : saisonB]; }
 function poids(nom) { const i = SAISONS.indexOf(nom); return (saisonA === i ? 1 - saisonT : 0) + (saisonB === i ? saisonT : 0); }
 function poidsHiver() { return poids("hiver"); }
 const ROUX = [[200, 112, 42], [181, 70, 42], [217, 161, 58], [168, 96, 40]];
@@ -338,21 +324,6 @@ function peindreContours(ctx, ops) {
     ctx.closePath(); ctx.fill(); ctx.stroke();
   }
   ctx.restore();
-}
-// Le même liseré pour les personnages dessinés À PLAT (costard, fermier,
-// baigneur) : la figure est d'abord peinte en encre, décalée dans huit
-// directions, puis normalement par-dessus. `dessin(c)` reçoit le contexte à
-// utiliser — en encre, toute couleur qu'il pose est remplacée par l'encre.
-export function contour2D(ctx, dessin, { couleur, px } = CONTOUR_PERSO) {
-  const encre = new Proxy(ctx, {
-    get(c, k) { const v = c[k]; return typeof v === "function" ? v.bind(c) : v; },
-    set(c, k, v) { c[k] = k === "fillStyle" || k === "strokeStyle" ? couleur : v; return true; },
-  });
-  const d = px * 0.71;
-  for (const [dx, dy] of [[px, 0], [-px, 0], [0, px], [0, -px], [d, d], [-d, d], [d, -d], [-d, -d]]) {
-    ctx.save(); ctx.translate(dx, dy); dessin(encre); ctx.restore();
-  }
-  dessin(ctx);
 }
 // Boîte englobante (u, v, h) de ce que dessine `fn(ctx)`, sans rien peindre :
 // sert à vérifier qu'un modèle ne ment pas sur sa boîte de collision.

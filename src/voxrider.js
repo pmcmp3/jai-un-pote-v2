@@ -8,7 +8,7 @@
 // dessin suit la profondeur — jambe et bras du côté du fond d'abord, puis
 // roues et cadre, puis le torse, puis la jambe et le bras côté caméra.
 
-import { drawBox, drawShadow, drawDisque, depth, project, echelle } from "./scene.js";
+import { drawBox, drawShadow, drawDisque, project, echelle } from "./scene.js";
 
 // Roue vue de côté : pneu, jante, moyeu, quatre rayons qui tournent avec la
 // distance parcourue (angle = v / R, sens horaire quand on file à droite).
@@ -248,4 +248,3 @@ export function drawJetpack(ctx, u, v, lift, flamme, t) {
   }
   drawBox(ctx, u - 0.19, dos + 0.08, 0.38, 0.06, 0.08, "#e13e26", lift + 1.2);
 }
-export function riderDepth(u, v) { return depth(u, v); }
