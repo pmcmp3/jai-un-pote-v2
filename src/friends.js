@@ -1,14 +1,12 @@
 // friends.js — Les potes derrière le joueur.
 //
-// v2 (19 septembre 2026, vue de profil, une voie) : la file indienne de la
-// v1 (premier pote 3 rangées derrière, puis 1,6 par pote) sortait de l'écran
-// en portrait — on ne voit que ~3,5 unités derrière le joueur. Les potes
-// roulent donc en MEUTE serrée, comme la horde de Zombie Tsunami : chacun a
-// sa place en profondeur (u) sur la largeur de la route, ils se chevauchent
-// sans se cacher. Ils refont les sauts ET les saltos du joueur au même
-// endroit (marques posées par main.js), ce qui donne la vague de la meute qui
-// saute l'un après l'autre. Aucun dégât ; ils ramassent les pièces qu'ils
-// croisent.
+// En portrait on ne voit que ~3,5 unités derrière le joueur : une file
+// indienne sortirait de l'écran. Les potes roulent donc en MEUTE serrée,
+// comme la horde de Zombie Tsunami : chacun a sa place en profondeur (u) sur
+// la largeur de la route, ils se chevauchent sans se cacher. Ils refont les
+// sauts ET les saltos du joueur au même endroit (marques posées par main.js),
+// ce qui donne la vague de la meute qui saute l'un après l'autre. Aucun
+// dégât ; ils ramassent les pièces qu'ils croisent.
 
 import { project } from "./scene.js";
 import { PALETTES, paletteDepuisSkin } from "./rider.js";
@@ -36,17 +34,11 @@ export function reset() { potes = []; maxCount = 0; joins = 0; marques = []; tir
 export function alive() { return potes.filter((p) => !p.leave); }
 export function count() { return alive().length; }
 export function maxReached() { return maxCount; }
-// En ligue, le peloton c'est LES MEMBRES de la ligue, rien d'autre (7 septembre
-// 2026 : « c'est plus Soberland etc., juste les gens qui font partie de la
-// ligue, donc le nombre de potes = le nombre de personnes dans la ligue »).
-// ⚠️ TOUJOURS `config.potesMax` depuis le 16 septembre 2026 (bêta fermée) :
-// renversement assumé du « le nombre de potes = le nombre de personnes dans la
-// ligue » du 7 septembre. Mesuré sur la première course de bêta : premier
-// inscrit seul dans sa ligue → `potes: 0` en base, aucun pote ne vient de toute
-// la course, le jeu perd son cœur et paraît vide (« je suis tout seul, il n'y a
-// pas assez de difficulté »). Le peloton est donc COMPLÉTÉ par les potes par
-// défaut (listeMembres) : les membres de la ligue d'abord, les autres ensuite.
-// Le plafond protège aussi la ligue de bêta, qui peut compter 60 personnes.
+// ⚠️ Taille du peloton = TOUJOURS `config.potesMax`, quelle que soit la taille
+// de la ligue : un joueur seul dans sa ligue n'aurait sinon aucun pote de
+// toute la course, et le jeu perd son cœur. Le peloton est COMPLÉTÉ par les
+// potes par défaut (listeMembres) : membres de la ligue d'abord, les autres
+// ensuite. Le plafond protège aussi les grandes ligues (jusqu'à 60 personnes).
 export function max() { return Math.min(listeMembres().length, window.CONFIG.potesMax); }
 
 // Marque un saut ("saut"), un saut tenu ("haut") ou un double saut ("double")
@@ -68,10 +60,9 @@ export function setNomsLigue(liste) {
   nomsLigue = Array.isArray(liste) ? liste.map((m) => (typeof m === "string" ? { nom: m, skin: null } : m)) : null;
   tirerSelection();
 }
-// ⚠️ 5 membres TIRÉS AU HASARD à chaque course (16 septembre 2026, demandé
-// pour la bêta : « oui, 5 personnes aléatoires à chaque fois »). Une ligue de
-// bêta peut compter 60 personnes pour 5 places dans le peloton : sans tirage,
-// tout le monde verrait éternellement les 5 premiers inscrits. Le tirage est
+// ⚠️ Membres TIRÉS AU HASARD à chaque course : une ligue peut compter 60
+// personnes pour 5 places dans le peloton ; sans tirage, tout le monde
+// verrait éternellement les 5 premiers inscrits. Le tirage est
 // refait à chaque `reset()` (donc à chaque course) et à chaque arrivée d'une
 // nouvelle liste de membres ; il est FIGÉ pendant la course, sinon les
 // prénoms changeraient entre deux potes d'un même peloton.
@@ -84,20 +75,20 @@ function tirerSelection() {
   const pool = nomsLigue.slice();
   for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
   const choisis = pool.slice(0, max);
-  // Dans une ligue, les places vides sont des BOTS (3 octobre 2026 : « Bot 1,
-  // Bot 2, Bot 3 [...] remplacés au fur et à mesure par tes vrais potes »),
-  // numérotés après les vrais membres — même numérotation que le menu.
+  // Dans une ligue, les places vides sont des BOTS (« bot 4 », « bot 5 »…),
+  // remplacés au fur et à mesure que de vrais membres rejoignent, numérotés
+  // après les vrais membres — même numérotation que le menu.
   const manquants = potesParDefaut().filter((d) => !choisis.some((m) => m.nom === d.nom))
     .map((d, k) => ({ nom: `bot ${choisis.length + k + 1}`, skin: d.skin }));
   selection = choisis.concat(manquants).slice(0, max);
 }
-// Le joueur a gardé l'appui : la dernière marque devient un saut tenu.
 // Durée réelle de l'appui du joueur sur son dernier saut : le pote la lit
-// pendant son propre saut (4 octobre 2026 — il tenait toujours au maximum,
-// son saut était plus long que celui du joueur et il ratait le suivant).
+// pendant son propre saut. S'il tenait toujours au maximum, son saut serait
+// plus long que celui du joueur et il raterait le suivant.
 export function majTenue(t) {
   for (let i = marques.length - 1; i >= 0; i--) { const m = marques[i]; if (m.type === "saut" || m.type === "haut") { m.tenue = Math.max(m.tenue || 0, t); return; } if (m.type === "double") return; }
 }
+// Le joueur a gardé l'appui : la dernière marque devient un saut tenu.
 export function marquerTenue() {
   for (let i = marques.length - 1; i >= 0; i--) { if (marques[i].type === "saut") { marques[i].type = "haut"; return; } if (marques[i].type === "double") return; }
 }
@@ -106,8 +97,8 @@ function potesParDefaut() { return window.CONFIG.potesDefaut || (window.CONFIG.p
 // complétés par les potes par défaut), sinon la ligue de démo.
 function listeMembres() { return selection || potesParDefaut(); }
 function listeNoms() { return listeMembres().map((m) => m.nom); }
-// Prénom : le premier de la liste qui n'est pas déjà dans le peloton
-// (Soberland revient en premier s'il est parti — plus de doublons).
+// Prénom : le premier de la liste qui n'est pas déjà dans le peloton (un pote
+// parti revient en premier, jamais de doublon).
 function prochainNom() {
   const noms = listeNoms();
   const pris = new Set(alive().map((p) => p.name));
@@ -125,13 +116,12 @@ export function join(player) {
   const base = PALETTES.potes[idx % PALETTES.potes.length];
   const palette = membre && membre.skin ? paletteDepuisSkin(membre.skin, base) : base;
   joins += 1;
-  // Il arrive du champ, derrière, et rejoint sa place dans la meute.
+  // Il arrive de derrière et rejoint sa place dans la meute.
   const v = vDuSlot(player.v, slot);
   const pote = {
     slot, palette, name,
-    // Il arrive PAR LA ROUTE, de derrière (28 septembre 2026) : en arrivant
-    // du champ du fond, il passait derrière les panneaux et les lampadaires
-    // du bas-côté (« regarde les textures qui se passent devant »).
+    // Il arrive PAR LA ROUTE, jamais par le champ du fond : il passerait
+    // derrière les panneaux et les lampadaires du bas-côté.
     u: U_MEUTE[slot % U_MEUTE.length], v: v - 4.5, prevV: v - 4.5, u0: U_MEUTE[slot % U_MEUTE.length], dv0: -4.5,
     arrive: 0, leave: null, pedal: Math.random() * 6, phase: Math.random() * 6,
     jumpY: 0, jumpVy: 0, doubled: false, flip: 0, lastMarkId: markId,
@@ -172,9 +162,8 @@ export function update(dt, player, phys) {
       const e = 1 - Math.pow(1 - p.arrive, 3);
       p.u = p.u0 + (cibleU - p.u0) * e;
       p.v = cibleV + p.dv0 * (1 - e);
-      // Il roule SUR la rampe pendant son arrivée aussi (30 septembre 2026 :
-      // un pote arrivé dans les halles roulait sous le plancher, puis sautait
-      // d'un coup dessus).
+      // Il roule SUR la rampe pendant son arrivée aussi : sinon, arrivé dans
+      // les halles, il roulerait sous le plancher puis sauterait d'un coup dessus.
       const solA = phys.sol ? phys.sol(p.v) : 0;
       p.jumpY = solA; p.jumpVy = 0; p.auSol = true;
       continue;
@@ -184,7 +173,7 @@ export function update(dt, player, phys) {
     // Le sol sous lui : la route, la halle, ou le toit d'une voiture s'il est
     // déjà au-dessus (il roule sur les toits comme le joueur).
     const sol = phys.solSous ? phys.solSous(p.v, Math.max(p.jumpY, p.prevJumpY)) : phys.sol ? phys.sol(p.v) : 0;
-    // JETPACK (5 octobre 2026) : la meute suit EXACTEMENT la trajectoire du
+    // JETPACK : la meute suit EXACTEMENT la trajectoire du
     // joueur dans les airs — même hauteur au même endroit de la route, comme
     // une file indienne d'avions. Rien de ce qu'il a survolé ne la touche.
     const ht = phys.trace ? phys.trace(p.v) : null;
@@ -197,8 +186,8 @@ export function update(dt, player, phys) {
     }
     p.jetpack = false;
     // Un saut arrivé pendant qu'il était encore en l'air part dès qu'il touche
-    // le sol (0,3 s au plus) : sinon il sautait le saut, puis faisait le
-    // double saut suivant depuis trop bas et retombait AVANT la voiture.
+    // le sol (0,3 s au plus) : sinon il raterait ce saut, ferait le double
+    // saut suivant depuis trop bas et retomberait AVANT la voiture.
     if (p.enAttente) {
       p.enAttente.t -= dt;
       if (p.jumpY <= sol + 0.02) { sauter(p, p.enAttente.m, sol, phys); p.enAttente = null; }
@@ -226,16 +215,15 @@ export function update(dt, player, phys) {
       p.jumpY += p.jumpVy * dt;
       if (phys.plafond) { const pl = phys.plafond(p.v); if (p.jumpY > pl) { p.jumpY = pl; if (p.jumpVy > 0) p.jumpVy = 0; } }
     }
-    // Comme le joueur, le pote colle au plancher de la halle (rows.solAt).
-    // Collage à la descente, comme le joueur (main.js).
+    // Comme le joueur (main.js), le pote colle au plancher de la halle
+    // (rows.solAt) à la descente.
     if (p.auSol && p.jumpVy <= 0 && p.jumpY > sol && p.jumpY - sol < 0.35) p.jumpY = sol;
     if (p.jumpY <= sol) { p.jumpY = sol; p.jumpVy = 0; p.doubled = false; p.flip = 0; p.marqueSaut = null; }
     p.auSol = p.jumpY <= sol + 0.001;
     if (p.flip > 0) p.flip = Math.min(Math.PI * 2, p.flip + dt * (Math.PI * 2 / 0.5));
     if (p.roue > 0) { p.roue += dt / 0.9; if (p.roue >= 1 || !p.auSol) p.roue = 0; }
   }
-  // Toutes les ~15 s, un pote au hasard fait une roue arrière, pour rien
-  // (30 septembre 2026 : « ça peut être trop bien »).
+  // Toutes les ~15 s, un pote au hasard fait une roue arrière, pour le style.
   roueT += dt;
   if (roueT >= 15) {
     roueT = 0;
@@ -254,9 +242,9 @@ export function drawables(ctx, pedalPhase, penteAt = null) {
   for (const p of potes) {
     let u = p.u, v = p.v, y = p.jumpY, alpha = 1;
     if (p.leave) {
-      // Il décroche : il ralentit, part dans le champ du fond, s'efface.
+      // Il décroche : il ralentit, se laisse distancer, s'efface.
       const t = p.leave.t;
-      v -= t * t * 4.5;   // il se laisse distancer sur la route (plus de détour par le champ du fond)
+      v -= t * t * 4.5;   // il reste sur la route (pas de détour par le champ du fond)
       y += Math.sin(Math.min(1, t) * Math.PI) * 1.2;
       alpha = 1 - t;
     }
@@ -272,14 +260,11 @@ export function drawables(ctx, pedalPhase, penteAt = null) {
           const g = project(u, v, y + RIDER_HEIGHT + 0.2);
           ctx.save();
           ctx.globalAlpha *= vu;
-          // Pastille « LEA EST LÀ » au-dessus du pote qui arrive (3 octobre
-          // 2026 : « un pop-up par-dessus le joueur [...] pendant 3 secondes,
-          // de manière hyper simple ») — remplace le grand bandeau.
+          // Pastille « LEA EST LÀ » au-dessus du pote qui arrive, 3 s.
           const txt = `${p.name.toUpperCase()} EST LÀ`;
           ctx.font = `900 11px "Helvetica Neue", Helvetica, Arial, sans-serif`;
           const w = ctx.measureText(txt).width + 14, h = 19;
-          // Toujours ENTIÈRE dans l'écran (4 octobre 2026 : « bot 5 est là,
-          // on ne voit pas le tag en entier, il est coupé à gauche »).
+          // Toujours ENTIÈRE dans l'écran, jamais coupée sur un bord.
           const x = Math.max(8 + w / 2, Math.min(largeurEcran - 8 - w / 2, g.x));
           ctx.fillStyle = "#ffcf2e"; ctx.strokeStyle = "#0d0d10"; ctx.lineWidth = 1.5;
           ctx.beginPath(); ctx.rect(Math.round(x - w / 2) + 0.5, Math.round(g.y - h - 4) + 0.5, Math.round(w), h); ctx.fill(); ctx.stroke();

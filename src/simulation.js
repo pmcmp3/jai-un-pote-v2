@@ -1,19 +1,14 @@
-// simulation.js — Le SCORE PARFAIT d'une course (9 septembre 2026 : « ce que
-// j'aimerais beaucoup, c'est que tu me donnes le score maximum à atteindre »).
-// Rejoue la course d'une graine avec un joueur idéal, avec les MÊMES formules
-// que main.js (regles.js) et sa propre instance de Route (le parcours en
-// cours n'est jamais touché).
+// simulation.js — Le SCORE PARFAIT d'une course, le maximum atteignable
+// affiché au joueur. Rejoue la course d'une graine avec un joueur idéal, avec
+// les MÊMES formules que main.js (regles.js) et sa propre instance de Route
+// (le parcours en cours n'est jamais touché).
 //
-// v2 (19 septembre 2026, vue de profil) : le joueur idéal ne change plus de
-// voie, il SAUTE. Il vise la prochaine cible devant lui — un obstacle ou une
-// pile de pièces en l'air — et part au bon moment pour culminer dessus :
-// saut simple pour un obstacle « saut » (l'arc de pièces qui le surmonte est
-// ramassé au passage), saut + re-tap à l'apex pour un obstacle « salto ». Il
-// ne fait le salto facultatif (pile tout en haut) que si la barre est pleine
-// et qu'aucun obstacle « salto » n'arrive avant qu'elle se recharge. Il
-// ramasse les pièces avec la même règle que le jeu (rows.checkMember). Le
-// re-tap du salto part quand il reste le temps d'une montée avant la cible.
-// Jamais freiné par la boue, jamais un pote perdu. ~20 000 pas : quelques ms.
+// Le joueur idéal SAUTE : il vise le prochain obstacle devant lui et part au
+// bon moment pour culminer dessus selon sa famille (tap, haut = appui tenu,
+// double = appui tenu + re-tap à l'apex). Les pièces en l'air dessinent l'arc
+// de ces sauts : il les ramasse au passage, avec la même règle que le jeu
+// (rows.checkMember). Jamais freiné par la boue, jamais un pote perdu.
+// ~20 000 pas : quelques ms.
 
 import { Route, CORPS_HAUT, familleDe, montee, solAt, toitGare, armer, delaiArmement } from "./rows.js";
 import { ROWS_AHEAD } from "./scene.js";
@@ -30,9 +25,9 @@ function montees(C) {
   return { tap: tTap, haut: tHaut, double: tHaut + tDouble * 0.6, tDouble };
 }
 
-// Ce que demande une rangée : null, "tap", "haut" ou "double". Depuis le
-// 20 septembre 2026 les pièces en l'air DESSINENT l'arc d'un obstacle voisin :
-// le pilote n'a plus à les viser séparément, il les ramasse en sautant.
+// Ce que demande une rangée : null, "tap", "haut" ou "double". Les pièces en
+// l'air DESSINENT l'arc d'un obstacle voisin : le pilote ne les vise pas
+// séparément, il les ramasse en sautant.
 function cibleDe(route, r) {
   const row = route.rowAt(r);
   if (row.type !== "safe") return familleDe(row.kind);
@@ -47,7 +42,7 @@ export function scoreParfait(seed, potesMax) {
   const M = montees(C);
   let v = 0, prevV = 0, speed = V_UNIT * C.vitesseBase;
   let jumpY = 0, vy = 0, doubled = false, tHaut = 0, plan = null;
-  // Le sol n'est plus toujours 0 : les halles portent le vélo en l'air.
+  // Le sol n'est pas toujours 0 : les halles portent le vélo en l'air.
   let metres = 0, points = 0, potesGagnes = 0, potes = 0, turbo = 0, cible = null;
   const stats = { pieces: 0, laits: 0, rouges: 0, sauts: 0, doubles: 0, rangees: 0 };
   for (let now = 0; now < T; now += dt) {

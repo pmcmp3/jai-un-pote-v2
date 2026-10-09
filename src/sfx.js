@@ -1,13 +1,10 @@
-// sfx.js — Bruitages synthétisés (6 septembre 2026 : « des bruitages quand un
-// pote arrive, en lien avec un bruit d'herbe, un peu moins fort que
-// l'instrumental »). Zéro fichier : oscillateurs et bruit filtré sur le
-// contexte du morceau, via audio.sfxOutput() (donc derrière le curseur de
-// volume). Gains bas : présents, jamais devant la musique.
-// ⚠️ Réaccordés le 4 octobre 2026 (nuit, « tous les bruitages sur la gamme ») :
-// le morceau est en mi mineur / sol majeur ; toutes les notes ci-dessous sont
-// dans la PENTATONIQUE de sol (sol la si ré mi — voir bruitages.js, GAMME).
-// Avant : do majeur (lait, fin), mi majeur (pièce rouge), des glissés qui
-// finissaient entre deux notes (salto, pote perdu).
+// sfx.js — Bruitages synthétisés du jeu (pièces, potes, saut, lait, fin).
+// Zéro fichier : oscillateurs et bruit filtré sur le contexte du morceau, via
+// audio.sfxOutput() (donc derrière le curseur de volume). Gains bas : présents,
+// jamais devant la musique.
+// ⚠️ Le morceau est en mi mineur / sol majeur : toutes les notes ci-dessous
+// sont dans la PENTATONIQUE de sol (sol la si ré mi — voir bruitages.js, GAMME),
+// glissés compris (ils finissent sur une note de la gamme).
 
 import * as audio from "./audio.js";
 
@@ -42,7 +39,7 @@ export function piece() {
   tone(o.ctx, o.dest, { f0: 880, f1: 1318.51, t0: o.ctx.currentTime, dur: 0.09, gain: 0.05 }); // la5 → mi6
 }
 
-// Pièce DOUBLE (5 octobre 2026) : deux blips qui montent.
+// Pièce DOUBLE : deux blips qui montent.
 export function pieceDouble() {
   const o = out(); if (!o) return;
   const t0 = o.ctx.currentTime;

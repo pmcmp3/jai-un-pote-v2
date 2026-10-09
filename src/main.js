@@ -1,19 +1,19 @@
-// main.js — « J'ai un pote v2 » : VUE DE PROFIL, une seule voie (19 septembre
-// 2026, « exactement comme Jetpack Joyride ou Zombie Tsunami »). Boucle à pas
-// fixe 120 Hz, horloge = audio (comme le premier jeu), rangées et traversants
-// (rows.js), meute de potes (friends.js), projection de côté (scene.js).
+// main.js — « J'ai un pote v2 » : VUE DE PROFIL, une seule voie (façon Jetpack
+// Joyride / Zombie Tsunami). Boucle à pas fixe 120 Hz, horloge = audio, rangées
+// et traversants (rows.js), meute de potes (friends.js), projection de côté
+// (scene.js).
 // Gestes : tap = saut, re-tap en l'air = salto. Tout se franchit en hauteur :
 // saut pour les petits obstacles, salto pour les hauts (tracteur, fermier,
 // voiture) ; les pièces dessinent le saut à faire.
 //
-// ⚠️ CONTRE-LA-MONTRE (6 septembre 2026) : la course dure exactement le
-// morceau (config.dureeMorceau, 173,65 s), qui ne boucle pas. Sa fin termine
-// la partie (« TERMINÉ ! »), sauf mort avant. Le score est en « pts »
-// (9 septembre 2026) : distance × potes × turbo + pièces.
+// ⚠️ CONTRE-LA-MONTRE : la course dure exactement le morceau
+// (config.dureeMorceau), qui ne boucle pas. Sa fin termine la partie
+// (« TERMINÉ ! »), sauf mort avant. Score en « pts » : distance × potes × turbo
+// + pièces.
 //
-// ⚠️ UNE LIGUE = UNE COURSE (9 septembre 2026) : graine dérivée du code de
-// ligue (regles.graineLigue), score PARFAIT calculé par simulation.js, et
-// FANTÔME du meilleur de la ligue (fantome.js) qui roule à côté du joueur.
+// ⚠️ UNE LIGUE = UNE COURSE : graine dérivée du code de ligue
+// (regles.graineLigue), score PARFAIT calculé par simulation.js, et FANTÔME du
+// meilleur de la ligue (fantome.js).
 
 import * as audio from "./audio.js";
 import * as sfx from "./sfx.js";
@@ -114,11 +114,11 @@ function tempsRestant() {
   return duree - pos;
 }
 
-// --- Le marchand du marché (4 octobre 2026, nuit) ------------------------------
-// « Quatre euros les belles courgettes ! » au mégaphone (audio.js) : chargé dès
-// la course lancée, lancé pour que le milieu du vocal tombe quand le joueur
-// passe le milieu de la halle du marché, replacé à chaque pas (volume, filtre,
-// gauche/droite). Une fois par course.
+// --- Le marchand du marché ------------------------------------------------------
+// Le vocal du marchand au mégaphone (audio.js) : préchargé à l'approche, lancé
+// pour que le milieu du vocal tombe quand le joueur passe le milieu de la halle
+// du marché, replacé à chaque pas (volume, filtre, gauche/droite). Une fois par
+// course.
 let marcheMilieu;
 function marchandPas() {
   if (marcheMilieu === undefined) { const d = rows.debutHalle("marche"); marcheMilieu = d === null ? null : d + rows.HALLE_ROWS / 2; }
@@ -174,22 +174,18 @@ let cameraX = null;
 let speed = V_UNIT * window.CONFIG.vitesseBase;
 // Courbe de vitesse et multiplicateur : regles.js (partagés avec la simulation).
 const targetSpeed = targetSpeedRegle;
-// Saut à hauteur VARIABLE (20 septembre 2026, demandé : « on peut sauter un
-// peu haut si on reste appuyé 0,5 s, et si on double-tape après, on peut
-// faire un double saut, comme dans tous les jeux d'arcade ») :
-//   - tap court        → apex ~1,3 (les poules, les chats, les moutons) ;
+// Saut à hauteur VARIABLE :
+//   - tap court       → apex ~1,3 (les poules, les chats, les moutons) ;
 //   - appui maintenu   → la pesanteur est réduite tant qu'on monte, apex ~2,5
 //                        (les vaches, les tracteurs) ;
 //   - re-tap en l'air  → on REMONTE d'un coup (apex ~3,7 depuis un saut
 //                        maintenu) + salto (les fermiers, les voitures).
-// --- JETPACK (5 octobre 2026) ---------------------------------------------------
-// « Dans une partie sur cinq, un jetpack apparaît au milieu, qui te permet de
-// rester appuyé pour voler. Ça dure 10 secondes [...] juste pour le plaisir.
-// Quand tu as le jetpack, tu peux mettre des pièces tout en haut de l'écran,
-// en fonction du responsive de l'écran. » Posé sur une rangée libre vers
-// `jetpackTempsS` ; appuyé = on monte, relâché = on redescend en douceur ; les
-// pièces du vol sont calées sur la HAUTEUR DE L'ÉCRAN (scene.hauteurA). Les
-// potes suivent la trajectoire exacte du joueur (friends.js, phys.trace).
+// --- JETPACK ----------------------------------------------------------------------
+// Une partie sur `jetpackUneSur`, un jetpack est posé sur une rangée libre vers
+// `jetpackTempsS`, pour `jetpackDureeS` de vol : appuyé = on monte, relâché = on
+// redescend en douceur. Les pièces du vol sont calées sur la HAUTEUR DE L'ÉCRAN
+// (scene.hauteurA), donc s'adaptent à chaque format. Les potes suivent la
+// trajectoire exacte du joueur (friends.js, phys.trace).
 // Hors du générateur de rangées : la route (et le score parfait des ligues)
 // reste la même avec ou sans jetpack.
 const HAUT_HUD_PX = 112;   // sous le score et le chrono
@@ -219,8 +215,8 @@ function gagnerJetpack() {
   for (let v = v0; v < v0 + long; v += 2.4) {
     const f = (v - v0) / long, montee = Math.min(1, (v - v0) / 16);
     const vague = hBas + (hHaut - hBas) * (0.5 + 0.5 * Math.sin(f * Math.PI * 2 * 2.2 - 1.2));
-    // Jamais plus bas que ce qui roule ou se tient dessous (5 octobre 2026 :
-    // une pièce qu'on ne prend qu'en touchant un véhicule, c'est un piège).
+    // Jamais plus bas que ce qui roule ou se tient dessous : une pièce qu'on
+    // ne prend qu'en touchant un véhicule serait un piège.
     let dessous = 0;
     for (let r = Math.floor(v) - 4; r <= Math.ceil(v) + 4; r++) {
       const row = rows.rowAt(r);
@@ -265,13 +261,11 @@ function multiplicateur() { return multRegle(friends.count(), game.turbo > 0) * 
 // toit d'une voiture s'il arrive déjà au-dessus d'elle.
 function solSous(v, jumpY) { return Math.max(rows.solAt(v), rows.toitSous(rows.routeVivante(), v, jumpY, tMonde())); }
 // Pente locale du sol, en radians : sert à incliner le vélo sur la rampe.
-// ⚠️ Signe NÉGATIF (27 septembre 2026) : sur le canvas un angle positif tourne
-// dans le sens horaire, donc le vélo piquait du nez en MONTANT (« quand on
-// monte, je penche vers l'avant, c'est trop bizarre, il faudrait que j'aie le
-// corps penché légèrement en arrière »). Nez en l'air à la montée, et tout le
-// cycliste tourne avec le vélo : le buste part en arrière.
+// ⚠️ Signe NÉGATIF : sur le canvas un angle positif tourne dans le sens
+// horaire ; sans le signe, le vélo piquerait du nez en MONTANT. Nez en l'air à
+// la montée, et tout le cycliste tourne avec le vélo : le buste part en arrière.
 function penteSol(v) { return -Math.atan2(rows.solAt(v + 0.6) - rows.solAt(v - 0.6), 1.2); }
-// Collines de 6,5 u (4 octobre 2026, deuxième passe) : ce qui se tient ou
+// Collines de 6,5 u : ce qui se tient ou
 // roule sur la chaussée MONTE avec elle (scene.avecLift : toute la géométrie
 // est soulevée, ombre comprise) et un véhicule s'incline sur la pente, autour
 // de son point de contact.
@@ -291,8 +285,8 @@ function palierPrecedent() {
   return game.potesGagnes === 0 ? 0 : p[game.potesGagnes - 1];
 }
 // Pièces à ramasser pour le prochain pote. Après le dernier palier, un pote
-// perdu se RACHÈTE (20 septembre 2026 : « j'ai perdu tous mes potes et
-// j'arrive pas à les regagner ») : une cible relative est posée à la perte.
+// perdu se RACHÈTE (sinon des potes perdus ne se regagnent jamais) : une cible
+// relative est posée à la perte.
 function prochainPalier() {
   const p = window.CONFIG.potesPaliers;
   if (game.cibleRachat !== null && game.cibleRachat !== undefined) return game.cibleRachat;
@@ -304,10 +298,9 @@ function armerRachat() {
   game.coutRachat = coutRachat();
   game.cibleRachat = game.points + game.coutRachat;
 }
-// Racheter un pote coûte de plus en plus cher (4 octobre 2026 : « plus ça
-// avance, plus ça doit être difficile [...] je suis allé jusqu'à la ligne
-// d'arrivée assez facilement ») : `poteRachatPieces` jusqu'à 60 s, puis on
-// monte vers `poteRachatPiecesFin` à 160 s.
+// Racheter un pote coûte de plus en plus cher, pour que la fin de course reste
+// difficile : `poteRachatPieces` jusqu'à 60 s, puis on monte vers
+// `poteRachatPiecesFin` à 160 s.
 function coutRachat() {
   const C = window.CONFIG, base = C.poteRachatPieces || 5, fin = C.poteRachatPiecesFin || base;
   const k = Math.max(0, Math.min(1, (clock.now() - 60) / 100));
@@ -319,13 +312,11 @@ function semerSparkles(u, v, n = 9, couleur = null) {
 }
 const ghosts = []; // traînée du salto
 
-// --- Tuto CONTEXTUEL au ralenti (28 septembre 2026) -------------------------------
-// « Enlève le tuto, mets pause quand les gens arrivent devant une situation, ils
-// ont le tuto qui correspond, genre tout passe en méga ralenti. » Plus de
-// consignes au départ ni de bestiaire : la PREMIÈRE fois qu'une famille
-// d'obstacle arrive (tap / appui long / double tap), le monde passe au ralenti
-// pile au moment où il faut sauter, la consigne s'affiche, et le temps ne
-// repart que sur le bon geste. L'obstacle expliqué ne fait jamais mal.
+// --- Tuto CONTEXTUEL au ralenti -----------------------------------------------------
+// Pas de consignes au départ : la PREMIÈRE fois qu'une famille d'obstacle
+// arrive (tap / appui long / double tap), le monde passe au ralenti pile au
+// moment où il faut sauter, la consigne s'affiche, et le temps ne repart que sur
+// le bon geste. L'obstacle expliqué ne fait jamais mal.
 // Une famille est apprise pour de bon dès qu'elle a été franchie (localStorage).
 const CONSEILS = {
   tap:    { titre: "TAPE !", sous: "un petit saut pour les petites bêtes" },
@@ -339,17 +330,14 @@ function appris() { return new Set(lireJson(CLE_APPRIS, [])); }
 function apprendre(f) { const a = appris(); a.add(f); ecrireJson(CLE_APPRIS, [...a]); }
 // ralenti : facteur de temps du MONDE (1 = normal). La musique, elle, continue :
 // seule l'horloge du monde (`tMonde`) prend du retard sur celle du morceau.
-// Deuxième version (29 septembre 2026, joué en direct : « le ralenti devrait
-// arriver bien avant la bête, genre une seconde avant le choc, pour me laisser
-// le temps de me poser » ; « j'ai trois fois le même truc de ralenti ») :
-//   approche  : ~1 s avant le bon moment, le monde glisse vers ×0,25 ; un tap
-//               donné là est GARDÉ et part pile au bon moment ;
-//   attente   : au bon moment, s'il n'a rien fait, gel à ×0,06 ;
-//   enl_air   : appui long / double saut, ×0,3 le temps du deuxième geste ;
-//   fini      : réussite → le temps repart d'un coup (« ça doit s'accélérer
-//               quand la personne réussit »).
+// Phases d'un conseil :
+//   approche  : peu avant le bon moment (APPROCHE_S), le monde glisse vers
+//               RALENTI_APPROCHE, pour laisser au joueur le temps de se poser ;
+//   attente   : au bon moment, s'il n'a rien fait, quasi-gel (RALENTI_MIN) ;
+//   enl_air   : appui long / double saut, ralenti le temps du deuxième geste ;
+//   fini      : réussite → le temps repart d'un coup.
 // Une famille est APPRISE dès que l'obstacle est franchi sans le toucher (quel
-// que soit le geste), et jamais montrée plus de deux fois.
+// que soit le geste), et n'est montrée qu'une fois.
 const RALENTI_MIN = 0.015, RALENTI_APPROCHE = 0.25, APPROCHE_S = 0.7;
 const conseil = { r: null, famille: null, phase: null, alpha: 0, ok: 0, tampon: false, touche: false };
 let ralenti = 1, retardMonde = 0;
@@ -374,11 +362,10 @@ function conseilCherche(tm, vitesse) {
     const row = rows.rowAt(r);
     if (row.type !== "statique" && row.type !== "traverse" && row.type !== "contresens") continue;
     const f = rows.familleDe(row.kind);
-    if (deja.has(f) || (vus[f] || 0) >= 1) continue; // UNE seule fois (30 septembre 2026 : « faut pas 2 fois le même tuto »)
+    if (deja.has(f) || (vus[f] || 0) >= 1) continue; // UNE seule fois par famille
     // L'obstacle RÉSERVÉ au tuto (route dégagée, rows.degagerTutos) ne file
-    // jamais (4 octobre 2026, nuit, mesuré : en l'air au mauvais moment, ou
-    // la brique de lait expliquée juste avant, et le tuto partait sur
-    // l'obstacle suivant — sans route dégagée). Les autres attendent le sol.
+    // jamais, même si le joueur est en l'air : sinon le tuto partirait sur
+    // l'obstacle suivant, sans route dégagée (mesuré). Les autres attendent le sol.
     const reserve = (game.tutos || []).includes(r);
     if (!player.auSol && !reserve) return;
     const t = tempsAvant(r, row, tm, vitesse);
@@ -390,22 +377,18 @@ function conseilCherche(tm, vitesse) {
     return; // seul l'obstacle le plus proche compte
   }
 }
-// Filtre du tap pendant un conseil : gardé en approche, relâché au bon moment.
+// Filtre du tap pendant un conseil (projecteur, approche, double saut).
 function conseilTap(tap, tm, vitesse) {
   if (projo.type) { if (tap && projo.age > 0.5) projoFin(); return false; }
   if (conseil.r === null) return tap;
   if (conseil.phase === "approche") {
     const t = tempsAvant(conseil.r, rows.rowAt(conseil.r), tm, vitesse);
-    // Tap pendant l'approche : on saute TOUT DE SUITE (30 septembre 2026 :
-    // « il y a une latence entre le moment où tu appuies et le moment où
-    // l'action se réalise, c'est très frustrant ») — l'ancien tap gardé
-    // partait plus tard. Pour que ça passe quand même, le saut est prolongé :
-    // tenue offerte, et double saut automatique au sommet si le tap était tôt.
+    // Tap pendant l'approche : on saute TOUT DE SUITE — différer le saut se
+    // ressent comme de la latence.
     if (tap && player.auSol) {
       const avance = t !== null ? t - momentIdeal(conseil.famille) : 0;
-      // 4 octobre 2026 : plus de double saut automatique (« je suis resté
-      // appuyé, il a fait un double saut tout seul ») — le saut trop tôt PLANE
-      // au-dessus de l'obstacle expliqué (voir la physique du saut).
+      // Un saut trop tôt PLANE au-dessus de l'obstacle expliqué (voir la
+      // physique du saut) ; jamais de double saut automatique.
       conseil.plane = conseil.famille !== "double" && avance > 0.12;
       conseil.phase = "attente";
       return true;
@@ -437,9 +420,7 @@ function conseilStep(dt, tm, vitesse) {
   let cible = 1;
   if (projo.type) { projo.age += dt; cible = RALENTI_MIN; if (projo.age > 8) projoFin(); }
   if (conseil.r !== null) {
-    // Un tap pendant l'approche : le temps REPART tout de suite (30 septembre
-    // 2026 : « si qqn appuie pour sauter, hop, faut accélérer ») et le saut
-    // part tout seul au bon moment, tenue comprise.
+    // Un tap pendant l'approche : le temps REPART tout de suite.
     if (conseil.phase === "approche") cible = conseil.tampon ? 1 : RALENTI_APPROCHE;
     else if (conseil.phase === "attente") cible = RALENTI_MIN;
     else if (conseil.phase === "enl_air") {
@@ -467,22 +448,21 @@ function conseilVue() {
   return { titre: fini ? "BIEN !" : titre, sous: fini ? null : c.sous, onglet: fini ? "BIEN !" : "À TOI", ok: fini, alpha: conseil.alpha, y: safeTop + 96 };
 }
 
-// --- Projecteur (3 octobre 2026) -----------------------------------------------
-// « La brique de lait : tu baisses l'opacité et la luminosité, tu mets en
-// surbrillance la brique et une indication » — pareil pour le premier
-// triangle d'alerte. Une fois par joueur (jp2-conseils-vus), le monde gèle,
-// l'écran s'assombrit sauf autour de l'objet, et un tap fait repartir.
+// --- Projecteur ------------------------------------------------------------------
+// Première brique de lait et premier triangle d'alerte : une fois par joueur
+// (jp2-conseils-vus), le monde gèle, l'écran s'assombrit sauf autour de
+// l'objet, une indication s'affiche, et un tap fait repartir.
 const PROJECTEURS = {
-  // 4 octobre 2026, nuit : un joueur l'avait vue sans comprendre — on dit ce
-  // qu'elle FAIT (l'invincibilité surtout, c'est ce qui se voit en jeu).
+  // On dit ce que la brique FAIT (l'invincibilité surtout, c'est ce qui se
+  // voit en jeu), pas seulement ce qu'elle est.
   lait: { titre: "BRIQUE DE LAIT = TURBO", sous: "Attrape-la : pendant 5 s, tu fonces, rien ne peut te toucher et tes points comptent double" },
   alerte: { titre: "ATTENTION !", sous: "Ce panneau annonce un danger qui arrive : prépare-toi à sauter" },
 };
 const projo = { type: null, x: 0, y: 0, r: 40, age: 0 };
 function projoLancer(type, x, y, r) {
   if (projo.type || game.sprint || game.ended || conseil.r !== null || !gameStarted || clock.now() < 1) return;
-  // Jamais juste avant un tuto (4 octobre 2026, nuit) : deux explications qui
-  // se marchent dessus, et ni l'une ni l'autre ne rentre.
+  // Jamais juste avant un tuto : deux explications qui se marchent dessus,
+  // et ni l'une ni l'autre ne rentre.
   if ((game.tutos || []).some((r) => r > player.v - 2 && r - player.v < 30)) return;
   const vus = lireJson(CLE_VUS, {});
   if ((vus[type] || 0) >= 1) return;
@@ -494,9 +474,8 @@ function projoSuivre(type, x, y) { if (projo.type === type) { projo.x = x; projo
 function projoFin() { if (!projo.type) return; projo.type = null; if (conseil.r === null) audio.setRalenti(false); }
 
 // --- Effets ------------------------------------------------------------------
-// Pastilles (3 octobre 2026 : « il y a trop de bandeaux turbo lait, ×2, etc. [...]
-// mes yeux sont en train de suivre la ligne avec les joueurs ») : les annonces
-// de course sont de petites pastilles au-dessus du joueur, plus des bandeaux.
+// Pastilles : les annonces de course sont de petites pastilles au-dessus du
+// joueur, là où le regard suit déjà l'action, plutôt que des bandeaux.
 const pastilles = [];
 function pousserPastille(texte, duree = 2) {
   pastilles.push({ texte, age: 0, duree });
@@ -509,8 +488,7 @@ function pousserPopup(texte, couleur) {
   if (popups.length > 3) popups.shift();
 }
 let banner = null;
-// `etiquette` : le mot écrit dans l'onglet de couleur (28 septembre 2026 : « le truc
-// jaune [...] il sert à rien » — l'onglet était vide).
+// `etiquette` : le mot écrit dans l'onglet de couleur du bandeau.
 function afficherBanner(titre, sous, couleur, duree = 2.4, etiquette = "") { banner = { titre, sous, couleur, duree, timer: duree, etiquette }; }
 const shake = { time: 0, duration: 0.5, amp: 6 };
 const rendusRates = new Set();   // une trace par message, pas une par image
@@ -530,7 +508,7 @@ function preparerJoueur() {
 }
 // Graine du sprint du dimanche : la même route pour tout le monde ce jour-là.
 function graineSprint() { let h = 0; for (const ch of net.jourSprint()) h = (h * 31 + ch.charCodeAt(0)) % 100000; return h; }
-// --- La course de la ligue (9 septembre 2026) --------------------------------------
+// --- La course de la ligue -----------------------------------------------------------
 // Une ligue = une graine (regles.graineLigue) : tous ses membres jouent la
 // MÊME route. Le sprint garde sa graine du jour ; sans ligue, graine aléatoire
 // (chaque partie différente). Calcule aussi le score PARFAIT de la course
@@ -550,10 +528,10 @@ function semerCourse() {
   ghost = null;
   game.tutos = [];
   degagerTutos(0);
-  // Fantôme retiré de l'écran (29 septembre 2026 : « le cycliste fantôme, pour
-  // l'instant, tu l'enlèves ») — la trace part toujours, pour pouvoir le rebrancher.
+  // Fantôme non chargé (voir chargerFantome) ; la trace part toujours, pour
+  // pouvoir le rebrancher.
 }
-// Le tuto garde la route pour lui (4 octobre 2026, nuit, rows.degagerTutos) :
+// Le tuto garde la route pour lui (rows.degagerTutos) :
 // rien juste avant ni juste après l'obstacle qu'on va expliquer — seulement
 // pour qui a encore une famille à voir, jamais en sprint. Rappelé après un
 // turbo de brique de lait : sa fenêtre sûre a pu effacer l'obstacle réservé
@@ -567,9 +545,9 @@ function degagerTutos(depuis) {
   game.tutos = familles.length ? rows.degagerTutos(familles, depuis, gardes) : gardes;
 }
 let ghost = null; // { graine, pseudo, palette, trace } — le meilleur de la ligue
-// ⚠️ EN SOMMEIL (fantôme retiré de l'écran le 29 septembre 2026) : la trace
-// part toujours avec le score ; pour le rallumer, appeler chargerFantome(l,
-// graine) dans requestGameStart une fois la base v2 branchée.
+// ⚠️ EN SOMMEIL (fantôme retiré de l'écran) : la trace part toujours avec le
+// score ; pour le rallumer, appeler chargerFantome(l, graine) dans
+// requestGameStart une fois la base v2 branchée.
 async function chargerFantome(l, seed) {
   const f = await net.fantome(l.code, seed);
   if (!f || seed !== game.graine) return;
@@ -719,11 +697,11 @@ function arriveePote(pote, direct) {
   if (!pote) return;
   sfx.pote();
   vibrer(30);
-  // Une seule ligne, courte (7 septembre 2026 : « trop d'infos au mètre carré »).
+  // Aucun texte à l'écran : un son et une vibration suffisent.
   audio.playComboJingle(Math.min(6, friends.count()));
 }
 
-// `val` = 2 pour la pièce DOUBLE (5 octobre 2026) : elle compte pour deux
+// `val` = 2 pour la pièce DOUBLE : elle compte pour deux
 // pièces, au score comme vers le prochain pote.
 function gagnerPiece(u, v, val = 1) {
   const mult = multiplicateur();
@@ -767,14 +745,14 @@ function gagnerRouge(u, v) {
   else { game.metres += 40 * multiplicateur(); pousserPopup("+40 PTS", JAUNE); }
 }
 
-// Une bête percutée tombe (20 septembre 2026) : on retient la rangée et
+// Une bête percutée tombe : on retient la rangée et
 // l'instant, le rendu la fait basculer pendant 1,6 s.
 const tombes = new Map();
 function marquerTombe(ev, now) { if (ev.r !== undefined && !KINDS_ROULANTS.has(ev.kind)) tombes.set(ev.r, now); }
 // Ce qui ROULE (ou glisse, ou marche) et qu'on percute en étant invincible —
 // turbo du lait, bouclier de reprise — est ÉJECTÉ : il s'envole en tournant
-// et disparaît (5 octobre 2026 : « je suis passé au travers du skieur,
-// normalement je dois mourir » — c'était le turbo, rien ne le montrait).
+// et disparaît. Sans ça, traverser un obstacle sous invincibilité ressemble à
+// un bug de collision.
 const ejectes = new Map(); // rangée → { t0 (horloge du monde), v (où il était) }
 const EJECTION_S = 0.9;
 function ejecter(ev, now) {
@@ -800,13 +778,12 @@ const chocs = []; // debug : les derniers chocs (auto-audit)
 function toucherJoueur(ev) {
   chocs.push({ r: ev.r, kind: ev.kind, conseil: conseil.r }); if (chocs.length > 20) chocs.shift();
   if (conseil.r !== null && ev.r === conseil.r) { conseil.touche = true; return; } // l'obstacle expliqué ne fait pas mal
-  // Le cri de ce qu'on a percuté (4 octobre 2026, nuit : « quand je prends une
-  // poule, je veux un bruit de poule ») — la voix suit la personne.
+  // Le cri de ce qu'on a percuté (poule, vache…) ; pour un humain, la voix
+  // suit la personne (homme / femme).
   bruitages.choc(ev.kind, { pan: -0.15, femme: ev.r !== undefined && humain(Math.round(ev.r), { enfants: false }).femme });
   // Invulnérable (turbo lait, bouclier de reprise) : la bête est quand même
   // renversée, avec une gerbe d'étincelles — sinon on croit à un bug de
-  // collision (27 septembre 2026 : « j'ai roulé sur une poule, j'ai pas eu
-  // de défaut »).
+  // collision.
   if (clock.now() < reviveShieldUntil || invincible || game.turbo > 0) {
     marquerTombe(ev, tMonde());
     ejecter(ev, tMonde());
@@ -827,8 +804,7 @@ function toucherJoueur(ev) {
     damageFlash = 0.8;
     vibrer(60);
     sfx.potePerdu();
-    // Juste « −1 POTE » au-dessus du joueur (« tu enlèves le wording, tu dis
-    // juste −1 pote en pop-up par-dessus et voilà »).
+    // Juste « −1 POTE » en pop-up au-dessus du joueur, sans autre texte.
     pousserPopup(perdus.length > 1 ? `−${perdus.length} POTES` : "−1 POTE", ROUGE);
     armerRachat();
   } else {
@@ -836,12 +812,11 @@ function toucherJoueur(ev) {
   }
 }
 
-// --- Les potes suivent le mouvement du joueur (4 octobre 2026) -----------------
-// « Quand je réussis mon double saut et que je tombe après la voiture ou le car,
-// j'ai des potes qui tombent avant la voiture. » Ils refaisaient le saut au
-// même ENDROIT ; or une voiture en face a avancé entre-temps. Chaque saut
-// retient donc l'obstacle qu'il franchit et la distance qui l'en séparait :
-// le pote saute quand il est à la même distance de CE véhicule, là où il est.
+// --- Les potes suivent le mouvement du joueur ------------------------------------
+// Refaire le saut au même ENDROIT ne marche pas : une voiture en face a avancé
+// entre-temps, et le pote retomberait dessus. Chaque saut retient donc
+// l'obstacle qu'il franchit et la distance qui l'en séparait : le pote saute
+// quand il est à la même distance de CE véhicule, là où il est.
 function refObstacle(v, tm) {
   let best = null;
   for (let r = Math.floor(v) - 3; r <= v + 16; r++) {
@@ -896,12 +871,10 @@ function step(dt) {
     }
     if (gameStarted) ancrerDepartSurLaGrille();
   }
-  // ⚠️ Jamais pendant une pause (5 octobre 2026) : audio.now() y est GELÉ
-  // exprès (pauseAnchor). Le chien de garde y voyait une horloge audio en
-  // panne, basculait au bout d'une seconde sur l'horloge de secours… qui, elle,
-  // tourne : le monde avançait derrière le menu pause (« le chasse-neige avait
-  // continué d'avancer ») et la course se décalait du morceau pour de bon
-  // (« à la fin, il y a du vide et la musique s'arrête »).
+  // ⚠️ Jamais pendant une pause : audio.now() y est GELÉ exprès (pauseAnchor).
+  // Le chien de garde y verrait une horloge audio en panne et basculerait sur
+  // l'horloge de secours… qui, elle, tourne : le monde avancerait derrière le
+  // menu pause et la course se décalerait du morceau pour de bon.
   if (gameStarted && audioDrivesClock && !game.ended && !isPaused()) {
     const audioT = audio.now();
     if (audioT > audioWatch.lastT + 1e-4) { audioWatch.lastT = audioT; audioWatch.lastReal = perfClock(); }
@@ -937,9 +910,8 @@ function step(dt) {
     // Roue libre après « TERMINÉ ! » : on continue d'avancer, sans rien ramasser.
     if (game.finAge >= 0) {
       game.finAge += dt; player.v += speed * 0.6 * dt; player.pedal += speed * dt * 2;
-      // … et la PESANTEUR continue (5 octobre 2026 : « au moment où je passe
-      // la ligne d'arrivée, la gravité n'agit plus sur mon personnage ») :
-      // franchie en plein saut, la ligne laissait le cycliste suspendu.
+      // … et la PESANTEUR continue : franchie en plein saut, la ligne
+      // laisserait sinon le cycliste suspendu en l'air.
       player.prevJumpY = player.jumpY; player.prevFlip = player.flip;
       const sol = solSous(player.v, player.jumpY);
       if (player.jumpY > sol + 0.001 || player.jumpVy > 0) {
@@ -972,8 +944,7 @@ function step(dt) {
   }
   // --- Nuit : tombe à partir de nuitDebutS, 30 s de transition ---
   const nd = nuitDebut !== null ? nuitDebut : window.CONFIG.nuitDebutS;
-  // La plage de fin rallume un coucher de soleil : la nuit s'y lève tout à
-  // fait (5 octobre 2026 : « intensifie le côté clarté soleil couchant »).
+  // La plage de fin rallume un coucher de soleil : la nuit s'y lève tout à fait.
   plageFondu += ((rows.enPlage(Math.round(player.v + 8)) ? 1 : 0) - plageFondu) * Math.min(1, dt * 0.45);
   scene.setPlage(plageFondu);
   if (nd !== undefined) scene.setNight(Math.max(0, Math.min(1, (now - nd) / 30)) * (1 - plageFondu));
@@ -1007,10 +978,8 @@ function step(dt) {
   }
   if (!enVol && player.jumpY > solIci) {
     // Tant que le doigt reste appuyé et qu'on monte, la pesanteur est réduite.
-    // ⚠️ Plus AUCUN appui offert pendant les tutos (4 octobre 2026 : « un petit
-    // saut pour les petites bêtes, ça m'a fait sauter hyper haut tout seul [...]
-    // à chaque fois que j'appuie, tu considères que c'est un appui lent ») :
-    // le saut est celui que fait le doigt.
+    // ⚠️ Aucun appui offert pendant les tutos : le saut est celui que fait le
+    // doigt, sinon un tap court sauterait haut tout seul.
     const tenu = isHolding() && player.jumpVy > 0 && player.tHaut < phys.tenueMax;
     if (tenu) player.tHaut += dt;
     player.jumpVy -= (tenu ? phys.gTenu : phys.g) * dt;
@@ -1028,8 +997,7 @@ function step(dt) {
         if (player.jumpY < H) { player.jumpY = H; player.jumpVy = 0; }
       } else conseil.plane = false;
     }
-    // Sous le toit d'une halle, on reste DESSOUS (4 octobre 2026 : « le
-    // personnage reste en dessous, sans possibilité de dépasser le toit »).
+    // Sous le toit d'une halle, on reste DESSOUS : impossible de le traverser.
     const plafond = rows.plafondA(player.v);
     if (player.jumpY > plafond) { player.jumpY = plafond; if (player.jumpVy > 0) player.jumpVy = 0; }
   }
@@ -1058,13 +1026,12 @@ function step(dt) {
   // Retombée / roulage sur la rampe de la halle, ou atterrissage sur le toit
   // d'une voiture : le vélo colle au plancher trouvé sous lui.
   // ⚠️ Le toit se cherche avec la hauteur d'AVANT la chute de ce pas : en
-  // retombant à ~10 u/s, les roues passaient sous le toit en une seule image
-  // et la voiture n'était plus un plancher mais un mur (28 septembre 2026 :
-  // « je peux pas rouler sur les voitures arrêtées »).
+  // retombant à ~10 u/s, les roues passeraient sous le toit en une seule image
+  // et la voiture deviendrait un mur au lieu d'un plancher.
   const solApres = solSous(player.v, Math.max(player.jumpY, player.prevJumpY));
   // Collage à la DESCENTE : au sol, on suit le plancher qui descend au lieu de
-  // décoller d'un cheveu à chaque image (le vélo tremblait et perdait son
-  // inclinaison une image sur deux — « glitchs bizarres dans la descente »).
+  // décoller d'un cheveu à chaque image (sinon le vélo tremble et perd son
+  // inclinaison une image sur deux).
   // Une vraie marche (bout d'un toit de voiture, > 0,35 u) fait toujours tomber.
   if (player.auSol && player.jumpVy <= 0 && player.jumpY > solApres && player.jumpY - solApres < 0.35) player.jumpY = solApres;
   if (player.jumpY <= solApres) {
@@ -1072,8 +1039,8 @@ function step(dt) {
     player.jumpY = solApres; player.jumpVy = 0; player.doubled = false; player.flip = 0; player.tHaut = 0;
   }
   player.auSol = player.jumpY <= solApres + 0.001;
-  // (Plus de bandeau « LES HALLES ! » : c'est l'enseigne peinte sur le toit
-  // qui annonce le bâtiment, 27 septembre 2026.)
+  // Pas de bandeau à l'entrée d'une halle : l'enseigne peinte sur le toit
+  // annonce le bâtiment.
   game.surHalle = rows.solAt(player.v) > 0.05;
   if (now >= 0) fantome.enregistrer(tm, player.u, player.v, player.jumpY);
   // Jetpack : ramassage, trajectoire (pour les potes) et pièces du vol.
@@ -1110,8 +1077,7 @@ function step(dt) {
     }
   }
 
-  // --- Ligne d'ARRIVÉE (1er octobre 2026 : « essaye de modéliser une ligne
-  // d'arrivée ») : 8 s avant la fin du morceau, on la pose là où le joueur
+  // --- Ligne d'ARRIVÉE : 8 s avant la fin du morceau, on la pose là où le joueur
   // sera quand la musique s'arrêtera (vitesse prévue intégrée). La franchir
   // termine la course, comme la fin du morceau.
   if (now >= 0 && !game.sprint && game.arriveeR === null && tempsRestant() <= 8) {
@@ -1148,15 +1114,13 @@ const GEO_HALLE = { haut: rows.HALLE_HAUT, montee: 7, plat: 26, descente: 7, tot
 const GEO_BOSSE = { ...rows.GEO_BOSSE, sol: rows.solAt };
 const SIGN_EVERY = 45;
 // Un seul panneau à la fois : celui d'entrée de village (la ville du joueur)
-// efface le panneau régulier voisin (20 septembre 2026 : « j'ai eu deux
-// panneaux en même temps, c'est assez bizarre »).
+// efface le panneau régulier voisin.
 function panneauVilleProche(r) {
   if (!scene.villeDuJoueur()) return false;
   for (let d = -9; d <= 9; d++) if (scene.debutVillage(r + d)) return true;
   return false;
 }
-// Jamais de panneau sur une halle ni juste avant/après (27 septembre 2026 :
-// « il y a un panneau de ville qui était derrière les halles, ça n'a aucun sens »).
+// Jamais de panneau sur une halle ni juste avant/après (il serait caché derrière).
 function prochDeHalle(r, marge = 14) {
   for (let d = -marge; d <= marge; d += 2) if (rows.halleA(r + d) !== null) return true;
   return false;
@@ -1176,9 +1140,9 @@ scene.setMasqueDecor((r) => {
   m = 0;
   for (let d = -3; d <= 3; d++) if (signAt(r + d) || panneauVilleA(r + d)) { m |= scene.SANS_LAMPE; break; }
   if (prochDeHalle(r, 4)) m |= scene.DANS_HALLE;
-  // Le bowling est une salle fermée : aucun décor derrière (4 octobre 2026).
+  // Le bowling est une salle fermée : aucun décor derrière.
   for (let k = -8; k <= 8; k += 2) { const dh = rows.halleA(r + k); if (dh !== null && rows.typeHalle(dh) === "bowling") { m |= scene.SANS_DECOR; break; } }
-  // Le marché de plein air longe la halle du marché (5 octobre 2026).
+  // Le marché de plein air longe la halle du marché.
   for (let k = -6; k <= 6; k += 2) { const dh = rows.halleA(r + k); if (dh !== null && rows.typeHalle(dh) === "marche") { m |= scene.ETALS; break; } }
   // Pas de lampadaire planté dans une bosse.
   for (let k = -2; k <= 2; k++) if (rows.bosseA(r + k) !== null) { m |= scene.SANS_LAMPE; break; }
@@ -1197,10 +1161,9 @@ function drawPiece(r, h, now, kind) {
   if (kind === "lait") {
     { const p = scene.project(0, r, h + 0.3); if (p.x < width * 0.82) projoLancer("lait", p.x, p.y, 46); projoSuivre("lait", p.x, p.y); }
     // Brique de lait : une VRAIE boîte qui tourne autour de son axe vertical
-    // (scene.drawBoxR). L'astuce précédente — réduire la largeur au cosinus —
-    // ne pouvait pas marcher : drawBox ne peint que des boîtes alignées sur
-    // les axes, donc la brique s'écrasait au lieu de tourner (20 septembre
-    // 2026 : « ça ne marche toujours pas en 3D, il faut que tu voies la logique »).
+    // (scene.drawBoxR). ⚠️ Pas drawBox avec une largeur au cosinus : drawBox ne
+    // peint que des boîtes alignées sur les axes, la brique s'écraserait au
+    // lieu de tourner.
     const bas = h - 0.42 + bob;
     scene.avecLift(rows.solAt(r), () => scene.drawShadow(ctx, 0, r, 0.22, 0.22, 0.18));
     scene.drawBoxR(ctx, 0, r, 0.42, 0.42, 0.74, "#f8f8f4", bas, spin);
@@ -1208,9 +1171,8 @@ function drawPiece(r, h, now, kind) {
     scene.drawBoxR(ctx, 0, r, 0.16, 0.16, 0.14, "#e8e8e2", bas + 0.74, spin);   // le bec
     return;
   }
-  // UNE SEULE taille de pièce, et la grosse dorée exactement 1,6 fois plus
-  // grande (20 septembre 2026 : « les tailles et l'espacement entre les
-  // pièces, ça n'a aucun sens »).
+  // UNE SEULE taille de pièce, et la grosse dorée dans un rapport fixe
+  // (PIECE_R × 1,45) : des tailles disparates se lisent comme du désordre.
   const p = scene.project(-0.35, r, h + bob);
   const R = scene.scale() * (kind === "grosse" ? PIECE_R * 1.45 : PIECE_R);
   ctx.save();
@@ -1241,7 +1203,7 @@ function dessinerJetpackObjet(r, now) {
   ctx.lineWidth = 3; ctx.strokeStyle = "rgba(0,0,0,0.6)"; ctx.lineJoin = "round";
   ctx.strokeText("JETPACK", t.x, t.y); ctx.fillStyle = "#ffcf2e"; ctx.fillText("JETPACK", t.x, t.y);
   ctx.restore();
-} // +20 % le 5 octobre 2026 (« elles sont pas assez grosses »)
+}
 
 // Avertisseur « ! » au bord droit (comme les missiles de Jetpack Joyride) :
 // une traversée est armée mais sa rangée n'est pas encore à l'écran.
@@ -1262,38 +1224,30 @@ function renderAlertes(now, vitesse) {
     const ou = row.type === "contresens" ? rows.contresensAt(r, row, now) : { v: r };
     // L'ARRIÈRE du véhicule compte : un tracteur lent entre dans l'écran par son cul.
     if (!ou || ou.v - (row.type === "contresens" ? rows.KINDS[row.kind].long / 2 : 0) <= player.v + devant + 0.2) continue;
-    // Le panneau ne s'allume que `alerteAvanceS` (3 s) avant que le véhicule
-    // n'entre dans l'écran (5 octobre 2026 : « ils arrivent trop longtemps
-    // avant [...] il y a vraiment un temps d'attente de 5 secondes »).
+    // Le panneau ne s'allume que `alerteAvanceS` avant que le véhicule n'entre
+    // dans l'écran : plus tôt, l'attente paraît interminable.
     const avant = row.type === "contresens"
       ? (ou.v - rows.KINDS[row.kind].long / 2 - (player.v + devant + 0.2)) / Math.max(0.5, vitesse + row.vitesse)
       : (r - (player.v + devant + 0.2)) / Math.max(0.5, vitesse);
     if (avant > (window.CONFIG.alerteAvanceS || 3)) continue;
     const tRest = row.type === "contresens" ? (ou.v - player.v) / Math.max(0.5, vitesse + row.vitesse) : (r - player.v) / Math.max(0.5, vitesse);
     const urgence = Math.max(0, Math.min(1, 1 - (tRest - 1) / 2.5));
-    // 4 octobre 2026 (« il doit trembler pendant 1 seconde, et après se réduire
-    // en taille et être tout le temps là [...] c'est un poil trop ») : grand et
-    // qui tremble la première seconde, puis petit et calme jusqu'à l'arrivée.
     const tReel = perfClock();
     if (!alertesVues.has(r)) { alertesVues.set(r, tReel); if (alertesVues.size > 40) alertesVues.delete(alertesVues.keys().next().value); }
     const age = tReel - alertesVues.get(r);
-    // Grand et qui tremble 0,6 s (1 s avant le 5 octobre 2026, avec un
-    // panneau qui ne reste plus que 1,8 s en tout), puis petit et calme.
+    // Grand et qui tremble 0,6 s, puis petit et calme jusqu'à l'arrivée.
     const reduit = Math.max(0, Math.min(1, (age - 0.6) / 0.25));
     const taille = 32 * (1 - reduit) + 17 * reduit;
     const tremble = age < 0.6 ? Math.sin(age * 72) * 5 * (1 - age) : 0;
     // Posé à hauteur de chaussée SOUS le joueur (sur la colline, la route est montée).
     const y = scene.project(0, player.v, rows.solAt(player.v) + 1.4).y + (age < 0.6 ? Math.cos(age * 61) * 2 : 0);
-    // ⚠️ Le panneau tenait sur `width − 18 − taille` et son sommet droit
-    // partait donc HORS de l'écran (20 septembre 2026 : « il est coupé sur la
-    // droite, il apparaît pas dans tout l'écran »). Il est désormais posé sur
-    // sa largeur réelle, 2 × taille, avec une marge franche.
+    // ⚠️ Posé sur sa largeur RÉELLE, 2 × taille, avec une marge franche :
+    // compté sur une seule `taille`, son coin droit sortirait de l'écran.
     const x = width - 14 - taille * 2 + tremble;
     projoLancer("alerte", x + taille, y, 70); projoSuivre("alerte", x + taille, y);
     if (debugAlertes) { const e = debugAlertes.get(r) || { kind: row.kind, alerte: 0, vu: 0 }; e.alerte += 1; debugAlertes.set(r, e); }
     ctx.save();
-    // Halo puis panneau plein, contour blanc : il doit sauter aux yeux
-    // (20 septembre 2026 : « le panneau d'attention n'est pas du tout assez visible »).
+    // Halo puis panneau plein, contour blanc : il doit sauter aux yeux.
     const halo = ctx.createRadialGradient(x + taille, y, 0, x + taille, y, taille * 2.4);
     const grave = row.kind === "tracteur" || row.kind === "contresens" || row.kind === "bus" || row.kind === "chasseneige";
     const teinte = grave ? "225,62,38" : "255,207,46";
@@ -1312,9 +1266,8 @@ function renderAlertes(now, vitesse) {
     ctx.closePath();
     ctx.stroke();
     ctx.fill();
-    // « ! » DESSINÉ (4 octobre 2026 : « le point d'exclamation n'est pas très
-    // bien centré ») : une barre et un point, centrés sur l'axe du triangle et
-    // posés dans son tiers bas — plus de dépendance aux métriques de la police.
+    // « ! » DESSINÉ : une barre et un point, centrés sur l'axe du triangle et
+    // posés dans son tiers bas — un glyphe de police ne se centre pas fiablement.
     ctx.fillStyle = grave ? "#ffffff" : "#0d0d10";
     const cx = x + taille, bw = taille * 0.22;
     ctx.beginPath();
@@ -1333,16 +1286,16 @@ let saisonForcee = null; // debug : touche S
 function poserSaison(t) {
   if (saisonForcee !== null) { scene.setSaison(saisonForcee, saisonForcee, 0); return; }
   const duree = Math.max(20, (window.CONFIG.dureeMorceau || 170) / 4);
-  const depart = 2; // toujours l'AUTOMNE au départ (29 septembre 2026 : « ça serait bien que ça commence dans le biome automne »)
+  const depart = 2; // toujours l'AUTOMNE au départ
   const k = Math.max(0, Math.floor(t / duree));
   const dans = t - k * duree;
   const a = (depart + k) % 4, b = (depart + k + 1) % 4;
   scene.setSaison(a, b, Math.max(0, (dans - (duree - 4)) / 4));
 }
 function render(alpha) {
-  // ⚠️ On repart d'une matrice propre à chaque image. Un seul `ctx.save()` non
-  // rendu — une exception au milieu d'une rotation, par exemple — laissait
-  // sinon TOUT le jeu penché jusqu'au rechargement de la page.
+  // ⚠️ On repart d'une matrice propre à chaque image. Sinon un seul `ctx.save()`
+  // non rendu — une exception au milieu d'une rotation, par exemple — laisse
+  // TOUT le jeu penché jusqu'au rechargement de la page.
   ctx.setTransform(dprCourant, 0, 0, dprCourant, 0, 0);
   ctx.globalAlpha = 1;
   const now = clock.now();
@@ -1370,7 +1323,7 @@ function render(alpha) {
   }
 
   poserSaison(gameStarted ? now : 0);
-  scene.renderGround(ctx, null);   // plus de boue depuis le 20 septembre 2026
+  scene.renderGround(ctx, null);   // pas de boue
   // Phare du vélo la nuit : un faisceau chaud sur la route, devant le joueur.
   const nuitF = scene.getNight();
   if (gameStarted && nuitF > 0.25) {
@@ -1415,11 +1368,10 @@ function render(alpha) {
   }
   const vc = scene.getVCentre(), largeurRoute = scene.demiLargeurRoute() + 2;
   // Ce qui vient en face CACHE la pièce sur laquelle il passe, le temps de
-  // passer (4 octobre 2026, nuit : « on voyait une pièce à travers un bus »,
-  // « ne mets pas des pièces à travers les véhicules et les personnages qui
-  // passent ») : comme une pièce derrière lui. Elle reste à prendre ensuite —
-  // rien ne change pour le score (le générateur, lui, n'en pose plus dans ce
-  // qu'un véhicule ou un piéton balaie à l'écran : rows.js, genererBloc).
+  // passer, comme une pièce derrière lui (sinon on la voit à travers le
+  // véhicule). Elle reste à prendre ensuite — rien ne change pour le score (le
+  // générateur, lui, n'en pose pas dans ce qu'un véhicule ou un piéton balaie à
+  // l'écran : rows.js, genererBloc).
   const enFace = [];
   for (let r = Math.max(0, from); r <= to; r++) {
     const row = rows.rowAt(r);
@@ -1442,9 +1394,7 @@ function render(alpha) {
     // Entrée du biome village : le panneau porte la ville du joueur.
     if (panneauVilleA(r + 1)) items.push({ d: scene.depth(scene.ROAD_HALF + 0.55, r + 1), draw: () => scene.drawSign(ctx, r + 1, [scene.villeDuJoueur(), "chez toi"]) });
     if (!row) continue;
-    // La voiture en face : elle roule SUR la route, vers le joueur (20
-    // septembre 2026 : « une voiture qui roule en sens inverse, pour que ce
-    // soit vraiment difficile »).
+    // Ce qui vient en face : il roule SUR la route, vers le joueur.
     if (row.type === "contresens") {
       const t = gameStarted ? tm : perfClock();
       const K = rows.KINDS[row.kind];
@@ -1497,10 +1447,9 @@ function render(alpha) {
   }
   if (game.arriveeR !== null && Math.abs(game.arriveeR - vc) < largeurRoute + 6) {
     const ra = game.arriveeR, RH = scene.ROAD_HALF;
-    // 4 octobre 2026 (« arrête d'écrire ARRIVÉE de manière 2D alors que le jeu
-    // est modélisé en 3D, tu mets juste les carreaux noirs et blancs ») : plus
-    // de texte. Un damier au sol, et un drapeau à damier sur chaque poteau,
-    // tourné vers la caméra pour se lire de profil.
+    // Pas de texte plaqué en 2D sur la scène en volume : un damier au sol, et un
+    // drapeau à damier sur chaque poteau, tourné vers la caméra pour se lire de
+    // profil.
     const damier = (i, j) => ((i + j) % 2 ? "#0d0d10" : "#f4efe4");
     const drapeau = (u) => {
       scene.drawBox(ctx, u, ra - 0.12, 0.24, 0.24, 5.2, "#3a3a40");
@@ -1561,9 +1510,8 @@ function render(alpha) {
   items.sort((a, b) => b.d - a.d);
   for (const it of items) {
     // Un objet qui plante ne doit emporter ni l'image ni l'état du canvas.
-    // Tout ce qui n'est pas décor reste ÉCLAIRÉ la nuit (29 septembre 2026 :
-    // « quand on est en nuit, à l'automne, on ne voit pas les personnages qui
-    // sont sur la route [...] je suis mort parce que j'ai pris une poule »).
+    // Tout ce qui n'est pas décor reste ÉCLAIRÉ la nuit : un obstacle invisible
+    // dans le noir tue sans prévenir.
     try { if (it.decor) it.draw(); else scene.eclaire(it.draw); } catch (e) { if (!rendusRates.has(String(e))) { rendusRates.add(String(e)); console.error("rendu d'objet :", e); } ctx.setTransform(dprCourant, 0, 0, dprCourant, 0, 0); ctx.globalAlpha = 1; }
   }
 
@@ -1642,8 +1590,8 @@ function render(alpha) {
     hud.renderTuto(ctx, width, height, conseilVue());
   }
   // Le doigt qui tape : 3 premières parties, jusqu'au premier saut.
-  // Après le GO seulement, et jamais par-dessus une consigne (3 octobre 2026 :
-  // « 3 ou 4 écrans au tout début qui s'affichent en même temps »).
+  // Après le GO seulement, et jamais par-dessus une consigne ou un projecteur :
+  // une seule indication à la fois.
   if (gameStarted && !game.ended && game.tapHint && now > COUNT_IN_GO_LINGER_S && !conseilVue() && !projo.type) hud.renderTapHint(ctx, width, height, tAnim, Math.min(1, (now - COUNT_IN_GO_LINGER_S) * 2));
   if (projo.type) hud.renderProjecteur(ctx, width, height, projo, PROJECTEURS[projo.type], tAnim);
   if (gameStarted && hudAlpha > 0.001 && banner) {
@@ -1676,8 +1624,7 @@ function renderApercu(pedal) {
   dessinerCycliste(skinCanvas, skinCtx, 240, 140, apercuPedal, false);
 }
 // Un cycliste qui pédale, centré dans un petit canvas : l'aperçu du menu, et
-// l'écran de chargement (4 octobre 2026 : « rajoute le cycliste en 3D en train
-// de pédaler »), où la route défile sous lui.
+// l'écran de chargement, où la route défile sous lui.
 function dessinerCycliste(cv, c2, cw, ch, ped, route) {
   const P = paletteDepuisSkin(screens.getSkin());
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -1700,11 +1647,10 @@ function dessinerCycliste(cv, c2, cw, ch, ped, route) {
   c2.restore();
   scene.setViewport(width, height);
 }
-// Le peloton de la carte « Joue avec tes potes » (5 octobre 2026 : « mets
-// vraiment un dessin [...] tu rajoutes des cyclistes dans l'image, comme dans
-// le jeu, parce que c'est incompréhensible avec les tags de couleur ») : le
-// joueur devant (à droite), ses potes qui arrivent derrière lui un par un,
-// « +10 % » qui jaillit au-dessus de chacun. Dessinés par le VRAI moteur.
+// Le peloton de la carte « Joue avec tes potes » : le joueur devant (à
+// droite), ses potes qui arrivent derrière lui un par un, « +10 % » qui jaillit
+// au-dessus de chacun. Dessinés par le VRAI moteur : un dessin du jeu explique
+// mieux que des étiquettes de couleur.
 function dessinerPeloton(cv, t, arrivees) {
   const c2 = cv.getContext("2d");
   const cw = cv.clientWidth || 260, ch = cv.clientHeight || 124;
@@ -1798,7 +1744,7 @@ if (document.fonts && document.fonts.load) {
   ]).catch(() => {});
 }
 
-// --- Le son du monde (ambiance.js, 4 octobre 2026, nuit) -----------------------
+// --- Le son du monde (ambiance.js) ---------------------------------------------
 // Ce que le vélo a sous les roues : un toit de voiture, les planches des
 // halles, la piste du bowling, la neige, le sable, le goudron.
 function surfaceSous(sol = player.jumpY) {

@@ -1,8 +1,8 @@
-// sw.js — Service worker de « J'ai un pote » (7 septembre 2026) : le morceau
-// (2,1 Mo), les polices et la page sont mis en cache au premier passage.
+// sw.js — Service worker de « J'ai un pote » : le morceau (2,1 Mo), les polices et
+// la page sont mis en cache au premier passage.
 // Page et config : réseau d'abord (une mise à jour est vue tout de suite),
 // repli cache hors ligne. Tout le reste : cache d'abord, puis réseau.
-const CACHE = "jp2-v33"; // 4 octobre 2026 (nuit) : bruitages sur la gamme, voix « pfff, aïe », curseurs musique/effets, train sorti d'un tunnel, personnages debout en cubes — // 4 octobre 2026 (nuit) : sound design (vélo, bêtes, klaxons, train, quilles, ambiances), chacun dans son décor — // 29 septembre 2026 : boost de ligue, ?9, poules, décor — // 28 septembre 2026 (nuit) : saisons, tuto au ralenti, homme/femme, décor allégé
+const CACHE = "jp2-v34"; // à incrémenter à chaque mise en ligne : les anciens caches sont effacés à l'activation
 const PRECACHE = ["./", "./config.js", "./assets/jai-un-pote.mp3", "./assets/pff-aie.mp3", "./fonts/SourceSerif2-Black.woff2", "./fonts/StageGrotesk-Medium.otf", "./fonts/StageGrotesk-Black.otf"];
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(PRECACHE)).then(() => self.skipWaiting()));

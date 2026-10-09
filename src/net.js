@@ -1,7 +1,6 @@
-// net.js — Ligues entre potes (7 septembre 2026 : « une compétition avec les
-// gens qu'on connaît, un code de ligue [...] si la personne E joue dans la
-// ligue, toutes les autres lettres rejoignent sa partie »). Supabase REST,
-// même projet que le premier jeu (config.apiBase / apiKey), tables de
+// net.js — Ligues entre potes : un code de ligue réunit des gens qui se
+// connaissent, et les membres d'une ligue rejoignent la course de chacun.
+// Supabase REST (config.apiBase / apiKey), tables de
 // supabase-migration-ligues.sql. Jamais bloquant : sans réseau ou sans
 // table, tout renvoie null et le jeu tourne avec les prénoms par défaut.
 
@@ -45,10 +44,9 @@ export async function creerLigue(code, pseudo, skin = null) {
   return rejoindreLigue(code, pseudo, skin);
 }
 
-export const LIGUE_MAX = 21; // toi + 20 potes (boost de ligue, 29 septembre 2026) — 6 avant
-// La bêta fermée (16 septembre 2026) a son propre plafond, porté par la
-// colonne `ligues.plafond` (supabase-migration-beta.sql). Repli sur 6 si la
-// migration n'est pas passée.
+export const LIGUE_MAX = 21; // toi + 20 potes (boost de ligue)
+// La bêta fermée a son propre plafond, porté par la colonne `ligues.plafond`
+// (supabase-migration-beta.sql) ; sans cette colonne, repli sur plafondLigue().
 export function estBeta(code) { return Boolean(window.CONFIG.ligueBeta) && code === window.CONFIG.ligueBeta; }
 export function plafondLigue(code) { return estBeta(code) ? (window.CONFIG.ligueBetaPlafond || 60) : LIGUE_MAX; }
 
@@ -87,9 +85,9 @@ export function debutSemaine(d = new Date()) {
   const x = new Date(d); const j = (x.getDay() + 6) % 7; x.setDate(x.getDate() - j); x.setHours(0, 0, 0, 0); return x;
 }
 
-// Score d'une course. `extra` = { graine, trace } (9 septembre 2026 : la
-// graine de la route, et la trace du fantôme quand la course bat le record
-// de la ligue). ⚠️ Repli sans ces colonnes si la migration
+// Score d'une course. `extra` = { graine, trace, duree } : la graine de la
+// route, et la trace du fantôme quand la course bat le record de la ligue.
+// ⚠️ Repli sans ces colonnes si la migration
 // supabase-migration-ligues.sql (troisième partie) n'est pas passée :
 // PostgREST refuse un insert portant une colonne inconnue, et le score doit
 // partir quand même.
@@ -136,12 +134,11 @@ export function evenement(type, infos = {}) {
   post("evenements", { type, ...infos }).then(() => {}, () => {});
 }
 
-// Retour d'un testeur (bêta fermée, 16 septembre 2026) : écrit depuis
-// l'écran de fin, lié au pseudo, jamais relu par le jeu (table retours_beta,
-// insert-only, lue dans le tableau de bord Supabase).
-// ⚠️ Renvoie le DÉTAIL de l'échec (statut HTTP ou message PostgREST) : le
-// premier retour de la bêta n'est jamais arrivé en base et rien à l'écran ne
-// disait pourquoi. Le tiroir affiche ce détail.
+// Retour d'un testeur (bêta fermée) : écrit depuis l'écran de fin, lié au
+// pseudo, jamais relu par le jeu (table retours_beta, insert-only, lue dans
+// le tableau de bord Supabase).
+// ⚠️ Renvoie le DÉTAIL de l'échec (statut HTTP ou message PostgREST), affiché
+// par le tiroir : sans lui, un retour perdu ne laisse aucune trace à l'écran.
 export async function envoyerRetour(infos) {
   if (!configured()) return { ok: false, detail: "hors ligne" };
   try {
@@ -156,8 +153,8 @@ export async function envoyerRetour(infos) {
 // Classement de la ligue. Avec `graine` : seules les courses de CETTE route
 // comptent (les scores d'une ancienne version du parcours restent en base
 // mais sortent du classement), meilleure course par pseudo, agrégée ici —
-// six membres, quelques dizaines de lignes. Sans graine (ou colonne absente) :
-// la vue historique.
+// une ligue ne pèse que quelques centaines de lignes. Sans graine (ou colonne
+// absente) : la vue ligue_classement.
 export async function classement(code, graine) {
   if (graine !== undefined && graine !== null) {
     const rows = await get("ligue_scores", `?code=eq.${encodeURIComponent(code)}&mode=eq.course&graine=eq.${graine}&select=pseudo,metres,potes&order=metres.desc&limit=500`);

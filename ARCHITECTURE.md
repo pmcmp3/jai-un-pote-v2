@@ -1,10 +1,9 @@
 # ARCHITECTURE — « J'ai un pote v2 » (vue de profil, une voie)
 
-Rédigé le 19 septembre 2026. Ce fichier décrit ce que la v2 CHANGE. Tout le reste (ligues, bêta,
-fantôme, skins, tiroir album, audio, écrans) est hérité tel quel de la v1 et documenté dans la
-seconde moitié : « Héritage v1 », recopié de `ARCHITECTURE.md` §14 du dépôt
-`pmcmp3/la-ville-est-belle` au commit `9e591d2`. Là où l'héritage parle de `iso.js`, de voies,
-de swipe latéral ou de file indienne, c'est ce fichier-ci qui fait foi.
+Ce fichier décrit la technique de la v2. L'état du jeu (ce qu'il fait, les décisions en
+vigueur) est dans `CLAUDE.md` ; le récit daté des décisions dans `JOURNAL.md`. La seconde
+moitié, « Héritage v1 », est un document d'époque : là où elle parle de voies, de swipe
+latéral ou de file indienne, c'est la première moitié qui fait foi.
 
 ## 1. Où ça vit
 
@@ -13,15 +12,16 @@ de swipe latéral ou de file indienne, c'est ce fichier-ci qui fait foi.
 | Code | `/Users/pmc/Documents/PMC/JAI-UN-POTE-V2/` — projet autonome, rien de partagé avec le dépôt du premier jeu |
 | Dépôt | **`pmcmp3/jai-un-pote-v2`** (public, obligatoire pour GitHub Pages gratuit). Branche `main` = historique normal, `gh-pages` = build |
 | En ligne | **https://pmcmp3.github.io/jai-un-pote-v2/** ; sous-domaine prévu `pote.la-ville-est-belle-pmc.fr` (voir §4) |
-| Base | **Aucune pour l'instant** : `apiBase`/`apiKey` vides dans `config.js`, le jeu tourne sans ligue (voir §5) |
+| Base | **Aucune pour l'instant** : `apiBase`/`apiKey` vides dans `config.js`, tout ce qui est en ligne est inerte (voir §5) |
 | Dev | `npm run dev` → port 5175 (LAN) ; lanceur `.claude/launch.json` « pote2 » |
-| Déploiement | `./deploy.sh "message"` : commit + push `main`, build, `gh-pages` orphelin dans un worktree. Pousse avec le compte `pmcmp3` via `gh auth token --user pmcmp3`, sans changer le compte actif du poste |
+| Tests | **`npm run verif`** : le filet (11 tests du vrai jeu, OK/ÉCHEC, code de sortie) — voir §7 |
+| Déploiement | `./deploy.sh "message"` : le filet, puis commit + push `main`, build, `gh-pages` orphelin dans un worktree. Pousse avec le compte `pmcmp3` via `gh auth token --user pmcmp3`, sans changer le compte actif du poste. `VERIF=0` saute le filet (urgence seulement) |
 
-Isolement de la v1 (où tourne la bêta fermée) : clés `localStorage` préfixées **`jp2`** (au lieu
-de `jaip`), cache du service worker **`jp2-v1`**, **`VERSION_COURSE = 3`** (regles.js : graines de
-ligue différentes de la v1), aucun appel à la base de la v1.
+Isolement de la v1 (où tourne la bêta fermée) : clés `localStorage` préfixées **`jp2`**, cache
+du service worker **`jp2-vNN`** (`public/sw.js`, incrémenté à chaque version), `VERSION_COURSE`
+propre (`regles.js`), aucun appel à la base de la v1.
 
-## 2. La perspective : `scene.js` (remplace `iso.js`)
+## 2. La perspective : `scene.js`
 
 Un sténopé posé à côté de la route, à `cameraDistance` (11) unités de son axe et
 `cameraHauteur` (3,6) unités de haut, qui regarde perpendiculairement à la route :
@@ -30,105 +30,57 @@ Un sténopé posé à côté de la route, à `cameraDistance` (11) unités de so
 s = K · camD / (camD + u)        x = W/2 + (v − vCentre) · s        y = horizon + (camH − h) · s
 ```
 
-- Le monde reste en **(u, v, h)** : u = profondeur (0 = la route, + = le fond, − = la caméra),
-  v = avance, h = hauteur. Seule la projection change : les modules qui dessinent en cubes
-  (`props`, `voxrider`, décor) n'ont été que réorientés, pas réécrits.
-- **Même contrat d'exports qu'`iso.js`** (project, depth, drawBox, drawFlat, drawShadow, rowDecor,
-  drawSign, lampsIn, renderGround, renderHaze, setViewport, setCamera, setNight…), plus
-  `setJoueurX`, `echelle`, `drawDisque`, `unitesDevant`, `demiLargeurRoute`, `getVCentre`.
+- Le monde est en **(u, v, h)** : u = profondeur (0 = la route, + = le fond, − = la caméra),
+  v = avance, h = hauteur.
 - **Parallaxe gratuite** : le fond est plus petit et défile moins vite, le premier plan grossit.
 - `K = min(W / unitesVisibles, H / 11)` : la largeur visible est fixe en unités (même temps de
   lecture pour tous en portrait), plafonnée par la hauteur sur un écran couché.
 - **Caméra qui prend de l'avance** : le joueur passe de 30 % à 25 % de la largeur quand la
-  vitesse monte (`cameraJoueurX`). Lecture devant soi : **10,2 unités au départ (2,3 s), 10,9 à
-  vitesse max (1,6 s)**.
-- Faces vues d'un cube : l'avant (vers la caméra), le dessus, et UN côté selon que le cube est à
-  gauche ou à droite du centre de l'écran (vraie perspective). Couleurs (nuit + brume de distance)
-  mises en cache par couleur × profondeur × nuit.
+  vitesse monte (`cameraJoueurX`). La caméra **monte avec les collines** (`setLevee`) en gardant
+  le plan de la route fixe à l'écran.
+- Faces vues d'un cube : l'avant, le dessus, et UN côté selon que le cube est à gauche ou à
+  droite du centre de l'écran. Couleurs (nuit + brume) en cache par couleur × profondeur × nuit.
 - Ordre du peintre : `depth = camD + u` (le fond d'abord), départagé par l'écart au centre.
-- **Décor** : tout ce qui est haut vit DERRIÈRE la route. Les deux rives de la v1 sont repliées
-  sur deux plans du fond. Le premier plan (u < 0) ne porte que du bas (herbes, épis, fleurs,
-  clôture), plafonné par `hauteurMaxPremierPlan(u)` : rien ne cache jamais la route.
-- Fond : ciel dégradé, soleil (lune et étoiles la nuit), nuages, **montagnes enneigées** (les
-  villages du jeu sont en Isère), collines, champs en sillons parallèles à la route.
-- ⚠️ **Retiré du bas-côté** : les bottes de foin du décor (de profil, identiques à la
-  botte-obstacle) ; les voitures garées et passants du village sont reculés à u ≥ RH + 1,3.
-  Règle : **rien qui ressemble à un obstacle ne doit être juste derrière la route.**
+- **Décor** : tout ce qui est haut vit DERRIÈRE la route ; le premier plan (u < 0) ne porte que
+  du bas, plafonné par `hauteurMaxPremierPlan(u)`. Règle : **rien qui ressemble à un obstacle ne
+  doit être juste derrière la route** (de profil, la profondeur se lit mal).
 
-## 3. Le gameplay en hauteur (`rows.js`, `simulation.js`)
+## 3. Le gameplay en hauteur (`rows.js`, `regles.js`, `simulation.js`)
 
-Une seule voie : plus de contournement, tout se règle en hauteur. **Refonte du
-20 septembre 2026** après le premier test sur iPhone (« faudrait que les personnages puissent
-sauter beaucoup plus haut, et si on reste appuyé un peu plus longtemps, on peut sauter un peu
-plus haut ; et si on double-tape après, un double saut, comme dans tous les jeux d'arcade »).
+Une seule voie : plus de contournement, tout se règle en hauteur.
 
-### Le saut, à trois étages
+- **Saut à trois étages** : tap, appui maintenu (pesanteur réduite tant que le doigt reste posé
+  ET que le cycliste monte, `sautGraviteTenue`, plafonné à `sautTenueMaxS`), re-tap en l'air =
+  double saut. Réglages dans `config.js` (`saut*`).
+- **Familles** : la famille de chaque espèce (tap / haut / double) est calculée par
+  `familleDe` en intégrant les trois arcs au pire cas — la vitesse MINIMALE, car un obstacle
+  est long en rangées. Tout ce qui roule est au double saut. `node outils/familles.mjs` les
+  liste.
+- **La route est une chaîne** : obstacle après obstacle, avec l'écart que la physique impose
+  entre les deux espèces (`ecartMin` = retombée du premier + élan du second, à la vitesse
+  locale `vitesseAuRang`). Espèces tirées de paquets fixes de 12, mélangés par la graine, selon
+  la phase de course (`paquetPour`). Les groupes de piétons et le bouchon se posent par leurs
+  propres règles.
+- **Le sol** vaut `rows.solAt(v)` (halles, collines) et les toits se lisent par `toitSous` /
+  `toitGare` : joueur, potes, simulation et pilotes de mesure s'y comparent tous.
+- **Pièces** : une toutes les `ESPACEMENT` (3) rangées sur l'arc du saut au-dessus de chaque
+  obstacle, à hauteur du buste ; pièce double au sommet d'un double saut ; aucune pièce sur le
+  passage d'un véhicule ou d'un piéton (`balayageVisible`) — une pièce qu'un véhicule traverse
+  quand même est cachée le temps qu'il passe.
+- **Vitesse** : doublement en `V_DOUBLING_S` jusqu'à `vitesseMax`, puis seconde accélération
+  vers `vitesseFinale` sur les `accelDernieresS` dernières secondes.
+- **Simulation** (`simulation.js`) : le score parfait d'une graine, affiché au menu et à la fin.
 
-| Geste | Apex | Ce que ça franchit |
-|---|---|---|
-| Tap court | ~1,3 | poule, chat, chien, mouton, botte, poule jetée |
-| Appui **maintenu** (≤ 0,4 s) | ~2,5 | cochon, vache, tracteur |
-| **Re-tap en l'air** (+ salto) | ~3,7 | fermier, voiture |
+### Mesures (`node outils/mesurer.mjs 20`, 9 octobre 2026)
 
-Le saut part au TOUCHER (c'est ce qui permet de mesurer la durée de l'appui) ; tant que le doigt
-reste posé ET que le cycliste monte, la pesanteur est réduite (`sautGraviteTenue`). Le double
-saut n'est plus rationné : **la barre d'élan a disparu** (« mets pas de barre de chargement de
-saltos »). Hauteurs à avoir au passage : `H_FRANCHIR` = 0,45 / 1,5 / 2,8.
-**Swipe vers le bas = roue arrière**, purement décoratif.
-
-### La route : une chaîne, pas des blocs
-
-Les obstacles sont posés **à la suite**, avec l'écart que la physique du saut impose entre les
-deux espèces (`ecartMin` = retombée du premier + élan du second, en rangées à vitesse maximale),
-plus une marge aléatoire qui se resserre au fil de la course (8 rangées au départ, 1 à la fin).
-Résultat : jamais deux obstacles collés, jamais de longue ligne droite vide (« des fois il y a
-trop d'obstacles au même moment, des fois de grandes lignes droites où il ne se passe rien »).
-Les espèces sortent toujours d'un paquet fixe de 12 mélangé par la graine, avec trois paquets
-selon la phase (petits sauts, puis gros animaux et tracteurs, puis fermiers et voitures), et
-jamais deux « double saut » consécutifs.
-
-### Les pièces : deux hauteurs, pas une de plus
-
-Au sol (0,9) ou en l'air (2,1) — « soit à hauteur 0, soit à hauteur 1, la moitié du joueur quand
-il saute ». Deux pièces en l'air encadrent chaque obstacle, d'autant plus écartées que le saut
-demandé est grand (1, 2 ou 3 rangées) : elles **dessinent le geste à faire**. Le reste est posé
-sur 15 % des rangées libres. La pièce ramassée si sa hauteur tombe dans le corps du cycliste.
-⚠️ La **pièce rouge est devenue une grosse pièce dorée qui brille** (elle se lisait comme un
-poison) ; la **brique de lait tourne sur elle-même** et montre son bec.
-
-### Le reste
-
-- **Potes** : meute serrée qui refait les sauts, les sauts tenus ET les doubles sauts du joueur.
-  ⚠️ Après le dernier palier, un pote perdu se **rachète** pour `poteRachatPieces` (10) pièces :
-  sans ça, le HUD affichait « prochain pote : 0 pièce » et le peloton ne revenait jamais.
-- **Vitesse** : doublement toutes les **88 s** (70 avant) — la montée devait être plus progressive.
-- **Bestiaire au départ** (`hud.renderBestiaire`) : trois familles, deux vignettes chacune
-  dessinées par le VRAI moteur au préchauffage, avec le geste en face. S'affiche 6 s au départ,
-  ou juste après le tutoriel.
-- **HUD** : plus de bandeau sombre ni de barre de salto ; chaque texte porte son contour.
-- **Menu** : trois réglages (maillot, chapeau, engin) au lieu de six — le short et les chaussures
-  suivent le maillot. **Roller** en plus du VTT et du Grand Bi. Chargement : 5 s → 1,8 s.
-- **Ciel** : le soleil traverse l'écran sur la durée du morceau, la lune prend le relais la nuit.
-  Couleurs saturées en permanence (`filter: saturate(1.28)`), panneaux sans numéro de département,
-  jamais deux panneaux à la fois, poteaux électriques plus hauts, village sur trois plans.
-
-### Mesures (`node outils/mesurer.mjs 40`, 20 septembre 2026)
-
-| Mesure | v2 | v1 |
-|---|---|---|
-| Obstacles / 1 100 rangées | 105–112 (tap 63–66, tenu 34–37, double 8–12) | 134–135 |
-| Écart entre deux obstacles | 6 à 18 rangées, 0 paire plus serrée que le saut ne permet | — |
-| Pièces posées / 1 100 rangées | 309–323 (dont ~235 en l'air) | ~330 |
-| Laits / pièces dorées | 22 / 15 sur toutes les graines | 22 / 15 |
-| Joueur idéal scripté | **0 obstacle touché sur 4 343** | — |
-| Joueur immobile | 4 343 touchés sur 4 343 | — |
-| Apex maximal atteint | 3,48 unités | — |
-| Score parfait, 5 potes | 7 554 | 8 374 |
-| Arrivée des 5 potes (joueur idéal) | 3 · 7 · 14 · 21 · 29 s | 3 · 7 · 9 · 15 · 21 s |
-| Rendu, CPU ralenti ×4, village, 5 potes | 60 images/s | — |
-
-Captures et coût de rendu : `node outils/capture.mjs [scènes]` (Chrome headless 375×812 ;
-`ECRAN=petit` pour un iPhone SE, `SERVIR=dist` pour le build, `PARTIES=0` pour le tuto).
+| Mesure | Valeur |
+|---|---|
+| Écart entre deux obstacles | 6 à 27 rangées, 0 paire plus serrée que le saut ne permet |
+| Joueur idéal scripté | **0 obstacle touché sur 1 828** (20 graines) |
+| Joueur immobile | 1 828 touchés sur 1 828 |
+| Score parfait, 5 potes | 6 511 en moyenne (6 246 → 6 701, ±3,5 % selon la graine) |
+| Arrivée des 5 potes (joueur idéal) | 4 · 10 · 24 · 37 · 50 s |
+| Coût d'une image, CPU ×4 (`perf-plage.mjs`) | 6 à 7,5 ms selon la charge de la machine |
 
 ## 4. Domaine : `pote.la-ville-est-belle-pmc.fr` (à brancher)
 
@@ -144,17 +96,20 @@ qui ne répond pas. L'ancienne adresse github.io reste valable ensuite (redirect
 
 La v2 ne parle JAMAIS à la base de la v1 (bêta en cours : classement, relais de la semaine et
 événements pollués sinon). Tant que la base v2 n'existe pas, `apiBase`/`apiKey` sont vides : pas
-de ligue, pas de classement, pas de fantôme, la ligue de démo pédale derrière le joueur.
+de ligue réelle, pas de classement, pas de boost, pas d'événements ; la ligue de démo pédale
+derrière le joueur.
 1. **L'artiste** crée un projet Supabase `jai-un-pote-v2` (même région que l'actuel).
 2. SQL Editor → coller et exécuter **`supabase/schema-v2.sql`** (consolidé, idempotent : tables,
    plafond par ligue, vues, événements, retours, ligues PMCMP et BETA).
 3. `V2_URL=https://<ref>.supabase.co/rest/v1 V2_KEY=<clé anon> node outils/copier-ligues-v1-vers-v2.mjs`
-   — recopie les 6 ligues et 29 membres (pseudos, skins, ordre d'arrivée). Sans variables : simple
+   — recopie les ligues et leurs membres (pseudos, skins, ordre d'arrivée). Sans variables : simple
    lecture de la v1. Les SCORES ne sont pas copiés (graines d'une route qui n'existe plus).
 4. Coller l'URL REST et la clé anon dans `public/config.js`, `./deploy.sh`.
+5. Pour rallumer le fantôme : appeler `chargerFantome(l, graine)` dans `requestGameStart`
+   (main.js) ; `net.fantome` et le dessin sont en place.
 ⚠️ Un projet gratuit se met en pause après 7 jours sans requête.
 
-## 5 bis. Pièges de rendu (27 septembre 2026)
+## 5 bis. Pièges de rendu
 
 - **Un modèle = un `scene.groupe()`**. À l'intérieur, `drawBox`/`drawDisque`/`drawShadow`/
   `drawFlat` ne peignent pas : ils empilent, puis le groupe trie (plan séparateur entre deux
@@ -162,31 +117,48 @@ de ligue, pas de classement, pas de fantôme, la ligue de démo pédale derrièr
   direct (ctx.fillText, stroke) dans un groupe : ça passerait avant tout le reste. Les
   groupes imbriqués se fondent dans le parent. Le cycliste (`voxrider`) n'est PAS groupé :
   son ordre manuel et ses traits (roues, cadre) tiennent.
-- **Halles** : deux entrées dans la liste du peintre — « fond » (piliers, tablier de la rampe)
-  à la profondeur du bord arrière de la route, « devant » (flanc, plancher, poteaux,
-  garde-corps, fermes, toit, enseigne) à celle du bord avant. La caméra (3,6 u) est SOUS le
-  plancher (4,2 u) : on voit le dessous du plancher et du toit, jamais leur dessus.
+- **Halles** : deux entrées dans la liste du peintre — « fond » à la profondeur du bord arrière
+  de la route, « devant » à celle du bord avant. La caméra (3,6 u) est SOUS le plancher : on voit
+  le dessous du plancher et du toit, jamais leur dessus.
+- **Collines** : au-dessus de l'œil de la caméra, on voit la route par en dessous ; le flanc est
+  peint AVANT ce qui roule (sinon il coupe les roues), et tout ce qui se tient sur la chaussée
+  monte avec elle (`scene.avecLift`).
 - **Masque du décor** (`scene.setMasqueDecor`, bits `SANS_LAMPE` / `DANS_HALLE`) : calculé
   dans main.js (où vivent les panneaux), mis en cache par rangée, vidé par `preparerJoueur`.
 - `scene.js` ne peut pas importer `props.js` (cycle scene → props → rows → scene : `rows`
   lit `ROAD_HALF` au chargement). D'où l'injection `setDessinVoiture`.
+- **Le canvas penché** : un objet qui lève au milieu d'un `save()`/`rotate()` laisse la matrice
+  tournée pour toutes les images suivantes. D'où : index de couleur toujours entiers,
+  `parseColor` qui rend du gris, matrice remise à zéro à chaque image et `try/catch` par objet.
 
-## 6. Reste à faire / points ouverts
+## 6. Points ouverts
 
-- Base Supabase v2 et sous-domaine : bloqués sur les deux actions de l'artiste ci-dessus.
-- Le système de ligue et de points est volontairement remis à plus tard (« après, on
-  réfléchira au système de ligue »).
-- **Retours du 27 septembre 2026 traités** (voir `CLAUDE.md`). À re-juger sur téléphone :
-  la voiture en face (assez tôt ?), la poule jetée (lisible ?), le toit des halles.
-- **Test sur un vrai téléphone** : lisibilité de profil (cycliste ~50 px), 1,6 s de lecture à
-  vitesse max, timing du salto (double tap) — rien de tout ça ne se juge en headless.
+- Base Supabase v2 et sous-domaine : bloqués sur les actions de l'artiste ci-dessus.
+- **Test sur un vrai téléphone** : clavier iOS dans Instagram, partage dans les navigateurs
+  intégrés, lisibilité de profil, les sons — rien de tout ça ne se juge sans écran.
 - Le ciel occupe beaucoup de hauteur en portrait (inévitable avec une largeur fixe en unités).
-- `simulation.js` : le joueur idéal ne vise pas toutes les piles ; le score parfait varie de ±6 %
-  selon la graine (±1,5 % en v1). Sans conséquence pour une ligue (même graine pour tous).
+- `simulation.js` : le joueur idéal ne vise pas toutes les piles ; le score parfait varie de
+  ±3,5 % selon la graine. Sans conséquence pour une ligue (même graine pour tous).
+
+## 7. Le filet (`npm run verif`)
+
+`outils/verif.mjs` enchaîne les tests du vrai jeu (Vite + Chrome sans tête, ou Node pur pour
+`regles`) ; chacun finit par `verdict(ok, résumé)` (`outils/verdict.mjs`), qui écrit ✅ OK ou
+❌ ÉCHEC et pose le code de sortie. Un test en échec est relancé une fois (Chrome sans tête est
+parfois lent à démarrer) : s'il passe, il est signalé « instable » sans bloquer. Délai de 150 s
+par test. `deploy.sh` refuse de mettre en ligne sur un échec.
+- Les i/s d'un Chrome sans écran suivent la charge de la machine : le test `build` ne les
+  affiche qu'à titre indicatif ; la fluidité est gardée par `perf` (ms par image à CPU ×4).
+- `outils/commentaires-seuls.mjs [réf]` : prouve qu'une retouche n'a changé que des commentaires
+  (esbuild sans commentaires ni espaces, avant/après, identiques au caractère près).
 
 ---
 
 # Héritage v1 (recopié de `ARCHITECTURE.md` §14, dépôt principal, 16 septembre 2026)
+
+> Document d'époque, gardé pour les mécanismes hérités (horloge, audio, Supabase, conversion).
+> Il parle de voies, de vue de dessus et de réglages qui ont changé depuis : **la première
+> moitié de ce fichier, `CLAUDE.md` et le code font foi** quand ils le contredisent.
 
 ## 14. Jeu n°2 — « J'ai un pote » (`jai-un-pote/`, 4 septembre 2026)
 

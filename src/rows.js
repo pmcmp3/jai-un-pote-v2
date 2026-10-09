@@ -2,46 +2,35 @@
 // graine (sauf l'ARMEMENT des traversées et des voitures en sens inverse, qui
 // dépend du moment où le joueur arrive — voir armer()).
 //
-// ⚠️ v2 (19 septembre 2026) : UNE SEULE VOIE, vue de profil. Il n'y a plus de
-// contournement latéral : tout se règle en HAUTEUR.
+// ⚠️ UNE SEULE VOIE, vue de profil : pas de contournement latéral, tout se
+// règle en HAUTEUR.
 //
-// ⚠️ 20 septembre 2026 (soir) — TROIS RENVERSEMENTS, tous demandés :
-//
-// 1. BOÎTES DE COLLISION RÉELLES. Avant, un obstacle était jugé à l'instant où
-//    le CENTRE du vélo passait sa rangée, contre un seuil de hauteur FIXE par
-//    famille de saut. D'où les deux plaintes : « je me suis pris un mouton mais
-//    je me le suis pas pris » et « il y avait un paysan, j'ai sauté par-dessus,
-//    je me le suis pris ». Désormais chaque espèce a une boîte (long × h) et le
+// 1. BOÎTES DE COLLISION RÉELLES. Chaque espèce a une boîte (long × h) et le
 //    cycliste la sienne : on touche si les deux se recouvrent VRAIMENT, à
 //    n'importe quel instant du recouvrement. Le seuil de franchissement d'une
-//    espèce, c'est sa hauteur, plus rien d'autre.
+//    espèce, c'est sa hauteur, rien d'autre.
 //
-// 2. LA FAMILLE DE SAUT EST CALCULÉE, plus écrite à la main. On intègre les
+// 2. LA FAMILLE DE SAUT EST CALCULÉE, jamais écrite à la main. On intègre les
 //    trois arcs (tap, appui maintenu, double saut) et on retient le plus petit
 //    qui reste au-dessus de l'obstacle pendant TOUT le temps qu'on met à le
-//    franchir (longueur de la bête + longueur du vélo, à vitesse maximale).
-//    Changer une taille dans KINDS ou un réglage de saut dans config.js
-//    ré-attribue les familles toutes seules. Même source pour l'écart minimal
-//    entre deux obstacles.
+//    franchir (longueur de la bête + longueur du vélo, à vitesse MINIMALE, le
+//    pire cas). Changer une taille dans KINDS ou un réglage de saut dans
+//    config.js ré-attribue les familles toutes seules. Même source pour
+//    l'écart minimal entre deux obstacles.
 //      → petits animaux = tap · gros animaux et fermier = appui maintenu
 //      · véhicules = double saut.
 //
-// 3. LES PIÈCES DESSINENT LE GESTE (« les tailles et l'espacement entre les
-//    pièces, ça n'a aucun sens, ça doit être une règle conditionnelle »). Plus
-//    de tirage : au-dessus de chaque obstacle on pose l'ARC que le joueur doit
-//    suivre, une pièce par rangée, à la hauteur exacte de sa trajectoire ; sur
-//    les longues lignes droites, une traînée au sol. Une seule taille de pièce,
-//    un seul espacement (une rangée).
+// 3. LES PIÈCES DESSINENT LE GESTE. Au-dessus de chaque obstacle on pose l'ARC
+//    que le joueur doit suivre, à la hauteur exacte de sa trajectoire ; sur
+//    les longues lignes droites, une traînée au sol. Une seule taille de
+//    pièce, un seul espacement (ESPACEMENT).
 //
-// Ajouts du même jour : les HALLES (une rampe qui monte à hauteur des fils
-// électriques toutes les ~40 s, sol variable, cf. solAt) et la VOITURE EN SENS
-// INVERSE (elle arrive de la droite de l'écran, face au joueur). La boue est
-// supprimée (« enlève les trucs de terre par terre, les gens comprennent pas »).
+// Le sol n'est pas toujours 0 : HALLES et MONTAGNE le soulèvent (solAt). Le
+// champ `boue` des rangées reste toujours null (pas de boue dans ce jeu).
 //
-// GÉNÉRATEUR À QUOTAS (9 septembre 2026, conservé) : blocs de 24 rangées,
-// espèces tirées d'un paquet fixe de 12 mélangé par la graine, lait et grosse
-// pièce sur des rangées réservées. Deux graines = deux routes différentes,
-// mêmes quantités.
+// GÉNÉRATEUR À QUOTAS : blocs de 24 rangées, espèces tirées d'un paquet fixe
+// de 12 mélangé par la graine, lait et grosse pièce sur des rangées
+// réservées. Deux graines = deux routes différentes, mêmes quantités.
 
 import { ROAD_HALF, HALLE_TOIT_AU_DESSUS } from "./scene.js";
 import { V_UNIT, vitesseAuRang, rangAuTemps, dureeCourse } from "./regles.js";
@@ -49,115 +38,83 @@ import { tailleObstacle } from "./humains.js";
 
 // --- Le bestiaire, à l'échelle : 1 unité ≈ 1 mètre --------------------------------
 // Le cycliste fait 1,8 u de haut et 1,24 u de long (VELO_DEMI × 2). Tout le
-// reste est calé dessus (20 septembre 2026 : « le plus proche de mes yeux doit
-// être le plus gros [...] j'ai des personnages beaucoup plus petits que des
-// voitures, ça va pas du tout », et « les vaches sont plus grosses que les
-// voitures »). `long` court le long de la route, `larg` en travers, `h` est la
-// hauteur qu'il faut dépasser.
+// reste est calé dessus, à l'échelle réelle. `long` court le long de la
+// route, `larg` en travers, `h` est la hauteur qu'il faut dépasser.
+// Traversants (`traverse`) : ils roulent le long de u, c'est `larg` qui barre la route.
 export const KINDS = {
-  // Traversants : ils roulent le long de u, donc c'est `larg` qui barre la route.
-  // ⚠️ 3 octobre 2026 : le tracteur ne TRAVERSE plus depuis le fond (« enlève
-  // les tracteurs qui viennent du fond, fais venir des tracteurs de gauche à
-  // droite ») : il roule SUR la route, dans le même sens que le joueur, plus
-  // lentement — on le rattrape et on le passe au double saut. Mécanique
-  // « contresens » avec une vitesse NÉGATIVE (il s'éloigne). Raccourci à 2,6 :
-  // on le croise à (vitesse joueur − 0,8) rangées/s, la fenêtre de saut en
-  // dépend (outils/mesurer.mjs : 0 choc pour le joueur idéal).
-  // ⚠️ 4 octobre 2026 : il arrive EN FACE (« fais en sorte que les tracteurs
-  // soient dans le sens opposé à nous, c'est beaucoup plus difficile à
-  // passer »), plus lentement qu'une voiture, et on peut ROULER dessus (« j'ai
-  // atterri sur le tracteur, j'ai perdu trois potes, pas très juste »).
+  // Le TRACTEUR arrive EN FACE, plus lentement qu'une voiture ; on peut
+  // ROULER dessus (atterrir sur son toit n'est pas un choc).
   tracteur:    { contresens: true, cout: 3, vitesse: 1.2, arme: 5.5, long: 2.6, larg: 1.6, h: 1.7, plancher: "double", montable: true, nom: "un tracteur" },
-  // Le CAR SCOLAIRE de la Région (3 octobre 2026 : « rajoute un bus scolaire
-  // de la région Auvergne-Rhône-Alpes ») : comme la voiture en face, en plus
-  // long et plus haut. Montable aussi.
+  // Le CAR SCOLAIRE de la Région (Auvergne-Rhône-Alpes) : comme la voiture en
+  // face, en plus long et plus haut. Montable aussi.
   bus:         { contresens: true, cout: 3, vitesse: 2.0, arme: 5.5, long: 3.6, larg: 1.8, h: 1.9, plancher: "double", montable: true, nom: "un car scolaire" },
-  // La MONTAGNE ENNEIGÉE (4 octobre 2026) : « au lieu de croiser un tracteur
-  // dans ce biome, il faut qu'on croise un chasse-neige ». Lame comprise dans
-  // la longueur ; on peut rouler dessus comme sur le tracteur.
+  // Le CHASSE-NEIGE : ce qui vient en face dans la montagne enneigée
+  // (auDecor). Lame comprise dans la longueur ; montable comme le tracteur.
   chasseneige: { contresens: true, cout: 3, vitesse: 1.4, arme: 5.5, long: 3.6, larg: 1.9, h: 2.0, plancher: "double", montable: true, nom: "un chasse-neige" },
-  // Le SKIEUR DE FOND (5 octobre 2026 : « un mec qui arrive en ski face à
-  // nous, en ski de fond, quand on est dans le biome neige exclusivement ») :
-  // il vient en face, lentement, skis compris dans la longueur.
+  // Le SKIEUR DE FOND, dans le biome neige uniquement : il vient en face,
+  // lentement, skis compris dans la longueur.
   skieur:      { contresens: true, cout: 2, vitesse: 1.5, arme: 5.5, long: 1.9, larg: 0.7, h: 1.8, nom: "un skieur" },
-  // Le BUGGY de la plage (5 octobre 2026 : « faut virer les tracteurs quand on
-  // est sur la plage, il vaut mieux des voiturettes de plage ») : remplace le
-  // tracteur sur la plage, même rôle — il vient en face, on peut rouler dessus.
+  // Le BUGGY remplace le tracteur sur la plage, même rôle : il vient en face,
+  // on peut rouler dessus.
   buggy:       { contresens: true, cout: 3, vitesse: 1.4, arme: 5.5, long: 2.4, larg: 1.5, h: 1.5, plancher: "double", montable: true, nom: "un buggy de plage" },
-  // Les PIÉTONS (5 octobre 2026 : « il me reste 1 minute, je m'ennuie [...]
-  // sur la route, des piétons présents, tu vois vraiment que ça monte en
-  // difficulté ») : ils marchent vers le joueur — seuls d'abord, puis en
-  // GROUPES de 2, puis de 3 sur la fin (taillePietons) : une rafale de sauts
-  // tenus, au plus serré que permet la physique. Lents : pas de panneau
-  // d'alerte (on les voit venir).
+  // Les PIÉTONS marchent vers le joueur — seuls d'abord, puis en GROUPES de
+  // plus en plus grands (taillePietons) : une rafale de sauts tenus, au plus
+  // serré que permet la physique. La difficulté monte à vue d'œil. Lents :
+  // pas de panneau d'alerte (on les voit venir).
   pieton:      { contresens: true, cout: 1, vitesse: 0.9, arme: 5.5, long: 0.6, larg: 0.6, h: 1.75, sansAlerte: true, nom: "un piéton" },
-  // En SENS INVERSE : elle roule sur la route, vers le joueur (20 septembre
-  // 2026 : « une voiture qui roule en sens inverse, pour que ce soit vraiment
-  // difficile »). Sa vitesse s'ajoute à celle du joueur.
-  // ⚠️ 27 septembre 2026 : 3,4 → 2,0 rangées/s et armée plus tôt (« elle doit
-  // arriver plus tôt [...] qu'on ait le temps de sauter par-dessus ») — à
-  // 3,4 elle traversait l'écran en une seconde à peine. MONTABLE comme la
-  // voiture garée (« faut qu'on ait la possibilité de rouler sur la voiture
-  // qui arrive en sens inverse ») : voir toitSous().
+  // La VOITURE EN FACE roule sur la route, vers le joueur ; sa vitesse
+  // s'ajoute à la sienne. ⚠️ Lente (2,0 rangées/s) et armée tôt pour laisser
+  // le temps de sauter : plus rapide, elle traverse l'écran en une seconde.
+  // MONTABLE comme la voiture garée : voir toitSous().
   contresens:  { contresens: true, cout: 2, vitesse: 2.0, arme: 5.5, long: 2.8, larg: 1.6, h: 1.45, plancher: "double", montable: true, nom: "une voiture en face" },
-  // La POULE JETÉE (27 septembre 2026) remplace la poule lancée depuis le fond
-  // (« enlève le paysan dans le fond qui lance une poule, on le voit pas
-  // arriver [...] il faudrait qu'il soit face à nous, il envoie la poule vers
-  // nous »). Le fermier attend sur le bas-côté, `lanceur` rangées PLUS LOIN
-  // que la rangée de croisement, tourné vers le joueur ; quand le joueur
-  // approche, il jette la poule, qui court sur la route vers lui. Mécanique
-  // d'une voiture en face (type « contresens »), en tout petit : un tap.
+  // La POULE JETÉE : le fermier attend sur le bas-côté, `lanceur` rangées PLUS
+  // LOIN que la rangée de croisement, face au joueur (on le voit venir) ;
+  // quand le joueur approche, il jette la poule, qui court sur la route vers
+  // lui. Mécanique d'une voiture en face (type « contresens »), en tout petit :
+  // un tap.
   poulejetee:  { contresens: true, cout: 1, vitesse: 4.5, lanceur: 3.5, long: 0.9, larg: 0.84, h: 0.9, nom: "une poule jetée" },
   // Posés sur la route.
-  // ×1,4 le 29 septembre 2026 (« les poules doivent être beaucoup plus
-  // grosses, on les voit pas assez ») — et rousses, pour trancher sur la neige.
+  // Poules grosses pour être bien vues, et rousses pour trancher sur la neige.
   poule:   { cout: 1, long: 0.9, larg: 0.84, h: 0.9, nom: "une poule" },
   chat:    { cout: 1, long: 0.80, larg: 0.60, h: 0.74, nom: "un chat" },
   chien:   { cout: 1, long: 0.80, larg: 0.55, h: 0.70, nom: "un chien" },
-  // Taille DOUBLÉE le 29 septembre 2026 (« des énormes moutons [...] il faut
-  // que tu doubles leur taille ») : un gros mouton laineux, appui long.
+  // Un énorme mouton laineux : appui long.
   mouton:  { cout: 1, long: 1.5, larg: 1.3, h: 1.35, nom: "un mouton" },
   botte:   { cout: 1, long: 0.85, larg: 0.85, h: 0.75, nom: "une botte de foin" },
   cochon:  { cout: 2, long: 1.30, larg: 0.85, h: 0.92, nom: "un cochon" },
   vache:   { cout: 2, long: 1.60, larg: 1.00, h: 1.22, nom: "une vache" },
-  // L'homme en COSTARD (30 septembre 2026 : « un gars en costard en plein
-  // milieu avec une valise, qui fait des gestes dans tous les sens, de manière
-  // statique. Il faut l'éviter, pareil »).
+  // L'homme en COSTARD, planté au milieu de la route avec sa valise, qui
+  // gesticule sur place.
   costard: { cout: 2, long: 0.8, larg: 0.7, h: 1.9, nom: "un homme en costard" },
-  // Le BAIGNEUR de la plage (5 octobre 2026 : « des mecs en slip de bain au
-  // milieu de la route, au lieu de mettre un mec en costard quand on est sur
-  // la plage ») : planté là comme le costard, même gabarit, même geste.
+  // Le BAIGNEUR en slip de bain remplace le costard sur la plage : même
+  // gabarit, même geste.
   baigneur: { cout: 2, long: 0.8, larg: 0.7, h: 1.9, nom: "un baigneur" },
-  fermier: { cout: 2, long: 0.85, larg: 0.75, h: 2.2, nom: "un fermier" }, // plus grand le 29 septembre 2026
-  // ⚠️ MONTABLE (20 septembre 2026, soir : « ça serait normal qu'on puisse
-  // monter sur le toit d'une voiture ») : son toit devient un plancher dès
-  // qu'on arrive au-dessus. Raccourcie de 3,9 à 3,0 le même jour, avec le
-  // saut rendu plus sec — « les voitures sont trop grandes, j'arrive pas à
-  // les passer ». Deux façons de la franchir : par-dessus, ou en s'y posant.
+  fermier: { cout: 2, long: 0.85, larg: 0.75, h: 2.2, nom: "un fermier" },
+  // ⚠️ MONTABLE : son toit devient un plancher dès qu'on arrive au-dessus.
+  // Deux façons de la franchir : par-dessus, ou en s'y posant. Assez courte
+  // pour rester passable au double saut.
   voiture: { cout: 2, long: 2.80, larg: 1.60, h: 1.45, plancher: "double", montable: true, nom: "une voiture" },
-  // Le BONHOMME DE NEIGE de la montagne (4 octobre 2026 : « un bonhomme de
-  // neige sur la route, ça fait un obstacle, mais faut qu'il soit gros,
-  // presque de la taille d'un bus »). Tête ronde : on ne roule pas dessus.
+  // Le BONHOMME DE NEIGE de la montagne, gros, presque de la taille d'un bus.
+  // Tête ronde : on ne roule pas dessus.
   bonhomme: { cout: 2, long: 1.7, larg: 1.7, h: 2.1, nom: "un bonhomme de neige" },
 };
 
-// ⚠️ 27 septembre 2026 (« vérifiez bien la hitbox de tous les éléments ») :
-// les hauteurs ont été re-mesurées sur les DESSINS (capture.mjs hitbox, qui
-// prend l'enveloppe réelle de chaque modèle) — cochon 1,05 → 0,92, vache
-// 1,35 → 1,22, chien 0,78 → 0,70, mouton 0,78 → 0,72, chat 0,78 → 0,74. On se
-// prenait une bête qu'on avait visiblement passée.
+// ⚠️ Les hauteurs `h` sont mesurées sur les DESSINS (capture.mjs hitbox, qui
+// prend l'enveloppe réelle de chaque modèle). Une hauteur plus grande que le
+// dessin fait prendre une bête qu'on a visiblement passée : re-mesurer après
+// toute retouche d'un modèle.
 
 // --- Boîte de collision -----------------------------------------------------------
 // Le cycliste occupe [v − VELO_DEMI, v + VELO_DEMI] le long de la route ; ses
 // roues sont à `jumpY`. On passe si les roues dépassent le haut de l'obstacle
 // de MARGE_H pendant TOUT le recouvrement.
-// 0,48 = la moitié de l'empattement : ce sont les ROUES qui accrochent, pas
-// les épaules du cycliste. Généreux pour le joueur, volontairement (il s'est
-// plaint de se prendre des bêtes qu'il avait visiblement passées).
+// VELO_DEMI ≈ la moitié de l'empattement : ce sont les ROUES qui accrochent,
+// pas les épaules du cycliste. Volontairement généreux : le joueur ne doit
+// jamais se prendre une bête qu'il a visiblement passée.
 export const VELO_DEMI = 0.44;
 export const MARGE_H = 0.04;
 export function hauteurAFranchir(kind) { return KINDS[kind].h + MARGE_H; }
-// Les HUMAINS n'ont pas tous la même taille (4 octobre 2026, nuit, humains.js) :
+// Les HUMAINS n'ont pas tous la même taille (humains.js) :
 // la collision lit la vraie hauteur de celui de la rangée r — un petit se
 // saute plus bas, jamais plus haut que K.h. Le planificateur (simulation,
 // joueur idéal) garde hauteurAFranchir, le cas le plus haut.
@@ -217,8 +174,8 @@ export function tempsAuDessus(tier, H) {
 
 // --- La famille de saut d'une espèce, CALCULÉE ------------------------------------
 // On franchit un obstacle pendant (sa longueur sur la route + celle du vélo)
-// rangées ; à vitesse maximale c'est le pire cas. Pour un véhicule en sens
-// inverse, les deux vitesses s'additionnent : la fenêtre est plus courte.
+// rangées. Pour un véhicule en sens inverse, les deux vitesses s'additionnent :
+// la fenêtre est plus courte.
 function vMaxRangees() { return V_UNIT * Math.max(window.CONFIG.vitesseMax, window.CONFIG.vitesseFinale || 0); }
 function vMinRangees() { return V_UNIT * window.CONFIG.vitesseBase; }
 // ⚠️ Le pire cas, c'est la vitesse MINIMALE : la longueur d'un obstacle est
@@ -245,27 +202,27 @@ export function familleDe(kind) {
       const H = hauteurAFranchir(k);
       const calculee = FAMILLES.find((t) => tempsAuDessus(t, H) >= besoin) || "double";
       // Plancher de lisibilité : TOUT CE QUI ROULE se passe au double saut,
-      // quel que soit le calcul (c'est la règle annoncée par le bestiaire —
-      // « tout ce qui roule : saute, puis re-tape »). Sans ça, la voiture en
-      // face, plus vite croisée, aurait demandé un geste différent de la
-      // voiture garée : même objet, deux gestes, impossible à apprendre.
+      // quel que soit le calcul (règle annoncée par le bestiaire : « tout ce
+      // qui roule : saute, puis re-tape »). Sans ça, la voiture en face, plus
+      // vite croisée, demanderait un geste différent de la voiture garée :
+      // même objet, deux gestes, impossible à apprendre.
       const plancher = KINDS[k].plancher;
       FAMILLE[k] = plancher && FAMILLES.indexOf(plancher) > FAMILLES.indexOf(calculee) ? plancher : calculee;
     }
   }
   return FAMILLE[kind];
 }
-// Compatibilité : `KINDS[k].franchir` reste lu par la simulation, le bestiaire
-// et les outils de mesure — c'est maintenant une propriété calculée.
+// `KINDS[k].franchir` est lu par la simulation, le bestiaire et les outils de
+// mesure : c'est une propriété calculée (familleDe).
 for (const k of Object.keys(KINDS)) {
   Object.defineProperty(KINDS[k], "franchir", { get() { return familleDe(k); }, enumerable: true });
 }
 // Écart minimal entre deux obstacles : le temps de retomber du premier plus
-// celui de prendre son élan pour le second, converti en rangées à vitesse
-// maximale, plus les deux demi-longueurs.
-// `v` (rangées/s) : la vitesse LÀ où les deux obstacles se suivent (1er
-// octobre... 30 septembre 2026 : l'écart calculé à la vitesse maximale de fin
-// espaçait tout le début de course — « c'est trop facile »). Sans `v`, le pire cas.
+// celui de prendre son élan pour le second, converti en rangées à la vitesse
+// `v`, plus les deux demi-longueurs.
+// `v` (rangées/s) : la vitesse LÀ où les deux obstacles se suivent — calculé
+// à la vitesse maximale de fin, l'écart espacerait trop tout le début de
+// course. Sans `v`, le pire cas (vitesse maximale).
 export function ecartMin(a, b, v = vMaxRangees()) {
   const t = retombee(familleDe(a)) + montee(familleDe(b));
   return Math.ceil(t * v + demiLongueurRoute(a) + demiLongueurRoute(b)) + 1;
@@ -283,56 +240,48 @@ export const PIECE_SOL = CORPS_CENTRE;      // 0,85 : ramassée en roulant
 export const H_LAIT = PIECE_SOL, H_ROUGE = PIECE_SOL;
 
 export const GRACE_ROWS = 40;    // ~9 s sans rien au départ
-const RAMP_ROWS = 380;   // 1000 → 380 le 30 septembre 2026 : le mou entre obstacles fond en ~40 s
+const RAMP_ROWS = 380;   // le mou entre obstacles fond en ~40 s
 // Marge ALÉATOIRE ajoutée à l'écart minimal, en rangées : large au début, plus
 // serrée à la fin.
 const MOU_DEBUT = 5, MOU_FIN = 0;
 export const BLOC = 24;
-// UN SEUL espacement dans tout le jeu : une pièce toutes les deux rangées,
-// sur l'arc comme au sol (20 septembre 2026 : « les tailles et l'espacement
-// entre les pièces, ça n'a aucun sens ; ça doit être une règle conditionnelle,
-// avoir des standards »). Une seule taille de pièce aussi (main.js, PIECE_R).
-// ⚠️ 5 octobre 2026 : 2 → 3, et plus d'éclaircissage « une sur deux » derrière
-// (« les espacements entre les pièces sont un peu bizarres » : l'éclaircissage
-// comptait les pièces à travers tout le bloc, et un arc ou une traînée perdait
-// tantôt sa première, tantôt sa deuxième pièce). Une pièce tous les 3 rangs,
-// partout et régulière : ~20 % de pièces en plus (« il en manque un tout petit
-// peu pour que ça soit vraiment, tout le temps, des pièces »).
+// UN SEUL espacement dans tout le jeu, sur l'arc comme au sol : une pièce
+// tous les ESPACEMENT rangs, régulière. Une seule taille de pièce aussi
+// (main.js, PIECE_R). ⚠️ Pas d'éclaircissage après coup : compté à travers
+// tout le bloc, il ferait perdre à un arc tantôt sa première, tantôt sa
+// deuxième pièce.
 export const ESPACEMENT = 3;
-const TRAINEE_MIN = 8;           // rangées libres d'affilée avant de poser une traînée au sol (7 → 8 le 5 octobre 2026, avec ESPACEMENT 3 : +15 % de pièces, +23 % en valeur avec les doubles)
-const TRAINEE_LONGUEUR = 2;      // pièces d'une traînée (3 → 2 le 5 octobre 2026 : plus d'éclaircissage derrière)
+const TRAINEE_MIN = 8;           // rangées libres d'affilée avant de poser une traînée au sol
+const TRAINEE_LONGUEUR = 2;      // pièces d'une traînée
 const LAIT_EVERY = 48;
 let FIN_LAIT = null;
 function rangFinLait() { if (FIN_LAIT === null) FIN_LAIT = Math.round(rangAuTemps(dureeCourse() - 55)); return FIN_LAIT; }
-const GROSSE_EVERY = 70;         // la grosse pièce dorée (ex-rouge)
+const GROSSE_EVERY = 70;         // rangée réservée à la grosse pièce (laissée vide)
 
-// --- Les HALLES (20 septembre 2026) ------------------------------------------------
-// « Faut que je prenne une rampe et que je me retrouve au niveau des fils
-// électriques [...] au bout de 30 ou 40 secondes de jeu, pour que ça fasse une
-// variation. » Une rampe monte, un plancher file en l'air, une rampe redescend :
-// pendant ce temps la route est vide et couverte de pièces. Le sol du jeu n'est
-// donc plus toujours 0 : voir solAt().
+// --- Les HALLES ------------------------------------------------------------------
+// Une variation de décor et de hauteur : une rampe monte au niveau des fils
+// électriques, un plancher file en l'air, une rampe redescend. Pendant ce
+// temps la route est vide et couverte de pièces. Le sol du jeu n'est donc pas
+// toujours 0 : voir solAt().
 export const HALLE_HAUT = 4.2;
 export const HALLE_MONTEE = 7, HALLE_PLAT = 26, HALLE_DESCENTE = 7;
 export const HALLE_ROWS = HALLE_MONTEE + HALLE_PLAT + HALLE_DESCENTE;
-// 4 octobre 2026 : marché 25 s, gare 88 s (la mi-morceau : « faut faire
-// venir la gare un peu avant »), bowling 116 s ; l'hiver (46 → 80 s) est
-// pris par la montagne enneigée. Avant : 30/58/86, 36/76/116, 156 retirée.
+// Marché 25 s, gare 88 s (vers la mi-morceau), bowling 116 s ; l'hiver
+// (46–80 s) est pris par la montagne enneigée.
 const HALLE_TEMPS = [25, 88, 116];  // secondes de course
 let HALLES = null;
 function halles() {
   if (!HALLES) HALLES = HALLE_TEMPS.map((t) => Math.round(rangAuTemps(t)));
   return HALLES;
 }
-// Trois bâtiments différents (3 octobre 2026 : « il faudrait traverser un
-// bowling et une gare, avec des rails de train, des trains à quai ») : la
-// première halle est le marché, la deuxième un bowling, la troisième la gare.
+// Trois bâtiments différents, dans l'ordre de HALLE_TEMPS : le marché, la
+// gare (rails, trains à quai), le bowling.
 export const TYPES_HALLE = ["marche", "gare", "bowling"];
 export function typeHalle(d) { const i = halles().indexOf(d); return TYPES_HALLE[Math.max(0, i) % TYPES_HALLE.length]; }
 // Hauteur du plancher et du toit (au-dessus du plancher) de chaque bâtiment.
-// Le BOWLING est de plain-pied (4 octobre 2026) : la caméra (3,6 u) était
-// SOUS son plancher à 4,2 u, on ne voyait pas ses pistes ; une marche de
-// 0,35 u, et un toit plus haut pour que le double saut y tienne.
+// Le BOWLING est de plain-pied (une marche de 0,35 u) : avec un plancher à
+// 4,2 u, la caméra (3,6 u) serait dessous et ne verrait pas ses pistes. Son
+// toit est plus haut pour que le double saut y tienne.
 const GEO_TYPES = { marche: { haut: HALLE_HAUT, toit: HALLE_TOIT_AU_DESSUS }, gare: { haut: HALLE_HAUT, toit: HALLE_TOIT_AU_DESSUS }, bowling: { haut: 0.35, toit: 7.4 } };
 export function geoHalle(d) { return GEO_TYPES[typeHalle(d)]; }
 // Première rangée de la halle d'un type donné (« marche »…), ou null.
@@ -355,24 +304,13 @@ export function solAt(v) {
 }
 function dansHalle(r) { const d = halleA(r); return d !== null && r >= d && r <= d + HALLE_ROWS; }
 
-// --- La MONTAGNE (4 octobre 2026) ------------------------------------------------
-// « Un biome dans les montagnes où la route monte, descend, monte, descend un
-// peu, à une minute de la fin du morceau, parce que là c'est trop plat. » Des
-// bosses en cosinus (on y roule comme sur la rampe des halles : solAt),
-// séparées par des plats où se posent les obstacles — JAMAIS un obstacle sur
-// une bosse : la famille de saut d'un obstacle suppose un départ au même
-// niveau que lui. Décor (sapins, rochers) : scene.js, zone « montagne ».
-// ⚠️ 4 octobre 2026, deuxième passe (« fais cinq fois cette hauteur, une
-// grosse partie ultra vallonnée [...] fais le truc vallonné directement dans
-// le passage avec la neige ») : la montagne passe dans l'HIVER (46 → 80 s de
-// course) et ses bosses deviennent des collines de 6,5 u — montée en douceur
-// (28 rangs), plateau (22), descente (28), vallée (22). Les obstacles se posent
-// sur les plateaux et dans les vallées : sur PLAT tout autour de leur saut
-// (penteAutour), jamais dans une pente.
-// ⚠️ 5 octobre 2026 : UNE SEULE colline (« il faut le faire qu'une seule fois,
-// là tu l'as fait deux fois [...] il faut qu'on sorte du biome neige un tout
-// petit peu plus tôt ») : un replat enneigé avant (MONTAGNE_AVANT rangs), la
-// colline, un replat après — et le biome se referme.
+// --- La MONTAGNE enneigée (l'hiver, à partir de 46 s) -----------------------------
+// Un replat enneigé (MONTAGNE_AVANT rangs), UNE colline en cosinus de 6,5 u —
+// montée douce (28 rangs), plateau (22), descente (28) —, un replat après, et
+// le biome se referme. On y roule comme sur la rampe des halles (solAt).
+// ⚠️ JAMAIS un obstacle dans une pente : la famille de saut d'un obstacle
+// suppose un départ au même niveau que lui. Ils se posent sur PLAT tout
+// autour de leur saut (penteAutour). Décor : scene.js, zone « montagne ».
 const MONTAGNE_DEBUT_S = 46, MONTAGNE_AVANT = 24, MONTAGNE_APRES = 22;
 const COLLINE_MONTEE = 28, COLLINE_PLAT = 22, COLLINE_VALLEE = 22, COLLINE_HAUT = 6.5;
 const COLLINE_LONG = 2 * COLLINE_MONTEE + COLLINE_PLAT;
@@ -386,8 +324,8 @@ function bosses() {
   if (!BOSSES) BOSSES = [montagne()[0] + MONTAGNE_AVANT];
   return BOSSES;
 }
-// La PLAGE de fin (5 octobre 2026 : « tu peux finir avec plage, coucher de
-// soleil : c'est la mer au fond et des palmiers ») : les 30 dernières secondes.
+// La PLAGE de fin (mer au fond, palmiers, coucher de soleil) : les 30
+// dernières secondes.
 const T_PLAGE = 30;
 let PLAGE = null;
 export function enPlage(r) { if (PLAGE === null) PLAGE = Math.round(rangAuTemps(dureeCourse() - T_PLAGE)); return r >= PLAGE; }
@@ -412,13 +350,11 @@ function penteAutour(r) {
   return false;
 }
 
-// --- Moments de course (4 octobre 2026) ----------------------------------------
-// « Il faut rajouter des difficultés de car scolaire à peu près à la moitié du
-// morceau » : trois cars d'affilée vers 72 s. « Vers la fin, trois voitures
-// arrêtées les unes après les autres, il faut sauter par-dessus et rouler sur
-// les voitures » : le BOUCHON, 15 s avant la fin — trois voitures garées
-// pare-chocs contre pare-chocs (2,8 de long tous les 3 rangs : le toit porte
-// d'une voiture à l'autre, toitSous), feux de détresse, pièces sur les toits.
+// --- Moments de course -----------------------------------------------------------
+// Le CONVOI : trois cars scolaires d'affilée à T_CONVOI. Le BOUCHON, 15 s
+// avant la fin : trois voitures garées pare-chocs contre pare-chocs (2,8 de
+// long tous les 3 rangs : le toit porte d'une voiture à l'autre, toitSous),
+// feux de détresse, pièces sur les toits — on saute dessus et on y roule.
 const T_CONVOI = 100, CONVOI_N = 3, T_BOUCHON_AVANT_FIN = 15;
 export const BOUCHON_PAS = 3;
 // Toit d'une voiture GARÉE sous v (les simulations : roule sur le bouchon).
@@ -432,9 +368,8 @@ export function toitGare(route, v, jumpY) {
   }
   return 0;
 }
-// Plafond du cycliste sous le toit d'une halle (4 octobre 2026 : « que le
-// personnage reste en dessous et n'ait pas la possibilité de dépasser le
-// toit ») : ses roues ne montent pas plus haut que le dessous des fermes
+// Plafond du cycliste sous le toit d'une halle, qu'il ne doit jamais
+// traverser : ses roues ne montent pas plus haut que le dessous des fermes
 // moins sa taille (2,1 u, salto compris). Infini partout ailleurs.
 export function plafondA(v) {
   const d = halleA(Math.round(v));
@@ -445,8 +380,8 @@ export function plafondA(v) {
 
 // Hauteur du toit d'un obstacle MONTABLE sous la position v, mais seulement si
 // le cycliste arrive déjà au-dessus (`jumpY`). En dessous, ce n'est pas un
-// plancher, c'est un mur : la collision s'en charge. La voiture EN FACE est
-// montable aussi (27 septembre 2026) : on cherche où elle est à l'instant t.
+// plancher, c'est un mur : la collision s'en charge. Les véhicules EN FACE
+// sont montables aussi : on cherche où ils sont à l'instant t.
 export function toitSous(route, v, jumpY, t = 0) {
   for (let r = Math.floor(v - 4); r <= Math.ceil(v + 40); r++) {
     if (r < 0) continue;
@@ -456,10 +391,9 @@ export function toitSous(route, v, jumpY, t = 0) {
     const K = KINDS[row.kind];
     if (!K.montable) continue;
     const centre = row.type === "statique" ? r : (row.armed ? r + row.v0 - row.vitesse * (t - row.t0) : null);
-    // Le toit porte sur TOUTE la zone de choc (30 septembre 2026 : « quand
-    // j'atterris sur une voiture, j'ai un problème ») : il s'arrêtait une
-    // demi-roue avant elle, le vélo retombait à l'arrière du toit ENCORE dans
-    // la voiture, et l'atterrissage comptait comme un choc.
+    // ⚠️ Le toit porte sur TOUTE la zone de choc : s'il s'arrêtait plus tôt,
+    // le vélo retomberait à l'arrière du toit ENCORE dans la voiture, et
+    // l'atterrissage compterait comme un choc.
     if (centre === null || Math.abs(v - centre) >= K.long / 2 + VELO_DEMI) continue;
     const toit = K.h + MARGE_H + solAt(centre); // sur une colline, le toit monte avec elle
     if (jumpY >= toit - 0.02) return toit;
@@ -469,24 +403,20 @@ export function toitSous(route, v, jumpY, t = 0) {
 
 // --- Paquets d'espèces ------------------------------------------------------------
 const PAQUETS = [
-  // Départ : que des petits sauts.
-  // (Plus de fermier qui jette une poule, 30 septembre 2026 : « tu me vires ça ».)
   // ⚠️ Chaque paquet compte EXACTEMENT 12 espèces (especeDanger : i % 12).
-  // Une VOITURE dès le premier paquet : le tuto du double saut doit venir tôt.
-  // + UNE voiture en face (3 octobre 2026 : « à partir d'une vingtaine de
-  // secondes, il faut des voitures qui arrivent en face »).
+  // Départ : surtout des petits sauts. Une VOITURE dès le premier paquet : le
+  // tuto du double saut doit venir tôt. Et UNE voiture en face (jamais avant
+  // ~20 s, voir etendreDangers).
   ["poule", "poule", "voiture", "chat", "chat", "chien", "chien", "mouton", "mouton", "botte", "botte", "contresens"],
-  // Ensuite : les gros animaux (appui maintenu) et les premiers véhicules.
-  // + voitures EN FACE (29 septembre 2026 : « les voitures qui arrivent dans ta tête, faut en mettre beaucoup plus »).
-  // + le premier PIÉTON (5 octobre 2026), seul.
+  // Ensuite : les gros animaux (appui maintenu), les premiers véhicules,
+  // beaucoup de voitures EN FACE, et le premier PIÉTON, seul.
   ["poule", "pieton", "mouton", "botte", "costard", "fermier", "cochon", "vache", "tracteur", "bus", "contresens", "contresens"],
   // Fin : fermiers, voitures, la voiture qui arrive en face — et deux
   // passages de piétons (seuls, puis par deux : taillePietons).
   ["pieton", "mouton", "botte", "costard", "pieton", "vache", "tracteur", "fermier", "voiture", "contresens", "bus", "contresens"],
-  // Finale (3 octobre 2026 : « à 30 secondes de la fin je me fais chier [...]
-  // que ceux qui terminent soient vraiment les plus forts ») : presque tout
-  // roule, et vite (armer : les véhicules en face accélèrent en fin de course).
-  // + deux GROUPES DE TROIS piétons par paquet (5 octobre 2026).
+  // Finale, la plus dure (ceux qui terminent doivent être les plus forts) :
+  // presque tout roule, et vite (armer : les véhicules en face accélèrent en
+  // fin de course), plus deux groupes de piétons par paquet.
   ["contresens", "bus", "tracteur", "contresens", "pieton", "fermier", "contresens", "bus", "pieton", "voiture", "contresens", "tracteur"],
 ];
 // Taille d'un groupe de piétons selon le PAQUET (même numéro de paquet pour
@@ -496,20 +426,18 @@ const PAQUETS = [
 function taillePietons(d) { return d < 3 ? 1 : d < 5 ? 2 : d < 6 ? 3 : 4; }
 // Écart DANS un groupe : la physique du saut, plus une rangée de grâce.
 const PIETONS_GRACE = 1;
-// Paquets avancés (30 septembre 2026 : « au bout de 40 secondes, ça doit devenir
-// difficile ») : 12 obstacles de départ, 12 intermédiaires, puis le dur.
+// La course devient difficile dès ~40 s : 12 obstacles de départ, 12
+// intermédiaires, 36 de fin, puis la finale.
 function paquetPour(d) { return PAQUETS[d < 1 ? 0 : d < 2 ? 1 : d < 5 ? 2 : 3]; }
 function estDouble(kind) { return familleDe(kind) === "double"; }
 
-// --- Chacun dans son décor (4 octobre 2026, nuit) ----------------------------------
-// « Attention, les gens en slip restent sur la plage, les skieurs au ski. »
-// Le personnage se choisissait sur la rangée de l'obstacle PRÉCÉDENT, jusqu'à
-// 25 rangs plus tôt : mesuré sur 400 routes, un skieur sur cinq finissait sur
-// le goudron à la sortie de la neige, des chasse-neige et des bonshommes
-// aussi, des fermiers et des tracteurs sur la plage. Il se choisit désormais
-// sur sa PROPRE rangée, et rien ne se pose à cheval sur une frontière : son
-// trajet à l'écran (3 rangs derrière, 8 devant pour ce qui vient en face)
-// reste dans un seul décor.
+// --- Chacun dans son décor ---------------------------------------------------------
+// Baigneurs sur la plage, skieurs dans la neige. Un obstacle s'habille selon
+// sa PROPRE rangée (⚠️ pas celle de l'obstacle précédent, jusqu'à 25 rangs
+// plus tôt : un skieur sur cinq finirait sur le goudron, mesuré sur 400
+// routes), et rien ne se pose à cheval sur une frontière : son trajet à
+// l'écran (3 rangs derrière, 8 devant pour ce qui vient en face) reste dans
+// un seul décor.
 export function biomeDe(r) { return enPlage(r) ? "plage" : enMontagne(r) ? "neige" : "route"; }
 function aCheval(r, kind) {
   const b = biomeDe(r), devant = KINDS[kind].contresens ? 8 : 2;
@@ -553,10 +481,9 @@ export class Route {
   ouvrirFenetreSure(from, to) {
     this.fenetreSure = [from, to];
     for (let r = from; r <= to; r++) {
-      // ⚠️ Un véhicule DÉJÀ ARMÉ reste (4 octobre 2026 : « il y a eu attention,
-      // et il n'y a pas eu d'obstacle ») : le turbo effaçait la voiture en face
-      // dont le panneau était déjà à l'écran. Le turbo rend invulnérable, elle
-      // passe sans dégât.
+      // ⚠️ Un véhicule DÉJÀ ARMÉ reste : son panneau d'alerte est peut-être
+      // déjà à l'écran, l'effacer laisserait une alerte sans obstacle. Le
+      // turbo rend invulnérable, il passe sans dégât.
       const avant = this.cache.get(r);
       if (avant && (avant.type === "contresens" || avant.type === "traverse") && avant.armed) continue;
       this.cache.set(r, this.rangeeSure(r));
@@ -616,10 +543,10 @@ export class Route {
     while (this.chaine.r <= rMax) {
       const i = this.chaine.i;
       let kind = this.especeDanger(i);
-      // Rien n'arrive en face avant ~20 s (3 octobre 2026) : une voiture garée à la place.
+      // Rien n'arrive en face avant ~20 s : une voiture garée à la place.
       if (KINDS[kind].contresens && KINDS[kind].vitesse > 0 && this.chaine.r < rangAuTemps(20)) kind = "voiture";
       // … ni dans les 8 dernières secondes : aucun véhicule qui roule ne
-      // traverse la ligne d'arrivée (3 octobre 2026). (Sur la plage — les 30
+      // traverse la ligne d'arrivée. (Sur la plage — les 30
       // dernières secondes —, la vache devient un baigneur : auDecor.)
       if (KINDS[kind].contresens && this.chaine.r > rangAuTemps(dureeCourse() - 8)) kind = "vache";
       const groupe = kind === "pieton" ? taillePietons(Math.floor(i / 12)) : 1;
@@ -675,8 +602,8 @@ export class Route {
   }
 
   // --- Les pièces d'un obstacle : l'ARC de son saut -------------------------------
-  // On échantillonne la trajectoire de la famille demandée, une pièce par
-  // rangée, à la hauteur du buste. Suivre l'arc = tout ramasser.
+  // On échantillonne la trajectoire de la famille demandée, une pièce tous
+  // les ESPACEMENT rangs, à la hauteur du buste. Suivre l'arc = tout ramasser.
   arcPieces(rObs, kind) {
     const tier = familleDe(kind);
     const vit = Math.max(1, vitesseAuRang(rObs));
@@ -684,13 +611,13 @@ export class Route {
     const demi = demiLongueurRoute(kind) + 0.4;
     const out = [];
     // On ne garde que la partie HAUTE de l'arc : les pièces qui rasent le sol
-    // juste avant et juste après le saut n'apprennent rien et faisaient
-    // exploser le compte (« il y a beaucoup trop de pièces »).
+    // juste avant et juste après le saut n'apprennent rien et feraient
+    // exploser le compte.
     const seuil = Math.min(apexArc(tier) * 0.45, 0.8);
     for (let q = Math.ceil(rDepart); q <= Math.floor(rDepart + retombee(tier) * vit + montee(tier) * vit); q++) {
       if (Math.abs(q - rObs) <= demi) continue;
-      // Une rangée sur deux, calées sur l'obstacle : l'arc reste lisible, et
-      // le compte ne double pas parce qu'un saut dure longtemps.
+      // Une rangée sur ESPACEMENT, calée sur l'obstacle : l'arc reste lisible,
+      // et le compte ne gonfle pas parce qu'un saut dure longtemps.
       if (((q - rObs) % ESPACEMENT + ESPACEMENT) % ESPACEMENT !== 0) continue;
       const h = hauteurArc(tier, (q - rDepart) / vit);
       if (h < seuil) continue;
@@ -735,13 +662,12 @@ export class Route {
       if (!kind || this.bouchons.has(r0 + p)) continue;
       // Une pièce d'arc jamais DANS une bosse de montagne.
       const arc = this.arcPieces(r0 + p, kind).filter((c) => c.h >= solAt(c.r) + PIECE_SOL - 0.3);
-      // PIÈCE DOUBLE (5 octobre 2026 : « des pièces de compte double, un peu
-      // plus grosses ») : la plus haute de l'arc d'un DOUBLE saut — la
-      // récompense du gros saut, au sommet.
+      // PIÈCE DOUBLE (compte double, un peu plus grosse) : la plus haute de
+      // l'arc d'un DOUBLE saut — la récompense du gros saut, au sommet.
       const sommet = familleDe(kind) === "double" && arc.length ? arc.reduce((a, c) => (c.h > a.h ? c : a)) : null;
       for (const c of arc) pose(c.r, c.h, false, c === sommet);
     }
-    // 3. Halle : plancher couvert de pièces (une rangée sur deux).
+    // 3. Halle : plancher couvert de pièces (une tous les 2 × ESPACEMENT rangs).
     for (let p = 0; p < BLOC; p++) {
       const r = r0 + p;
       const d = halleA(r);
@@ -762,9 +688,7 @@ export class Route {
         libre = 0;
       }
     }
-    // (4 bis « une pièce sur deux », 29 septembre 2026, remplacé le 5 octobre
-    // par ESPACEMENT = 3 : même densité visée, espacement enfin régulier.)
-    // 4 ter. Le bouchon : une pièce entre chaque paire de voitures, à hauteur
+    // 4 bis. Le bouchon : une pièce entre chaque paire de voitures, à hauteur
     // de toit — elles disent « roule dessus ».
     for (let p = -2 * BOUCHON_PAS; p < BLOC; p++) {
       const rb = r0 + p;
@@ -775,7 +699,7 @@ export class Route {
     // 5. Lait et grosse pièce sur leurs rangées réservées, sinon au plus près.
     // Le lait et la grosse pièce se posent sur une rangée LIBRE et à l'écart :
     // jamais sur un arc (ça y ferait un trou) ni collée à un obstacle (elle
-    // attirait le joueur pile là où il ne faut pas être).
+    // attirerait le joueur pile là où il ne faut pas être).
     const dispo = (p) => {
       if (p < 0 || p >= BLOC) return false;
       const row = rowsBloc[p];
@@ -786,11 +710,9 @@ export class Route {
     };
     for (let p = 0; p < BLOC; p++) {
       const r = r0 + p;
-      // La grosse pièce dorée est RETIRÉE le 20 septembre 2026 au soir
-      // (« vire-la pour l'instant, c'est trop bizarre ») : sa rangée reste
-      // réservée, elle ne porte plus rien.
-      // Plus de lait dans les 55 dernières secondes (3 octobre 2026) : chaque
-      // brique vide la route 5 s, la fin de course devenait la plus calme.
+      // La grosse pièce dorée n'est pas posée : sa rangée reste réservée, vide.
+      // Pas de lait dans les 55 dernières secondes : chaque brique vide la
+      // route 5 s, la fin de course deviendrait la plus calme.
       const kind = r % LAIT_EVERY === LAIT_EVERY / 2 && r < rangFinLait() ? "lait" : null;
       if (!kind) continue;
       let q = null;
@@ -799,9 +721,8 @@ export class Route {
       rowsBloc[q][kind] = kind === "lait" ? solAt(r0 + q) + H_LAIT : solAt(r0 + q) + H_ROUGE;
     }
     // 6. Aucune pièce qu'un véhicule venu d'en face TRAVERSE sous les yeux du
-    //    joueur (5 octobre 2026 : « une pièce qui est passée à travers une
-    //    voiture [...] on a l'impression qu'on ne peut pas faire le meilleur
-    //    score »). En face, il balaie les rangées au-delà de son point de
+    //    joueur : elle semblerait imprenable, le meilleur score hors
+    //    d'atteinte. En face, il balaie les rangées au-delà de son point de
     //    croisement pendant qu'il entre dans l'écran : une pièce plus basse
     //    que son toit, là, semble prise dans la carrosserie. On l'enlève.
     for (let p = 0; p < BLOC; p++) {
@@ -812,9 +733,8 @@ export class Route {
         const kind = this.dangers.get(r);
         if (!kind) continue;
         const K = KINDS[kind];
-        // Tout ce qui vient en face, piétons compris (4 octobre 2026, nuit :
-        // « ne mets pas des pièces à travers les véhicules et les personnages
-        // qui passent »). Seule la poule jetée part d'ailleurs (le fermier).
+        // Tout ce qui vient en face, piétons compris. Seule la poule jetée
+        // part d'ailleurs (le fermier).
         if (!K.contresens || K.lanceur) continue;
         const d = q - r, demi = demiLongueurRoute(kind);
         if (d <= demi + 0.4 || d > balayageVisible(r, kind)) continue;
@@ -833,14 +753,11 @@ export class Route {
     return this.cache.get(r) || this.rangeeSure(r);
   }
 
-  // Le TUTO (4 octobre 2026, nuit : « quand tu mets un tutoriel, il ne faut
-  // pas que tu mettes un autre obstacle avant. Il devait sauter un bus et il
-  // s'est pris un mec en costard qui était avant » ; « beaucoup plus d'espace
-  // […] quand les gens doivent taper deux fois, il faut que tu laisses la
-  // place »). Pour chaque famille qu'on va expliquer, son premier obstacle
-  // garde la route pour lui : rien TUTO_AVANT_S avant, rien TUTO_APRES_S
-  // après. Deux tutos ne se suivent jamais de plus près que ces deux fenêtres
-  // réunies — un obstacle de la famille trop tôt est retiré, c'est le suivant
+  // Le TUTO : pour chaque famille qu'on va expliquer, son premier obstacle
+  // garde la route pour lui — rien TUTO_AVANT_S avant (un autre obstacle
+  // juste avant piégerait le joueur concentré sur la consigne), rien
+  // TUTO_APRES_S après (le double saut demande de la place). Deux tutos ne se
+  // suivent jamais de plus près que ces deux fenêtres réunies — un obstacle de la famille trop tôt est retiré, c'est le suivant
   // qu'on expliquera. Seulement pour qui a encore un tuto à voir (main.js).
   // `depuis` / `gardes` : après un turbo (sa fenêtre sûre a pu effacer
   // l'obstacle réservé), main.js en réserve un autre plus loin, en gardant
@@ -967,9 +884,10 @@ export function armer(row, now, tArrivee) {
   row.vitesse = Math.max(1.8, Math.min(K.vmax || 9, dist / dt));
 }
 
-// Position d'une voiture en sens inverse à l'instant t (null si pas armée).
+// Route dégagée autour du premier obstacle de chaque tuto (Route.degagerTutos).
 export const TUTO_AVANT_S = 2.4, TUTO_APRES_S = 1.6;
 export function degagerTutos(familles, depuis, gardes) { return live.degagerTutos(familles, depuis, gardes); }
+// Position d'une voiture en sens inverse à l'instant t (null si pas armée).
 export function contresensAt(r, row, t) {
   if (row.type !== "contresens" || !row.armed) return null;
   const v = r + row.v0 - row.vitesse * (t - row.t0);

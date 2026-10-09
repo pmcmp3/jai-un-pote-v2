@@ -1,8 +1,5 @@
-// bruitages.js — Le SOUND DESIGN (4 octobre 2026, nuit : « un bruitage de
-// bicyclette dans le fond, en pas fort », « quand je prends une poule je veux
-// un bruit de poule, un bruit de klaxon quand une voiture arrive [...] plus de
-// sound design, à fond : à la gare je veux un klaxon de train, au bowling un
-// bruit de quilles »).
+// bruitages.js — Le SOUND DESIGN : cris des bêtes, chocs, klaxons, train,
+// quilles, vélo, ambiances de décor.
 //
 // Tout est SYNTHÉTISÉ, comme sfx.js : oscillateurs, bruit filtré, formants.
 // Zéro fichier à télécharger — le jeu s'ouvre dans le navigateur d'Instagram,
@@ -24,9 +21,7 @@
 
 import * as audio from "./audio.js";
 
-// --- La GAMME du morceau (4 octobre 2026, nuit : « analyse la gamme du
-// morceau [...] et fais en sorte que tous les bruitages soient sur la gamme,
-// pour pas qu'il y ait des fausses notes ») -----------------------------------
+// --- La GAMME du morceau : tous les bruitages sont dessus, pas de fausse note ---
 // Mesurée sur le MP3 (python3 outils/gamme.py : chromagramme, profils de Krumhansl) :
 // MI MINEUR / SOL MAJEUR — une seule altération, fa♯ —, accordé sur le La 440
 // (+3 cents). Notes dominantes mi, do, si, sol, ré, la ; la basse descend
@@ -317,8 +312,8 @@ SONS.bonhomme = (ctx, out, t0, o) => {
 };
 
 // ===== Les véhicules =====
-// Leurs klaxons, à l'arrivée (« un bruit de klaxon quand une voiture arrive ») :
-// chacun le sien. doppler > 1 : il fonce vers nous.
+// Leurs klaxons, quand ils entrent à l'écran : chacun le sien. doppler > 1 :
+// il fonce vers nous.
 const KLAXONS = {
   // La voiture : « tut-tuuut », double ton européen.
   contresens: { notes: [n("G4"), n("B4")], segments: [[0, 0.11], [0.17, 0.5]], f: 1700, q: 1.1, grain: 2.2, corps: 0.5 },
@@ -340,7 +335,7 @@ SONS.carambolage = (ctx, out, t0, o) => {
   coupSourd(ctx, out, t0, { f0: 85 * k, f1: 36 * k, duree: 0.32, crete: 1 });
   bouffee(ctx, out, t0, { type: "lowpass", f: 2400, crete: 0.8, tau: 0.06, alea: a });
   // La tôle : des partiels posés sur la gamme (une tôle n'a pas de note, mais
-  // ses résonances, si — et elles tombaient entre les notes du morceau).
+  // ses résonances, si — laissées libres, elles tomberaient entre les notes).
   const tole = o.gros ? ["B3", "E5", "B5", "G6", "D7"] : ["G4", "A5", "G6", "D7", "G7"];
   partiels(ctx, out, t0 + 0.005, tole.map((nm, i) => [n(nm), [0.3, 0.22, 0.16, 0.12, 0.08][i], [0.12, 0.09, 0.07, 0.05, 0.04][i]]));
   if (!o.gros) for (let i = 0; i < 6; i++) partiels(ctx, out, t0 + 0.04 + a() * 0.3, [[surGamme(2800 + a() * 3600), 0.05 + a() * 0.05, 0.04]], 0.0005);
@@ -562,7 +557,7 @@ export function couche(ctx, out, nom) {
 // Les MOTEURS de ce qui arrive en face : une note de moteur (passe-bas),
 // modulée au rythme des cylindres, + un bruit (diesel, lame, skis). doppler
 // > 1 tant qu'il fonce vers nous, < 1 une fois passé.
-// ⚠️ Accordés (4 octobre 2026, nuit) : le Doppler fait ×1,06 en approche et
+// ⚠️ Accordés : le Doppler fait ×1,06 en approche et
 // ×0,94 une fois passé — un ton d'écart. La note de base est choisie pour que
 // les deux tombent sur la gamme : voiture la1 → sol1, car mi1 → ré1,
 // chasse-neige si0 → la0, buggy mi2 → ré2.
@@ -639,17 +634,16 @@ export const APPELS = { poule: "glousse", vache: "meuh", mouton: "bee", cochon: 
 // Gain de chaque son, calé par outils/bruitages.mjs : la crête de son niveau
 // momentané (fenêtre 400 ms) visée en LUFS, le morceau étant à −9,9 LUFS.
 // Un choc ~12 LU sous la musique, un klaxon ~13, le train ~10, le vélo et
-// l'ambiance ~20-25 (« en pas fort »).
+// l'ambiance ~20-25 (présents, jamais devant la musique).
 export const CIBLES = {
-  // Les bêtes un peu plus fort qu'au premier essai (« rajoute les miaulements
-  // du chat ») : leurs cris d'approche passent de ~18 à ~15 LU sous la musique.
+  // Les bêtes : cris d'approche ~15 LU sous la musique, chocs ~11.
   poule: -21, glousse: -24, vache: -21, meuh: -25, mouton: -21, bee: -25, cochon: -21, groin: -25, chien: -21, ouaf: -24, chat: -21, miaou: -24,
   aie: -18, // la voix du joueur : ~8 LU sous la musique, on l'entend à chaque choc
   botte: -24, ouf: -23, costard: -23, skieur: -23, bonhomme: -24, carambolage: -21,
   klaxon_contresens: -23, klaxon_voiture: -23, klaxon_bus: -23, klaxon_tracteur: -24, klaxon_chasseneige: -23, klaxon_buggy: -24,
   sonnette: -25, atterrissage: -27, train: -20, rail: -29, pschit: -28, carillon: -28, quilles: -24,
   oiseau: -33, grillon: -35, chouette: -33, mouette: -31, cloche: -29,
-  // Continus, au niveau nominal (ambiance.js les module) : le vélo « en pas fort ».
+  // Continus, au niveau nominal (ambiance.js les module) : le vélo reste discret.
   couche_roulement: -33, roueLibre: -34, neigeRoule: -34, planches: -32, couche_vent: -36, couche_blizzard: -33, couche_vagues: -31,
   couche_jet: -26, couche_grondement: -28, couche_freins: -27, couche_boules: -33,
   moteur_contresens: -30, moteur_bus: -29, moteur_tracteur: -29, moteur_chasseneige: -29, moteur_buggy: -30, moteur_skieur: -32,
@@ -714,13 +708,11 @@ export function choc(kind, o = {}) {
 export function klaxonDe(kind) { return KLAXONS[kind] ? `klaxon_${kind}` : null; }
 
 // --- La VOIX du joueur : « Pfff… aïe ! » -------------------------------------------
-// (4 octobre 2026, nuit : « dès que tu te prends un objet, tu prends cet
-// audio-là, pour que les gens fassent « pfff » quand ils se prennent un
-// objet ».) Le vocal de PMC (config.fichierAie, 0,78 s) nettoyé et compressé —
-// voir CLAUDE.md. Trois façons de le jouer pour qu'il ne radote pas : en
-// entier, le « pfff » seul, le « aïe » seul (son « aïe » descend de mi à ré :
-// déjà sur la gamme, on n'y touche pas). Seulement quand le choc fait mal (pas
-// sous turbo), jamais deux fois en une demi-seconde.
+// Joué à chaque obstacle percuté. Le vocal de PMC (config.fichierAie, 0,78 s)
+// nettoyé et compressé — voir CLAUDE.md. Trois façons de le jouer pour qu'il
+// ne radote pas : en entier, le « pfff » seul, le « aïe » seul (son « aïe »
+// descend de mi à ré : déjà sur la gamme, on n'y touche pas). Seulement quand
+// le choc fait mal (pas sous turbo), jamais deux fois en une demi-seconde.
 const PRISES_AIE = [[0, 0.78], [0.02, 0.31], [0.34, 0.78]];
 let derniereAie = -9;
 export function prechargerVoix() { audio.echantillon(window.CONFIG.fichierAie); }

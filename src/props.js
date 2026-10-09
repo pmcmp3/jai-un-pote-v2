@@ -1,19 +1,14 @@
 // props.js — Obstacles en cubes (scene.drawBox), vue de PROFIL.
 //
-// ⚠️ TOUT EST REDESSINÉ À L'ÉCHELLE le 20 septembre 2026 (soir) : 1 unité ≈
-// 1 mètre, comme le cycliste (1,8 u de haut, 1,24 u de long). Deux plaintes
-// visaient exactement ça :
-//   « les vaches sont plus grosses que les voitures, ça va pas du tout » — la
-//   voiture était dessinée en tranche de 0,96 u de haut pour 3,4 de long, donc
-//   plus basse qu'une vache et longue comme une limousine ;
-//   « les voitures, faut vraiment que tu revoies le design ».
-// Désormais la voiture fait 3,9 × 1,55 (une berline), le tracteur 4,2 × 2,3,
-// la vache 2,3 × 1,5 : sur la route, le plus gros objet est toujours un
-// véhicule. Les tailles vivent dans rows.KINDS et le dessin les SUIT (chaque
-// modèle est construit à partir de K.long / K.larg / K.h), pour qu'une boîte
-// de collision ne puisse plus mentir sur ce qu'on voit.
+// ⚠️ TOUT EST À L'ÉCHELLE : 1 unité ≈ 1 mètre, comme le cycliste (1,8 u de
+// haut, 1,24 u de long). La voiture fait 3,9 × 1,55 (une berline), le tracteur
+// 4,2 × 2,3, la vache 2,3 × 1,5 : sur la route, le plus gros objet est
+// toujours un véhicule, jamais un animal. Les tailles vivent dans rows.KINDS
+// et le dessin les SUIT (chaque modèle est construit à partir de K.long /
+// K.larg / K.h), pour qu'une boîte de collision ne puisse pas mentir sur ce
+// qu'on voit.
 //
-// Le mouton fait un 360 sur lui-même (demandé) : vraie rotation 3D autour de
+// Le mouton fait un 360 sur lui-même : vraie rotation 3D autour de
 // l'axe vertical, via scene.drawBoxR.
 
 import { drawBox, drawShadow, drawFlat, drawDisque, getNight, project, groupe, echelle, CONTOUR_PERSO, teteVoxel } from "./scene.js";
@@ -82,8 +77,8 @@ function drawTracteur(ctx, K, u, v, dir, t) {
   for (const bb of [y + 0.22, y + Wd - 0.44]) drawBox(ctx, avant - 0.02, bb, 0.06, 0.22, 0.18, getNight() > 0.2 ? "#fff6c8" : "#e8e2c8", 1.42);
 }
 
-// Tracteur SUR la route, de profil, capot vers +v (3 octobre 2026 : il roule
-// dans le sens du joueur, on le rattrape). `bloc(a, da, b, db, h, lift)` : `a`
+// Tracteur SUR la route, de profil, capot vers +v (il roule dans le sens du
+// joueur, on le rattrape). `bloc(a, da, b, db, h, lift)` : `a`
 // depuis l'ARRIÈRE le long de la route, `b` en travers — en fractions de la
 // boîte, pour que le dessin suive K.long / K.larg / K.h.
 export function drawTracteurRoute(ctx, K, uC, v, t, sens = -1) {
@@ -124,9 +119,8 @@ export function drawTracteurRoute(ctx, K, uC, v, t, sens = -1) {
   });
 }
 
-// Le BUGGY de la plage (5 octobre 2026 : « faut virer les tracteurs quand on
-// est sur la plage, il vaut mieux que tu rajoutes des voiturettes de plage ») :
-// coque rose bonbon façon Miami, gros pneus de sable, arceau de sécurité
+// Le BUGGY de la plage (remplace le tracteur dans ce biome) : coque rose
+// bonbon façon Miami, gros pneus de sable, arceau de sécurité
 // turquoise, un conducteur à lunettes noires. Il vient en face (avant vers −v).
 const BUGGY = ["#ff5fa2", "#ffb347", "#36c6d0"];
 export function drawBuggy(ctx, K, uC, v, t, r = 0) {
@@ -134,8 +128,8 @@ export function drawBuggy(ctx, K, uC, v, t, r = 0) {
     const L = K.long, W = K.larg, H = K.h;
     const x = uC - W / 2, av = v - L / 2;
     const bloc = (a, da, b, db, h, lift, col) => drawBox(ctx, x + b * W, av + a * L, db * W, da * L, h * H, col, lift * H);
-    // Couleur tirée de la RANGÉE, jamais de v : il roule, sa coque changeait
-    // de couleur en route (vu à la capture, rose puis turquoise).
+    // Couleur tirée de la RANGÉE, jamais de v : il roule, sa coque changerait
+    // de couleur en route.
     const COQUE = BUGGY[Math.abs(r) % 3], ARCEAU = "#36e0e6";
     drawShadow(ctx, uC, v, W / 2, L / 2, 0.26);
     // Le sable qui gicle derrière.
@@ -169,7 +163,7 @@ export function drawBuggy(ctx, K, uC, v, t, r = 0) {
   });
 }
 
-// Car scolaire de la Région (3 octobre 2026) : livrée blanche, bandeau bleu
+// Car scolaire de la Région : livrée blanche, bandeau bleu
 // nuit et filet turquoise, panneau jaune « transport d'enfants » à l'avant
 // et à l'arrière. Il arrive EN FACE : capot vers −v.
 export function drawBus(ctx, K, uC, v, t) {
@@ -200,11 +194,10 @@ export function drawBus(ctx, K, uC, v, t) {
   });
 }
 
-// Chasse-neige (4 octobre 2026 : « au lieu de croiser un tracteur dans ce
-// biome, il faut qu'on croise un chasse-neige ») : camion orange des routes,
-// lame jaune et noire, gyrophare, sel dans la benne. Il arrive EN FACE (avant
-// côté −v) et rejette la neige sur le bas-côté du fond. Toit PLAT sur toute la
-// longueur, à K.h : on y roule comme sur le car (rows.toitSous).
+// Chasse-neige (remplace le tracteur dans le biome montagne) : camion orange
+// des routes, lame jaune et noire, gyrophare, sel dans la benne. Il arrive EN
+// FACE (avant côté −v) et rejette la neige sur le bas-côté du fond. Toit PLAT
+// sur toute la longueur, à K.h : on y roule comme sur le car (rows.toitSous).
 export function drawChasseNeige(ctx, K, uC, v, t) {
   groupe(ctx, () => {
     const L = K.long, W = K.larg, H = K.h;
@@ -238,13 +231,12 @@ export function drawChasseNeige(ctx, K, uC, v, t) {
   });
 }
 
-// Skieur de fond (5 octobre 2026 : « un mec qui arrive en ski face à nous,
-// en ski de fond ») : il vient EN FACE (vers −v), en pas alternatif — un ski
+// Skieur de fond : il vient EN FACE (vers −v), en pas alternatif — un ski
 // glisse devant pendant que l'autre recule, le bras opposé plante son bâton
 // derrière lui. Combinaison rouge, bonnet jaune à pompon.
 export function drawSkieur(ctx, K, uC, v, t, r = 0) {
-  // La personne sous la combinaison (humains.js, 4 octobre 2026, nuit) : sa
-  // peau, sa taille (la collision lit la même), sa carrure (+10 % de base).
+  // La personne sous la combinaison (humains.js) : sa peau, sa taille (la
+  // collision lit la même), sa carrure.
   const M = humain(r, { enfants: false });
   const sy = M.taille, w = M.corpulence;
   const b = (u, vv, du, dv, h, col, lift = 0) => drawBox(ctx, u, vv, du, dv, h * sy, col, lift * sy);
@@ -276,22 +268,18 @@ export function drawSkieur(ctx, K, uC, v, t, r = 0) {
   }, CONTOUR_PERSO);
 }
 
-// Le PIÉTON qui marche vers le joueur (5 octobre 2026 : « sur la route, des
-// piétons présents »). Même grammaire que le skieur : jambes et bras qui
-// balancent le long de la route (−v = vers le joueur). Ce qu'il porte selon
+// Le PIÉTON qui marche vers le joueur. Même grammaire que le skieur : jambes
+// et bras qui balancent le long de la route (−v = vers le joueur). Ce qu'il porte selon
 // la rangée — la baguette sous le bras, le téléphone devant le nez, le
 // footing, le cabas —, et en maillot sur la plage.
-// ⚠️ Depuis le 4 octobre 2026 (nuit) la PERSONNE vient d'humains.js : peau,
-// cheveux, coiffure, taille, corpulence, âge (« je veux des métis, des gros,
-// des petits, des grands, des vieux… »). Gabarit +10 % (« ils sont trop
-// fins »), cerné d'un liseré sombre (« des humains blancs sur un fond blanc »).
+// ⚠️ La PERSONNE vient d'humains.js : peau, cheveux, coiffure, taille,
+// corpulence, âge. Cernée d'un liseré sombre pour se détacher sur les fonds
+// clairs.
 const HAUTS = ["#c8301c", "#7a828e", "#2f9a6a", "#1f5fb8", "#f2c21c", "#8a3fd4", "#2b2d38", "#e8742e", "#3f8a8a", "#d8d2c4"];
 const BAS = ["#23252e", "#2f4f9a", "#1a1a1e", "#5a4632", "#4a5260", "#7a2e3a"];
 const OBJETS_VILLE = ["baguette", "telephone", "joggeur", "cabas"];
-// Sur la plage (5 octobre 2026 : « il faudrait qu'ils tiennent un ballon
-// au-dessus de leur tête, qu'ils jouent avec des raquettes ») : ballon de
-// plage brandi à deux mains, raquette de plage avec la balle qui rebondit
-// dessus, ou serviette sur l'épaule.
+// Sur la plage : ballon de plage brandi à deux mains, raquette de plage avec
+// la balle qui rebondit dessus, ou serviette sur l'épaule.
 const OBJETS_PLAGE = ["ballon", "raquette", "serviette"];
 const MAILLOTS = ["#e13e26", "#1f8fd6", "#f2c21c", "#ff5fa2", "#2f9a6a", "#8a3fd4"];
 // Ballon de plage : un disque à six quartiers qui tourne doucement.
@@ -315,7 +303,7 @@ export function drawPieton(ctx, K, uC, v, t, r, plage = false) {
   const maillot = MAILLOTS[(ri * 3) % MAILLOTS.length];
   const jupe = !plage && M.femme && objet !== "joggeur" && ri % 5 < 2;
   const sy = (K.h * M.taille) / 1.7;          // le modèle est dessiné pour 1,70 m
-  const w = M.corpulence;                     // 1,12 = l'ancien gabarit + 12 %
+  const w = M.corpulence;                     // × la largeur nominale du modèle
   const vieux = M.age === "vieux";
   const cadence = objet === "joggeur" ? 9 : vieux ? 4.6 : 6.2;
   const ph = t * cadence + r;
@@ -388,7 +376,7 @@ export function drawPieton(ctx, K, uC, v, t, r, plage = false) {
   }
 }
 
-// Feux de détresse (le bouchon, 4 octobre 2026) : les quatre coins de la
+// Feux de détresse (le bouchon) : les quatre coins de la
 // voiture garée clignotent orange.
 export function drawFeuxDetresse(ctx, K, uC, v, t) {
   if (Math.floor(t * 2.4) % 2) return;
@@ -408,12 +396,10 @@ export function drawVoiture(ctx, K, uCenter, v, sens, t, couleur = null) {
   groupe(ctx, () => voitureNue(ctx, K, uCenter, v, sens, t, couleur));
 }
 function voitureNue(ctx, K, uCenter, v, sens, t, couleur = null) {
-  // Refaite le 28 septembre 2026 (« refais une repasse de tous les éléments
-  // 3D qui ont trop de soucis ») : plus de passages de roue ni de pare-chocs
-  // noirs sur toute la largeur (vus de biais, ils faisaient de grandes bandes
-  // noires en travers de la caisse), plus de galerie de toit. Une caisse, un
-  // habitacle VITRÉ avec trois montants, un toit plat clair (on s'y pose),
-  // des pare-chocs gris fins, des feux aux quatre coins.
+  // Une caisse, un habitacle VITRÉ avec trois montants, un toit plat clair (on
+  // s'y pose), des pare-chocs gris fins, des feux aux quatre coins. Pas de
+  // passages de roue ni de pare-chocs noirs sur toute la largeur : vus de
+  // biais, ils font de grandes bandes noires en travers de la caisse.
   const L = K.long, Wd = K.larg, H = K.h;
   const x = uCenter - Wd / 2;
   const A = (a) => (sens > 0 ? v - L / 2 + a : v + L / 2 - a);
@@ -430,7 +416,7 @@ function voitureNue(ctx, K, uCenter, v, sens, t, couleur = null) {
   }
   bloc(0.0, L, 0.0, Wd, 0.62, 0.3, CAISSE);                      // caisse
   bloc(0.35, L - 0.7, -0.012, 0.02, 0.05, 0.62, LIGNE);          // ligne de caisse, côté caméra
-  bloc(0.75, L - 1.5, 0.1, Wd - 0.2, 0.42, 0.92, "#5f7f9c");     // habitacle vitré, teinté : clair, on croyait voir À TRAVERS la voiture
+  bloc(0.75, L - 1.5, 0.1, Wd - 0.2, 0.42, 0.92, "#5f7f9c");     // habitacle vitré, teinté : clair, on croirait voir À TRAVERS la voiture
   for (const a of [0.72, L / 2 - 0.07, L - 0.86]) bloc(a, 0.14, 0.08, Wd - 0.16, 0.42, 0.92, CAISSE); // montants
   bloc(0.68, L - 1.36, 0.06, Wd - 0.12, H - 1.34, 1.34, TOIT);   // toit plat
   bloc(-0.05, 0.1, 0.12, Wd - 0.24, 0.12, 0.34, GRIS);           // pare-chocs
@@ -455,17 +441,12 @@ export function drawStatic(ctx, kind, uCenter, r, t, graine = Math.round(r)) {
 }
 
 // Les personnages DEBOUT — costard, fermier, baigneur — en CUBES, de profil,
-// tournés vers le joueur, comme le cycliste et les piétons (4 octobre 2026,
-// nuit : « l'apparence des personnages qui attendent debout est globalement
-// la même que moi en tant que personnage [...] il faut que ça soit dans le
-// même univers, sinon on a un manque de cohérence »). Ils remplacent les
-// silhouettes plates DE FACE du 3 octobre (« de face en 2D ») : même corps
-// que le piéton (jambes, buste, tête teteVoxel, liseré), mais planté là, qui
-// respire, et ce qui le fait reconnaître — la mallette et le bras qui
-// s'agite, la fourche et le chapeau de paille, le slip et le ballon.
+// tournés vers le joueur, dans le même univers que le cycliste et les
+// piétons : même corps que le piéton (jambes, buste, tête teteVoxel, liseré),
+// mais planté là, qui respire, et ce qui le fait reconnaître — la mallette et
+// le bras qui s'agite, la fourche et le chapeau de paille, le slip et le ballon.
 // ⚠️ Les bras sont une CHAÎNE de cubes qui pivote à l'épaule (brasCubes) :
-// d'une pièce, jamais « désarticulés » (le reproche fait à la toute première
-// version en cubes, le 3 octobre). Hauteur = K.h × taille de la personne,
+// d'une pièce, jamais désarticulés. Hauteur = K.h × taille de la personne,
 // chapeau compris : ce qu'on voit est ce que la collision juge.
 const COSTARDS = ["#2b2d38", "#3a3f5a", "#5a4632"], CRAVATES = ["#e13e26", "#1f8fd6", "#f2c21c"];
 const SLIPS = ["#e13e26", "#1f8fd6", "#f2c21c", "#ff5fa2"];
@@ -510,7 +491,7 @@ function debout(ctx, kind, uC, v, t, graine) {
     if (kind === "costard") {
       // Le costard : veste qui descend sous la taille, col blanc et cravate
       // devant ; la mallette au bout du bras du fond ; l'autre bras s'agite
-      // au-dessus de la tête (« il fait des gestes dans tous les sens »).
+      // au-dessus de la tête, dans tous les sens.
       const tissu = COSTARDS[ri % 3], cravate = CRAVATES[ri % 3];
       jambes(tissu, "#1a1a1e");
       const m = brasCubes(ctx, uBf, vE, hE, 0.14 + 0.05 * Math.sin(phase * 3.1), L, tissu, M.peau);
@@ -587,9 +568,9 @@ function staticNu(ctx, kind, uCenter, r, t) {
   const K = KINDS[kind];
   // ⚠️ `r` peut être DÉCIMAL : drawStaticTombe recule la bête qui bascule.
   // Les couleurs se choisissent donc sur un index ENTIER. Sans ça,
-  // ["gris","blanc","noir"][74.35 % 3] rendait `undefined`, parseColor plantait
-  // au milieu d'une rotation du canvas, et la rotation restait : tout le jeu
-  // partait de travers jusqu'au rechargement (bug vécu le 20 septembre 2026).
+  // ["gris","blanc","noir"][74.35 % 3] rend `undefined`, parseColor plante au
+  // milieu d'une rotation du canvas, et la rotation reste : tout le jeu part
+  // de travers jusqu'au rechargement.
   const ri = Math.abs(Math.round(r));
   const wob = Math.sin(t * 2.2 + r) * 0.05;
   const B = corps(ctx, uCenter, r, K);
@@ -622,8 +603,8 @@ function staticNu(ctx, kind, uCenter, r, t) {
   } else if (kind === "vache") {
     for (const [la, lb] of [[0.1, 0.1], [0.1, 0.66], [0.62, 0.1], [0.62, 0.66]]) B(la, lb, 0.09, 0.18, 0.34, WHITE);
     B(0.04 + wob, 0.04, 0.68, 0.9, 0.42, WHITE, 0.34);
-    // Taches PLAQUÉES sur le flanc côté caméra et sur le dos (elles flottaient
-    // en blocs au-dessus du dos, 28 septembre 2026).
+    // Taches PLAQUÉES sur le flanc côté caméra et sur le dos, à ras du corps
+    // (pas en blocs qui flottent au-dessus).
     B(0.14 + wob, 0.02, 0.2, 0.03, 0.22, BLACK, 0.42);
     B(0.44 + wob, 0.02, 0.16, 0.03, 0.18, BLACK, 0.52);
     B(0.22 + wob, 0.3, 0.2, 0.36, 0.02, BLACK, 0.76);
@@ -662,10 +643,10 @@ function staticNu(ctx, kind, uCenter, r, t) {
     B(0.4 - 0.22 * g, 1.0, 0.16, 0.14, 0.3, "#2b2d38", 0.52 + 0.24 * g);
     B(0.4 - 0.22 * g, 1.0, 0.16, 0.14, 0.05, "#d69a68", 0.82 + 0.24 * g);
   } else if (kind === "bonhomme") {
-    // Le gros bonhomme de neige de la montagne (4 octobre 2026 : « un
-    // bonhomme de neige [...] gros, presque de la taille d'un bus ») : trois
-    // boules arrondies (deux boîtes croisées chacune), regard et nez carotte
-    // vers le joueur (−v), écharpe rouge au cou, chapeau, bras en branches.
+    // Le gros bonhomme de neige de la montagne, presque de la taille d'un
+    // bus : trois boules arrondies (deux boîtes croisées chacune), regard et
+    // nez carotte vers le joueur (−v), écharpe rouge au cou, chapeau, bras en
+    // branches.
     const NEIGE = "#f4f7fa", BRANCHE = "#5a3f26", ROUGE = "#d33a2a";
     const boule = (a, w, h, lift) => {
       const m = (1 - w) / 2;
@@ -692,19 +673,17 @@ function staticNu(ctx, kind, uCenter, r, t) {
     B(0.02, 0.47, 0.05, 0.05, 0.1, BRANCHE, 0.59);
   } else if (kind === "botte") {
     B(0, 0, 1, 1, 1, "#d0a84a");
-    // Liens de ficelle en SAILLIE (29 septembre 2026 : « on voit les trois
-    // couches en 3D ») : à ras des faces, ils se battaient avec elles.
+    // Liens de ficelle en SAILLIE : à ras des faces, ils se battent avec elles
+    // (z-fighting).
     B(-0.03, -0.03, 1.06, 1.06, 0.06, "#a8862f", 0.33);
     B(-0.03, -0.03, 1.06, 1.06, 0.06, "#a8862f", 0.7);
   } else if (kind === "voiture") {
     drawVoiture(ctx, K, uCenter, r, 1, t);
   } else if (kind === "chat") {
-    // Plus de gris : il se perdait sur l'asphalte (« les chats gris, on ne les
-    // voit pas assez »). Noir, blanc ou roux foncé, et une tache de contraste.
+    // Ni gris (il se perd sur l'asphalte) ni noir (invisible dans le biome de
+    // nuit) : roux vif, blanc ou tigré orange, et une tache de contraste.
+    // (`noir` est un nom resté : c'est le roux vif à tache blanche.)
     const noir = ri % 3 === 0;
-    // Plus de chat NOIR (30 septembre 2026 : « quand il y a un chat et qu'on est
-    // dans le biome de la nuit, on ne se rend pas du tout compte qu'il y a un
-    // chat ») : roux vif, blanc, ou tigré orange.
     const col = noir ? "#e0701e" : ri % 3 === 1 ? "#f4efe4" : "#c85a1a";
     const tache = noir ? "#f4efe4" : "#1a1a1e";
     for (const [la, lb] of [[0.14, 0.08], [0.14, 0.64], [0.62, 0.08], [0.62, 0.64]]) B(la, lb, 0.1, 0.18, 0.3, col);
@@ -725,7 +704,7 @@ function staticNu(ctx, kind, uCenter, r, t) {
   }
 }
 
-// --- La POULE JETÉE (27 septembre 2026) ---------------------------------------
+// --- La POULE JETÉE -----------------------------------------------------------
 // Le fermier est planté sur le bas-côté du fond, juste derrière la route,
 // TOURNÉ VERS LE JOUEUR (vers −v, la gauche de l'écran). Il tient une poule
 // au-dessus de sa tête ; quand le joueur approche, il la jette et elle court
@@ -778,10 +757,9 @@ function poule(ctx, u, v, lift, t, sens) {
   if (lift < 0.5) { b(0.22, y + 0.22 * S, 0.06, 0.06, (lift + 0.16 * S) / S, ORANGE, 0); b(0.34, y + 0.34 * S, 0.06, 0.06, (lift + 0.16 * S) / S, ORANGE, 0); }
 }
 
-// Un obstacle TOUCHÉ bascule (20 septembre 2026 : « quand on se prend un
-// cochon ou une vache qui tombe par terre, pour qu'on comprenne qu'il s'est
-// passé un truc »). On fait pivoter le dessin autour de son point d'appui, à
-// l'écran, comme le salto du cycliste.
+// Un obstacle TOUCHÉ bascule, pour qu'on comprenne qu'il s'est passé quelque
+// chose. On fait pivoter le dessin autour de son point d'appui, à l'écran,
+// comme le salto du cycliste.
 export function drawStaticTombe(ctx, kind, uCenter, r, t, age) {
   const K = KINDS[kind];
   const k = Math.min(1, age / 0.45);

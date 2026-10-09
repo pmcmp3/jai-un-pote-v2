@@ -2,9 +2,8 @@
 // "rgb(...)" → [r, g, b].
 
 // Accepte hex ET "rgb(...)" : une couleur déjà assombrie revient sous forme
-// rgb(). Ne gérer que le hex donnait un parseInt NaN, un fillStyle invalide
-// silencieusement ignoré par Canvas, et donc une face peinte avec la couleur
-// précédente.
+// rgb(). Sans ce cas, parseInt rend NaN, Canvas ignore en silence le fillStyle
+// invalide et la face est peinte avec la couleur précédente.
 export function parseColor(c) {
   // Filet : une couleur manquante peint du gris au lieu de faire tomber tout
   // le rendu (et, avec lui, la pile de transformations du canvas).

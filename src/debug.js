@@ -4,8 +4,8 @@
 // (BPM/offset) colle bien au morceau du début à la fin.
 
 import { clock } from "./clock.js";
-// (refonte Crossy Road : plus de projection perspective — la grille rythmique
-// n'est plus dessinée, vitesse/distance sont dans la ligne `classement`.)
+// Pas de projection perspective dans ce jeu : la grille rythmique n'est pas
+// dessinée et vitesse/distance restent à 0 (stubs).
 const getSpeed = () => 0; const getDistanceScrolled = () => 0;
 import { isTypingTarget } from "./input.js";
 
@@ -30,14 +30,12 @@ export function isEnabled() {
   return enabled;
 }
 
-// --- Journal d'erreurs (21 août 2026) --------------------------------------
-// Ajouté après le bug qui a bloqué toutes les parties pendant quelques heures
-// (`runsTimer` non déclaré, voir ARCHITECTURE.md §11, vingt-sixième passe) :
-// une exception dans un handler de clic ou dans la boucle de rendu ne laissait
-// AUCUNE trace visible sur un téléphone — ni console, ni message, juste un jeu
-// qui ne démarre pas. Les erreurs sont désormais retenues ici, affichées dans
-// l'overlay `?debug` et exposées sur `window.__erreursJeu` : sur un téléphone
-// de testeur, `?debug` suffit à lire la cause au lieu de la deviner.
+// --- Journal d'erreurs -----------------------------------------------------
+// Sur un téléphone, une exception dans un handler de clic ou dans la boucle de
+// rendu ne laisse AUCUNE trace visible — ni console, ni message, juste un jeu
+// qui ne démarre pas. Les erreurs sont donc retenues ici, affichées dans
+// l'overlay `?debug` et exposées sur `window.__erreursJeu` : `?debug` suffit à
+// lire la cause sur le téléphone d'un testeur.
 const MAX_ERREURS = 6;
 const erreurs = [];
 
@@ -65,9 +63,8 @@ export function renderStats(ctx, stats) {
     `x=${stats.playerX.toFixed(2)}  vitesse=${getSpeed().toFixed(1)} u/s`,
     `distance=${getDistanceScrolled().toFixed(1)} u`,
     `temps=${now.toFixed(2)}s  beat=${clock.beatIndexAt(now).toFixed(2)}`,
-    // Les deux lignes qui permettent de diagnostiquer à distance le blocage
-    // audio/horloge remonté au playtest iPhone : si `horloge` reste sur
-    // "secours" ou si `temps` ne bouge pas, le problème est là.
+    // Diagnostic à distance d'un blocage audio/horloge (iPhone) : si `horloge`
+    // reste sur "secours" ou si `temps` ne bouge pas, le problème est là.
     `audio=${stats.audioStatus ?? "?"}`,
     `horloge=${stats.clockSource ?? "?"}`,
     // Palier de conversion courant (presave → suivre → libre) : c'est lui qui
@@ -76,7 +73,7 @@ export function renderStats(ctx, stats) {
     `conversion=${stats.conversion ?? "?"}`,
     // Classement : nombre de lignes reçues, ou la raison de l'échec. Un
     // « 0 lignes » alors que des scores existent = la vue publique ne répond
-    // plus (voir le journal du 24 août 2026).
+    // plus.
     `classement=${stats.classement ?? "?"}`,
     `debug: ↑+10s  F=fin  G=game over  B=bonus  O=obstacle`,
   ];

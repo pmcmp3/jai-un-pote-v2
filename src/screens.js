@@ -1,7 +1,6 @@
-// screens.js — Écrans hors-jeu de « J'ai un pote » : menu (un seul champ),
-// écran de fin, carte de mort, tiroir album (même échelle de conversion que
-// le premier jeu, mêmes clés localStorage — un joueur qui a déjà ouvert
-// l'album sur l'autre jeu est « libre » ici aussi), pause, son.
+// screens.js — Écrans hors-jeu de « J'ai un pote » : menu en trois étapes,
+// écran de fin, carte de mort, tiroir album (échelle de conversion), pause,
+// son.
 // Câblage DOM et présentation uniquement ; main.js garde l'état de partie et
 // reçoit les actions en callbacks via init().
 
@@ -58,10 +57,9 @@ const volMusique = $("volume-musique"), volEffets = $("volume-effets");
 const resumeButton = $("resume-button");
 const pauseReplayButton = $("pause-replay-button");
 
-// --- Conversion (mêmes clés que le premier jeu) -----------------------------
-// Clés PROPRES à « J'ai un pote » depuis le 7 septembre 2026 : quelqu'un qui a
-// déjà franchi le tiroir sur « La ville est belle » repasse par l'album ici
-// (« la personne avait déjà joué, elle a pu rejouer sans passer par Spotify »).
+// --- Conversion ---------------------------------------------------------------
+// Clés PROPRES à « J'ai un pote » (préfixe jp2) : quelqu'un qui a déjà franchi
+// le tiroir sur « La ville est belle » (même origine) repasse par l'album ici.
 const CLE_MORCEAU_OUVERT = "jp2MorceauOuvert";
 const CLE_PMC_SUIVI = "jp2PmcSuivi";
 const CLE_PLATEFORME = "jp2PlateformeAlbum";
@@ -71,8 +69,8 @@ const CLE_PARTIES = "jp2Parties";
 const CLE_LIGUE = "jp2Ligue";
 const CLE_INSTA = "jp2Insta", CLE_VILLE = "jp2Ville", CLE_SKIN = "jp2Skin", CLE_SOURCE = "jp2Source", CLE_SPRINT = "jp2Sprint";
 
-// --- Bêta fermée (16 septembre 2026) -----------------------------------------
-// Une seule ligue pour les fans du groupe WhatsApp : on arrive par
+// --- Bêta fermée -------------------------------------------------------------
+// Une seule ligue pour les testeurs : on arrive par
 // `…/jai-un-pote/?ligue=BETA`, le menu se réduit (pseudo → cycliste → JOUER),
 // il n'y a ni choix de ligue, ni sprint, ni tiroir album, et l'écran de fin
 // porte un bouton « Laisser un retour ». Les autres visiteurs, eux, gardent le
@@ -80,16 +78,15 @@ const CLE_INSTA = "jp2Insta", CLE_VILLE = "jp2Ville", CLE_SKIN = "jp2Skin", CLE_
 const CODE_BETA = String(window.CONFIG.ligueBeta || "").toUpperCase();
 export function enBeta() { return Boolean(CODE_BETA) && Boolean(ligue) && ligue.code === CODE_BETA; }
 
-// `?zero` : tout effacer (pseudo, record, conversion) — « comme si je n'avais
-// jamais joué ». Même origine que le premier jeu, donc ça le remet à zéro aussi.
+// `?zero` : tout effacer (pseudo, record, conversion), comme un joueur neuf.
+// Même origine que le premier jeu, donc ça le remet à zéro aussi.
 try {
   if (new URLSearchParams(location.search).has("zero")) {
     localStorage.clear();
     const url = new URL(location.href); url.searchParams.delete("zero"); history.replaceState(null, "", url.toString());
   }
-  // `?premiere` (3 octobre 2026 : « un lien comme si c'était la première fois
-  // que je me connectais et que je pouvais créer ma ligue ») : tout effacer
-  // comme `?zero`, puis ligue démo VIDE — on crée sa ligue, on « invite », des
+  // `?premiere` : simule une toute première connexion. Tout effacer comme
+  // `?zero`, puis ligue démo VIDE — on crée sa ligue, on « invite », des
   // potes fictifs arrivent un par un et le boost monte. Rien ne part au réseau.
   if (new URLSearchParams(location.search).has("premiere")) {
     localStorage.clear();
@@ -113,13 +110,9 @@ function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* naviga
 
 function morceauDejaOuvert() { return lsGet(CLE_MORCEAU_OUVERT) === "1"; }
 function pmcDejaSuivi() { return lsGet(CLE_PMC_SUIVI) === "1"; }
-// Échelle de conversion (5 octobre 2026, précisée le soir même : « continuer
-// la course ou rejouer la première fois, c'est ajouter l'album ; et après,
-// rejouer après 1 partie : abonnement si déjà crash ; si pas de crash, rejouer
-// après la 1re partie : ajouter l'album ; et après, 2e partie libre ; 3e
-// abonnement ; et après libre ad vitam æternam »). UNE demande à la fois :
+// Échelle de conversion. UNE demande à la fois :
 //   partie 1   → la PREMIÈRE porte, CONTINUER comme REJOUER, c'est l'album ;
-//                album déjà ajouté (« déjà crash ») → REJOUER demande l'abonnement ;
+//                album déjà ouvert → REJOUER demande l'abonnement ;
 //   partie 2   → libre ;
 //   partie 3+  → abonnement tant qu'il n'est pas fait, puis libre à vie.
 // `getParties()` compte les courses LANCÉES (celle en cours ou qui vient de finir).
@@ -148,9 +141,8 @@ export function getSkin() {
   return skin;
 }
 function setSkin(cle, val) { getSkin()[cle] = val; lsSet(CLE_SKIN, JSON.stringify(skin)); majSkinUi(); }
-// Choisir une puce ne RECONSTRUIT plus la rangée (4 octobre 2026, nuit) : on
-// bascule seulement l'état actif — le bouton touché reste en place, rien ne
-// bouge à l'écran, rien ne perd le focus.
+// Choisir une puce ne RECONSTRUIT pas la rangée : on bascule seulement l'état
+// actif — le bouton touché reste en place, rien ne bouge, rien ne perd le focus.
 function majSkinUi() {
   const sk = getSkin();
   document.querySelectorAll("#skin-options .chips").forEach((box) => {
@@ -159,10 +151,8 @@ function majSkinUi() {
 }
 function construireSkinUi() {
   const sk = getSkin();
-  // Menu réduit le 20 septembre 2026 (« il faut réduire : si on choisit le
-  // T-shirt, on ne choisit pas le short ») : trois réglages au lieu de six —
-  // le short et les chaussures se déduisent du maillot. Sur un petit iPhone,
-  // la carte tenait à peine à l'écran.
+  // Peu de réglages : le short et les chaussures se déduisent du maillot,
+  // pour que la carte tienne sur un petit iPhone.
   const listes = { genre: [["Homme", "homme"], ["Femme", "femme"]], c1: COULEURS, chapeau: CHAPEAUX.map((c) => [c, c]), velo: [["VTT", "vtt"], ["Grand Bi", "grandbi"], ["Vélo enfant", "enfant"]] };
   document.querySelectorAll("#skin-options .chips").forEach((box) => {
     const cle = box.dataset.cle;
@@ -198,10 +188,10 @@ export function setStep(n) {
   onboarding.dataset.step = String(n); if (n === 3) construireSkinUi(); majSprint(); majBoutonJouer();
   requestAnimationFrame(centrerMenu);
 }
-// Ordre du premier passage (3 octobre 2026 : « choisir son personnage, ça
-// arrive avant de créer la ligue [...] ils ont envie de jouer ») : pseudo →
-// cycliste (« Continuer ») → ligue (« Jouer »). Ensuite, le cycliste est
-// l'accueil avec JOUER, la ligue reste à un tap (« Ma ligue »).
+// Ordre du premier passage : pseudo → cycliste (« Continuer ») → ligue
+// (« Jouer ») — le personnage avant la ligue, le joueur veut jouer vite.
+// Ensuite, le cycliste est l'accueil avec JOUER, la ligue reste à un tap
+// (« Ma ligue »).
 const CLE_LIGUE_VUE = "jp2LigueVue";
 function premierPassage() { return ligueDispo() && !ligue && !lsGet(CLE_LIGUE_VUE); }
 function majBoutonJouer() {
@@ -225,9 +215,9 @@ export function setRecord(m) { lsSet(CLE_RECORD, String(Math.floor(m))); }
 
 export function showOverlay() { overlay.classList.add("visible"); requestAnimationFrame(centrerMenu); }
 
-// --- Menu centré (4 octobre 2026) ---------------------------------------------
-// « Il faudrait que ça soit centré sur l'écran » : la marge haute de l'overlay
-// (--centre) centre le bloc titre + carte + album. Les champs font 16 px : en
+// --- Menu centré ---------------------------------------------------------------
+// La marge haute de l'overlay (--centre) centre le bloc titre + carte + album
+// sur l'écran. Les champs font 16 px : en
 // dessous, Safari zoome dans la page à l'ouverture du clavier. Clavier ouvert,
 // c'est placerSaisie (plus bas) qui pose la carte : centrerMenu ne s'en mêle pas.
 function centrerMenu() {
@@ -249,19 +239,17 @@ function centrerMenu() {
   overlay.style.setProperty("--centre", `${Math.max(0, Math.round(libre / 2))}px`);
 }
 
-// --- Clavier ouvert (5 octobre 2026, troisième passe) -----------------------
-// Capture iPhone dans Instagram : la carte partait en haut, COUPÉE, « ça monte
-// d'un seul coup et ça redescend », et les lignes se resserraient au fur et à
-// mesure. Trois mécanismes se battaient — la marge haute recentrée avec une
-// transition, l'overlay recalé sur la zone visible à chaque événement, l'overlay
-// qu'on faisait défiler pour montrer le bouton — en plus du défilement d'iOS.
-// UNE seule règle désormais : clavier ouvert, la carte (même forme, même
-// espacement : 270 px, elle tient au-dessus du clavier d'un iPhone SE dans
-// Instagram) est posée par une TRANSLATION, centrée dans la zone visible.
+// --- Clavier ouvert -------------------------------------------------------------
+// ⚠️ UNE seule règle, pour ne pas se battre avec le défilement d'iOS (dans
+// Instagram, plusieurs mécanismes concurrents — marge recentrée, overlay recalé
+// à chaque événement, overlay défilé — faisaient sauter la carte et la
+// coupaient) : clavier ouvert, la carte (même forme, même espacement : 270 px,
+// elle tient au-dessus du clavier d'un iPhone SE dans Instagram) est posée par
+// une TRANSLATION, centrée dans la zone visible.
 // Au focus, cette zone est ESTIMÉE (la part de l'écran que prend le clavier,
-// mesurée et retenue la première fois, sinon la moitié — volontairement un peu
-// trop : le champ ne passe jamais sous le clavier, iOS n'a rien à faire
-// défiler, c'était ça le saut). La carte glisse UNE fois, avec le clavier ;
+// mesurée et retenue la première fois, sinon une estimation — volontairement
+// un peu trop : le champ ne passe jamais sous le clavier, iOS n'a rien à faire
+// défiler, donc pas de saut). La carte glisse UNE fois, avec le clavier ;
 // une fois le clavier là, on corrige seulement si l'estimation s'est trompée.
 // Seulement sur écran tactile : avec un vrai clavier, rien ne bouge.
 const CLE_CLAVIER = "jp2Clavier";
@@ -270,7 +258,7 @@ let hauteurRef = window.innerHeight;
 let clavierT = 0, saisieT = 0, dernierOff = 0;
 function carteActive() { return onboardingEl.querySelector(`.step[data-step="${onboardingEl.dataset.step}"]`); }
 // Haut de la carte sans translation, dans le repère de l'écran (l'overlay est
-// fixe en 0 ; on ne le fait plus jamais défiler pendant la saisie).
+// fixe en 0 ; on ne le fait jamais défiler pendant la saisie).
 function hautNaturel(carte) { return carte.offsetTop - overlay.scrollTop; }
 function poserY(carte, y, anime) {
   if (!anime) carte.style.transition = "none";
@@ -390,12 +378,10 @@ function brancherCentrage() {
     entrerSaisie(e.target);
   });
   if (!TACTILE) return;
-  // ⚠️ Seulement quand un CHAMP perd le focus, clavier ouvert (4 octobre 2026,
-  // nuit, Samsung dans Instagram : « dès qu'on sélectionne un carreau, une
-  // couleur, un choix, la fenêtre réapparaît du bas et remonte »). Sur
-  // Android, toucher un BOUTON lui donne le focus (pas sur iPhone) ; quand il
-  // le perdait, on « refermait le clavier » : retour en haut du menu et
-  // carte rejouée depuis le bas, à chaque choix.
+  // ⚠️ Seulement quand un CHAMP perd le focus, clavier ouvert. Sur Android,
+  // toucher un BOUTON lui donne le focus (pas sur iPhone) : réagir à toute
+  // perte de focus « refermerait le clavier » à chaque choix de puce (retour
+  // en haut du menu, carte rejouée depuis le bas).
   onboardingEl.addEventListener("focusout", (e) => {
     if (!(e.target instanceof Element) || !e.target.matches("input") || !overlay.classList.contains("clavier")) return;
     clearTimeout(clavierT);
@@ -457,8 +443,8 @@ let reviveCallbacks = null;
 let reviveMetres = 0;
 
 // `potes` = nombre de potes au maximum de la course : la carte les promet de
-// retour (c'est le ressort émotionnel demandé : les potes s'en vont, ouvre
-// l'album pour les rattraper).
+// retour (ressort émotionnel : les potes s'en vont, ouvre l'album pour les
+// rattraper).
 export function openReviveSheet({ metres, potes, onAccept, onDecline, onReplay }) {
   reviveCallbacks = { onAccept, onDecline, onReplay };
   reviveMetres = metres;
@@ -501,7 +487,7 @@ function construirePlateformes() {
   const liste = plateformes();
   gatePlatforms.textContent = "";
   if (!liste.length) return false;
-  // Cinq liens de la même taille, sans « préféré » (6 septembre 2026).
+  // Des liens tous de la même taille, sans « préféré ».
   liste.forEach((p) => {
     const a = document.createElement("a");
     a.className = "plat-btn";
@@ -522,14 +508,13 @@ function construirePlateformes() {
   return true;
 }
 
-// Même tiroir, même wording pour les trois entrées (6 septembre 2026 :
-// « ça doit être la même condition pour rejouer [...] tu vires le titre, tu
-// mets "Ajoute l'album à ta bibliothèque pour continuer la partie" »).
+// Même tiroir, même formulation pour toutes les entrées : rejouer et
+// continuer passent par exactement la même condition.
 function gateTextes(action, niveau) {
   const continuer = action === "continuer";
   const presave = niveau === "presave";
   return {
-    // Sticker rouge, comme toutes les cartes (28 septembre 2026, cohérence des menus).
+    // Sticker rouge, comme toutes les cartes (cohérence des menus).
     eyebrow: presave ? "L'album est sorti" : "Dernière étape",
     titre: presave
       ? (continuer ? "Ajoute l'album à ta bibliothèque pour continuer la partie" : "Ajoute l'album à ta bibliothèque pour rejouer")
@@ -617,14 +602,14 @@ export function ouvrirEcoute() {
   });
 }
 function exigerConversion({ action, onOk, onCancel }) {
-  // En bêta, aucune porte : les testeurs sont déjà des fans (groupe WhatsApp)
-  // et doivent pouvoir enchaîner les parties pour trouver des bugs.
+  // En bêta, aucune porte : les testeurs sont déjà des fans et doivent
+  // pouvoir enchaîner les parties pour trouver des bugs.
   const niveau = enBeta() ? "libre" : niveauPour(action);
   if (niveau === "libre") { suivi(action === "continuer" ? "continuer" : "rejouer", { niveau }); onOk(); return; }
   ouvrirGate({ action, onUnlocked: () => { suivi(action === "continuer" ? "continuer" : "rejouer", { niveau, apresPorte: true }); onOk(); }, onCancel, niveauForce: niveau });
 }
 
-// --- Ligue entre potes (7 septembre 2026) -------------------------------------
+// --- Ligue entre potes ---------------------------------------------------------
 // Un code à 5 lettres, stocké en local. Les autres membres deviennent les
 // potes du peloton ; chaque course envoie un score ; l'écran de fin montre le
 // classement de la ligue. `?ligue=CODE` dans l'URL = invitation.
@@ -636,8 +621,7 @@ let ligue = null;           // { code, membres: [] }
 let ligueInvitation = null; // code reçu par l'URL, en attente d'un pseudo
 
 export function getLigue() { return ligue; }
-// --- LIGUE DÉMO (29 septembre 2026 : « copie-moi le lien avec ma ligue, pour
-// que ce soit une ligue fake ») -------------------------------------------------
+// --- LIGUE DÉMO -----------------------------------------------------------------
 // `?demo` dans l'URL : une ligue locale, sans réseau, pour montrer le système
 // — 6 potes ont « joué », boost ×1,6 actif, classement de fin où l'on se
 // compare à eux. Rien n'est envoyé nulle part. Mémorisé (jp2Demo) jusqu'à `?zero`.
@@ -694,11 +678,10 @@ function afficherBoost() {
   el.classList.toggle("hidden", (!net.estConfigure() && !demo) || enBeta());
   const C = window.CONFIG, pct = Math.round((C.boostLigueParPote || 0.1) * 100);
   const n = ligue && !ligue.enAttente ? ligue.membres.filter((m) => m.nom !== getPseudo()).length : 0;
-  // Explication en deux lignes (« il faut que j'arrive à trouver un moyen
-  // d'expliquer assez simplement comment ça fonctionne ») : le chiffre, puis la règle.
+  // Explication en deux lignes, la plus simple possible : le chiffre, puis la règle.
   el.innerHTML = "";
   const titre = document.createElement("b");
-  // En POURCENTAGE (« les 1,6 %, faut faire des phrases plus simples »).
+  // En POURCENTAGE : « +60 % » se lit mieux qu'un multiplicateur « ×1,6 ».
   titre.textContent = `TES POINTS +${Math.round((boost.mult - 1) * 100)} %`;
   const ligne1 = document.createElement("span");
   ligne1.textContent = n ? ` · ${n} pote${n > 1 ? "s" : ""} dans ta ligue` : "";
@@ -713,10 +696,8 @@ async function rafraichirBoost() {
   if (p) calculerBoost(p);
 }
 
-// Deux places pour les messages (4 octobre 2026 : « tu mets le code avec
-// Touche pour copier ; en dessous, tu écris : Ta ligue est créée, tu peux
-// inviter tes potes ») : sans ligue, sous le champ du code (erreurs) ; avec
-// une ligue, le bandeau jaune SOUS le code.
+// Deux places pour les messages : sans ligue, sous le champ du code
+// (erreurs) ; avec une ligue, le bandeau jaune SOUS le code.
 let statutLigue = "";
 const MSG_CREEE = "Ta ligue est créée. Tu peux inviter tes potes.";
 function ligueMessage(txt) {
@@ -730,9 +711,9 @@ function majStatut() {
   const t = !ligue || ligue.enAttente ? "" : statutLigue || (autres.length === 0 ? MSG_CREEE : "");
   el.textContent = t; el.classList.toggle("hidden", !t);
 }
-// Le peloton compte au moins 4 cyclistes (3 octobre 2026 : « trois bots qui
-// s'appellent Bot 1, Bot 2 et Bot 3 [...] remplacés au fur et à mesure par
-// les personnes qui arrivent vraiment »). Mêmes noms dans le jeu (friends.js).
+// Le peloton compte au moins 4 cyclistes : des bots « Bot 1 », « Bot 2 »,
+// « Bot 3 », remplacés au fur et à mesure par les vrais membres qui arrivent.
+// Mêmes noms dans le jeu (friends.js).
 export const BOTS_LIGUE = 3;
 let pelotonAffiche = new Set();
 function afficherLigue() {
@@ -804,16 +785,14 @@ async function rejoindre(code, creer = false) {
 }
 function lienLigue(code) { return `${window.CONFIG.lienJeu || location.origin + location.pathname}?ligue=${code}`; }
 
-// --- Partage (5 octobre 2026 : « Inviter tes potes, ça ne marche pas dans le
-// navigateur Instagram [...] je spamme le bouton, il ne se passe rien ») ------
-// Dans certains navigateurs INTÉGRÉS le partage natif manque ou échoue, et
-// l'ancien repli — l'API presse-papiers — y était refusé aussi, l'erreur
-// avalée : rien ne se passait. Désormais le partage natif d'abord, partout où
-// il existe (il marche dans Instagram sur iPhone, essayé le 5 octobre) ; s'il
-// manque ou échoue : un tiroir maison. Le lien y est AFFICHÉ et
-// sélectionnable — la seule voie qui marche partout —, avec un bouton copier
-// et des raccourcis WhatsApp / Messages / Snapchat. NAVIGATEUR_INTEGRE ne sert
-// plus qu'au suivi (événements).
+// --- Partage --------------------------------------------------------------------
+// ⚠️ Dans certains navigateurs INTÉGRÉS (Instagram…), le partage natif manque
+// ou échoue, et l'API presse-papiers y est refusée aussi — un repli sur elle
+// seule ne fait rien du tout. Donc : le partage natif d'abord, partout où il
+// existe (il marche dans Instagram sur iPhone) ; s'il manque ou échoue, un
+// tiroir maison. Le lien y est AFFICHÉ et sélectionnable — la seule voie qui
+// marche partout —, avec un bouton copier et des raccourcis WhatsApp /
+// Messages / Snapchat. NAVIGATEUR_INTEGRE ne sert qu'au suivi (événements).
 const UA = navigator.userAgent || "";
 const NAVIGATEUR_INTEGRE = /Instagram|FBAN|FBAV|FB_IAB|FBIOS|Messenger|Snapchat|TikTok|musical_ly|Bytedance|\bLine\/|LinkedInApp|Pinterest|Twitter/i.test(UA);
 const DANS_INSTAGRAM = /Instagram/i.test(UA);
@@ -890,9 +869,9 @@ function initPartage() {
   $("partage-veil").addEventListener("click", fermerPartage);
 }
 // `texteSansLigue` : sans VRAIE ligue (aucune, en attente, ou démo — elle
-// n'existe nulle part), on partage le JEU, sans code. ⚠️ L'écran de fin
-// envoyait sinon « …?ligue= » avec un code vide à tous ceux qui n'avaient pas
-// de ligue — c'est-à-dire à tout le monde tant que la base v2 n'existe pas.
+// n'existe nulle part), on partage le JEU, sans code. ⚠️ Sans ça, l'écran de
+// fin enverrait « …?ligue= » avec un code vide à tous ceux qui n'ont pas de
+// ligue (donc à tout le monde tant que la base n'est pas en place).
 async function partagerLigue(texte, texteSansLigue = "Viens jouer à « J'ai un pote », le jeu de PMC : plus on est de potes, plus on marque") {
   const vraie = !!(ligue && !ligue.enAttente && !demo && ligue.code);
   const code = vraie ? ligue.code : "";
@@ -901,10 +880,8 @@ async function partagerLigue(texte, texteSansLigue = "Viens jouer à « J'ai un 
   $("partage-text").textContent = vraie || demo ? "Chaque pote qui joue te rapporte des points en plus." : "Envoie-leur le jeu : qui fera le meilleur score ?";
   net.evenement("invitation_ouverte", { pseudo: getPseudo(), ligue: code || null, source: getSource(), details: { integre: NAVIGATEUR_INTEGRE } });
   // Le partage natif du téléphone d'abord, partout où il existe — y compris
-  // dans Instagram (5 octobre 2026, essayé sur iPhone : « "Autres applis",
-  // ça fonctionne directement [...] pourquoi on ne fait pas directement
-  // là-dedans ? »). Le tiroir maison ne sert plus que s'il manque (navigateur
-  // d'Instagram sur Android, par exemple) ou s'il échoue.
+  // dans Instagram sur iPhone. Le tiroir maison ne sert que s'il manque
+  // (navigateur d'Instagram sur Android, par exemple) ou s'il échoue.
   if (navigator.share) {
     try { await navigator.share({ title: "J'ai un pote", text: msg, url }); partageFait("natif"); return; }
     catch (e) { if (e && e.name === "AbortError") return; /* sinon : le tiroir */ }
@@ -913,9 +890,8 @@ async function partagerLigue(texte, texteSansLigue = "Viens jouer à « J'ai un 
 }
 // @pmc.mp3 : dans le navigateur d'Instagram, un lien https vers le profil
 // s'ouvre DANS ce navigateur (version web, souvent sans connexion) au lieu de
-// l'appli (5 octobre 2026 : « j'ouvre PMCMP3 dans le navigateur Instagram,
-// mais ça ne va pas sur Instagram ») — le schéma instagram:// y ouvre le
-// profil dans l'appli elle-même. Partout ailleurs, le lien https (lien
+// l'appli — le schéma instagram:// y ouvre le profil dans l'appli elle-même.
+// Partout ailleurs, le lien https (lien
 // universel : l'appli s'ouvre si elle est installée).
 function lienInstaPmc() {
   const web = window.CONFIG.lienInsta;
@@ -936,7 +912,7 @@ export async function preparerLigue() {
 // Fin de course : envoi du score, puis classement de la ligue sur la carte.
 // `bilan` = { graine, trace, scoreMax } (main.js) : la graine de la route et
 // la trace du fantôme, envoyée SEULEMENT si la course bat le record de la
-// ligue sur cette route (9 septembre 2026).
+// ligue sur cette route.
 export async function finLigue(metres, potes, mode = "course", bilan = {}) {
   endLigue.classList.add("hidden");
   if (mode === "sprint") lsSet(CLE_SPRINT, net.jourSprint());
@@ -978,8 +954,7 @@ export async function finLigue(metres, potes, mode = "course", bilan = {}) {
   afficherClassement(ligue.code, rows);
 }
 // Classement de la ligue sur l'écran de fin, avec le rang du joueur en tête
-// de carte (« il faut un système de classement à la fin qui dit que je suis
-// premier, je peux inviter des potes »).
+// de carte (« Tu es 1er de ta ligue ! »).
 function afficherClassement(code, rows, titre = null) {
   endLigueCode.textContent = titre || code;
   endLigueListe.textContent = "";
@@ -1049,9 +1024,9 @@ function majSprint() {
 }
 
 // --- Chargement --------------------------------------------------------------
-// Au moins `config.chargementMinS` secondes de 0 à 100 % (6 septembre 2026 :
-// « une phase de chargement de 5-6 s, ça fait sérieux »), le temps de mettre
-// en cache le morceau, les polices et de préchauffer le moteur (main.js,
+// Au moins `config.chargementMinS` secondes de 0 à 100 % (un chargement de
+// quelques secondes fait sérieux), le temps de mettre en cache le morceau,
+// les polices et de préchauffer le moteur (main.js,
 // prechauffer()). La barre ne dépasse jamais ce qui est VRAIMENT chargé.
 let loadingDone = false;
 const loadingT0 = performance.now();
@@ -1078,9 +1053,8 @@ export function syncLoadingUi() {
   if (p >= 1) { loadingDone = true; loadingBlock.classList.add("done"); finSplash(); majBoutonJouer(); }
 }
 // Le menu reste INERTE (ni tap ni focus possibles) tant que l'écran de
-// chargement est là, et jusqu'à la fin de son fondu (5 octobre 2026 : « le
-// clavier s'ouvre tout seul, et du coup on ne voit pas l'animation la ville
-// est belle » — dans Instagram, le moindre focus ouvre le clavier).
+// chargement est là, et jusqu'à la fin de son fondu : dans Instagram, le
+// moindre focus ouvre le clavier et cache l'animation d'intro.
 function finSplash() {
   const splash = $("splash");
   if (splash.classList.contains("fini")) return;
@@ -1092,29 +1066,22 @@ function finSplash() {
 export function showEndScreen({ metres, potesMax, record, fin, sprint, scoreMax }) {
   scoreVal.textContent = Math.floor(metres).toLocaleString("fr-FR");
   derniereCourse = { metres: Math.floor(metres), potes: potesMax, fin: !!fin };
-  // Course de ligue : le score PARFAIT de cette route (simulation.js), pour
-  // savoir à quelle distance du maximum on est (« si le score maximal c'est
-  // 100 000 et que le premier fait 88 000… »).
+  // Ligne d'encouragement (meilleur score à battre) et rappel du boost de
+  // ligue — plutôt que le score parfait de la route.
   const endMax = $("end-max");
   const pct = Math.round((window.CONFIG.boostLigueParPote || 0.1) * 100);
   const ligneBoost = sprint || (!net.estConfigure() && !demo) ? "" : boost.potes.length
     ? `Tes potes te donnent <b>+${Math.round((boost.mult - 1) * 100)} %</b> · +${pct} % par nouveau pote`
     : `<b>+${pct} %</b> de points par pote invité qui joue`;
-  // (30 septembre 2026 : « à la place du score parfait, dis : Tu peux encore
-  // faire un meilleur score ».)
-  // 3 octobre 2026 : « mets meilleur score [...] tu peux battre ton meilleur score ».
   const meilleur = Math.max(getRecord(), Math.floor(metres));
   const mieux = record ? "" : `Meilleur score : ${pts(meilleur)} · tu peux le battre.`;
   endMax.classList.toggle("hidden", !mieux && !ligneBoost);
   endMax.innerHTML = [mieux, ligneBoost].filter(Boolean).join("<br>");
   // Le but : arriver au bout du morceau avec un max de potes.
   const potesTxt = potesMax === 0 ? "0 pote" : `${potesMax} pote${potesMax > 1 ? "s" : ""}`;
-  // Aller au bout du morceau, c'est la victoire : on le dit (20 septembre
-  // 2026 : « bravo d'avoir joué avec tes potes, tu peux écouter le morceau »).
-  // 30 septembre 2026 : « enlève le bravo, tu es allé au bout du morceau avec
-  // 5 potes. Faut mettre : nouveau record, 5 potes maximum. Tu enlèves le tag
-  // terminé » — et le sticker record fait doublon avec la ligne (place gagnée
-  // pour l'iPhone 16).
+  // Sous-titre sobre : record éventuel + nombre maximum de potes. Pas de
+  // sticker « record » à part (doublon avec cette ligne, et la place manque
+  // sur les iPhone récents).
   endSub.textContent = record ? `Meilleur score · ${potesTxt} maximum` : fin ? `${potesTxt} maximum` : `Tombé avant la fin · ${potesTxt}`;
   endBest.classList.add("hidden");
   $("end-eyebrow").textContent = sprint ? "Sprint du dimanche" : "Ta course";
@@ -1122,7 +1089,7 @@ export function showEndScreen({ metres, potesMax, record, fin, sprint, scoreMax 
   setTimeout(() => { setView("end"); showOverlay(); }, fin ? 1500 : 600);
 }
 
-// --- Retour des testeurs (bêta fermée, 16 septembre 2026) --------------------
+// --- Retour des testeurs (bêta fermée) -------------------------------------------
 // « Laisser un retour » sur l'écran de fin : une carte, un champ libre, un
 // envoi, une confirmation dans la MÊME carte (pas de second pop-up qui se
 // referme tout seul). Le retour part avec le pseudo, le score de la course
@@ -1241,20 +1208,17 @@ function lireVolume(cle) {
 function ecrireVolume(cle, v) { try { localStorage.setItem(cle, String(v)); } catch (e) { /* stockage indisponible */ } }
 
 // --- Démarrage ---------------------------------------------------------------
-// Explication au lancement, en QUATRE temps depuis (son, tap, arrivée, potes),
-// d'abord en TROIS (1er octobre 2026, test avec une
-// joueuse : elle glissait au lieu de taper, lisait « 1,6 % », ne savait pas que
-// la partie dure le morceau) : 1) tape l'écran, pas besoin de glisser ;
-// 2) une partie = un morceau, jusqu'à la ligne d'arrivée ; 3) joue avec tes
-// potes, +10 % par pote. Un tap passe à l'étape suivante ; après la
-// troisième, la course part toute seule. Le contexte audio est débloqué AVANT,
+// Explication au lancement, en QUATRE cartes : 1) monte le son ; 2) tape
+// l'écran, pas besoin de glisser ; 3) une partie = un morceau, jusqu'à la
+// ligne d'arrivée ; 4) joue avec tes potes, +10 % par pote. Elle vise ce qui
+// bloque un joueur neuf : glisser au lieu de taper, ne pas savoir que la
+// partie dure le morceau. Un tap passe à l'étape suivante ; après la
+// dernière, la course part toute seule. Le contexte audio est débloqué AVANT,
 // dans le geste du JOUER. 3 premières parties + toujours en ligue démo.
-// ⚠️ 5 octobre 2026 : « Monte le son » passe EN PREMIER (« je le mettrais en
-// tout premier, et après 2, 3, 4 ») ; les cartes se reconnaissent à leur NOM
-// (data-e), plus à leur rang. Durées par carte :
+// ⚠️ Les cartes se reconnaissent à leur NOM (data-e), pas à leur rang.
+// Durées par carte :
 const EXPL_DUREES = { son: 5.0, tap: 4.2, arrivee: 3.8, potes: 6.4 };
-// « Monte le son » (4 octobre 2026 : « il faut le mettre vraiment pendant 5
-// secondes avant que le jeu démarre ») : deux coups de klaxon pour régler le
+// « Monte le son » reste ~5 s avant le départ : deux bruitages pour régler le
 // volume. Le décompte ne le répète pas.
 let annonceSon = false;
 export function consommerAnnonceSon() { const a = annonceSon; annonceSon = false; return a; }
@@ -1364,9 +1328,9 @@ export function init(d) {
   });
   sprintButton.addEventListener("click", () => { if (getPseudo().length === 0) { setStep(1); return; } startGame({ sprint: true }); });
   net.evenement("arrivee", { pseudo: lsGet(CLE_PSEUDO) || null, source: getSource(), ligue: null });
-  // (Pas de MutationObserver sur `disabled` : il se redéclenchait lui-même en
-  // boucle et gelait la page — syncLoadingUi relit le champ à la fin du
-  // chargement, l'input le relit à chaque frappe.)
+  // ⚠️ Pas de MutationObserver sur `disabled` : il se redéclenche lui-même en
+  // boucle et gèle la page — syncLoadingUi relit le champ à la fin du
+  // chargement, l'input le relit à chaque frappe.
 
   $("end-retour").addEventListener("click", ouvrirRetour);
   retourInput.addEventListener("input", majCompteurRetour);
@@ -1377,9 +1341,9 @@ export function init(d) {
   // Entrée envoie, Maj+Entrée fait un retour à la ligne.
   retourInput.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); envoyerRetour(); } });
 
-  // Retour au menu depuis l'écran de fin (27 septembre 2026 : « à la fin, je
-  // peux pas revenir au menu principal pour changer de ligue »). On arrive
-  // sur « Mon cycliste », d'où « Ma ligue » et « Mon profil » sont à un tap.
+  // Retour au menu depuis l'écran de fin (pour changer de ligue, de tenue…).
+  // On arrive sur « Mon cycliste », d'où « Ma ligue » et « Mon profil » sont
+  // à un tap.
   $("end-menu").addEventListener("click", () => {
     document.getElementById("game-canvas").classList.remove("game-over-bw");
     setView("onboarding");

@@ -1,12 +1,11 @@
-// input.js — v2 (19 septembre 2026, une seule voie) :
+// input.js — Gestes (une seule voie) :
 //   tap court               → saut
 //   appui MAINTENU (≤ 0,4 s) → le saut monte plus haut, tant qu'on appuie
 //   re-tap en l'air         → double saut (on remonte) + salto
 //   swipe vers le bas       → roue arrière (décoratif)
 //   swipe vers le haut      → saut aussi (réflexe du premier jeu)
-// Le saut part au TOUCHER (et non au relâcher) depuis le 20 septembre 2026 :
-// c'est ce qui permet de mesurer la durée de l'appui. Le swipe latéral est
-// ignoré (il n'y a plus de voie).
+// Le saut part au TOUCHER (et non au relâcher) : c'est ce qui permet de
+// mesurer la durée de l'appui. Le swipe latéral est ignoré (une seule voie).
 
 const SWIPE_THRESHOLD = 28;
 let jumpPressed = false;
@@ -46,13 +45,10 @@ function end() {
   holding = false;
 }
 
-// ⚠️ UN tap = DEUX appuis sur Android (4 octobre 2026, nuit : « quand il
-// appuie une fois, ça fait directement un double saut », Samsung, navigateur
-// d'Instagram) : après touchstart/touchend, Android rejoue le geste en
-// événements souris (mousedown, mouseup) pour les vieux sites. Le mousedown
-// arrivait quand le cycliste venait de décoller, donc comptait comme le
-// re-tap du double saut. Sur iPhone, ces souris de compatibilité ne sont pas
-// envoyées au canvas : le bug n'existait que sur Android. Toute souris qui
+// ⚠️ UN tap = DEUX appuis sur Android : après touchstart/touchend, Android
+// rejoue le geste en événements souris (mousedown, mouseup) de compatibilité.
+// Ce mousedown arrive quand le cycliste vient de décoller et compterait comme
+// le re-tap du double saut (iOS ne les envoie pas au canvas). Toute souris qui
 // suit un toucher de moins d'une seconde est donc ignorée.
 let dernierToucher = -1e9;
 const toucher = () => { dernierToucher = performance.now(); };

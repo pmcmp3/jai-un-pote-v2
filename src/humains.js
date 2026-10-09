@@ -1,10 +1,7 @@
-// humains.js — QUI on croise, sur la route et dans le décor (4 octobre 2026,
-// nuit : « on n'a pas de métis, y a que des blancs. Je veux des métis, je veux
-// des gens gros, je veux des petits, je veux des grands, je veux des vieux, je
-// veux des jeunes, je veux des enfants, je veux tout »). Jusque-là chaque
-// personnage avait SA peau en dur, et c'était presque toujours la même (rosée
-// ou bronzée). Un seul tirage désormais pour tous : peau, cheveux, coiffure,
-// taille, corpulence, âge.
+// humains.js — QUI on croise, sur la route et dans le décor : un seul tirage
+// pour tous les personnages (peau, cheveux, coiffure, taille, corpulence, âge),
+// pour que la foule soit variée — toutes les couleurs de peau, gros et minces,
+// petits et grands, jeunes et vieux, enfants.
 //
 // Déterministe (une graine = la rangée, ou une position du décor) : un même
 // piéton garde la même tête d'une image à l'autre, et la même TAILLE pour la
@@ -39,8 +36,8 @@ export function assombrir(hex, k = 0.82) {
 const cache = new Map();
 // { peau, peauOmbre, fonce, cheveux, coiffure, taille, corpulence, age, femme, barbe }
 //   taille     : × la hauteur nominale (1 = la plus grande ; enfant ~0,6)
-//   corpulence : × la largeur d'ORIGINE — jamais moins de 1,05, 1,12 le plus
-//                souvent (« plus épais de 10 % »), 1,38 une personne ronde
+//   corpulence : × la largeur nominale — jamais moins de 1,05, 1,12 le plus
+//                souvent, 1,38 une personne ronde
 //   coiffure   : court · rase · long · chignon · afro · tresses · chauve
 export function humain(graine, { enfants = true } = {}) {
   const cle = `${graine}|${enfants ? 1 : 0}`;

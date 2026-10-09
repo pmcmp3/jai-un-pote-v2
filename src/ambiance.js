@@ -1,7 +1,5 @@
-// ambiance.js — Ce qui sonne EN CONTINU pendant la course (4 octobre 2026,
-// nuit : « un bruitage de bicyclette dans le fond, en pas fort », « plus de
-// sound design, à fond »). main.js appelle pas() à chaque image avec l'état
-// du joueur ; ici on règle :
+// ambiance.js — Ce qui sonne EN CONTINU pendant la course. main.js appelle
+// pas() à chaque image avec l'état du joueur ; ici on règle :
 //   - le VÉLO : le pneu sur la chaussée (goudron, neige qui crisse, planches
 //     des halles, piste du bowling, toit de voiture), la roue libre qui
 //     cliquette en l'air, le vent de la vitesse, le jetpack ;
@@ -121,7 +119,8 @@ function velo(E, t) {
   if (roule && S.grain) {
     C.gSol.gain.setTargetAtTime(NIV(S.grain === "latte" ? "planches" : "neigeRoule") * V, t, 0.05);
     const cadence = S.grain === "latte" ? E.vitesse : S.cadence * (0.6 + 0.6 * vit);
-    // (Les lattes sonnent une note : rejouées à la seconde près, ré-sol ou mi-la, sur la gamme.)
+    // Les lattes sonnent une note : rejouées telles quelles ou un ton plus haut
+    // (ré-sol ou mi-la), toujours sur la gamme.
     rafale("sol", t, cadence, (tt) => B.jouerGrain(ctx, C.gSol, S.grain, tt, S.grain === "latte" ? (alea() < 0.5 ? 1 : 1.1225) : 0.85 + alea() * 0.3));
   } else rafales.sol = 0;
   // La roue libre : « tic-tic-tic » en l'air, et après l'arrivée.
@@ -185,7 +184,7 @@ function betes(E, t) {
     const x = E.ecranX(r);
     if (x > 1.02) continue;
     appels.add(r);
-    // Toutes (« rajoute les miaulements du chat »), jamais deux d'affilée trop vite.
+    // Toutes les bêtes qui ont un cri, jamais deux d'affilée trop vite.
     if (t - dernier.appel > 1) { dernier.appel = t; B.jouer(B.APPELS[row.kind], { pan: clamp(2 * x - 1, -0.2, 0.85) }); }
   }
 }

@@ -20,9 +20,8 @@
 // → entities.js). Tant que le contexte n'avance pas, elle renvoie 0 en boucle
 // et fige toute la grille rythmique — bonus et obstacles restent plantés sur
 // place pendant que le décor, lui, défile (il avance sur dt, pas sur
-// l'horloge). C'était exactement le bug remonté au playtest iPhone. main.js
-// surveille isRunning() pour basculer sur une horloge de secours plutôt que
-// de laisser la partie figée.
+// l'horloge). main.js surveille isRunning() pour basculer sur une horloge de
+// secours plutôt que de laisser la partie figée.
 
 let audioCtx = null;
 let buffer = null;
@@ -33,10 +32,10 @@ let startCtxTime = 0;
 let loadError = null;
 // Décodage hors-ligne en échec alors qu'on a toujours les octets : ce n'est
 // PAS fatal, le décodage sera retenté avec le contexte de sortie au moment du
-// geste (vieux WebKit, voir waitForRunningThenPlay). Mais `buffer` reste null
-// d'ici là — et sans ce drapeau, l'écran de chargement n'avait aucun moyen de
-// distinguer "ça arrive" de "ça n'arrivera jamais", donc restait bloqué à 90 %
-// avec le bouton JOUER grisé pour toujours (voir isReadyToStart plus bas).
+// geste (vieux WebKit, voir waitForRunningThenPlay). `buffer` reste null d'ici
+// là : ce drapeau permet à l'écran de chargement de distinguer "ça arrive" de
+// "ça n'arrivera jamais" — sans lui, il resterait bloqué à 90 % avec le bouton
+// JOUER grisé (voir isReadyToStart plus bas).
 let decodeDeferred = false;
 
 // Des gains en série, chacun avec sa propre raison d'exister, pour qu'ils ne
@@ -47,9 +46,8 @@ let decodeDeferred = false;
 let envelopeGain = null;
 let volumeGain = null;
 let focusGain = null;
-// Deux curseurs dans les options (4 octobre 2026, nuit : « un réglage pour la
-// musique et un réglage pour les effets sonores ») : musiqueGain porte le
-// morceau et la boucle de mort ; effetsGain TOUS les bruitages (sfx.js,
+// Deux curseurs dans les options : musiqueGain porte le morceau et la boucle
+// de mort ; effetsGain TOUS les bruitages (sfx.js,
 // bruitages.js, ambiance.js, le marchand, la voix « pfff, aïe »). Les deux
 // arrivent sur volumeGain (volume général). effetsGain est PERSISTANT (créé au
 // premier bruitage, même avant le morceau) et rebranché sur chaque nouveau
@@ -77,11 +75,7 @@ let currentSource = null; // nœud en cours de lecture, pour pouvoir l'arrêter 
 let lowpass = null;
 const FILTRE_OUVERT_HZ = 20000;
 
-// --- Boucle du début pendant la seconde chance (22 août 2026) --------------
-// « On doit mettre en place le début de la boucle à la place du mp3 qui tourne
-// de base derrière [...] le début filtré, on a le décompte des 10 secondes et
-// un filtre passe-bas qui remonte au fur et à mesure du chrono. »
-//
+// --- Boucle du début pendant la seconde chance ------------------------------
 // À la mort, le morceau s'ARRÊTE (fondu court) et cette boucle prend le
 // relais : le même AudioBuffer, rejoué en boucle sur ses N premières secondes
 // (config.loopMortDuree, 4 mesures par défaut), dans son PROPRE passe-bas.
@@ -90,8 +84,8 @@ const FILTRE_OUVERT_HZ = 20000;
 //
 // ⚠️ Deux raisons d'arrêter le morceau au lieu de le laisser tourner étouffé
 // comme le menu pause :
-//   1. c'est la demande — on veut entendre le DÉBUT du morceau, pas l'endroit
-//      où le joueur est mort ;
+//   1. on veut entendre le DÉBUT du morceau, pas l'endroit où le joueur est
+//      mort ;
 //   2. ça supprime toute dérive. Le morceau ne prenant plus d'avance pendant
 //      la décision (qui peut durer un aller-retour sur Spotify, donc beaucoup
 //      plus que les 10 s du décompte), la reprise le relance PILE à la
@@ -231,7 +225,7 @@ function onDecoded(decoded) {
 }
 
 // Progression 0..1 du chargement, pour l'afficher en pourcentage à l'écran :
-// le morceau pèse 3,9 Mo (128 kbps), sur data mobile l'attente est réelle et
+// le morceau pèse plusieurs Mo, sur data mobile l'attente est réelle et
 // un simple « Chargement… » ne dit pas si ça avance. On réserve les 10
 // derniers pour cent au décodage, qui n'expose aucune progression.
 const PART_TELECHARGEMENT = 0.9;
@@ -298,11 +292,9 @@ fetchAvecProgression(window.CONFIG.fichierAudio)
   });
 
 // `offset` = seconde du morceau où démarrer la lecture. 0 au premier
-// lancement et au rejeu. Non nul dans un seul cas restant : la soupape de
-// dérive en sortie de pause, quand le morceau a tellement avancé qu'il
-// finirait avant la ligne d'arrivée (voir setPlaybackMode). Une sortie de
-// pause ordinaire ne rembobine PLUS le morceau : c'est la course qui se
-// recale dessus, via clockShift.
+// lancement et au rejeu. Non nul à la sortie de la boucle de mort et quand la
+// soupape de dérive se déclenche en sortie de pause (voir setPlaybackMode) :
+// le morceau repart alors sur la position de la course.
 const REPRISE_FONDU = 0.18; // s : fondu d'entrée d'une reprise en cours de morceau
 
 function playNow(offset = 0) {
@@ -316,19 +308,17 @@ function playNow(offset = 0) {
   sourceNode.buffer = buffer;
   currentSource = sourceNode;
 
-  // --- Morceau en BOUCLE (24 août 2026, jeu infini) -------------------------
-  // La course n'a plus de fin (voir entities.js) : le morceau ne doit plus
-  // s'arrêter. Longueur de boucle arrondie à la MESURE inférieure (4 temps à
-  // 120 BPM = 2 s) : le raccord retombe pile sur la grille rythmique du jeu
-  // (clock.timeOfBeat), donc les créneaux restent calés sur les temps du
-  // morceau à chaque tour de boucle — c'est la même astuce que la boucle de
-  // mort (loopMortDuree = 4 mesures pile).
+  // --- Morceau en BOUCLE (si config.boucleMorceau) ---------------------------
+  // Longueur de boucle arrondie à la MESURE inférieure : le raccord retombe
+  // pile sur la grille rythmique du jeu (clock.timeOfBeat), donc les créneaux
+  // restent calés sur les temps du morceau à chaque tour de boucle — même
+  // astuce que la boucle de mort (loopMortDuree = 4 mesures pile).
   const debutBoucle = window.CONFIG.premierTempsOffset;
   const mesure = beatPeriod * 4;
   const longueurBoucle = Math.max(mesure,
     Math.floor((buffer.duration - debutBoucle) / mesure) * mesure);
   // « J'ai un pote » est un contre-la-montre : le morceau ne boucle PAS, sa fin
-  // termine la partie (config.boucleMorceau, 6 septembre 2026).
+  // termine la partie (config.boucleMorceau à false).
   sourceNode.loop = window.CONFIG.boucleMorceau !== false;
   sourceNode.loopStart = debutBoucle;
   sourceNode.loopEnd = debutBoucle + longueurBoucle;
@@ -361,16 +351,12 @@ function playNow(offset = 0) {
   const { fonduEntree } = window.CONFIG;
   const now = audioCtx.currentTime;
 
-  // Le fondu d'entrée n'a de sens qu'au vrai début du morceau : reprendre en
-  // plein milieu avec une montée de 1,2 s s'entendrait comme un gonflement.
-  // (Plus de fondu de SORTIE programmé : le morceau boucle sans fin depuis le
-  // passage au jeu infini — voir la section boucle plus haut.)
+  // Le fondu d'entrée long n'a de sens qu'au vrai début du morceau : reprendre
+  // en plein milieu avec une montée de 1,2 s s'entendrait comme un gonflement.
   if (offset > 0) {
-    // Fondu très court (pas les 1,2 s du vrai début, qui s'entendraient comme
-    // un gonflement en plein morceau) : sans lui, une reprise en pleine forme
-    // d'onde claque. Chemin emprunté par la soupape de dérive ET par la sortie
-    // de la boucle de mort, qui relance le morceau à la seconde exacte de la
-    // mort.
+    // Fondu très court : sans lui, une reprise en pleine forme d'onde claque.
+    // Chemin emprunté par la soupape de dérive ET par la sortie de la boucle
+    // de mort, qui relance le morceau à la seconde exacte de la mort.
     envelopeGain.gain.setValueAtTime(0, now);
     envelopeGain.gain.linearRampToValueAtTime(1, now + REPRISE_FONDU);
   } else {
@@ -384,8 +370,8 @@ function playNow(offset = 0) {
   clockShift = 0;              // la lecture repart calée sur la course : plus aucun retard à traîner
   started = true;
 
-  // Métadonnées « Now Playing » (21 août 2026, avec le favicon) : c'est ce qui
-  // habille la Dynamic Island / l'écran verrouillé pendant que le morceau
+  // Métadonnées « Now Playing » : c'est ce qui habille la Dynamic Island /
+  // l'écran verrouillé pendant que le morceau
   // joue — titre, artiste, pochette de l'EP. Purement déclaratif et
   // best-effort : aucun navigateur n'en dépend pour jouer le son.
   if ("mediaSession" in navigator) {
@@ -400,8 +386,8 @@ function playNow(offset = 0) {
 }
 
 // Attend que le contexte tourne VRAIMENT (et que le buffer soit prêt) avant
-// de lancer la lecture. Sans cette attente, on capturait startCtxTime sur une
-// horloge gelée et le jeu entier se retrouvait bloqué à t=0 (voir en-tête).
+// de lancer la lecture. Sans cette attente, startCtxTime serait lu sur une
+// horloge gelée et le jeu entier resterait bloqué à t=0 (voir en-tête).
 const RESUME_POLL_MS = 100;
 const RESUME_TIMEOUT_MS = 8000;
 
@@ -450,15 +436,13 @@ export function unlock() {
   if (started || armed) return;
   armed = true;
 
-  // « J'avais pas de son sur mon tél » — remonté à chaque playtest iPhone, et
-  // à chaque fois la cause était l'interrupteur SILENCIEUX physique : par
-  // défaut, iOS classe le Web Audio en catégorie "ambient", donc coupé par le
-  // petit switch latéral, exactement comme un son d'interface. Aucun réglage
-  // dans la page ne pouvait le contourner… jusqu'à l'API AudioSession
-  // (Safari 16.4+) : en déclarant le type "playback", on dit à iOS que c'est
-  // du contenu média (comme un lecteur de musique), et le son sort MÊME en
-  // mode silencieux. À poser avant la création du contexte, et sans risque
-  // ailleurs (l'API n'existe simplement pas sur les autres navigateurs).
+  // Interrupteur SILENCIEUX de l'iPhone : par défaut, iOS classe le Web Audio
+  // en catégorie "ambient", donc coupé par le petit switch latéral, comme un
+  // son d'interface. L'API AudioSession (Safari 16.4+) permet de déclarer le
+  // type "playback" : iOS le traite alors comme du contenu média (comme un
+  // lecteur de musique), et le son sort MÊME en mode silencieux. À poser avant
+  // la création du contexte, sans risque ailleurs (l'API n'existe pas sur les
+  // autres navigateurs).
   try {
     if (navigator.audioSession) navigator.audioSession.type = "playback";
   } catch (e) { /* non bloquant : on retombe sur le comportement par défaut */ }
@@ -511,10 +495,9 @@ export function isRunning() {
 // Erreur fatale de chargement (téléchargement impossible, ou décodage en
 // échec des deux côtés), ou null tant que tout va bien. Exporté pour que
 // l'écran de chargement puisse SORTIR de son attente : sans ça, `progress`
-// n'atteignait jamais 1, le bouton JOUER restait grisé pour toujours et le
-// joueur n'avait aucun moyen de savoir pourquoi — le seul état du jeu dont
-// on ne pouvait pas sortir, alors que la course, elle, sait tourner sans le
-// morceau (horloge de secours, voir l'en-tête et main.js).
+// n'atteindrait jamais 1 et le bouton JOUER resterait grisé sans explication,
+// alors que la course, elle, sait tourner sans le morceau (horloge de secours,
+// voir l'en-tête et main.js).
 export function getLoadError() {
   return loadError;
 }
@@ -522,9 +505,9 @@ export function getLoadError() {
 // Peut-on lancer une partie ? Vrai dès que le morceau est décodé — mais AUSSI
 // quand le décodage hors-ligne a échoué et sera retenté au geste : dans ce
 // cas les octets sont là, il n'y a plus rien à attendre côté écran de
-// chargement. Sans cette seconde branche, `buffer` restait null pour toujours
-// et le bouton JOUER ne s'activait jamais, y compris quand la lecture aurait
-// parfaitement démarré au tap suivant. Et si le décodage rate aussi cette
+// chargement. Sans cette seconde branche, `buffer` resterait null et le bouton
+// JOUER ne s'activerait jamais, alors que la lecture démarrerait parfaitement
+// au tap suivant. Et si le décodage rate aussi cette
 // fois-là, la partie part sur l'horloge de secours avec son bandeau « Son
 // indisponible » (main.js/hud.js) — jamais sur un menu qui ne répond plus.
 export function isReadyToStart() {
@@ -568,22 +551,17 @@ export function getVolumeMusique() { return pendingMusique; }
 export function setVolumeEffets(v) { pendingEffets = Math.max(0, Math.min(1, v)); regler(effetsGain, pendingEffets); }
 export function getVolumeEffets() { return pendingEffets; }
 
-// --- Jingle de combo (demandé le 20 août 2026 : « quand y'a un combo, un
-// bruit de pixels dans la tonalité du morceau ») ------------------------------
-// ⚠️ Réaccordé le 4 octobre 2026 (nuit) : il jouait encore en RÉ BÉMOL MAJEUR,
-// la tonalité de « La ville est belle » (le jeu n°1) — fausse sur « J'ai un
-// pote », qui est en MI MINEUR / SOL MAJEUR (mesuré : chromagramme du MP3,
-// notes dominantes mi, do, si, sol, ré, la). Il ne joue plus que la
+// --- Jingle de combo : un arpège 8 bits dans la tonalité du morceau -----------
+// ⚠️ « J'ai un pote » est en MI MINEUR / SOL MAJEUR (mesuré : chromagramme du
+// MP3, notes dominantes mi, do, si, sol, ré, la). Le jingle ne joue que la
 // PENTATONIQUE de sol (sol, la, si, ré, mi — voir bruitages.js, GAMME) : pas un
 // demi-ton, rien ne frotte, quel que soit l'accord du moment.
-// Onde carrée = le timbre « console 8 bits » demandé. L'arpège s'allonge d'une
-// note par palier (4 notes au ×1,5, puis 5, puis 6) : le son lui-même dit que
-// ça monte. Branché sur volumeGain (donc le slider et le mute s'appliquent),
-// jamais sur envelopeGain (réservé au fondu du morceau).
+// Onde carrée = timbre « console 8 bits ». L'arpège s'allonge d'une note par
+// palier (4 notes au ×1,5, puis 5, puis 6) : le son lui-même dit que ça monte.
+// Branché sur la sortie des effets (curseur Effets, volume général), jamais
+// sur envelopeGain (réservé au fondu du morceau).
 const JINGLE_NOTES = [587.33, 659.26, 783.99, 987.77, 1174.66, 1318.51]; // Ré5 Mi5 Sol5 Si5 Ré6 Mi6
 const JINGLE_PAS_S = 0.066;   // écart entre deux notes — débit « pièce de Mario »
-// 0,16 → 0,09 le 21 août 2026 (« baisse de 5 dB le bruit des bruitages ») :
-// −5 dB = ×10^(−5/20) ≈ ×0,562, soit 0,16 × 0,562 ≈ 0,09.
 const JINGLE_GAIN = 0.09;     // crête par note : présent sans couvrir le morceau
 
 export function playComboJingle(palier) {
@@ -610,7 +588,7 @@ export function playComboJingle(palier) {
   }
 }
 
-// --- Le MARCHAND du marché (4 octobre 2026, nuit) ------------------------------
+// --- Le MARCHAND du marché ------------------------------------------------------
 // « Quatre euros les belles courgettes ! » : un vocal de PMC enregistré au
 // téléphone, nettoyé et passé au mégaphone dans une halle (fichier
 // config.fichierMarchand, traitement décrit dans CLAUDE.md). Joué pas fort, une
@@ -706,7 +684,7 @@ export function marchandEtat() {
 //   "running"  — la course : filtre ouvert, son plein.
 //   "muffled"  — menu pause : le morceau CONTINUE mais passe dans le filtre
 //                passe-bas (~800 Hz, réglable dans config.js), donc on
-//                n'entend plus que les basses. Demandé explicitement.
+//                n'entend plus que les basses.
 //   "silent"   — onglet/app quitté : fondu à 0 puis audioCtx.suspend(). Là,
 //                jouer même étouffé n'aurait aucun sens, personne n'écoute.
 //
@@ -718,27 +696,23 @@ export function marchandEtat() {
 // jamais partir tant que l'app est en arrière-plan. Un seul mécanisme couvre
 // donc les deux.
 //
-// À la reprise, le morceau a pris de l'avance sur la course. C'est LA course
-// qui se recale sur lui : on n'a jamais rembobiné le morceau (l'artiste
-// l'entendait comme un retour en arrière), on encaisse l'écart dans
+// À la reprise, le morceau a pris de l'avance sur la course. Par défaut, c'est
+// LA course qui se recale sur lui : on ne rembobine pas le morceau (ça
+// s'entendrait comme un retour en arrière), on encaisse l'écart dans
 // `clockShift`, un retard permanent que now() retranche à l'horloge audio.
 //
 // Le retard est arrondi au TEMPS musical le plus proche, et c'est tout
-// l'intérêt : les objets arrivent tous les 1,5 temps, donc un décalage
-// multiple d'un temps les laisse exactement sur la même grille rythmique — ils
-// retombent sur les temps du morceau comme avant, simplement plus loin dans le
-// morceau. Le résidu est au pire d'un demi-temps (0,25 s à 120 BPM), soit le
+// l'intérêt : un décalage multiple d'un temps laisse les objets exactement sur
+// la même grille rythmique — ils retombent sur les temps du morceau, simplement
+// plus loin dans le morceau. Le résidu est au pire d'un demi-temps, soit le
 // petit sursaut de la course à la reprise, dans un sens ou dans l'autre.
 //
-// Seule contrepartie : le morceau finit `clockShift` secondes plus tôt dans la
-// course. Il y a ~114 s de marge (course `dureeCourse` = 143,5 s, morceau
-// 257,9 s) — au-delà de `pauseDeriveMax` (25 s), la soupape rembobine quand
-// même, sans quoi le joueur terminerait en silence.
-// Durée du fondu des GAINS à l'entrée/sortie de pause. Lue dans config.js —
-// c'est ce que ce réglage promet ("à l'entrée comme à la sortie de la pause"),
-// alors qu'une constante locale figée à 0,5 vivait ici en parallèle : le
-// filtre suivait le réglage, les gains non. Les deux valeurs coïncidaient,
-// donc rien ne se voyait — jusqu'au jour où on aurait touché à pauseFondu.
+// Contrepartie : le morceau finit `clockShift` secondes plus tôt que la course.
+// Au-delà de `pauseDeriveMax`, la soupape relance donc le morceau sur la
+// position de la course. Avec pauseDeriveMax à 0 (contre-la-montre : le
+// morceau EST le chrono), toute pause d'au moins un demi-temps passe par elle.
+// Durée du fondu des GAINS à l'entrée/sortie de pause, lue dans config.js
+// comme celle du filtre : gains et filtre suivent le même réglage.
 function pauseFade() {
   return window.CONFIG.pauseFondu;
 }
@@ -855,8 +829,6 @@ export function setPlaybackMode(next) {
     const ecart = Math.max(0, positionMorceau - clockShift - reprise);
     const rattrapage = Math.round(ecart / beatPeriod) * beatPeriod;
 
-    // (Plus de cas « morceau fini » : il boucle sans fin depuis le passage au
-    // jeu infini — seule la dérive excessive déclenche encore la soupape.)
     if (clockShift + rattrapage > window.CONFIG.pauseDeriveMax) {
       // Soupape : la course a pris trop de retard sur le morceau — on
       // relance la lecture pile sur la position de la course.
@@ -877,16 +849,16 @@ export function setPlaybackMode(next) {
 }
 
 
-// --- Sortie pour les bruitages (sfx.js, 6 septembre 2026) --------------------
-// Le contexte et le nœud de volume, uniquement quand le son tourne vraiment :
-// les bruitages passent par volumeGain (donc le curseur du joueur), jamais par
-// les fondus de pause du morceau.
+// --- Sortie pour les bruitages (sfx.js, bruitages.js, ambiance.js) ----------
+// Le contexte et le nœud d'entrée des effets, uniquement quand le son tourne
+// vraiment : les bruitages passent par effetsGain puis volumeGain (curseurs du
+// joueur), jamais par le fondu propre du morceau (envelopeGain).
 export function sfxOutput() {
   if (!audioCtx || audioCtx.state !== "running") return null;
   return { ctx: audioCtx, dest: sortieEffets() };
 }
 
-// --- Échantillons (4 octobre 2026, nuit) ---------------------------------------
+// --- Échantillons ---------------------------------------------------------------
 // Un fichier son court (la voix « pfff, aïe » du joueur qui se prend un
 // obstacle) : chargé et décodé hors-ligne à la première demande, comme le
 // marchand. null tant qu'il n'est pas prêt (ou s'il manque : le jeu s'en passe).

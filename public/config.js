@@ -1,7 +1,7 @@
-// config.js — Réglages de « J'ai un pote » (jeu n°2, 4 septembre 2026).
+// config.js — Réglages de « J'ai un pote ».
 // Fichier UNIQUE de configuration, chargé tel quel (pas bundlé). Aucune
-// logique de jeu ici. Même contrat que le premier jeu : audio.js lit les clés
-// audio, tout le reste est lu par main.js/track.js/friends.js.
+// logique de jeu ici. audio.js lit les clés audio, tout le reste est lu par
+// main.js/track.js/friends.js.
 
 window.CONFIG = {
 
@@ -12,12 +12,12 @@ window.CONFIG = {
   premierTempsOffset: 0.04,
   dureeMorceau: 173.65,
   fichierAudio: "assets/jai-un-pote.mp3", // 96 kbps, 2,1 Mo (le 320 de l'EPK fait 6,9 Mo)
-  boucleMorceau: false,     // contre-la-montre : la fin du morceau = la fin de la partie (6 septembre 2026)
-  chargementMinS: 2.6,      // 5 → 1,8 le 20 septembre 2026 (« le démarrage est vraiment extrêmement lent ») → 2,6 le 4 octobre (« un tout petit peu plus, pour tous les appareils »)
+  boucleMorceau: false,     // contre-la-montre : la fin du morceau = la fin de la partie
+  chargementMinS: 2.6,      // durée minimale de l'écran de chargement (s)
   fonduEntree: 1.2,
   pauseFiltreHz: 800,
   pauseFondu: 0.5,
-  pauseDeriveMax: 0,        // 25 → 0 le 5 octobre 2026 : ici le morceau EST le chrono — à la reprise il repart là où la course s'était arrêtée (avec 25 s de dérive tolérée, il finissait avant la course : « à la fin, il y a du vide »)
+  pauseDeriveMax: 0,        // 0 : le morceau EST le chrono, il reprend là où la course s'est arrêtée
 
   // Boucle du début pendant la seconde chance : 16 temps = 4 mesures à 85 BPM.
   loopMortDebut: 0.04,
@@ -25,47 +25,36 @@ window.CONFIG = {
   loopMortFiltreMin: 170,
   loopMortFiltreMax: 16000,
   loopMortVolumeMin: 0.32,
-  // Le MARCHAND du marché (4 octobre 2026, nuit) : vocal de PMC enregistré au
-  // téléphone, nettoyé, passé au mégaphone dans une halle. Joué une fois par
-  // course au passage du marché, pas fort. `marchandVolume` = volume devant
-  // les étals (1 = le fichier tel quel, à −16 LUFS ; le morceau est à ~−14) ;
-  // de loin il descend à ~35 % de ça, étouffé. "" = marché muet.
+  // Le MARCHAND du marché : vocal de PMC passé au mégaphone dans une halle,
+  // joué une fois par course au passage du marché. `marchandVolume` = volume
+  // devant les étals (1 = le fichier tel quel, à −16 LUFS ; le morceau est à
+  // ~−14) ; de loin il descend à ~35 % de ça, étouffé. "" = marché muet.
   fichierMarchand: "assets/marchand-courgettes.mp3",
-  marchandVolume: 0.34,     // 0,6 → 0,34 (−5 dB) le 4 octobre 2026, nuit : « beaucoup trop fort »
-  // Le SOUND DESIGN (4 octobre 2026, nuit : « un bruitage de bicyclette dans le
-  // fond, en pas fort », « un bruit de poule, un klaxon quand une voiture
-  // arrive, un klaxon de train à la gare, des quilles au bowling ») : tout est
-  // synthétisé (bruitages.js, ambiance.js), chaque son calé sur le morceau.
-  // 1 = le réglage d'origine ; 0,5 ≈ −6 dB ; 0 = coupé.
-  bruitagesVolume: 1,       // TOUS les nouveaux bruitages (cris, chocs, klaxons, train, quilles…)
+  marchandVolume: 0.34,
+  // SOUND DESIGN : tout est synthétisé (bruitages.js, ambiance.js), chaque son
+  // calé sur le morceau. 1 = réglage de référence ; 0,5 ≈ −6 dB ; 0 = coupé.
+  bruitagesVolume: 1,       // cris, chocs, klaxons, train, quilles…
   veloVolume: 1,            // le vélo : roulement du pneu, roue libre en l'air, vent, atterrissages
   ambianceVolume: 1,        // le décor : oiseaux, grillons, chouette, cloche, vent de montagne, vagues, mouettes
-  // La voix du joueur qui se prend un obstacle (4 octobre 2026, nuit) : le
-  // vocal « Pfff… aïe ! » de PMC, nettoyé et compressé. "" = pas de voix.
+  // La voix du joueur qui se prend un obstacle : le vocal « Pfff… aïe ! » de
+  // PMC, nettoyé et compressé. "" = pas de voix.
   fichierAie: "assets/pff-aie.mp3",
   aieVolume: 1,
 
   // === VITESSE ===
-  // Jeu d'endurance : montée plus douce que le premier (le but est d'aller
-  // LOIN avec ses potes, pas de survivre 2 minutes). Plafond ×4,6 = 51 u/s.
-  // Vitesse d'avance en rangées/seconde : 4,4 au départ → plafond 9,4 (Crossy
-  // Road : 1 rangée = 1 unité). Doublement toutes les 70 s (main.js).
+  // En multiples de V_UNIT (regles.js) : la vitesse double toutes les
+  // V_DOUBLING_S secondes depuis vitesseBase jusqu'à vitesseMax.
   vitesseBase: 1.7,
   vitesseMax: 2.6,
-  // DEUXIÈME ACCÉLÉRATION (30 septembre 2026 : « à partir du moment où il reste
-  // 1 minute 25, il faut que ça s'accélère, parce que là on s'ennuie trop
-  // vite ») : sur les `accelDernieresS` dernières secondes, la vitesse repart
-  // de vitesseMax vers vitesseFinale, atteinte ~15 s avant la fin.
-  // 30 septembre 2026 (« la difficulté que j'ai à 30 s de la fin, je l'attends
-  // pour le milieu de la course ») : la 2e accélération démarre vers 50 s et
-  // monte jusqu'à 4,0.
-  vitesseFinale: 4.4,            // 4,0 → 4,4 le 4 octobre 2026 (« jusqu'à la ligne d'arrivée assez facilement »)
-  accelDernieresS: 120,          // 3,6 → 2,6 le 7 septembre 2026 (« quand ça va vite, ça va vraiment trop vite »)
+  // DEUXIÈME ACCÉLÉRATION : sur les `accelDernieresS` dernières secondes, la
+  // vitesse repart de vitesseMax vers vitesseFinale, atteinte ~15 s avant la fin.
+  vitesseFinale: 4.4,
+  accelDernieresS: 120,          // durée de la 2e accélération (s), comptée depuis la fin du morceau
 
-  // === VUE DE PROFIL (v2, 19 septembre 2026) ===
-  // « Une seule voie, en 2D, exactement comme Jetpack Joyride ou Zombie
-  // Tsunami ». Caméra posée à côté de la route (scene.js) : le joueur file
-  // vers la droite, le fond défile moins vite que la route (parallaxe).
+  // === VUE DE PROFIL ===
+  // Une seule voie, en 2D (Jetpack Joyride, Zombie Tsunami). Caméra posée à
+  // côté de la route (scene.js) : le joueur file vers la droite, le fond
+  // défile moins vite que la route (parallaxe).
   unitesVisibles: 14.5,     // largeur de l'écran en unités, à la profondeur de la route (portrait)
   solEcran: 0.7,            // hauteur de la route à l'écran (fraction, depuis le haut)
   cameraDistance: 11,       // distance caméra → route (unités) : plus petit = perspective plus forte
@@ -75,31 +64,20 @@ window.CONFIG = {
   // garder ~1,6 s de lecture devant soi.
   cameraJoueurX: [0.3, 0.25],
 
-  // === SAUT (20 septembre 2026 : « faudrait que les personnages puissent
-  // sauter beaucoup plus haut, et si on reste appuyé un peu plus longtemps,
-  // on peut sauter un peu plus haut [...] et si on double-tape après, un
-  // double saut, un peu comme dans tous les jeux d'arcade ») ===
+  // === SAUT ===
   // Tap court    → apex ~1,3 (poules, chats, chiens, moutons, bottes)
   // Appui tenu   → apex ~2,5 (cochons, vaches, tracteurs)
   // Re-tap en l'air → apex ~3,7 (fermiers, voitures) + salto
-  // ⚠️ 20 septembre 2026, soir : « il faudrait qu'on monte et qu'on retombe
-  // beaucoup plus vite, plus de gravité, là on flotte, on a l'impression
-  // d'être sur la lune ». Les hauteurs d'apex sont GARDÉES (1,74 / 3,08 /
-  // 4,20), c'est le TEMPS qui est comprimé d'un tiers : vitesse initiale et
-  // pesanteur montent ensemble.
+  // Vitesse initiale et pesanteur sont fortes ENSEMBLE : mêmes apex, mais on
+  // monte et on retombe vite (sans ça, le saut flotte).
   sautVitesse: 17.4,        // vitesse verticale au départ du saut (u/s)
-  // 1er octobre 2026 (test avec une joueuse : « quand une personne spamme et
-  // fait un double saut et qu'il y a un tracteur, le double saut ne fait pas
-  // sauter assez haut [...] la gravité, un poil moins agressive, genre 10 % ») :
-  // double 13,6 → 17, pesanteurs −10 %.
-  sautVitesseDouble: 17,    // impulsion du second saut, en l'air
-  sautGravite: 54,          // pesanteur normale
-  sautGraviteTenue: 26,     // pesanteur tant qu'on monte ET qu'on reste appuyé
-  sautTenueMaxS: 0.28,      // au-delà, l'appui ne fait plus monter
+  sautVitesseDouble: 17,    // impulsion du second saut, en l'air (u/s) — assez pour passer un tracteur
+  sautGravite: 54,          // pesanteur normale (u/s²)
+  sautGraviteTenue: 26,     // pesanteur tant qu'on monte ET qu'on reste appuyé (u/s²)
+  sautTenueMaxS: 0.28,      // au-delà, l'appui ne fait plus monter (s)
 
-  // === SCORE (en « pts » depuis le 9 septembre 2026 : tout le monde fait la
-  // même distance sur la même course, ce qui départage c'est les potes gardés
-  // et les pièces — le mot « mètres » ne voulait plus rien dire) ===
+  // === SCORE (en « pts » : tout le monde fait la même distance sur la même
+  // course, ce qui départage c'est les potes gardés et les pièces) ===
   metresParUnite: 1,      // 1 rangée = 1 pt de base (× potes, × turbo)
   // Chaque pote ajoute ce pourcentage aux mètres gagnés (×1 seul, ×3 avec 8 potes).
   potesBonusMetres: 0.25,
@@ -107,43 +85,32 @@ window.CONFIG = {
   pieceMetres: 4,
 
   // === POTES ===
-  // PIÈCES cumulées qui font venir le pote n°1, n°2… (croissant : chaque pote
-  // est plus long à gagner que le précédent). Le premier arrive vite (8
-  // pièces) pour que le principe se comprenne dans les dix premières secondes.
   potesMax: 5,              // sans ligue : la ligue de démo (5 membres)
-  // BOOST DE LIGUE (29 septembre 2026, idée du manager de Bluefit : « pour
-  // faire le meilleur score, les fans sont obligés de faire jouer leurs potes »).
-  // Chaque AUTRE membre de ta ligue qui a joué au moins `boostLigueDureeS`
-  // secondes te donne +`boostLigueParPote` sur tous tes points, jusqu'à
-  // `boostLigueMaxPotes` potes (×3 à 20). Un fan doit donc recruter.
+  // BOOST DE LIGUE : pour faire le meilleur score, un fan doit faire jouer ses
+  // potes. Chaque AUTRE membre de ta ligue qui a joué au moins
+  // `boostLigueDureeS` secondes te donne +`boostLigueParPote` sur tous tes
+  // points, jusqu'à `boostLigueMaxPotes` potes (×3 à 20).
   boostLigueParPote: 0.10,
   boostLigueMaxPotes: 20,
   boostLigueDureeS: 30,
-  // Peloton (9 septembre 2026 : « il faut que les potes soient un peu plus
-  // éloignés de toi, parce que c'est trop difficile sinon ») : le premier
-  // pote roule `potesRecul` rangées derrière le joueur, puis `potesEcart`
-  // rangées entre chaque pote (avant : 1,5 et 1,5).
-  // v2 (vue de profil) : MEUTE serrée — en portrait on ne voit que ~3,5
-  // unités derrière le joueur, la file indienne de la v1 (3,0 + 1,6 × rang)
-  // sortait de l'écran dès le 2e pote.
+  // Peloton : le premier pote roule `potesRecul` unités derrière le joueur,
+  // puis `potesEcart` entre chaque pote. MEUTE serrée : en portrait on ne voit
+  // que ~3,5 unités derrière le joueur, une file indienne sortirait de l'écran.
   potesRecul: 1.0,
   potesEcart: 0.5,
-  // ×1,2 le 5 octobre 2026 (« un peu trop facile, la manière dont les potes
-  // arrivent [...] faut durcir de 20 % ») : [3, 7, 14, 23, 34] → [4, 8, 17, 28, 41].
-  potesPaliers: [4, 8, 17, 28, 41],    // divisés par deux le 29 septembre 2026, avec les pièces (une sur deux)   // re-étalés le 20 septembre 2026 : les 5 potes arrivaient tous avant 25 s
-  // Après le dernier palier, un pote PERDU se rachète pour ce nombre de
-  // pièces (20 septembre 2026 : « j'ai perdu tous mes potes et j'arrive pas
-  // à les regagner »).
-  poteRachatPieces: 6,                // 5 → 6 (×1,2, 5 octobre 2026)
-  // … et de plus en plus cher : 5 pièces jusqu'à 60 s, puis jusqu'à
-  // `poteRachatPiecesFin` à 160 s (4 octobre 2026 : « plus ça avance, plus ça
-  // doit être difficile »). Et passé `chocPlusUnApres` (fraction de la
+  // PIÈCES cumulées qui font venir le pote n°1, n°2… (croissant : chaque pote
+  // est plus long à gagner que le précédent ; le premier arrive vite pour que
+  // le principe se comprenne dans les premières secondes).
+  potesPaliers: [4, 8, 17, 28, 41],
+  // Après le dernier palier, un pote PERDU se rachète pour ce nombre de pièces…
+  poteRachatPieces: 6,
+  // … et de plus en plus cher : `poteRachatPieces` jusqu'à 60 s, puis jusqu'à
+  // `poteRachatPiecesFin` à 160 s. Et passé `chocPlusUnApres` (fraction de la
   // course), chaque choc coûte UN pote de plus.
-  poteRachatPiecesFin: 17,            // 14 → 17 (×1,2, 5 octobre 2026)
+  poteRachatPiecesFin: 17,
   chocPlusUnApres: 0.5,
-  // Prénoms des potes, dans l'ordre d'arrivée (Soberland en premier, verrouillé).
-  // Sans ligue, le peloton c'est la LIGUE DE DÉMO (7 septembre 2026) : Paul et
-  // ses quatre potes, avec leurs skins. Dans une ligue, ce sont les membres.
+  // Sans ligue, le peloton c'est la LIGUE DE DÉMO : Paul et ses quatre potes,
+  // avec leurs skins, dans l'ordre d'arrivée. Dans une ligue, ce sont les membres.
   potesDefaut: [
     { nom: "paul", skin: { motif: "raye", c1: "#2f7a46", c2: "#f2ede2", short: "#3a3e4e", chapeau: "casquette", chaussures: "#565a66", velo: "vtt" } },
     { nom: "lea", skin: { motif: "uni", c1: "#ffcf2e", c2: "#f2ede2", short: "#3f63b4", chapeau: "paille", chaussures: "#f2ede2", velo: "grandbi" } },
@@ -153,16 +120,12 @@ window.CONFIG = {
   ],
   potesNoms: ["paul", "lea", "marius", "ines", "hugo"],
   ligueDemo: "PMCMP",       // code de la ligue de démo (jamais ouverte au public)
-  // === BÊTA FERMÉE (16 septembre 2026) ===
-  // Une ligue unique pour les fans du groupe WhatsApp. Arriver par
-  // `lienJeu?ligue=BETA` met le joueur dans cette ligue ET simplifie tout le
-  // menu (plus de choix de ligue, plus de sprint, plus de tiroir album) : on
-  // ne joue QUE dans cette ligue. Les autres visiteurs gardent le jeu normal.
-  // Table et plafond (60) créés par supabase-migration-beta.sql.
-  // 20 septembre 2026 : nouvelle ligue de test pour la v2 (« crée la ligue
-  // test [...] après, c'est tous les gens qui vont se rajouter à la ligue avec
-  // le code de partage »). C'est ELLE qui déclenche le menu simplifié, le
-  // plafond à 60 et le bouton « Laisser un retour ».
+  // === LIGUE DE TEST (bêta) ===
+  // Arriver par `lienJeu?ligue=<ligueBeta>` met le joueur dans cette ligue ET
+  // simplifie tout le menu (plus de choix de ligue, plus de sprint, plus de
+  // tiroir album) : on ne joue QUE dans cette ligue. Les autres visiteurs
+  // gardent le jeu normal. C'est elle qui déclenche le menu simplifié, le
+  // plafond de membres et le bouton « Laisser un retour ».
   // ⚠️ Créée par supabase/ligue-test-v2.sql, À EXÉCUTER avant de partager le lien.
   ligueBeta: "TESTV2",
   ligueBetaPlafond: 60,
@@ -171,19 +134,19 @@ window.CONFIG = {
   relaisDistance: 30000,    // mètres cumulés d'une ligue pour gagner le relais
   sprintDureeS: 60,         // le sprint du dimanche : 60 s, même route pour tous
 
-  piecesLogo: false,        // « mets juste des pièces jaunes pour l'instant, enlève les dessins »
+  piecesLogo: false,        // false = pièces jaunes unies, sans dessin
   laitDureeS: 5,            // brique de lait : ×2 sur les mètres pendant 5 s
-  laitVitesse: 1.2,         // et seulement +20 % de vitesse (« pas ×2, c'est n'importe quoi »)
-  // JETPACK (5 octobre 2026) : une partie sur cinq (la 3e, la 8e, la 13e…),
-  // un jetpack posé vers 70 s ; 10 s de vol, appuyé = on monte.
+  laitVitesse: 1.2,         // et seulement +20 % de vitesse
+  // JETPACK : une partie sur `jetpackUneSur` (la 3e, la 8e, la 13e…), un
+  // jetpack posé vers `jetpackTempsS` ; `jetpackDureeS` de vol, appuyé = on monte.
   jetpackUneSur: 5,
   jetpackPartie: 3,
   jetpackTempsS: 70,
   jetpackDureeS: 10,
   jetpackPoussee: 30,       // u/s² vers le haut, doigt appuyé
   jetpackGravite: 15,       // u/s² vers le bas, doigt levé (moins qu'un saut : on plane)
-  alerteAvanceS: 1.8,      // le panneau « attention » s'allume 1,8 s avant que le véhicule n'entre dans l'écran (5 octobre 2026 : 5 s → 3 s, puis 3 → 1,8 le soir — « à la limite 2-3 secondes à l'écran [...] j'ai tout le temps le panneau sur la droite » : mesuré 2,6 s par véhicule et 56 % de la dernière minute, outils/alertes.mjs)
-  nuitDebutS: 50,           // la nuit tombe à partir de cet instant du morceau (30 s de transition) — 95 → 50 le 27 septembre 2026 (« le biome de nuit, il faudrait qu'il arrive beaucoup plus tôt dans la chanson »)
+  alerteAvanceS: 1.8,      // avance (s) du panneau « attention » sur l'entrée du véhicule à l'écran (plus long : panneau allumé en permanence, mesuré par outils/alertes.mjs)
+  nuitDebutS: 50,           // la nuit tombe à partir de cet instant du morceau (s, 30 s de transition)
 
   // === PANNEAUX DE VILLAGE (nom, département) ===
   villages: [
@@ -206,9 +169,9 @@ window.CONFIG = {
   lienInsta: "https://www.instagram.com/pmc.mp3/",
 
   // === BACKEND ===
-  // ⚠️ v2 (19 septembre 2026) : la v2 a SA PROPRE base Supabase, jamais celle
-  // de la v1 (où tourne la bêta fermée : ses classements, son relais de la
-  // semaine et ses événements ne doivent pas recevoir de courses v2).
+  // ⚠️ La v2 a SA PROPRE base Supabase, jamais celle de la v1 (où tourne la
+  // bêta fermée : ses classements, son relais et ses événements ne doivent pas
+  // recevoir de courses v2).
   // Tant que le projet Supabase v2 n'existe pas, les deux champs restent VIDES :
   // net.js ne fait alors aucun appel, le jeu tourne avec la ligue de démo
   // (potesDefaut), sans ligue ni classement. Pour brancher la base : créer le

@@ -1,10 +1,10 @@
-// voxrider.js — Le cycliste en cubes (4 septembre 2026), posé dans le monde
-// via scene.drawBox : cadre, jambes, torse rayé, tête, cheveux, chapeau.
-// Palette par personnage (rider.js, PALETTES). Pédalage : les deux jambes
-// montent et descendent en opposition, le buste tangue avec.
+// voxrider.js — Le cycliste en cubes, posé dans le monde via scene.drawBox :
+// cadre, jambes, torse rayé, tête, cheveux, chapeau. Palette par personnage
+// (rider.js, PALETTES). Pédalage : les deux jambes montent et descendent en
+// opposition, le buste tangue avec.
 //
-// VUE DE PROFIL (v2, 19 septembre 2026) : les ROUES sont des disques qui
-// tournent (des cubes donnaient des roues carrées de côté), et l'ordre de
+// Vue de profil : les ROUES sont des disques qui tournent (des cubes
+// donneraient des roues carrées de côté), et l'ordre de
 // dessin suit la profondeur — jambe et bras du côté du fond d'abord, puis
 // roues et cadre, puis le torse, puis la jambe et le bras côté caméra.
 
@@ -29,21 +29,18 @@ function roue2(ctx, u, v, hc, R, angle) {
   drawDisque(ctx, u - 0.004, v, hc, R * 0.14, RIM);
 }
 
-// Cadre de VTT en vrais tubes (27 septembre 2026 : « le bonhomme est un peu
-// écrasé, il faudrait que tu revoies le cadre du vélo »). Avant : une barre
-// horizontale et deux piquets, en cubes — de profil, ça ne ressemblait à
-// rien. Désormais le losange d'un vrai vélo, tracé dans le plan des roues :
-// bases, haubans, tube de selle, tube horizontal, tube diagonal, fourche,
-// pédalier qui tourne. Couleur du maillot, cernée de noir pour se lire sur
-// l'asphalte comme sur le ciel.
+// Cadre de VTT en vrais tubes (des cubes ne ressemblent à rien de profil) :
+// le losange d'un vrai vélo, tracé dans le plan des roues — bases, haubans,
+// tube de selle, tube horizontal, tube diagonal, fourche, pédalier qui
+// tourne. Couleur du maillot, cernée de noir pour se lire sur l'asphalte
+// comme sur le ciel.
 function cadre(ctx, um, y, L, lift, pedal, P) {
   const pt = (dv, h) => project(um - 0.002, y + dv, lift + h);
   const moyeuAr = pt(0.25, 0.25), moyeuAv = pt(L - 0.25, 0.25), pedalier = pt(0.5, 0.24);
   const selle = pt(0.4, 0.84), douille = pt(0.86, 0.8), douilleBas = pt(0.83, 0.58);
   const e = echelle(um);
   const tubes = [[moyeuAr, pedalier], [moyeuAr, selle], [pedalier, selle], [selle, douille], [pedalier, douilleBas], [douilleBas, douille], [douilleBas, moyeuAv]];
-  // Tubes « pixel » (29 septembre 2026 : « donner au cadre une dimension un
-  // peu pixel ») : bouts carrés, angles vifs, un peu plus épais.
+  // Tubes « pixel » : bouts carrés, angles vifs, un peu plus épais.
   ctx.lineCap = "square"; ctx.lineJoin = "miter";
   for (const [larg, coul] of [[0.14, "#141418"], [0.085, P.top1 || FRAME]]) {
     ctx.strokeStyle = coul; ctx.lineWidth = Math.max(1.5, larg * e);
@@ -62,10 +59,8 @@ function cadre(ctx, um, y, L, lift, pedal, P) {
   ctx.stroke();
 }
 
-// VÉLO ENFANT (30 septembre 2026, à la place du roller : « tu crois que tu peux
-// remplacer Roller par vélo pour enfant, ça serait hilarant ») : petites roues
-// roses, roulettes, guidon trop haut, fanion sur sa perche — et un adulte assis
-// tout en bas, les genoux aux oreilles.
+// VÉLO ENFANT (gag) : petites roues roses, roulettes, guidon trop haut, fanion
+// sur sa perche — et un adulte assis tout en bas, les genoux aux oreilles.
 const ROSE = "#ff6fae";
 function veloEnfant(ctx, um, y, lift, pedal) {
   const pt = (dv, h) => project(um - 0.002, y + dv, lift + h);
@@ -104,14 +99,11 @@ export function drawRider(ctx, u, v, lift, P, pedal, alpha = 1, flip = 0, ombre 
   // L'ombre reste au sol, dessinée AVANT toute rotation.
   if (ombre) drawShadow(ctx, u, v, 0.3, 0.6, 0.24);
   let tourne = false;
-  // `pente` : sur la rampe d'une halle, le vélo suit l'inclinaison du plancher
-  // (20 septembre 2026 : « quand on monte ou qu'on descend la rampe, il faut
-  // que le personnage s'oriente vis-à-vis de la rampe »).
+  // `pente` : sur la rampe d'une halle, le vélo suit l'inclinaison du plancher.
   const angle = flip > 0.01 ? flip : (roue > 0 ? -Math.sin(Math.PI * roue) * 0.75 : pente);
   if (Math.abs(angle) > 0.01) {
-    // Salto : tout le vélo tourne à l'écran. Roue arrière : il se cabre
-    // autour de sa roue arrière (20 septembre 2026, demandé « une animation
-    // marrante quand on glisse vers le bas »).
+    // Salto : tout le vélo tourne à l'écran. Roue arrière (glissade vers le
+    // bas) : il se cabre autour de sa roue arrière.
     const c = flip > 0.01 ? project(u, v, lift + 0.9) : project(u, v - (roue > 0 ? 0.5 : 0), lift + 0.25);
     ctx.save();
     ctx.translate(c.x, c.y);
@@ -128,12 +120,10 @@ export function drawRider(ctx, u, v, lift, P, pedal, alpha = 1, flip = 0, ombre 
   const enfant = P.velo === "enfant";
   const um = x + W / 2;        // plan des roues et du cadre
   const liftSelle = lift + (grandBi ? 0.4 : enfant ? -0.3 : 0);
-  // Jambes : le haut reste COLLÉ au bassin (20 septembre 2026 : « on dirait
-  // que les jambes du personnage ne sont pas attachées »), seul le pied monte
-  // et descend avec le pédalage.
+  // Jambes : le haut reste COLLÉ au bassin (sinon elles paraissent détachées),
+  // seul le pied monte et descend avec le pédalage.
   const bassin = liftSelle + 0.88;
-  // Pieds SUR les pédales (29 septembre 2026 : « on a l'impression qu'il pédale
-  // à côté de ses pédales ») : chaque semelle suit exactement le bout de sa
+  // Pieds SUR les pédales : chaque semelle suit exactement le bout de sa
   // manivelle — même centre, même rayon, même angle que cadre(). Au Grand Bi,
   // les pédales sont sur le moyeu de la grande roue. En rollers, les patins
   // glissent d'avant en arrière et le pied de retour décolle un peu.
@@ -231,7 +221,7 @@ export function drawRider(ctx, u, v, lift, P, pedal, alpha = 1, flip = 0, ombre 
 
 export const RIDER_HEIGHT = 1.9;
 
-// JETPACK (5 octobre 2026) : deux bouteilles argentées sur le dos du cycliste
+// JETPACK : deux bouteilles argentées sur le dos du cycliste
 // (le dos est côté −v : il roule vers +v), sangles rouges, et des flammes qui
 // crépitent sous les tuyères quand il pousse.
 export function drawJetpack(ctx, u, v, lift, flamme, t) {

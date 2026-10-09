@@ -1,7 +1,7 @@
 // hud.js — Interface peinte dans le canvas pendant la course : le SCORE en
-// gros (serif de l'e-card ; « pts » depuis le 9 septembre 2026 — tout le
-// monde fait la même distance, ce qui compte c'est les potes et les pièces), le multiplicateur, la rangée de potes et la
-// jauge vers le prochain, le décompte 3-2-1-GO, le rappel des commandes.
+// gros (serif de l'e-card, en « pts » : tout le monde fait la même distance,
+// ce qui départage ce sont les potes et les pièces), le multiplicateur, le
+// nombre de potes et la prochaine étape, le décompte 3-2-1-GO, les tutos.
 // Le canvas ne lit pas les variables CSS : mêmes valeurs qu'index.html.
 
 const BLANC = "#ffffff";
@@ -27,9 +27,7 @@ export function formatMetres(m) {
   return `${Math.floor(m).toLocaleString("fr-FR")}`;
 }
 
-// `hud` = { metres, potes, potesMax, gaugeT (0..1 vers le prochain pote),
-//           mult (multiplicateur des mètres), nextIn (points manquants) }
-// Police réduite jusqu'à tenir dans maxW (responsive : « ça dépasse de partout »).
+// Police réduite jusqu'à tenir dans maxW (petits écrans).
 function fitFont(ctx, weight, size, text, maxW, min = 9) {
   let t = size;
   ctx.font = `${weight} ${t}px ${POLICE}`;
@@ -37,20 +35,15 @@ function fitFont(ctx, weight, size, text, maxW, min = 9) {
   return t;
 }
 
-// `hud` = { metres, potes, potesMax, gaugeT, mult, restant, restantS, avance, turbo, safeTop, nuit, plage, plein }
-// Disposition revue le 5 octobre 2026 (« la manière dont les points sont
-// affichés et la temporalité, le 1,5, ce n'est pas hyper ergonomique »), puis
-// SIMPLIFIÉE le soir même, en jouant en portrait (« mets un peu plus gros le
-// prochain pote dans 6 pièces, 1,5 [...] tu dis juste deux potes, c'est très
-// bien ; tu mets prochaine étape, t'enlèves la barre [...] t'enlèves les
-// carreaux qui montrent qu'il y a cinq potes maximum ») :
+// `hud` = { metres, potes, potesMax, gaugeT, mult, restant, restantS, avance,
+//           turbo, safeTop, nuit, plage, plein }
+// Disposition :
 //   haut   : la barre du MORCEAU (le chrono), sur toute la largeur, jusqu'au
 //            drapeau — rouge les 10 dernières secondes ;
 //   centre : les points ;
 //   droite : « ×1,5  2 POTES » en gros, puis « PROCHAINE ÉTAPE » et
 //            « 6 PIÈCES ». Ni cases ni jauge, aucun texte flouté.
-// Texte blanc la nuit ET sur la plage (ciel violet : « le texte est en noir et
-// le ciel est en violet »).
+// Texte blanc la nuit ET sur la plage : le noir ne se lit pas sur le ciel violet.
 export function renderHud(ctx, width, height, hud) {
   ctx.save();
   const top = hud.safeTop || 0;
@@ -133,8 +126,8 @@ export function renderHud(ctx, width, height, hud) {
   ctx.restore();
 }
 
-// La main qui tape, DESSINÉE (4 octobre 2026, nuit) : l'emoji 👆 changeait de
-// tête selon le téléphone (Samsung ≠ iPhone). Mêmes formes que le SVG de la
+// La main qui tape, DESSINÉE plutôt qu'en emoji 👆, qui change de tête selon
+// le téléphone (Samsung ≠ iPhone). Mêmes formes que le SVG de la
 // carte « 1 tap = 1 saut » (index.html), repère 48 × 48.
 function dessinerMain(ctx, x, y, k) {
   ctx.save();
@@ -150,9 +143,8 @@ function dessinerMain(ctx, x, y, k) {
   ctx.restore();
 }
 
-// Doigt qui tape, au départ des premières parties, jusqu'au premier saut
-// (1er octobre 2026 : « il faut mettre un logo, un GIF de quelqu'un qui tape,
-// pour dire qu'il faut taper sur l'écran, il n'y a pas besoin de slider »).
+// Doigt qui tape, au départ des premières parties, jusqu'au premier saut :
+// montre qu'il faut TAPER l'écran, pas glisser.
 export function renderTapHint(ctx, width, height, t, alpha) {
   if (alpha <= 0.01) return;
   const ph = (t % 0.9) / 0.9;
@@ -200,9 +192,8 @@ export function renderCountIn(ctx, width, height, t, beatPeriod, beats, linger, 
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.font = `900 ${t < 0 ? 84 : 66}px ${POLICE_TITRE}`;
-  // OMBRE PORTÉE franche (27 septembre 2026 : « il y a un problème avec les
-  // chiffres : pas d'ombre portée ») — l'ancien flou noir à 55 % se perdait
-  // sur le ciel clair. Un double décalé net, puis un flou doux dessous.
+  // Contour noir net sous le remplissage : un simple flou se perd sur le ciel
+  // clair.
   ctx.shadowColor = "transparent";
   ctx.shadowBlur = 10;
   ctx.shadowOffsetY = 2;
@@ -214,8 +205,8 @@ export function renderCountIn(ctx, width, height, t, beatPeriod, beats, linger, 
   ctx.fillStyle = t < 0 ? BLANC : JAUNE;
   ctx.fillText(texte, 0, 0);
   ctx.restore();
-  // « Il faut mettre au début qu'il faut jouer avec du son » (29 septembre 2026).
-  // Pas si la carte « Monte le son » de l'explication vient de passer.
+  // Rappel de jouer avec le son (les klaxons annoncent les voitures). Pas si
+  // la carte « Monte le son » de l'explication vient de passer.
   if (!avecSon) return;
   const msg = "MONTE LE SON : LES KLAXONS T'ANNONCENT LES VOITURES";
   ctx.save();
@@ -249,8 +240,7 @@ export function renderBanner(ctx, width, height, banner, safeTop = 0, yForce = n
   ctx.translate(-width / 2, -(y + h / 2));
   const x = (width - w) / 2;
   // Carte BLANCHE à bord noir, comme les panneaux du jeu et l'e-card de l'EP
-  // (20 septembre 2026 : « quand il y a Hugo affiché, pas un panneau avec un
-  // fond gris — que ce soit à la DA du jeu, là ça va pas du tout »).
+  // (DA du jeu, jamais un fond gris).
   ctx.fillStyle = "#ffffff";
   roundRect(ctx, x, y, w, h, 3); ctx.fill();
   ctx.strokeStyle = NOIR; ctx.lineWidth = 1.5;
@@ -285,16 +275,14 @@ export function renderBanner(ctx, width, height, banner, safeTop = 0, yForce = n
   ctx.restore();
 }
 
-// Effets du TURBO LAIT : flou de vitesse (v2, vue de profil) — voile sur le
-// bord qui arrive et traits HORIZONTAUX qui filent vers la gauche. Les
-// couleurs saturées viennent du CSS (canvas.turbo).
+// Effets du TURBO LAIT (vue de profil) : traits HORIZONTAUX qui filent vers
+// la gauche. Les couleurs saturées viennent du CSS (canvas.turbo).
 export function renderTurbo(ctx, width, height, t, force) {
   if (force <= 0.01) return;
   ctx.save();
   ctx.globalAlpha = force * 0.75;
-  // Plus de voile blanc sur le bord droit (20 septembre 2026 : « quand on a
-  // pris une brique de lait, t'as des overlays blancs sur la droite, enlève
-  // l'overlay blanc ») : il ne reste que les traits de vitesse.
+  // Pas de voile blanc sur le bord droit (il masque le jeu) : seulement les
+  // traits de vitesse.
   ctx.fillStyle = "rgba(255,255,255,0.7)";
   for (let i = 0; i < 14; i++) {
     const y = height * (0.2 + ((i * 0.618) % 1) * 0.7);
@@ -306,17 +294,14 @@ export function renderTurbo(ctx, width, height, t, force) {
 }
 
 // Tutoriel du tout début : une consigne à la fois, en gros, jusqu'au geste.
-// Même carte que le reste du jeu depuis le 28 septembre 2026 (« je veux une
-// cohérence dans les menus ») : blanche à bord noir, onglet rouge de travers
-// (jaune quand l'étape est réussie), titre en serif noire — c'était le seul
-// panneau encore sombre et translucide.
+// Même carte que le reste du jeu, par cohérence : blanche à bord noir, onglet
+// rouge de travers (jaune quand l'étape est réussie), titre en serif noire.
 export function renderTuto(ctx, width, height, tuto) {
   if (!tuto) return;
   ctx.save();
-  // Plus gros le 4 octobre 2026, nuit (« dans les tutos, il faut écrire
-  // vraiment un peu plus gros » : un joueur avait vu la consigne sans la lire).
+  // En gros : une consigne trop petite est vue sans être lue.
   const w = Math.min(width - 24, 350), h = tuto.sous ? 118 : 84;
-  const x = width / 2 - w / 2, y = tuto.y !== undefined ? tuto.y : height * 0.3; // en HAUT, sous le score (29 septembre 2026)
+  const x = width / 2 - w / 2, y = tuto.y !== undefined ? tuto.y : height * 0.3; // en HAUT, sous le score
   ctx.globalAlpha = tuto.alpha;
   ctx.fillStyle = "#ffffff";
   roundRect(ctx, x, y, w, h, 3); ctx.fill();
@@ -348,11 +333,9 @@ export function renderTuto(ctx, width, height, tuto) {
   ctx.restore();
 }
 
-// Fin du morceau = fin de la course. Refait le 27 septembre 2026 (« quand il
-// y a marqué Terminé, c'est quand même pas très esthétique ») : plus de voile
-// blanc ni de serif condensée en contour noir, mais le STICKER rouge posé de
-// travers de toute la DA (cartes, onglets, e-card de l'EP), qui tombe sur
-// l'écran avec un rebond, et une ligne dessous.
+// Fin du morceau = fin de la course : le STICKER rouge posé de travers de
+// toute la DA (cartes, onglets, e-card de l'EP), qui tombe sur l'écran avec un
+// rebond, et une ligne dessous.
 export function renderFin(ctx, width, height, age, sous = "Tu es allé au bout du morceau") {
   const tPop = Math.min(1, age / 0.32);
   const rebond = 1 + 0.12 * Math.sin(tPop * Math.PI) * (1 - tPop * 0.4);
@@ -393,7 +376,7 @@ export function renderFin(ctx, width, height, age, sous = "Tu es allé au bout d
   }
 }
 
-// Pastille d'annonce (3 octobre 2026) : petite, au-dessus d'un cycliste, là où
+// Pastille d'annonce : petite, au-dessus d'un cycliste, là où
 // les yeux regardent déjà. Fond blanc, bord noir, comme les cartes du menu.
 export function renderPastille(ctx, x, y, texte, alpha, jaune = false) {
   if (alpha <= 0.01) return;

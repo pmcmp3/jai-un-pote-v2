@@ -1,7 +1,5 @@
-// fantome.js — Le FANTÔME du meilleur de la ligue (9 septembre 2026 :
-// « comme dans Mario Kart, un fantôme du vainqueur [...] qu'on puisse voir
-// tout son parcours, là où il est passé, là où il a sauté, avec un bonhomme
-// transparent »). Deux moitiés :
+// fantome.js — Le FANTÔME du meilleur de la ligue, façon Mario Kart : un
+// cycliste transparent qui refait son parcours (positions, sauts). Deux moitiés :
 //   - ENREGISTRER la course du joueur : un échantillon (u, v, hauteur) tous
 //     les 1/HZ s, dans le temps de course `now` (0 = GO). Encodé compact en
 //     texte (~15 Ko pour 170 s), envoyé avec le score s'il bat le record de

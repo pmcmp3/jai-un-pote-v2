@@ -1,7 +1,6 @@
-// scene.js — « J'ai un pote v2 » : VUE DE PROFIL, une seule voie (19 septembre
-// 2026 : « une seule voie, en 2D, exactement comme Jetpack Joyride ou Zombie
-// Tsunami »). Remplace iso.js (vue 3/4 tournée de 30°) avec le MÊME contrat
-// d'exports : le monde reste en (u, v, h) — u = profondeur (0 = la route,
+// scene.js — « J'ai un pote v2 » : VUE DE PROFIL, une seule voie, à la manière
+// de Jetpack Joyride ou Zombie Tsunami. Même contrat d'exports que l'iso.js de
+// la v1 (vue 3/4) : le monde reste en (u, v, h) — u = profondeur (0 = la route,
 // + = vers le fond, − = vers la caméra), v = avance, h = hauteur — seule la
 // projection change. Le joueur file vers la DROITE de l'écran.
 //
@@ -56,12 +55,12 @@ export function setViewport(width, height) {
   appliquerLevee();
   majCentre();
 }
-// Caméra qui MONTE avec la colline (5 octobre 2026 : en haut, la route passait
-// au-dessus de l'œil de la caméra et on voyait les vélos par en dessous — « les
-// vélos ne sont pas très bien modélisés »). L'œil monte de `levee` et l'image
-// est recalée pour que le plan de la route (u = 0) reste EXACTEMENT au même
-// endroit de l'écran : le joueur grimpe toujours autant à l'écran ; le fond
-// monte, le premier plan descend, et tout se voit de nouveau par-dessus.
+// Caméra qui MONTE avec la colline : sinon, en haut, la route passe au-dessus
+// de l'œil de la caméra et on voit les vélos par en dessous. L'œil monte de
+// `levee` et l'image est recalée pour que le plan de la route (u = 0) reste
+// EXACTEMENT au même endroit de l'écran : le joueur grimpe toujours autant à
+// l'écran ; le fond monte, le premier plan descend, et tout se voit de
+// nouveau par-dessus.
 function appliquerLevee() { camH = camH0 + levee; horizonY = horizonY0 - levee * K; }
 export function setLevee(d) { levee = Math.max(0, d); appliquerLevee(); }
 // Hauteur (u) qui s'affiche à la ligne d'écran y, dans le plan de la route
@@ -75,16 +74,15 @@ export function setJoueurX(f) { joueurX = f; majCentre(); }
 export function getVCentre() { return vCentre; }
 export function unitesDevant() { return (1 - joueurX) * W / K; }
 export function setNight(n) { night = Math.max(0, Math.min(1, n)); }
-// Avancement de la journée (20 septembre 2026, demandé : « le soleil qui
-// tourne de gauche à droite de l'écran jusqu'à la nuit, où la lune fait
-// pareil — on a l'impression que la temporalité passe »).
+// Avancement de la journée : le soleil traverse l'écran de gauche à droite
+// jusqu'à la nuit, puis la lune fait pareil — on sent le temps passer.
 export function setHeure(t) { heure = Math.max(0, Math.min(1, t)); }
 export function getNight() { return night; }
 export function setDecorTime(t) { decorT = t; }
 export function scale() { return K; }
 
 export function echelle(u) { return K * camD / Math.max(0.35, camD + u); }
-// Sol surélevé (4 octobre 2026, les collines de la montagne) : tout ce qui est
+// Sol surélevé (les collines de la montagne) : tout ce qui est
 // dessiné dans avecLift(h, …) est posé h plus haut. Les primitives l'ajoutent
 // dès l'ENTRÉE (hauteurs absolues dans les opérations triées), `project`
 // l'ajoute pour les dessins 2D des modèles (personnages, etc.).
@@ -139,8 +137,7 @@ function teintes(color, u) {
 let eclaireActif = false;
 export function eclaire(fn) { const e = eclaireActif; eclaireActif = true; try { fn(); } finally { eclaireActif = e; } }
 
-// --- Saisons (28 septembre 2026 : « fais les saisons avec neige, faut plein de
-// variations ») ------------------------------------------------------------------
+// --- Saisons ---------------------------------------------------------------------
 // Quatre saisons se succèdent pendant le morceau (main.js pose la saison et le
 // fondu). Elles ne repeignent QUE le décor et le sol — jamais la route, les
 // bêtes ni les cyclistes : `modeSaison` est levé autour de leurs dessins.
@@ -222,22 +219,19 @@ function poly(ctx, pts, color) {
   ctx.fill();
 }
 
-// --- Modèles TRIÉS (27 septembre 2026) ----------------------------------------
-// Un modèle (voiture, tracteur, bête) est une pile de cubes peints dans l'ordre
-// où le code les appelle. Tant que cet ordre était écrit à la main, il ne
-// valait que pour UN point de vue : dès que le véhicule passait de l'autre
-// côté du centre de l'écran, un phare du flanc du fond se peignait par-dessus
-// la carrosserie (« on voit les phares à travers la coque du véhicule »), une
-// roue du fond par-dessus le châssis (« le tracteur a un gros problème de
-// modélisation 3D »). `groupe()` collecte les cubes d'un modèle et les peint
+// --- Modèles TRIÉS ---------------------------------------------------------------
+// Un modèle (voiture, tracteur, bête) est une pile de cubes. Peints dans
+// l'ordre du code, ils ne seraient justes que pour UN point de vue : dès que
+// le véhicule passe de l'autre côté du centre de l'écran, un phare du flanc
+// du fond se peindrait par-dessus la carrosserie, une roue du fond par-dessus
+// le châssis. `groupe()` collecte les cubes d'un modèle et les peint
 // selon la VRAIE géométrie : deux cubes qui se recouvrent à l'écran sont
 // départagés par un plan qui les sépare (celui qui est du côté de la caméra
 // passe devant). Les ombres et aplats au sol partent en premier.
 let groupeOps = null;
 // `contour` ({ couleur, px }) : un liseré sombre autour du modèle entier (les
-// personnages, 4 octobre 2026, nuit : « il manque un peu de contraste [...]
-// sur la plage, c'est très difficile de distinguer des humains blancs sur un
-// fond blanc »). La silhouette de chaque cube, élargie, est peinte en encre
+// personnages, pour qu'ils se détachent sur les fonds clairs comme le sable).
+// La silhouette de chaque cube, élargie, est peinte en encre
 // AVANT tous les cubes : une fois ceux-ci peints par-dessus, il ne reste que le
 // bord extérieur de la figure — jamais de trait entre ses morceaux.
 export const CONTOUR_PERSO = { couleur: "#17131c", px: 1.3 };
@@ -254,7 +248,7 @@ export function groupe(ctx, fn, contour = null) {
 }
 // Tête en cubes d'une personne d'humains.js : peau, cheveux selon la coiffure,
 // barbe, œil (blanc + pupille sur les peaux foncées : un point noir y
-// disparaissait). La tête occupe u ∈ [uH, uH+td] (uH côté caméra), v ∈ [vH,
+// disparaît). La tête occupe u ∈ [uH, uH+td] (uH côté caméra), v ∈ [vH,
 // vH+tw], h ∈ [HT, HT+TE]. `face` : "profil" = le visage regarde −v (piéton,
 // skieur) ; "camera" = il regarde la caméra (marchands). `chapeau` : le dessus
 // est couvert, seuls la nuque et les côtés dépassent.
@@ -424,12 +418,10 @@ function boxNu(ctx, u, v, du, dv, h, color, lift) {
 }
 
 // Boîte TOURNÉE autour de son axe vertical, centrée sur (cu, cv) : un vrai
-// prisme à quatre arêtes, dont on peint les faces du fond vers l'avant. C'est
-// ce qui manquait à la brique de lait (20 septembre 2026 : « les briques de
-// lait, ça ne marche toujours pas en 3D, il faut que tu voies la logique ») —
-// drawBox ne sait peindre qu'une boîte alignée sur les axes, donc réduire sa
-// largeur au cosinus donnait une boîte écrasée, jamais une boîte qui tourne.
-// Sert aussi au mouton qui fait un 360.
+// prisme à quatre arêtes, dont on peint les faces du fond vers l'avant. Sert à
+// la brique de lait et au mouton qui fait un 360 : drawBox ne sait peindre
+// qu'une boîte alignée sur les axes, et réduire sa largeur au cosinus donne
+// une boîte écrasée, jamais une boîte qui tourne.
 export function drawBoxR(ctx, cu, cv, du, dv, h, color, lift = 0, angle = 0) {
   lift += liftSol;
   const t = teintes(color, cu);
@@ -500,26 +492,23 @@ function hash(n) {
   const x = Math.sin(n * 12.9898 + 78.233) * 43758.5453;
   return x - Math.floor(x);
 }
-// Biomes TRANCHÉS de 55 rangées (« comme Minecraft ») : même suite que la v1.
+// Biomes TRANCHÉS de 55 rangées (frontières nettes) : même suite que la v1.
 const ZONE_ROWS = 55;
-// 20 septembre 2026 : « essaye de faire un village typique du nord de la
-// France dans un des biomes premiers, et après un village typique du sud ».
-// Le village du Nord arrive tôt (3e tranche), celui du Sud en fin de boucle.
+// Un village typique du nord de la France arrive tôt (3e tranche), un village
+// du Sud en fin de boucle.
 const ZONES = ["ble", "prairie", "village", "tournesol", "foret", "vigne", "villageSud"];
-// Zone imposée par le parcours (4 octobre 2026 : le biome MONTAGNE de la fin,
-// posé par main.js à partir de rows.enMontagne).
+// Zone imposée par le parcours (le biome MONTAGNE de la fin, posé par main.js
+// à partir de rows.enMontagne).
 let zoneForcee = () => null;
 export function setZoneForcee(f) { zoneForcee = typeof f === "function" ? f : () => null; }
 export function zoneAt(r) { return zoneForcee(r) || ZONES[Math.floor(Math.max(0, r) / ZONE_ROWS) % ZONES.length]; }
 const SOIL = { ble: "#c9a648", prairie: "#7aa63c", tournesol: "#6f8c2f", foret: "#3f5a2a", vigne: "#8a6a45", village: "#8fa864", villageSud: "#b9a06a", montagne: "#e4e9ee", plage: "#ecd3a0" };
 const HERBE = { ble: "#6f8f34", prairie: "#7aa63c", tournesol: "#66852f", foret: "#4a6a30", vigne: "#6f8f34", village: "#8fa864", villageSud: "#9aa86a", montagne: "#dfe5eb", plage: "#e6c993" };
-// La route de la montagne est ENNEIGÉE (4 octobre 2026 : « il faudrait que la
-// route soit un peu pleine de neige ») : neige tassée et deux ornières.
+// La route de la montagne est ENNEIGÉE : neige tassée et deux ornières.
 const NEIGE_ROUTE = "#dde3e9", ORNIERE = "#b9c2cc", BORD_NEIGE = "#cfd7df";
 function routeNeige(r) { return zoneForcee(r) === "montagne"; }
-// La PLAGE de fin (5 octobre 2026 : « tu peux finir avec plage, coucher de
-// soleil : c'est la mer au fond et des palmiers. On est un peu comme Miami
-// Beach ») : du sable jusqu'au rivage (u = RIVAGE), la mer au-delà.
+// La PLAGE de fin, au coucher du soleil, façon Miami Beach : du sable jusqu'au
+// rivage (u = RIVAGE), la mer et les palmiers au fond.
 function enPlage(r) { return zoneForcee(r) === "plage"; }
 const RIVAGE = 7.25, SABLE_BORD = "#dcc08a";
 function bordure(r) { return routeNeige(r) ? BORD_NEIGE : enPlage(r) ? SABLE_BORD : DIRT; }
@@ -619,7 +608,7 @@ function montagnes(ctx, u) {
   ctx.closePath(); ctx.fill();
 }
 
-// Montagnes PROCHES (biome montagne, 4 octobre 2026) : une chaîne rocheuse
+// Montagnes PROCHES (biome montagne) : une chaîne rocheuse
 // devant les Alpes lointaines, qui apparaît en fondu (setMontagne).
 let montagneAlpha = 0;
 export function setMontagne(a) { montagneAlpha = Math.max(0, Math.min(1, a)); }
@@ -740,7 +729,7 @@ function soleilCouchant(ctx, a) {
   halo.addColorStop(1, "rgba(120,60,160,0)");
   ctx.fillStyle = halo;
   ctx.fillRect(0, 0, W, horizonY + 4);
-  // Le disque uni (le soleil d'avant) s'efface pendant que le disque rayé apparaît.
+  // Le disque uni (le soleil du ciel) s'efface pendant que le disque rayé apparaît.
   if (e < 1) { ctx.globalAlpha = 1 - e; ctx.fillStyle = "rgba(255,200,130,1)"; ctx.beginPath(); ctx.arc(x, y, R, 0, Math.PI * 2); ctx.fill(); }
   ctx.globalAlpha = e;
   const disque = ctx.createLinearGradient(0, y - R, 0, y + R);
@@ -787,9 +776,8 @@ export function renderGround(ctx, boueAt) {
   const hiv = poidsHiver() * 0.3, aut = poids("automne") * 0.25;
   let haut = melange(melange(melange(CIEL_HAUT, [176, 188, 204], hiv), [214, 170, 120], aut), CIEL_HAUT_NUIT, night);
   let bas = melange(melange(melange(CIEL_BAS, [226, 230, 236], hiv), [240, 196, 150], aut), CIEL_BAS_NUIT, night);
-  // Coucher de soleil sur la plage (5 octobre 2026, intensifié : « il faut
-  // vraiment que le soleil soit à l'horizon ») : indigo en haut, magenta,
-  // corail, puis de l'or tout contre la mer.
+  // Coucher de soleil sur la plage, soleil à l'horizon : indigo en haut,
+  // magenta, corail, puis de l'or tout contre la mer.
   const g = ctx.createLinearGradient(0, 0, 0, horizonY);
   if (plageAlpha > 0.01) {
     const p = plageAlpha;
@@ -845,8 +833,8 @@ export function renderGround(ctx, boueAt) {
   // La mer, de l'horizon au rivage : elle recouvre montagnes, collines et
   // champs lointains, et reflète le soleil couchant.
   if (plageAlpha > 0.01) mer(ctx, plageAlpha);
-  // Dans la montagne, collines et champs lointains passent sous la neige (5
-  // octobre 2026 : une bande jaune restait visible derrière les sapins).
+  // Dans la montagne, collines et champs lointains passent sous la neige
+  // (sinon une bande jaune reste visible derrière les sapins).
   if (montagneAlpha > 0.01) {
     ctx.save(); ctx.globalAlpha = montagneAlpha;
     collines(ctx, 62, 0.4, 9, teintes("#dfe6ec", 12).plat, 4.1);
@@ -869,9 +857,8 @@ export function renderGround(ctx, boueAt) {
   { const e = 0.18 + 0.14 * Math.sin(decorT * 1.3); bande(ctx, RIVAGE - e, RIVAGE + 0.12, (r) => (enPlage(r) ? teintes("#f6efe2", RIVAGE).plat : null)); }
   bande(ctx, ROAD_HALF + 0.22, ROAD_HALF + 1.0, (r) => teintes(HERBE[zoneAt(r)], 1).plat);
   bande(ctx, ROAD_HALF, ROAD_HALF + 0.22, (r) => teintes(bordure(r), 1).plat);
-  // La route : asphalte et lignes de rive en tirets (repère de vitesse). Plus
-  // de flaques de boue depuis le 20 septembre 2026 (« enlève les trucs de
-  // terre par terre, les gens comprennent pas, je pense »).
+  // La route : asphalte et lignes de rive en tirets (repère de vitesse). Pas
+  // de flaques de boue : les joueurs ne les comprennent pas.
   modeSaison = null;
   bande(ctx, -ROAD_HALF, ROAD_HALF, (r) => (routeNeige(r) ? teintes(r % 2 ? NEIGE_ROUTE : shadeHex(NEIGE_ROUTE, -3), 0).plat : teintes(r % 2 ? ROAD : shadeHex(ROAD, 3), 0).plat));
   const rive = (r) => (routeNeige(r) ? teintes(NEIGE_ROUTE, 0).plat : r % 3 === 0 ? teintes(ROAD, 0).plat : teintes(LINE, 0).plat);
@@ -889,7 +876,7 @@ export function renderGround(ctx, boueAt) {
   k = 0;
   for (let u = -ROAD_HALF - 1.3; u > uFin; u -= 0.6, k++) {
     const u1 = Math.max(uFin, u - 0.6), kk = k;
-    bande(ctx, u1, u, (r) => { const soil = SOIL[zoneAt(r)]; return teintes(kk % 2 ? shadeHex(soil, -7) : shadeHex(soil, 2), 0).plat; }); // sillons adoucis (3 octobre 2026)
+    bande(ctx, u1, u, (r) => { const soil = SOIL[zoneAt(r)]; return teintes(kk % 2 ? shadeHex(soil, -7) : shadeHex(soil, 2), 0).plat; }); // sillons adoucis
   }
   modeSaison = null;
 }
@@ -929,11 +916,10 @@ function shadeHex(hex, a) {
 // hauteurMaxPremierPlan() : rien ne cache jamais la route.
 // `clear` = rangée traversée par un tracteur ou une poule lancée : rien sur
 // leur chemin.
-// Masque posé par main.js (27 septembre 2026) : rangées où le mobilier de bord
-// de route doit s'effacer. Bit 1 = pas de lampadaire (un panneau est là : « il
-// y avait un panneau avec marqué Jules, il était caché derrière un lampadaire,
-// on le voit pas ») ; bit 2 = une halle est là (lampadaires et poteaux
-// passaient À TRAVERS son plancher et son toit).
+// Masque posé par main.js : rangées où le mobilier de bord de route doit
+// s'effacer. Bit 1 = pas de lampadaire (un panneau est là, le lampadaire le
+// cacherait) ; bit 2 = une halle est là (lampadaires et poteaux passeraient
+// À TRAVERS son plancher et son toit).
 let masque = () => 0;
 export function setMasqueDecor(f) { masque = typeof f === "function" ? f : () => 0; }
 export const SANS_LAMPE = 1, DANS_HALLE = 2, SANS_DECOR = 4, ETALS = 8;
@@ -942,8 +928,7 @@ function poteauIci(r) { return r % 5 === 0 && !(masque(r) & DANS_HALLE) && !(mas
 
 export function rowDecor(ctx, r, clear) {
   const out = [];
-  // Le bowling est un INTÉRIEUR (4 octobre 2026 : « enlève les maisons
-  // derrière ») : son mur du fond remplace tout le décor.
+  // Le bowling est un INTÉRIEUR : son mur du fond remplace tout le décor.
   if (masque(r) & SANS_DECOR) return out;
   const zone = zoneAt(r);
   const push = (u, v, draw) => out.push({ d: depth(u, v), draw: () => avecSaison("objet", draw) });
@@ -952,30 +937,27 @@ export function rowDecor(ctx, r, clear) {
     // Palmiers le long de la route, parasols sur le sable, et de temps en
     // temps une cabane de sauveteur pastel (Miami Beach).
     if (r % 4 === 0) { const a = hash(r * 23 + 1), u = ROAD_HALF + 1.4 + a * 1.2, v = r - 0.3, k = r * 1.7; push(u, v, () => palmier(ctx, u, v, 6.2 + a * 2.4, Math.sin(decorT * 1.1 + k) * 0.12, hash(r * 5) < 0.5 ? -1 : 1)); }
-    // Une partie de raquettes au bord de l'eau, tous les 37 rangs (5 octobre
-    // 2026 : « qu'ils jouent avec des raquettes ») : pas de parasol dessus.
+    // Une partie de raquettes au bord de l'eau, tous les 37 rangs : pas de
+    // parasol dessus.
     const jeu = ((r % 37) + 37) % 37;
     if (jeu === 11) { const u = RIVAGE - 1.1, v = r; push(u, v, () => raquettesPlage(ctx, u, v, decorT, r)); }
     if (r % 4 === 2 && !(jeu >= 9 && jeu <= 15) && hash(r * 29 + 4) < 0.55) { const a = hash(r * 31 + 2), u = ROAD_HALF + 3.0 + a * 2.0, v = r; push(u, v, () => parasol(ctx, u, v, Math.floor(hash(r * 7 + 1) * 4))); }
     if (r % 41 === 17) { const u = ROAD_HALF + 3.2, v = r; push(u, v, () => cabaneSauveteur(ctx, u, v, Math.floor(hash(r) * 3))); }
     return out;
   }
-  // Le MARCHÉ de plein air le long des halles (5 octobre 2026 : « des stands
-  // comme s'ils étaient à Paris, des mecs qui vendent des courgettes, des
-  // légumes, des pastèques ») : les étals remplacent le premier plan, les
-  // maisons du fond restent.
+  // Le MARCHÉ de plein air le long des halles (courgettes, légumes,
+  // pastèques) : les étals remplacent le premier plan, les maisons du fond
+  // restent.
   const marche = (masque(r) & ETALS) !== 0;
-  // (Hors teinte de saison : en automne, la pastèque virait au marron.)
+  // (Hors teinte de saison : en automne, la pastèque virerait au marron.)
   if (marche && ((r % 5) + 5) % 5 === 0) { const u = ROAD_HALF + 1.4, v = r; out.push({ d: depth(u, v), draw: () => etalMarche(ctx, u, v, Math.floor(r / 5), decorT) }); }
   if (!clear) {
     for (const side of [1, -1]) {
       if (marche && side > 0) continue;
       const base = side > 0 ? ROAD_HALF + 1.2 : ROAD_HALF + 6.0;
-      // Décor ALLÉGÉ (28 septembre 2026 : « simplifie les décors et la
-      // complexité des choses ») : un seul élément semé par rangée, et
-      // seulement juste derrière la route — le fond ne garde que ses arbres.
-      // 29 septembre 2026 (« trop d'éléments à l'arrière-plan ») : encore
-      // divisé par deux.
+      // Décor ALLÉGÉ, pour ne pas surcharger l'arrière-plan : au plus un
+      // élément semé sur ~30 % des rangées, et seulement juste derrière la
+      // route — le fond ne garde que ses arbres.
       const n = estVillage(zone) || side < 0 ? 0 : hash(r * 7 + 3) < 0.3 ? 1 : 0;
       if (estVillage(zone)) decorVillage(ctx, push, r, side, sway, zone === "villageSud");
       for (let i = 0; i < n; i++) {
@@ -1002,9 +984,8 @@ export function rowDecor(ctx, r, clear) {
           push(u, v, () => rocher(ctx, u, v, t));
         }
       }
-      // Arbres ESPACÉS (29 septembre 2026 : l'ancien « une rangée sur deux »
-      // faisait un mur de forêt derrière la route) : un tous les 5 près de
-      // la route, un tous les 3 au fond.
+      // Arbres ESPACÉS (plus serrés, ils font un mur de forêt derrière la
+      // route) : un tous les 5 près de la route, un tous les 3 au fond.
       if ((side > 0 ? r % 5 === 0 : r % 3 === 1) && !estVillage(zone)) {
         const a = hash(r * 13 + side * 7);
         const u = (side > 0 ? ROAD_HALF + 6.6 : ROAD_HALF + 11.2) + a * 0.8, v = r - 0.4, k = r * 2.3 + side * 5;
@@ -1017,16 +998,15 @@ export function rowDecor(ctx, r, clear) {
         push(u, v, () => sapin(ctx, u, v, 7 + a * 4));
       }
     }
-    // Hiver et montagne (4 octobre 2026 : « rajoute des bonshommes de neige
-    // sur le côté, dans le décor [...] tu peux mettre un sapin de Noël dans
-    // le fond ») : de petits bonshommes près de la route, un sapin décoré au fond.
+    // Hiver et montagne : de petits bonshommes de neige près de la route, un
+    // sapin de Noël décoré au fond.
     if ((zone === "montagne" || poidsHiver() > 0.5) && !estVillage(zone)) {
       if (hash(r * 61 + 7) < 0.07) { const a = hash(r * 67 + 3), u = ROAD_HALF + 1.6 + a * 2.2, v = r - 0.3; push(u, v, () => bonhommeDecor(ctx, u, v, 0.55 + a * 0.25)); }
       if (r % 37 === 5) { const u = ROAD_HALF + 7.2, v = r; push(u, v, () => sapinNoel(ctx, u, v, 6.5)); }
     }
-    // (Plus de bottes de foin sur le bas-côté : de profil, elles se
-    // confondaient avec la botte-obstacle posée sur la route.) Des buissons
-    // bas, ronds et verts, à la place.
+    // Pas de bottes de foin sur le bas-côté : de profil, elles se confondent
+    // avec la botte-obstacle posée sur la route. Des buissons bas, ronds et
+    // verts, à la place.
     if (hash(r * 41 + 1) < 0.05 && zone !== "foret" && !estVillage(zone) && !marche) {
       const u = ROAD_HALF + 1.3, v = r - 0.25;
       push(u, v, () => { drawBox(ctx, u, v, 0.6, 0.7, 0.35, "#4f7f35"); drawBox(ctx, u + 0.1, v + 0.1, 0.4, 0.5, 0.18, "#5f9440", 0.35); });
@@ -1035,8 +1015,7 @@ export function rowDecor(ctx, r, clear) {
   // Poteaux électriques (fils tendus jusqu'au suivant) et lampadaires, sur le
   // bas-côté du fond. Même sur une rangée traversée : ils sont hors du chemin.
   // Poteaux électriques (8 m, comme dans la vraie vie) et lampadaires (6,5 m) :
-  // ils faisaient la taille du cycliste (20 septembre 2026, « je fais la même
-  // taille qu'un lampadaire, il faudrait qu'ils soient plus grands »).
+  // à l'échelle, bien plus grands que le cycliste.
   if (false && poteauIci(r) && zone !== "foret") { // poteaux et fils retirés (décor allégé)
     const u = ROAD_HALF + 1.55, v = r - 0.05;
     push(u, v, () => {
@@ -1064,9 +1043,8 @@ export function rowDecor(ctx, r, clear) {
     });
   }
   // Premier plan : herbes, fleurs, épis, clôture — jamais plus haut que la route.
-  // ⚠️ RETIRÉ le 3 octobre 2026 (« simplifier les éléments au premier plan,
-  // pour qu'on arrive plus facilement à voir quand il y a quelque chose sur
-  // la route ») : le champ du premier plan est désormais nu.
+  // ⚠️ Désactivé (boucle à 0 itération) : le champ du premier plan reste nu,
+  // pour qu'on voie du premier coup d'œil ce qui arrive sur la route.
   const pres = hash(r * 57 + 3);
   for (let i = 0; i < 0; i++) {
     const a = hash(r * 23 + i * 11 + 5), b = hash(r * 29 + i * 3 + 9);
@@ -1090,7 +1068,7 @@ export function rowDecor(ctx, r, clear) {
   }
   // Clôture de bois du premier plan : un piquet toutes les deux rangées,
   // une lisse qui court jusqu'au suivant.
-  if (false && r % 2 === 0 && !estVillage(zone)) { // clôture du premier plan retirée (29 septembre 2026)
+  if (false && r % 2 === 0 && !estVillage(zone)) { // clôture du premier plan retirée (décor allégé)
     const u = -(ROAD_HALF + 3.4), v = r;
     const h = Math.min(0.62, hauteurMaxPremierPlan(u) - 0.04);
     if (h > 0.2) {
@@ -1212,15 +1190,12 @@ function arbre(ctx, u, v, h, sw) {
 // qui regarde la caméra. Emplacements FIXES par rangée de la tranche (rz) :
 // rien ne se marche dessus. Côté +1 = juste derrière la route, côté −1 = au
 // fond (les deux rives de la v1).
-// ⚠️ TOUT LE VILLAGE EST À L'ÉCHELLE DEPUIS LE 20 SEPTEMBRE 2026 (« on a un
-// background avec des maisons, des voitures et des personnages : les
-// perspectives, ça va pas du tout [...] j'ai des personnages beaucoup plus
-// petits que des voitures »). Le bug n'était pas la projection, qui est juste,
-// mais les MODÈLES : un villageois faisait 0,78 unité de haut et un étage de
-// maison 1,0 — soit un bonhomme de 78 cm devant une maison de 1 m. Règle
-// désormais : 1 unité ≈ 1 mètre, comme le cycliste (1,8 u).
+// ⚠️ TOUT LE VILLAGE EST À L'ÉCHELLE : 1 unité ≈ 1 mètre, comme le cycliste
+// (1,8 u) — un villageois de 1,75 m, un étage de 2,9 m. Si les perspectives
+// paraissent fausses, c'est un MODÈLE hors d'échelle qu'il faut chercher, pas
+// la projection.
 const PERSO_H = 1.75, ETAGE_H = 2.9;
-// La personne vient d'humains.js (4 octobre 2026, nuit) : peau, taille —
+// La personne vient d'humains.js : peau, taille —
 // enfants compris, c'est le décor —, carrure, cheveux.
 function personnage(ctx, u, v, lift, haut, bas) {
   const M = humain(Math.round(v * 13 + u * 7) + 3000);
@@ -1257,12 +1232,10 @@ function maisonNue(ctx, u, v, prof, larg, etages, P, k, balcon) {
     drawBox(ctx, u - 0.82, v + 0.2, 0.08, larg - 0.4, 0.95, "#6b4b2e", ETAGE_H + 0.14);
   }
   if (P.pente > 0.7) {
-    // NORD (refait le 28 septembre 2026) : pignon à redents CENTRÉ sur la
-    // façade, face à la rue, et le toit d'ardoise derrière lui, faîtage
-    // perpendiculaire à la route. L'ancien toit en marches parallèles à la
-    // route passait AU-DESSUS de la caméra : on n'en voyait que des dessous
-    // sombres qui flottaient, et le « pignon » était un escalier collé à
-    // gauche de la maison.
+    // NORD : pignon à redents CENTRÉ sur la façade, face à la rue, et le toit
+    // d'ardoise derrière lui, faîtage perpendiculaire à la route. Un toit en
+    // marches parallèles à la route passerait AU-DESSUS de la caméra : on n'en
+    // verrait que des dessous sombres qui flottent.
     const marches = 4, hm = 0.62, retrait = larg / (2 * marches + 1);
     for (let e = 0; e < marches; e++) {
       const l = larg - 2 * e * retrait, vv = v + e * retrait;
@@ -1283,8 +1256,8 @@ function decorVillage(ctx, push, r, side, sway, sud) {
   const pres = side > 0;
   const P = sud ? PALETTE_SUD : PALETTE_NORD;
   const k = r * 7 + (pres ? 0 : 3);
-  // UNE MAISON SUR DEUX, une voiture sur deux, moins d'habitants (29 septembre
-  // 2026 : « il y a beaucoup trop de choses [...] mets une maison sur deux »).
+  // Village clairsemé (une maison sur deux, une voiture sur deux, peu
+  // d'habitants) pour ne pas surcharger l'écran.
   if (rz % 12 === (pres ? 4 : 1) && rz !== 27 && rz !== 12) {
     const u = pres ? ROAD_HALF + 2.2 : ROAD_HALF + 8.0, v = r - 1.2;
     push(u, v, () => maisonRegion(ctx, u, v, 4.0, 3.2, 1, P, k, null));
@@ -1337,12 +1310,8 @@ function decorVillage(ctx, push, r, side, sway, sud) {
   }
   // Voitures garées : EXACTEMENT le modèle de la route (props.drawVoiture,
   // injecté par main.js — scene.js ne peut pas importer props.js, qui
-  // l'importe). Le modèle simplifié d'ici avait des roues en cubes et une
-  // vitre qui flottait (27 septembre 2026 : « dans le biome aux maisons
-  // rouges, les voitures avaient un gros problème de modélisation »).
-  // Voitures garées posées LOIN des maisons (30 septembre 2026 : « des voitures
-  // qui passent derrière des maisons ») : à rz 1 la voiture chevauchait la
-  // maison de rz 4 — même profondeur, le tri les mélangeait.
+  // l'importe). Posées LOIN des maisons : à la même profondeur qu'une maison
+  // qu'elle chevauche, le tri les mélange et la voiture passe derrière.
   if (pres && rz % 24 === 20 && dessinVoiture) {
     const cu = ROAD_HALF + 3.4, cv = r + 0.4;
     push(cu, cv, () => dessinVoiture(ctx, cu, cv));
@@ -1357,7 +1326,7 @@ function decorVillage(ctx, push, r, side, sway, sud) {
   }
 }
 
-// --- Les ÉTALS du marché (5 octobre 2026) -------------------------------------------
+// --- Les ÉTALS du marché ------------------------------------------------------------
 // Au sol, derrière la route, le long de la halle du marché : la caméra (3,6 u)
 // les voit d'en haut, on lit donc les cagettes. Trois étals qui tournent :
 // le primeur (courgettes, tomates, salades, aubergines, poireaux), le
@@ -1378,7 +1347,7 @@ function etalMarche(ctx, u, v, n, t) {
   // Le marchand (et parfois sa collègue) : tablier, marinière, béret ou casquette.
   const vendeurs = sorte === 1 ? [L * 0.3, L * 0.72] : [L * 0.5];
   vendeurs.forEach((dv, k) => {
-    // La personne (humains.js, 4 octobre 2026, nuit) : peau, carrure, taille,
+    // La personne (humains.js) : peau, carrure, taille,
     // coiffure ; béret, casquette, ou tête nue.
     const M = humain(n * 2 + k + 7000, { enfants: false });
     const sy = M.taille, w = M.corpulence, chapeau = (n + k) % 3;
@@ -1489,18 +1458,15 @@ function produit(ctx, sorte, u, v, du, dv, h, graine) {
   for (let a = 0; a < nu - 1; a++) for (let b = 0; b < nv - 1; b++) if (g(a * 5 + b) < 0.6) drawBox(ctx, u + (a + 0.5) * (du / nu), v + (b + 0.5) * (dv / nv), t, t, t * 0.9, COUL[(a + b + 1) % 2], h + t * 0.9);
 }
 
-// --- Les HALLES DE MARCHÉ (20 septembre 2026) ---------------------------------------
-// « Un bâtiment un peu comme des halles de marché typiques françaises, où il y
-// a une rampe [...] on est au premier étage des halles. » Une rampe de bois
-// monte depuis la route, un plancher file à HALLE_HAUT, une rampe redescend ;
-// au-dessus, la charpente et le toit de tuiles sur des piliers de pierre.
+// --- Les HALLES DE MARCHÉ ----------------------------------------------------------
+// Halles de marché à la française, qu'on traverse au premier étage : une
+// rampe de bois monte depuis la route, un plancher file à HALLE_HAUT, une
+// rampe redescend ; au-dessus, la charpente et le toit de tuiles sur des
+// piliers de pierre.
 //
-// ⚠️ DEUX COUCHES depuis le 27 septembre 2026 (« attention aux perspectives au
-// niveau des halles : il y a beaucoup de bugs de texture et de perspective
-// entre ce qui est devant et ce qui est derrière »). La halle était UN seul
-// objet peint derrière la route : le garde-corps et le flanc de la rampe, qui
-// sont DEVANT le cycliste, passaient derrière lui, et les lampadaires du
-// bas-côté traversaient le plancher. Désormais :
+// ⚠️ DEUX COUCHES : peinte d'un seul bloc derrière la route, la halle ferait
+// passer derrière le cycliste le garde-corps et le flanc de la rampe, qui sont
+// DEVANT lui. Donc :
 //   « fond »  — piliers, bandes du départ, tablier de la rampe (la surface où
 //              l'on roule) : peints avant le cycliste ;
 //   « devant » — flanc de la rampe, plancher, poteaux, garde-corps, fermes,
@@ -1508,12 +1474,11 @@ function produit(ctx, sorte, u, v, du, dv, h, graine) {
 // Le toit est monté assez haut pour qu'un double saut depuis le plancher ne
 // le traverse jamais (tête à ~9,6 u au plus haut, sous-face à 10,05).
 export const HALLE_TOIT_AU_DESSUS = 5.4;
-// --- La gare et le bowling VIVENT (4 octobre 2026, nuit : « à la gare je veux
-// un klaxon de train, au bowling un bruit de quilles ») -----------------------
+// --- La gare et le bowling VIVENT (klaxon du train, fracas des quilles) -------
 // Le TER ENTRE EN GARE : il arrive DE DERRIÈRE le joueur, le double pendant
 // qu'il monte la rampe, freine le long du quai et s'y arrête quand le joueur
 // est au milieu du quai — on le voit filer ~2 s puis s'immobiliser (un train
-// venu d'en face traversait l'écran en moins d'une seconde). Fonction de la
+// venu d'en face traverserait l'écran en moins d'une seconde). Fonction de la
 // position du JOUEUR (pas du temps) : le ralenti d'un tuto ou une pause ne le
 // désynchronisent jamais, et ambiance.js en tire le son (klaxon, roulement,
 // freins) par la même formule. `arret` : où est le joueur quand il s'arrête
@@ -1546,7 +1511,7 @@ export function drawHalle(ctx, rDebut, geo, rFrom = -Infinity, rTo = Infinity, c
   const type = geo.type || "marche";
   const visible = (v0, v1) => v1 >= rFrom - 2 && v0 <= rTo + 2;
   const uG = -ROAD_HALF - 0.2, uD = ROAD_HALF + 0.2;
-  // Palette par bâtiment (3 octobre 2026) : marché (bois, pierre, tuiles),
+  // Palette par bâtiment : marché (bois, pierre, tuiles),
   // bowling (piste cirée, violet nuit, néons), gare (quai béton, acier vert,
   // marquise vitrée).
   const PAL = {
@@ -1561,9 +1526,7 @@ export function drawHalle(ctx, rDebut, geo, rFrom = -Infinity, rTo = Infinity, c
   // exactement, la pente est lisse.
   const rampes = [[rDebut, v1, 0, haut], [v2, vFin, haut, 0]];
   if (couche === "salle") {
-    // L'INTÉRIEUR du bowling (4 octobre 2026 : « il faut vraiment que tu mettes
-    // des pistes, enlève les maisons derrière, et que les quilles soient
-    // beaucoup plus grosses ») : derrière la route, les pistes filent vers le
+    // L'INTÉRIEUR du bowling : derrière la route, les pistes filent vers le
     // fond (la perspective les fait converger), des quilles en bout de piste,
     // un mur violet à néons qui cache tout le décor (scene.SANS_DECOR).
     const uW = ROAD_HALF + 6.2, a0 = rDebut - 0.5, a1 = vFin + 0.5, t = geo.t || 0;
@@ -1616,11 +1579,10 @@ export function drawHalle(ctx, rDebut, geo, rFrom = -Infinity, rTo = Infinity, c
     return;
   }
   if (couche === "estrade") {
-    // Le marché EN HAUT, sur le plancher des halles (5 octobre 2026 : « il
-    // faut qu'ils soient en haut de l'estrade, en hauteur, logique, parce
-    // qu'on est dans les halles ») : le plancher se prolonge derrière la
-    // route, porté par des poteaux, et les étals s'y alignent entre les
-    // piliers. (Ceux d'en bas, sous le pont, restent.)
+    // Le marché EN HAUT, sur le plancher des halles (on est dans les halles,
+    // les étals aussi) : le plancher se prolonge derrière la route, porté par
+    // des poteaux, et les étals s'y alignent entre les piliers. (Ceux d'en
+    // bas, sous le pont, restent.)
     const uE = uD, pE = 3.7;
     if (!visible(v1, v2)) return;
     for (let i = 0; i <= plat; i += 6) { const v = v1 + Math.min(i, plat - 0.3); if (visible(v, v + 0.3)) drawBox(ctx, uE + pE - 0.4, v, 0.3, 0.3, haut - 0.42, POUTRE); }
@@ -1642,12 +1604,10 @@ export function drawHalle(ctx, rDebut, geo, rFrom = -Infinity, rTo = Infinity, c
     drawBox(ctx, uR - 0.2, a0, 2.4, a1 - a0, haut - 0.05, "#8a8478");              // remblai
     for (let v = Math.ceil(a0); v < a1; v += 1) if (visible(v, v + 0.3)) drawBox(ctx, uR, v, 2.0, 0.3, 0.06, "#6b4b2e", haut - 0.05); // traverses
     for (const du of [0.35, 1.55]) drawBox(ctx, uR + du, a0, 0.1, a1 - a0, 0.1, "#b8bcc4", haut);   // rails
-    // ⚠️ Le TER ne sort que du TUNNEL (4 octobre 2026, nuit : « le train
-    // apparaissait un peu dans le vide, au milieu de nulle part, avant même que
-    // j'arrive dans la gare ») : il arrivait de derrière à hauteur de quai, au
-    // bord gauche de l'écran, pendant qu'on montait la rampe — là où il n'y a
-    // pas encore de quai, rien sous lui. Il sort maintenant d'un tunnel au bout
-    // du quai : on ne dessine que la partie sortie (de a0 à a1).
+    // ⚠️ Le TER ne sort que du TUNNEL au bout du quai : on ne dessine que la
+    // partie sortie (de a0 à a1). Sinon, arrivant de derrière à hauteur de
+    // quai pendant qu'on monte la rampe, il flotterait dans le vide, là où il
+    // n'y a pas encore de quai sous lui.
     const dv = geo.trainDv || 0;
     const t0 = rDebut + TRAIN.corps[0] + dv, t1 = rDebut + TRAIN.corps[1] + dv, H = haut + 0.25;
     const tv0 = Math.max(a0 + 1, t0), tv1 = Math.min(a1, t1);
@@ -1738,15 +1698,15 @@ export function drawHalle(ctx, rDebut, geo, rFrom = -Infinity, rTo = Infinity, c
     if (visible(v, v + 0.8)) drawBox(ctx, -ROAD_HALF - 0.4, v + 0.15, ROAD_HALF * 2 + 0.9, 0.4, 0.35, POUTRE, TOIT + 0.1);
   }
   // Le toit. La caméra est SOUS lui : on n'en voit que la sous-face et la
-  // rive. Une seule masse de tuiles (plus deux boîtes superposées qui se
-  // peignaient dans le mauvais ordre), une sous-face de voliges sombre juste
-  // dessous, et un débord côté caméra limité à 0,5 u (à 1 u, la rive mangeait
-  // le tiers haut de l'écran).
+  // rive. Une seule masse de tuiles (deux boîtes superposées se peindraient
+  // dans le mauvais ordre), une sous-face de voliges sombre juste dessous, et
+  // un débord côté caméra limité à 0,5 u (à 1 u, la rive mange le tiers haut
+  // de l'écran).
   const uT = -ROAD_HALF - 0.5, lT = ROAD_HALF * 2 + 1.9;
   drawBox(ctx, uT, rDebut - 0.5, lT, total + 1.0, 0.55, TUILE, TOIT + 0.5);
   drawBox(ctx, uT + 0.02, rDebut - 0.45, lT - 0.04, total + 0.9, 0.05, PAL.SOUS, TOIT + 0.45);
-  // L'ENSEIGNE, suspendue sous la rive à l'entrée (remplace le bandeau
-  // « LES HALLES ! » qui s'affichait par-dessus le jeu).
+  // L'ENSEIGNE, suspendue sous la rive à l'entrée : le nom du lieu est dans
+  // le décor, pas en bandeau par-dessus le jeu.
   const vE = rDebut + 3.2, lE = 6.2, hE = 1.15, basE = TOIT - 1.05;
   if (visible(vE - lE / 2, vE + lE / 2)) {
     const uE = uT - 0.05;
@@ -1766,14 +1726,12 @@ export function drawHalle(ctx, rDebut, geo, rFrom = -Infinity, rTo = Infinity, c
   }
 }
 
-// Bosse de montagne (4 octobre 2026) : la chaussée monte et redescend. Deux
-// couches comme la halle : « dessus » (la route, peinte avant le cycliste) et
-// « flanc » (le talus côté caméra, peint après lui).
-// Trois couches depuis les collines de 6,5 u (4 octobre 2026, deuxième passe) :
-// « dos » (le terrain derrière la route, soulevé jusqu'au fond du décor, où se
-// posent les sapins — mêmes sillons que les champs : aucune couture au pied),
-// « dessus » (la chaussée enneigée) et « flanc » (le versant côté caméra, qui
-// redescend jusqu'au sol — ou jusqu'en bas de l'écran).
+// Bosse de montagne : la chaussée monte et redescend. Trois couches, sur le
+// même principe que la halle : « dos » (le terrain derrière la route, soulevé
+// jusqu'au fond du décor, où se posent les sapins — mêmes sillons que les
+// champs : aucune couture au pied), « dessus » (la chaussée enneigée, peinte
+// avant le cycliste) et « flanc » (le versant côté caméra, qui redescend
+// jusqu'au sol — ou jusqu'en bas de l'écran — peint après lui).
 // Chaque bande est UN polygone qui suit la colline (points tous les 0,5 rang).
 const PENTE_VERSANT = 1.2; // le versant avant recule de 1,2 u par unité de hauteur
 export function drawBosse(ctx, d, geo, rFrom = -Infinity, rTo = Infinity, couche = "dessus") {
@@ -1866,10 +1824,10 @@ export function lampsIn(from, to) {
 // Panneau de village sur le bas-côté du fond : deux poteaux, une plaque rouge,
 // le nom écrit sur la face qui regarde la caméra (un rectangle à l'écran).
 export function drawSign(ctx, r, village) {
-  const [nom] = village;   // le département ne sert à rien (20 septembre 2026)
+  const [nom] = village;   // le département n'est pas affiché
   const u = ROAD_HALF + 0.55, v = r;
-  // +50 % le 4 octobre 2026, nuit (« il faut que les panneaux de commune
-  // soient 50 % plus gros ») : 2,3 × 0,85 → 3,45 × 1,28, poteaux plus hauts.
+  // Plaque de 3,45 × 1,28 sur des poteaux de 1,5 : grande, pour qu'on lise le
+  // nom de la commune en passant.
   const w = 3.45, hb = 1.28, base = 1.5;
   drawBox(ctx, u, v - w / 2 + 0.3, 0.15, 0.15, base, "#8a8d98");
   drawBox(ctx, u, v + w / 2 - 0.45, 0.15, 0.15, base, "#8a8d98");
