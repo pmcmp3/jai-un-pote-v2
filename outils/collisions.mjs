@@ -18,6 +18,9 @@ const page = await (await navigateur.newContext({ viewport: { width: 375, height
 const erreurs = [];
 page.on("pageerror", (e) => erreurs.push(e.message));
 await page.addInitScript(() => {
+  // Espion : chaque appel à la vibration (Android) est noté.
+  window.__vibrations = [];
+  Object.defineProperty(Navigator.prototype, "vibrate", { value: (m) => { window.__vibrations.push(m); return true; }, configurable: true });
   localStorage.setItem("jp2-appris", '["tap","haut","double"]'); localStorage.setItem("jp2Pseudo", "pmc"); localStorage.setItem("jp2LigueVue", "1");
   localStorage.setItem("jp2-conseils-vus", '{"lait":1,"alerte":1}'); localStorage.setItem("jp2Parties", "5");
   localStorage.setItem("jp2MorceauOuvert", "1"); localStorage.setItem("jp2PmcSuivi", "1");
@@ -58,12 +61,14 @@ const res = await page.evaluate(() => {
       else ratees.push(`${row.kind}@${r} t=${P.clock.now().toFixed(1)}`);
     }
   }
-  return { vus, touches, invulnerables, pourquoi, ratees: ratees.slice(0, 20), fin: P.clock.now() };
+  return { vus, touches, invulnerables, pourquoi, ratees: ratees.slice(0, 20), fin: P.clock.now(), vibrationsChoc: window.__vibrations.filter((m) => m === 60).length };
 });
 console.log("Rencontrés / percutés (et payés) / percutés pendant une invulnérabilité (turbo, bouclier) :");
 for (const k of Object.keys(res.vus).sort()) console.log(`  ${k.padEnd(12)} ${res.vus[k]} / ${res.touches[k] || 0} / ${res.invulnerables[k] || 0}`);
 console.log(`Traversés SANS choc : ${res.ratees.length}`, res.ratees.join(" · "));
 console.log("Chocs sans coût :", res.pourquoi.join(" · "));
 console.log(`fin à ${res.fin.toFixed(1)} s`, erreurs.length ? `ERREURS ${erreurs.join(" | ")}` : "");
-verdict(!res.ratees.length && !erreurs.length && res.fin > 160, `${res.ratees.length} obstacle(s) traversé(s) sans choc, ${erreurs.length} erreur(s) JS, course jusqu'à ${res.fin.toFixed(0)} s`);
+const payes = Object.values(res.touches).reduce((a, b) => a + b, 0);
+console.log(`Vibrations de choc : ${res.vibrationsChoc} pour ${payes} chocs payés`);
+verdict(!res.ratees.length && !erreurs.length && res.fin > 160 && res.vibrationsChoc >= payes, `${res.ratees.length} obstacle(s) traversé(s) sans choc, ${res.vibrationsChoc}/${payes} chocs qui vibrent, ${erreurs.length} erreur(s) JS, course jusqu'à ${res.fin.toFixed(0)} s`);
 await navigateur.close(); await serveur.close();

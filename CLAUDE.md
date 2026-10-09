@@ -77,6 +77,10 @@ intégré d'Instagram d'abord**, portrait natif.
 - Chaque pote = +`potesBonusMetres` au multiplicateur. Un choc coûte des potes ; seul le joueur
   meurt.
 - **Brique de lait** : turbo 5 s, invincible, points doublés ; ce qu'on percute est éjecté.
+  Plus grande qu'une pièce, avec un halo qui pulse au rythme du morceau.
+- ⚠️ **Aucun conflit entre objets et récompenses** : aucune pièce ni brique de lait dans un
+  obstacle, ni sur le passage d'un véhicule venu d'en face pendant qu'il est à l'écran
+  (`balayageVisible`, rows.js). Gardé par le test `conflits` du filet.
 - **Jetpack** une partie sur cinq, posé hors du générateur (une course à jetpack peut dépasser
   le score parfait).
 
@@ -93,7 +97,8 @@ intégré d'Instagram d'abord**, portrait natif.
   ralentit, la consigne s'affiche, le temps repart sur le bon geste ; l'obstacle expliqué ne fait
   jamais mal et la route est dégagée autour (`rows.degagerTutos`).
 - **Explication au lancement** en étapes (`EXPL_ETAPES`, screens.js) : 3 premières parties et
-  toujours en ligue démo. Projecteurs une fois par joueur (brique de lait, panneau d'alerte).
+  toujours en ligue démo. Projecteur une fois par joueur sur la première brique de lait. Le
+  panneau « attention » n'a PAS de tuto : il se comprend seul (retour de joueurs).
 
 ### Rendu (`scene.js`, `props.js`, `voxrider.js`, `humains.js`)
 - Sténopé de profil, tout en cubes ; un modèle = un `scene.groupe()` trié (ARCHITECTURE §5 bis).
@@ -124,6 +129,11 @@ intégré d'Instagram d'abord**, portrait natif.
 - ⚠️ **Tout ce qui est en ligne est INERTE** tant que la base Supabase v2 n'existe pas
   (`apiBase` vide) : ni ligue réelle, ni classement, ni boost, ni événements de funnel. Le jeu
   tourne alors avec la ligue de démo.
+- **Couronne** : le premier de la ligue la porte à la place de son chapeau, dans la course de
+  ses potes (et sur soi si c'est soi), et devant son nom sur l'écran de fin. Retenu par ligue
+  (`jp2Leader`) ; en démo, avant toute course finie, c'est le premier pote fictif.
+- **Écran de fin** : « Il te manque X pts pour passer devant @pseudo » (ou « La couronne est à
+  toi »), sous le rang.
 - **Fantôme** du meilleur de la ligue : en sommeil (la trace part avec le score ; le
   chargement `chargerFantome` est à rebrancher quand la base existera).
 - **Porte de conversion** (`niveauPour`) : une demande à la fois — l'album d'abord, puis
@@ -132,6 +142,10 @@ intégré d'Instagram d'abord**, portrait natif.
   de l'artiste ; le premier jeu l'évitait (règle Spotify : pas de contrepartie contre un ajout).
   Risque connu, assumé.
 - Ligue de test `TESTV2` (`config.ligueBeta`) : menu simplifié et bouton « Laisser un retour ».
+
+### Vibrations (Android seulement : aucune API web ne fait vibrer un iPhone)
+Choc 60 ms, chute, nouveau pote, brique de lait, salto, fin. Le test `collisions` vérifie que
+chaque choc payé vibre.
 
 ### Liens et touches
 - URL : `?9` (vide caches et service worker), `?premiere` (première visite), `?demo` (ligue de
@@ -145,24 +159,29 @@ intégré d'Instagram d'abord**, portrait natif.
 - **Base Supabase v2** à créer par l'artiste (ARCHITECTURE §5), puis **sous-domaine** (§4).
 - **À juger sur un vrai téléphone** : clavier iOS dans Instagram, partage dans les navigateurs
   intégrés, lien `instagram://` vers @pmc.mp3, les sons à l'oreille.
-- **Découper `render()` et `step()` de main.js** (les deux plus longues fonctions du jeu) : pas
-  fait, faute d'un test qui prouve que l'image n'a pas bougé — la course démarre en temps réel
-  avant le pas-à-pas du mode vidéo, donc deux rendus de la même course ne sont pas identiques
-  au pixel. Prérequis : un démarrage déterministe en mode vidéo.
+- **Mesurer le parcours des joueurs** (où ils décrochent : chargement, pseudo, 1re course,
+  2e course, clic album) : voulu par l'artiste. Les événements sont codés ; il faut la base v2,
+  puis une page de tableau de bord.
+- **Défi à un ami** (lien avec un score à battre) : prévu, pas commencé.
 - Idées de lots pour les champions de ligue (maillot jaune du leader, nom du champion dans le
   jeu, finale du dimanche, règle des 5 potes actifs, blocage des scores impossibles) : proposées
   le 5 octobre 2026, rien de commencé.
 
 ## Le filet et les outils
 
-- **`npm run verif`** (≈ 3 min) : 11 tests du vrai jeu, chacun conclut par ✅ OK ou ❌ ÉCHEC
+- **`npm run verif`** (≈ 3 min) : 12 tests du vrai jeu, chacun conclut par ✅ OK ou ❌ ÉCHEC
   (`outils/verdict.mjs`) ; un test qui échoue est relancé une fois et signalé « instable » s'il
   passe au second essai. `npm run verif -- collisions clavier` pour n'en lancer que certains.
   Ce qu'il garantit : joueur idéal sans choc et joueur immobile qui touche tout (`regles`),
-  chaque obstacle percuté coûte (`collisions`), un tap = un saut sur Android, tutos sur route
+  aucune récompense dans un obstacle ou un véhicule (`conflits`), chaque obstacle percuté
+  coûte et vibre (`collisions`), un tap = un saut sur Android, tutos sur route
   dégagée, menu stable sur Android, clavier sur 6 téléphones, première visite façon Instagram,
   curseurs de son, course entière sans erreur avec les sons dans leur décor, < 8,3 ms par image
   à CPU ×4 (`perf` ; une machine très chargée peut le faire monter), build qui tourne.
+- **Réorganiser du code sans changer l'image** : `node outils/rendu-identique.mjs --reference`
+  AVANT, puis `node outils/rendu-identique.mjs` APRÈS — 13 images d'une même course (départ
+  reproductible `__pote.videoAuDepart`) comparées au pixel près. Pas dans le filet : sa
+  référence n'a de sens qu'autour d'une retouche qui ne doit rien changer à l'écran.
 - Ajouter un test au filet : finir le script par `verdict(ok, résumé)` et l'inscrire dans
   `TESTS` (`outils/verif.mjs`).
 - Autres outils : `outils/capture.mjs [scènes]` (captures, `SERVIR=dist` pour le build,

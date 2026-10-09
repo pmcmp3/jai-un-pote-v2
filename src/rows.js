@@ -706,6 +706,12 @@ export class Route {
       if (row.type !== "safe" || row.coins.length || row.lait !== undefined || row.grosse !== undefined) return false;
       if (dansHalle(r0 + p)) return false;
       for (let d = -3; d <= 3; d++) if (this.dangers.has(r0 + p + d)) return false;
+      // Ni sur le passage d'un véhicule venu d'en face pendant qu'il est à
+      // l'écran : il traverserait la brique sous les yeux du joueur.
+      for (let r = r0 + p - BALAYAGE_MAX; r < r0 + p; r++) {
+        const k = this.dangers.get(r);
+        if (k && KINDS[k].contresens && !KINDS[k].lanceur && r0 + p - r <= balayageVisible(r, k)) return false;
+      }
       return true;
     };
     for (let p = 0; p < BLOC; p++) {

@@ -11,6 +11,7 @@ import * as net from "./net.js";
 import * as friends from "./friends.js";
 import { COULEURS, CHAPEAUX, SKIN_DEFAUT } from "./rider.js";
 
+import { graineLigue } from "./regles.js";
 const pts = (n) => `${Math.floor(Number(n) || 0).toLocaleString("fr-FR")} pts`;
 
 let deps = null;
@@ -955,17 +956,49 @@ export async function finLigue(metres, potes, mode = "course", bilan = {}) {
 }
 // Classement de la ligue sur l'écran de fin, avec le rang du joueur en tête
 // de carte (« Tu es 1er de ta ligue ! »).
+// Le PREMIER de la ligue porte une couronne, dans la course de ses potes et
+// sur l'écran de fin. Retenu par ligue : la course suivante le sait d'avance.
+// En démo, avant toute course terminée, c'est le premier pote fictif.
+const CLE_LEADER = "jp2Leader";
+export function getLeader() {
+  if (!ligue) return null;
+  try { const l = JSON.parse(lsGet(CLE_LEADER) || "null"); if (l && l.code === ligue.code && l.pseudo) return l.pseudo; } catch (e) { /* illisible : on recalcule */ }
+  return ligue.demo ? autresDemo()[0] || null : null;
+}
+function retenirLeader(code, pseudo) { if (pseudo) lsSet(CLE_LEADER, JSON.stringify({ code, pseudo })); }
+// Ligue réelle : le classement de SA course (même graine pour tous).
+async function rafraichirLeader() {
+  if (!ligue || ligue.demo) return;
+  const rows = await net.classement(ligue.code, graineLigue(ligue.code));
+  if (rows && rows.length) retenirLeader(ligue.code, rows[0].pseudo);
+}
+const COURONNE_SVG = '<svg class="couronne" viewBox="0 0 16 12" aria-hidden="true"><path d="M1.5 10.5h13l1-8-4.2 3.2L8 1 4.7 5.7.5 2.5z" fill="#ffcf2e" stroke="#0d0d10" stroke-width="1.2" stroke-linejoin="round"/></svg>';
 function afficherClassement(code, rows, titre = null) {
   endLigueCode.textContent = titre || code;
+  if (!titre && ligue && code === ligue.code && rows.length) retenirLeader(code, rows[0].pseudo);
   endLigueListe.textContent = "";
   const moi = getPseudo() || "toi";
   const rang = rows.findIndex((r) => r.pseudo === moi) + 1;
   const annonce = $("end-rang");
   if (annonce) { annonce.textContent = rang === 1 ? "Tu es 1er de ta ligue !" : rang > 0 ? `Tu es ${rang}e de ta ligue` : ""; annonce.classList.toggle("hidden", !rang); }
+  // Ce qui fait relancer : l'écart avec celui qui est juste devant.
+  const ecart = $("end-ecart");
+  if (ecart) {
+    ecart.textContent = "";
+    if (rang === 1 && rows.length > 1) ecart.textContent = "La couronne est à toi : tes potes la verront sur toi dans leur course.";
+    else if (rang > 1) {
+      const devant = rows[rang - 2], manque = Math.max(1, Math.floor(Number(devant.metres)) - Math.floor(Number(rows[rang - 1].metres)) + 1);
+      const b1 = document.createElement("b"), b2 = document.createElement("b");
+      b1.textContent = pts(manque); b2.textContent = `@${devant.pseudo}`;
+      ecart.append("Il te manque ", b1, " pour passer devant ", b2);
+    }
+    ecart.classList.toggle("hidden", !ecart.textContent);
+  }
   rows.slice(0, enBeta() ? 12 : 7).forEach((r, i) => {
     const li = document.createElement("li");
     if (r.pseudo === moi) li.className = "moi";
-    const rang = document.createElement("span"); rang.className = "rang"; rang.textContent = `${i + 1}`;
+    const rang = document.createElement("span"); rang.className = "rang";
+    if (i === 0) rang.innerHTML = COURONNE_SVG; else rang.textContent = `${i + 1}`;
     const nom = document.createElement("span"); nom.className = "nom"; nom.textContent = `@${r.pseudo}`;
     const m = document.createElement("span"); m.className = "m"; m.textContent = pts(r.metres);
     li.append(rang, nom, m);
@@ -975,6 +1008,7 @@ function afficherClassement(code, rows, titre = null) {
 }
 function initLigue() {
   initPartage();
+  setTimeout(rafraichirLeader, 0);
   afficherBoost();
   rafraichirBoost();
   const b = $("boost-ligue");

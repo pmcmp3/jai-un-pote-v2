@@ -854,3 +854,27 @@ Code `TESTV2`, qui est aussi `config.ligueBeta` (menu simplifié + bouton « Lai
   `ARCHITECTURE.md` (partie v2) remis à jour avec les mesures du jour.
 - **Pas fait** : le découpage de `render()`/`step()` (voir CLAUDE.md, points ouverts).
 
+## 9 octobre 2026, soir — retours sur les dix propositions
+
+Retenu par l'artiste : la mesure du parcours des joueurs (« absolument ça qu'il faut garder »,
+pour quand la base existera), la couronne plutôt que le maillot jaune (« il a un chapeau, il a
+une couronne »), l'écart au suivant sur l'écran de fin, la vibration, le départ reproductible.
+Écarté : les Reels. Plus tard : la base, le défi.
+- **Panneau « attention » sans tuto** (« quelqu'un m'a dit que c'était assez logique ») : son
+  projecteur est retiré, celui de la brique de lait reste.
+- **Brique de lait** plus visible (×1,2, halo qui pulse au temps, éclats) ; **conflits objets /
+  récompenses** mesurés : 0 pièce et 0 brique dans un obstacle, mais 32 briques sur 900
+  traversées à l'écran par un véhicule venu d'en face (le convoi de cars surtout) → corrigé
+  dans le générateur, 0 sur 60 courses, test `conflits` ajouté au filet. `VERSION_COURSE` 23.
+  L'outil comptait 14 rangées visibles devant le joueur au lieu de 10,9 : aligné sur l'écran.
+- **Couronne** du premier de la ligue et **écart au suivant** sur l'écran de fin.
+- **Vibration au choc** : elle existait déjà (Android) ; le test `collisions` vérifie
+  maintenant que chaque choc payé vibre.
+- **Départ reproductible** (`__pote.videoAuDepart`) et `outils/rendu-identique.mjs`. Premier
+  essai faussé : le test photographiait le petit vélo de l'écran de chargement (premier
+  canevas de la page) — corrigé sur `#game-canvas`, puis rendu identique obtenu en figeant le
+  hasard, l'horloge, les autres boucles d'animation, la phase de pédalage et le tirage des
+  potes. Grâce à lui, `step()` (244 lignes) et `render()` (323 lignes) sont découpés en
+  fonctions nommées : 13 images sur 13 identiques au pixel près, filet vert, scènes rares
+  (fantôme, jetpack, éjection, nuit, fin) sans erreur.
+

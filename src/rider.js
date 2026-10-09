@@ -29,6 +29,9 @@ export const COULEURS = [
 export const CHAPEAUX = ["casquette", "bob", "paille", "aucun"];
 export const SKIN_DEFAUT = { genre: "homme", motif: "raye", c1: "#2f7a46", c2: "#f2ede2", short: "#3a3e4e", chapeau: "casquette", chaussures: "#565a66", velo: "vtt" };
 
+// Le premier de la ligue porte une COURONNE dorée à la place de son chapeau.
+export function couronner(P) { return { ...P, hat: "couronne", hatColor: "#ffcf2e" }; }
+
 export function paletteDepuisSkin(skin, base = PALETTES.pmc) {
   const s = { ...SKIN_DEFAUT, ...(skin || {}) };
   const uni = s.motif === "uni";

@@ -329,6 +329,9 @@
     #end-ligue-liste li { display: flex; gap: 8px; padding: 5px 4px; border-bottom: 1px solid rgba(0,0,0,0.08); }
     #end-ligue-liste li.moi { background: rgba(255,207,46,0.35); border-radius: 3px; font-weight: 900; }
     #end-ligue-liste .rang { width: 18px; color: rgba(0,0,0,0.45); font-weight: 900; }
+    #end-ligue-liste .rang .couronne { width: 16px; height: 12px; vertical-align: -1px; }
+    #end-ecart { margin: 0; font: 600 13px/1.35 var(--police); text-align: center; color: var(--noir); }
+    #end-ecart b { font-weight: 900; color: var(--rouge); }
     #end-ligue-liste .nom { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     #end-ligue-liste .m { font-variant-numeric: tabular-nums; font-weight: 900; }
     #end-ligue .btn { width: 100%; padding: 8px 10px; min-height: 40px; font-size: 12px; }
@@ -582,6 +585,7 @@
           </div>
           <div id="end-ligue" class="hidden">
             <p id="end-rang" class="hidden"></p>
+            <p id="end-ecart" class="hidden"></p>
             <button id="end-ligue-titre" type="button">Ligue <b id="end-ligue-code">—</b> <small id="end-ligue-copier">· copier</small></button>
             <ol id="end-ligue-liste"></ol>
             <p id="end-relais" class="hidden"></p>

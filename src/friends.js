@@ -9,7 +9,7 @@
 // dégât ; ils ramassent les pièces qu'ils croisent.
 
 import { project } from "./scene.js";
-import { PALETTES, paletteDepuisSkin } from "./rider.js";
+import { PALETTES, paletteDepuisSkin, couronner } from "./rider.js";
 import { drawRider, drawJetpack, RIDER_HEIGHT } from "./voxrider.js";
 
 // Profondeur de chaque place de la meute (+ = côté fond, − = côté caméra).
@@ -30,6 +30,9 @@ let joins = 0;
 let marques = []; // { id, v, type, ref } — là où le joueur a sauté, et devant quel obstacle
 let markId = 0;
 
+// Le premier de la ligue (screens.getLeader) : couronné dans le peloton.
+let leader = null;
+export function setLeader(nom) { leader = nom || null; }
 export function reset() { potes = []; maxCount = 0; joins = 0; marques = []; tirerSelection(); }
 export function alive() { return potes.filter((p) => !p.leave); }
 export function count() { return alive().length; }
@@ -114,7 +117,8 @@ export function join(player) {
   const idx = Math.max(0, listeNoms().indexOf(name));
   const membre = listeMembres()[idx];
   const base = PALETTES.potes[idx % PALETTES.potes.length];
-  const palette = membre && membre.skin ? paletteDepuisSkin(membre.skin, base) : base;
+  const tenue = membre && membre.skin ? paletteDepuisSkin(membre.skin, base) : base;
+  const palette = leader && name === leader ? couronner(tenue) : tenue;
   joins += 1;
   // Il arrive de derrière et rejoint sa place dans la meute.
   const v = vDuSlot(player.v, slot);

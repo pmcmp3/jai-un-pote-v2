@@ -11,6 +11,7 @@ const racine = fileURLToPath(new URL("..", import.meta.url));
 // Du plus rapide au plus lent ; chaque ligne : nom, commande, ce qui est garanti.
 const TESTS = [
   ["regles", ["outils/mesurer.mjs", "20"], {}, "joueur idéal sans choc, joueur immobile touche tout"],
+  ["conflits", ["outils/pieces-piegees.mjs", "20"], {}, "aucune pièce ni brique de lait dans un obstacle ou un véhicule"],
   ["collisions", ["outils/collisions.mjs"], {}, "chaque obstacle percuté coûte"],
   ["tap-android", ["outils/tap-android.mjs"], {}, "un tap = un saut sur Android"],
   ["tuto", ["outils/tuto-neuf.mjs"], {}, "chaque tuto tombe sur une route dégagée"],

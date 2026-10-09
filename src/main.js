@@ -30,7 +30,7 @@ import * as screens from "./screens.js";
 import * as net from "./net.js";
 import * as debugOverlay from "./debug.js";
 import { consumeJumpPress, consumeWheelie, isHolding } from "./input.js";
-import { PALETTES, paletteDepuisSkin } from "./rider.js";
+import { PALETTES, paletteDepuisSkin, couronner } from "./rider.js";
 import { drawRider, drawJetpack, RIDER_HEIGHT } from "./voxrider.js";
 import { drawCoin } from "./coin.js";
 import { V_UNIT, LEAD_IN, targetSpeed as targetSpeedRegle, multiplicateur as multRegle, graineLigue, dureeCourse, rangAuTemps } from "./regles.js";
@@ -449,14 +449,14 @@ function conseilVue() {
 }
 
 // --- Projecteur ------------------------------------------------------------------
-// Première brique de lait et premier triangle d'alerte : une fois par joueur
-// (jp2-conseils-vus), le monde gèle, l'écran s'assombrit sauf autour de
-// l'objet, une indication s'affiche, et un tap fait repartir.
+// Première brique de lait : une fois par joueur (jp2-conseils-vus), le monde
+// gèle, l'écran s'assombrit sauf autour de l'objet, une indication s'affiche,
+// et un tap fait repartir. Le panneau « attention » n'a pas de projecteur : il
+// se comprend seul.
 const PROJECTEURS = {
   // On dit ce que la brique FAIT (l'invincibilité surtout, c'est ce qui se
   // voit en jeu), pas seulement ce qu'elle est.
   lait: { titre: "BRIQUE DE LAIT = TURBO", sous: "Attrape-la : pendant 5 s, tu fonces, rien ne peut te toucher et tes points comptent double" },
-  alerte: { titre: "ATTENTION !", sous: "Ce panneau annonce un danger qui arrive : prépare-toi à sauter" },
 };
 const projo = { type: null, x: 0, y: 0, r: 40, age: 0 };
 function projoLancer(type, x, y, r) {
@@ -501,8 +501,15 @@ const JAUNE = "#ffcf2e", ROUGE = "#e13e26";
 
 // --- Départ / rejeu -----------------------------------------------------------------
 let paletteJoueur = PALETTES.pmc;
+// Le premier de la ligue porte la couronne : sur lui si c'est le joueur, sur
+// le pote concerné sinon (friends.setLeader).
+function paletteDuJoueur() {
+  const P = paletteDepuisSkin(screens.getSkin()), chef = screens.getLeader();
+  return chef && chef === screens.getPseudo() ? couronner(P) : P;
+}
 function preparerJoueur() {
-  paletteJoueur = paletteDepuisSkin(screens.getSkin());
+  paletteJoueur = paletteDuJoueur();
+  friends.setLeader(screens.getLeader());
   scene.setVille(screens.getVille());
   masqueCache.clear();
 }
@@ -858,7 +865,43 @@ function armerTraversees(now, vitesse) {
 const STEP = 1 / 120;
 const MAX_FRAME_TIME = 0.1;
 
+// Un pas de simulation (120 Hz). Les étapes s'enchaînent dans cet ordre :
+// chacune lit ce que la précédente vient de poser.
 function step(dt) {
+  demarrerSiPret();
+  surveillerHorlogeAudio();
+  vieillirEffets(dt);
+  if (!gameStarted) {
+    player.pedal += 4.5 * dt;
+    return;
+  }
+  if (game.ended) {
+    rouleApresArrivee(dt);
+    return;
+  }
+  if (isPaused()) return;
+
+  const now = clock.now();
+  const phys = jumpPhysics();
+  // Ralenti du tuto contextuel : le monde avance à `ralenti`, la musique non.
+  const dtReel = dt;
+  if (now >= 0) { conseilStep(dtReel, tMonde(), speed); dt = dtReel * ralenti; retardMonde += dtReel - dt; }
+  const tm = tMonde();
+  marchandPas();
+  annoncerBoost(now);
+  majCiel(now, dt);
+  const marque = sauter(dt, now, tm, phys);
+  const vitesse = avancer(dt, now, tm, phys, marque);
+  // --- Traversées : armées pour croiser le joueur ---
+  if (now >= 0) armerTraversees(tm, vitesse);
+  collisionsEtPieces(now, tm);
+  if (arriveeOuFin(now)) return;
+
+  if (friends.count() > 0 || friends.maxReached() === 0) canvas.classList.remove("danger");
+  else if (!game.ended) canvas.classList.add("danger");
+}
+// Départ : on attend que le son tourne (ou, faute de son, l'horloge de secours).
+function demarrerSiPret() {
   if (!gameStarted && startRequested) {
     if (audio.isRunning()) {
       clock.setTimeSource(audio.now);
@@ -869,8 +912,11 @@ function step(dt) {
       useFallbackClock(false);
       gameStarted = true;
     }
-    if (gameStarted) ancrerDepartSurLaGrille();
+    if (gameStarted) { ancrerDepartSurLaGrille(); if (videoAuDepart) entrerVideoAuDepart(); }
   }
+}
+// Chien de garde de l'horloge audio : un son figé bascule sur l'horloge de secours.
+function surveillerHorlogeAudio() {
   // ⚠️ Jamais pendant une pause : audio.now() y est GELÉ exprès (pauseAnchor).
   // Le chien de garde y verrait une horloge audio en panne et basculerait sur
   // l'horloge de secours… qui, elle, tourne : le monde avancerait derrière le
@@ -881,6 +927,10 @@ function step(dt) {
     else if (perfClock() - audioWatch.lastReal > AUDIO_STALL_TIMEOUT) useFallbackClock(true);
   }
 
+}
+// Ce qui vieillit à chaque pas, course lancée ou non : étincelles, traînée du
+// salto, popups, pastilles, bandeau, flash, secousse, fondu du HUD.
+function vieillirEffets(dt) {
   player.prevU = player.u; player.prevV = player.v; player.prevJumpY = player.jumpY; player.prevPedal = player.pedal; player.prevFlip = player.flip;
   for (let i = sparkles.length - 1; i >= 0; i--) {
     const sp = sparkles[i];
@@ -902,39 +952,26 @@ function step(dt) {
     if (hudAlpha !== cible) { const pas = dt / HUD_FADE; hudAlpha = cible > hudAlpha ? Math.min(cible, hudAlpha + pas) : Math.max(cible, hudAlpha - pas); }
   }
 
-  if (!gameStarted) {
-    player.pedal += 4.5 * dt;
-    return;
-  }
-  if (game.ended) {
-    // Roue libre après « TERMINÉ ! » : on continue d'avancer, sans rien ramasser.
-    if (game.finAge >= 0) {
-      game.finAge += dt; player.v += speed * 0.6 * dt; player.pedal += speed * dt * 2;
-      // … et la PESANTEUR continue : franchie en plein saut, la ligne
-      // laisserait sinon le cycliste suspendu en l'air.
-      player.prevJumpY = player.jumpY; player.prevFlip = player.flip;
-      const sol = solSous(player.v, player.jumpY);
-      if (player.jumpY > sol + 0.001 || player.jumpVy > 0) {
-        player.jumpVy -= jumpPhysics().g * dt;
-        player.jumpY += player.jumpVy * dt;
-        if (player.flip > 0) player.flip = Math.min(Math.PI * 2, player.flip + dt * (Math.PI * 2 / 0.55));
-        if (player.jumpY <= sol) { player.jumpY = sol; player.jumpVy = 0; player.doubled = false; player.flip = 0; player.tHaut = 0; }
-      }
-      player.auSol = player.jumpY <= sol + 0.001;
-      friends.recordPlayer(player.v, null); friends.update(dt, player, jumpPhysics());
+}
+function rouleApresArrivee(dt) {
+  // Roue libre après « TERMINÉ ! » : on continue d'avancer, sans rien ramasser.
+  if (game.finAge >= 0) {
+    game.finAge += dt; player.v += speed * 0.6 * dt; player.pedal += speed * dt * 2;
+    // … et la PESANTEUR continue : franchie en plein saut, la ligne
+    // laisserait sinon le cycliste suspendu en l'air.
+    player.prevJumpY = player.jumpY; player.prevFlip = player.flip;
+    const sol = solSous(player.v, player.jumpY);
+    if (player.jumpY > sol + 0.001 || player.jumpVy > 0) {
+      player.jumpVy -= jumpPhysics().g * dt;
+      player.jumpY += player.jumpVy * dt;
+      if (player.flip > 0) player.flip = Math.min(Math.PI * 2, player.flip + dt * (Math.PI * 2 / 0.55));
+      if (player.jumpY <= sol) { player.jumpY = sol; player.jumpVy = 0; player.doubled = false; player.flip = 0; player.tHaut = 0; }
     }
-    return;
+    player.auSol = player.jumpY <= sol + 0.001;
+    friends.recordPlayer(player.v, null); friends.update(dt, player, jumpPhysics());
   }
-  if (isPaused()) return;
-
-  const now = clock.now();
-  const phys = jumpPhysics();
-  // Ralenti du tuto contextuel : le monde avance à `ralenti`, la musique non.
-  const dtReel = dt;
-  if (now >= 0) { conseilStep(dtReel, tMonde(), speed); dt = dtReel * ralenti; retardMonde += dtReel - dt; }
-  const tm = tMonde();
-  marchandPas();
-
+}
+function annoncerBoost(now) {
   // Le boost de ligue s'annonce au « GO ».
   if (!game.boostAnnonce && now >= COUNT_IN_GO_LINGER_S) {
     game.boostAnnonce = true;
@@ -942,6 +979,9 @@ function step(dt) {
     // Pas aux premières parties : le doigt qui tape a la priorité au départ.
     if (game.boost > 1 && !game.tapHint) pousserPastille(`+${Math.round((game.boost - 1) * 100)} % GRÂCE À TES ${b.potes.length} POTES`, 2.4);
   }
+}
+// Nuit, plage, soleil, montagne, et caméra qui monte avec la colline.
+function majCiel(now, dt) {
   // --- Nuit : tombe à partir de nuitDebutS, 30 s de transition ---
   const nd = nuitDebut !== null ? nuitDebut : window.CONFIG.nuitDebutS;
   // La plage de fin rallume un coucher de soleil : la nuit s'y lève tout à fait.
@@ -958,6 +998,9 @@ function step(dt) {
   leveeCam += (Math.max(0, rows.hauteurBosse(player.v) + 2.4 - (window.CONFIG.cameraHauteur || 3.6)) - leveeCam) * Math.min(1, dt * 3);
   scene.setLevee(leveeCam);
 
+}
+// Renvoie la marque du saut (« saut » / « double » / null) que la meute refera.
+function sauter(dt, now, tm, phys) {
   // --- Saut : tap, maintien, double saut ---
   // ⚠️ Le sol n'est plus toujours 0 : sur une halle, le plancher monte
   // (rows.solAt). Décoller, retomber et « être au sol » se comparent donc à la
@@ -1011,6 +1054,11 @@ function step(dt) {
   player.prevRoue = player.roue;
   if (player.roue > 0) { player.roue = player.roue + dt / 0.9; if (player.roue >= 1) player.roue = 0; }
 
+  return marque;
+}
+// Turbo, vitesse, distance, sol sous les roues, jetpack, meute. Renvoie la
+// vitesse du pas (turbo compris).
+function avancer(dt, now, tm, phys, marque) {
   // --- Turbo lait ---
   if (game.turbo > 0) { game.turbo -= dt; if (game.turbo <= 0) { game.turbo = 0; canvas.classList.remove("turbo"); } }
 
@@ -1057,9 +1105,9 @@ function step(dt) {
   friends.recordPlayer(player.v, marque, marque ? refObstacle(player.v, tm) : null);
   friends.update(dt, player, phys);
 
-  // --- Traversées : armées pour croiser le joueur ---
-  if (now >= 0) armerTraversees(tm, vitesse);
-
+  return vitesse;
+}
+function collisionsEtPieces(now, tm) {
   // --- Collisions et pièces ---
   if (now >= 0) {
     for (const ev of rows.checkMember("j", player.prevV, player.v, player.jumpY, tm)) {
@@ -1077,6 +1125,9 @@ function step(dt) {
     }
   }
 
+}
+// Vrai si la course vient de se terminer (ligne franchie ou morceau fini).
+function arriveeOuFin(now) {
   // --- Ligne d'ARRIVÉE : 8 s avant la fin du morceau, on la pose là où le joueur
   // sera quand la musique s'arrêtera (vitesse prévue intégrée). La franchir
   // termine la course, comme la fin du morceau.
@@ -1085,12 +1136,11 @@ function step(dt) {
     for (let t = 0; t < tempsRestant(); t += 0.05) d += targetSpeed(now + t) * 0.05;
     game.arriveeR = player.v + d;
   }
-  if (game.arriveeR !== null && player.v >= game.arriveeR && !game.ended) { terminer(); return; }
+  if (game.arriveeR !== null && player.v >= game.arriveeR && !game.ended) { terminer(); return true; }
   // --- Fin du morceau = fin de la course ---
-  if (now >= 0 && !game.ended && tempsRestant() <= 0) { terminer(); return; }
+  if (now >= 0 && !game.ended && tempsRestant() <= 0) { terminer(); return true; }
 
-  if (friends.count() > 0 || friends.maxReached() === 0) canvas.classList.remove("danger");
-  else if (!game.ended) canvas.classList.add("danger");
+  return false;
 }
 
 // Touches de debug (avec ?debug) : P = +1 pote, O = −1 pote, G = mourir,
@@ -1164,11 +1214,14 @@ function drawPiece(r, h, now, kind) {
     // (scene.drawBoxR). ⚠️ Pas drawBox avec une largeur au cosinus : drawBox ne
     // peint que des boîtes alignées sur les axes, la brique s'écraserait au
     // lieu de tourner.
-    const bas = h - 0.42 + bob;
-    scene.avecLift(rows.solAt(r), () => scene.drawShadow(ctx, 0, r, 0.22, 0.22, 0.18));
-    scene.drawBoxR(ctx, 0, r, 0.42, 0.42, 0.74, "#f8f8f4", bas, spin);
-    scene.drawBoxR(ctx, 0, r, 0.44, 0.44, 0.2, "#2f7fd6", bas + 0.2, spin);
-    scene.drawBoxR(ctx, 0, r, 0.16, 0.16, 0.14, "#e8e8e2", bas + 0.74, spin);   // le bec
+    // 20 % plus grande qu'une pièce ne le laisserait croire, et elle BRILLE :
+    // c'est le bonus le plus fort du jeu, il doit se voir de loin.
+    const k = 1.2, bas = h - 0.42 * k + bob;
+    halo(r, bas + 0.45 * k, now, "248,252,255", "120,190,255");
+    scene.avecLift(rows.solAt(r), () => scene.drawShadow(ctx, 0, r, 0.22 * k, 0.22 * k, 0.18));
+    scene.drawBoxR(ctx, 0, r, 0.42 * k, 0.42 * k, 0.74 * k, "#f8f8f4", bas, spin);
+    scene.drawBoxR(ctx, 0, r, 0.44 * k, 0.44 * k, 0.2 * k, "#2f7fd6", bas + 0.2 * k, spin);
+    scene.drawBoxR(ctx, 0, r, 0.16 * k, 0.16 * k, 0.14 * k, "#e8e8e2", bas + 0.74 * k, spin);   // le bec
     return;
   }
   // UNE SEULE taille de pièce, et la grosse dorée dans un rapport fixe
@@ -1181,6 +1234,29 @@ function drawPiece(r, h, now, kind) {
   ctx.restore();
 }
 const PIECE_R = 0.36;
+// Halo d'un bonus : un disque doux qui pulse au rythme du morceau (un temps =
+// une pulsation), et quatre éclats en croix qui tournent lentement autour.
+function halo(r, h, now, coeur, bord) {
+  const p = scene.project(-0.3, r, h), R = scene.scale() * 1.35;
+  const pulse = 0.5 + 0.5 * Math.sin((now / clock.beatPeriod) * Math.PI * 2);
+  ctx.save();
+  const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, R);
+  g.addColorStop(0, `rgba(${coeur},${0.75 + 0.2 * pulse})`);
+  g.addColorStop(0.45, `rgba(${bord},${0.35 + 0.2 * pulse})`);
+  g.addColorStop(1, `rgba(${bord},0)`);
+  ctx.fillStyle = g;
+  ctx.fillRect(p.x - R, p.y - R, R * 2, R * 2);
+  ctx.fillStyle = `rgba(${coeur},0.95)`;
+  for (let i = 0; i < 4; i++) {
+    const a = now * 0.9 + (i * Math.PI) / 2, d = R * (0.62 + 0.08 * pulse), e = R * (0.07 + 0.05 * ((i + Math.floor(now * 2)) % 2));
+    const x = p.x + Math.cos(a) * d, y = p.y + Math.sin(a) * d;
+    ctx.beginPath();
+    ctx.moveTo(x, y - e * 2); ctx.lineTo(x + e * 0.5, y); ctx.lineTo(x, y + e * 2); ctx.lineTo(x - e * 0.5, y); ctx.closePath(); ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(x - e * 2, y); ctx.lineTo(x, y + e * 0.5); ctx.lineTo(x + e * 2, y); ctx.lineTo(x, y - e * 0.5); ctx.closePath(); ctx.fill();
+  }
+  ctx.restore();
+}
 // Le jetpack posé sur la route : il flotte, tourne, brille, et s'annonce.
 function dessinerJetpackObjet(r, now) {
   const bas = rows.solAt(r) + 0.35 + Math.sin(now * 3) * 0.08, spin = now * 2.2;
@@ -1244,7 +1320,6 @@ function renderAlertes(now, vitesse) {
     // ⚠️ Posé sur sa largeur RÉELLE, 2 × taille, avec une marge franche :
     // compté sur une seule `taille`, son coin droit sortirait de l'écran.
     const x = width - 14 - taille * 2 + tremble;
-    projoLancer("alerte", x + taille, y, 70); projoSuivre("alerte", x + taille, y);
     if (debugAlertes) { const e = debugAlertes.get(r) || { kind: row.kind, alerte: 0, vu: 0 }; e.alerte += 1; debugAlertes.set(r, e); }
     ctx.save();
     // Halo puis panneau plein, contour blanc : il doit sauter aux yeux.
@@ -1292,6 +1367,8 @@ function poserSaison(t) {
   const a = (depart + k) % 4, b = (depart + k + 1) % 4;
   scene.setSaison(a, b, Math.max(0, (dans - (duree - 4)) / 4));
 }
+// Une image : le sol, puis tous les objets triés par profondeur (ordre du
+// peintre), les effets de scène, les messages au-dessus du joueur, l'interface.
 function render(alpha) {
   // ⚠️ On repart d'une matrice propre à chaque image. Sinon un seul `ctx.save()`
   // non rendu — une exception au milieu d'une rotation, par exemple — laisse
@@ -1322,6 +1399,30 @@ function render(alpha) {
     ctx.translate((Math.random() - 0.5) * shake.amp * k, (Math.random() - 0.5) * shake.amp * k);
   }
 
+  peindreSol(now, v);
+
+  const items = [];
+  const { from, to } = scene.rowRange();
+  objetsHallesEtCollines(items, from, to, v, tAnim);
+  const vc = scene.getVCentre(), largeurRoute = scene.demiLargeurRoute() + 2;
+  objetsDeLaRoute(items, from, to, now, tm, tAnim, vc, largeurRoute);
+  objetsCyclistes(items, alpha, u, v, jy, pedal, flip, now, tm, tAnim, vc, largeurRoute);
+  peindreObjets(items);
+  const night = effetsDeScene(from, to, tm, tAnim);
+  messagesSurJoueur(u, v, jy);
+  if (shakeActive) ctx.restore();
+  interfaceDeCourse(now, tAnim);
+
+  renderApercu(pedal);
+  debugOverlay.renderStats(ctx, {
+    fps: perf.fps, frameMs: perf.frameMs, playerX: player.u,
+    audioStatus: audio.getStatus(), clockSource: audioDrivesClock ? "audio" : "secours",
+    conversion: screens.niveauConversionCourant(), classement: `graine ${game.graine}${game.scoreMax ? ` · max ${game.scoreMax}` : ""}${ghost ? ` · fantôme @${ghost.pseudo}` : ""} · potes ${friends.count()} · pièces ${game.points} · v ${player.v.toFixed(1)} · ${speed.toFixed(1)} r/s · reste ${gameStarted ? tempsRestant().toFixed(0) : "-"} s · nuit ${night.toFixed(2)}`,
+  });
+}
+
+// Saison, sol, et phare du vélo la nuit.
+function peindreSol(now, v) {
   poserSaison(gameStarted ? now : 0);
   scene.renderGround(ctx, null);   // pas de boue
   // Phare du vélo la nuit : un faisceau chaud sur la route, devant le joueur.
@@ -1335,9 +1436,9 @@ function render(alpha) {
     ctx.beginPath(); ctx.ellipse((a.x + b.x) / 2, a.y, (b.x - a.x) / 2 + 20, scene.scale() * 1.1, 0, 0, Math.PI * 2); ctx.fill();
     ctx.restore();
   }
-
-  const items = [];
-  const { from, to } = scene.rowRange();
+}
+// Halles (rampe, plancher, charpente, train, bowling, étals) et collines de la montagne.
+function objetsHallesEtCollines(items, from, to, v, tAnim) {
   // Les halles : la rampe, le plancher et la charpente, posés à la profondeur
   // du bord ARRIÈRE de la route pour que le joueur reste peint par-dessus.
   const hallesVues = new Set();
@@ -1366,7 +1467,10 @@ function render(alpha) {
     items.push({ decor: true, d: scene.depth(scene.ROAD_HALF + 0.05, d), draw: () => scene.drawBosse(ctx, d, GEO_BOSSE, from, to, "dessus") });
     items.push({ decor: true, d: scene.depth(scene.ROAD_HALF + 0.04, d), draw: () => scene.drawBosse(ctx, d, GEO_BOSSE, from, to, "flanc") });
   }
-  const vc = scene.getVCentre(), largeurRoute = scene.demiLargeurRoute() + 2;
+}
+// Tout ce qui est sur la route ou à son bord : décor, panneaux, véhicules,
+// obstacles, pièces, brique de lait, jetpack, ligne d'arrivée.
+function objetsDeLaRoute(items, from, to, now, tm, tAnim, vc, largeurRoute) {
   // Ce qui vient en face CACHE la pièce sur laquelle il passe, le temps de
   // passer, comme une pièce derrière lui (sinon on la voit à travers le
   // véhicule). Elle reste à prendre ensuite — rien ne change pour le score (le
@@ -1462,6 +1566,9 @@ function render(alpha) {
     } });
     items.push({ d: scene.depth(-RH - 0.6, ra), draw: () => drapeau(-RH - 0.6) });
   }
+}
+// La meute, les pièces du jetpack, le fantôme, la traînée du salto et le joueur.
+function objetsCyclistes(items, alpha, u, v, jy, pedal, flip, now, tm, tAnim, vc, largeurRoute) {
   if (gameStarted) for (const dr of friends.drawables(ctx, pedal, penteSol)) items.push({ d: scene.depth(dr.u, dr.v), draw: dr.draw });
   for (const c of jet.pieces) if (!c.pris && Math.abs(c.v - vc) < largeurRoute) items.push({ d: scene.depth(-0.3, c.v), draw: () => drawPiece(c.v, c.h, now, "piece") });
   // Le fantôme du meilleur de la ligue : transparent, sans ombre, étiqueté.
@@ -1507,6 +1614,8 @@ function render(alpha) {
       ctx.restore();
     }
   } });
+}
+function peindreObjets(items) {
   items.sort((a, b) => b.d - a.d);
   for (const it of items) {
     // Un objet qui plante ne doit emporter ni l'image ni l'état du canvas.
@@ -1514,7 +1623,10 @@ function render(alpha) {
     // dans le noir tue sans prévenir.
     try { if (it.decor) it.draw(); else scene.eclaire(it.draw); } catch (e) { if (!rendusRates.has(String(e))) { rendusRates.add(String(e)); console.error("rendu d'objet :", e); } ctx.setTransform(dprCourant, 0, 0, dprCourant, 0, 0); ctx.globalAlpha = 1; }
   }
-
+}
+// Étincelles, halos des lampadaires, brume, météo, panneaux d'alerte, turbo.
+// Renvoie le niveau de nuit (affiché par le debug).
+function effetsDeScene(from, to, tm, tAnim) {
   for (const sp of sparkles) {
     const g = scene.project(sp.u, sp.v, sp.h);
     ctx.globalAlpha = Math.max(0, 1 - sp.age / 0.6);
@@ -1541,7 +1653,10 @@ function render(alpha) {
   scene.renderMeteo(ctx, tAnim);
   renderAlertes(tm, speed);
   hud.renderTurbo(ctx, width, height, tAnim, Math.min(1, game.turbo * 2));
-
+  return night;
+}
+// Flash de choc, pastilles et popups au-dessus du joueur.
+function messagesSurJoueur(u, v, jy) {
   if (damageFlash > 0) {
     ctx.fillStyle = `rgba(225, 62, 38, ${0.35 * damageFlash})`;
     ctx.fillRect(0, 0, width, height);
@@ -1569,8 +1684,9 @@ function render(alpha) {
     }
     ctx.restore();
   }
-  if (shakeActive) ctx.restore();
-
+}
+// HUD, décompte, tuto, doigt qui tape, projecteur, bandeau, écran « terminé ».
+function interfaceDeCourse(now, tAnim) {
   if (gameStarted && hudAlpha > 0.001) {
     ctx.save();
     ctx.globalAlpha = hudAlpha;
@@ -1602,12 +1718,6 @@ function render(alpha) {
   }
   if (game.finAge >= 0) hud.renderFin(ctx, width, height, game.finAge, game.sprint ? "Fin du sprint" : "Tu es allé au bout du morceau");
 
-  renderApercu(pedal);
-  debugOverlay.renderStats(ctx, {
-    fps: perf.fps, frameMs: perf.frameMs, playerX: player.u,
-    audioStatus: audio.getStatus(), clockSource: audioDrivesClock ? "audio" : "secours",
-    conversion: screens.niveauConversionCourant(), classement: `graine ${game.graine}${game.scoreMax ? ` · max ${game.scoreMax}` : ""}${ghost ? ` · fantôme @${ghost.pseudo}` : ""} · potes ${friends.count()} · pièces ${game.points} · v ${player.v.toFixed(1)} · ${speed.toFixed(1)} r/s · reste ${gameStarted ? tempsRestant().toFixed(0) : "-"} s · nuit ${night.toFixed(2)}`,
-  });
 }
 
 // --- Aperçu du cycliste (étape « Mon cycliste ») ------------------------------------
@@ -1626,7 +1736,7 @@ function renderApercu(pedal) {
 // Un cycliste qui pédale, centré dans un petit canvas : l'aperçu du menu, et
 // l'écran de chargement, où la route défile sous lui.
 function dessinerCycliste(cv, c2, cw, ch, ped, route) {
-  const P = paletteDepuisSkin(screens.getSkin());
+  const P = paletteDuJoueur();
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   if (cv.width !== cw * dpr) { cv.width = cw * dpr; cv.height = ch * dpr; }
   c2.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -1781,6 +1891,23 @@ function frame(nowMs) {
 // avancent à la main, image par image — une course filmée nette à 30 i/s
 // quel que soit le temps que prend chaque capture.
 let modeVideo = null;
+// Harnais (?debug) : `__pote.videoAuDepart(rappel)` demandé avant JOUER fait
+// jouer la course pas à pas dès sa toute première image, sur un départ
+// toujours identique (même instant, même position dans le morceau ; `rappel`
+// fige le hasard). Deux rendus de la même course sont alors identiques au
+// pixel près (outils/rendu-identique.mjs).
+let videoAuDepart = null;
+function entrerVideoAuDepart() {
+  const go = Math.ceil(LEAD_IN / clock.beatPeriod) * clock.beatPeriod;
+  departMorceau = go;
+  modeVideo = { t: 0 };
+  audioDrivesClock = false;
+  clock.setTimeSource(() => modeVideo.t);
+  clock.jumpBy(-go);
+  const rappel = videoAuDepart;
+  videoAuDepart = null;
+  if (typeof rappel === "function") rappel();
+}
 function frameInterne(nowMs) {
   if (modeVideo) { lastTime = nowMs / 1000; return; }
   const t0 = performance.now();
@@ -1788,7 +1915,8 @@ function frameInterne(nowMs) {
   const frameTime = Math.min(now - lastTime, MAX_FRAME_TIME);
   lastTime = now;
   accumulator += frameTime;
-  while (accumulator >= STEP) { step(STEP); accumulator -= STEP; }
+  while (accumulator >= STEP && !modeVideo) { step(STEP); accumulator -= STEP; }
+  if (modeVideo) return; // la course vient de passer en pas à pas (harnais)
   render(accumulator / STEP);
   ambiance.pas(frameTime, etatSon(frameTime));
   screens.syncLoadingUi();
@@ -1828,6 +1956,7 @@ if (debugOverlay.isEnabled()) {
     forcerJetpack: () => { jetpackForce = true; poserJetpack(); return jet.r; },
     jetPieces: () => jet.pieces.filter((c) => !c.pris).map((c) => ({ v: c.v, h: c.h })),
     conversion: () => screens.niveauConversionCourant(),
+    videoAuDepart: (rappel) => { videoAuDepart = rappel || true; },
     videoDemarrer: () => { modeVideo = { t: clock.now() }; audioDrivesClock = false; clock.setTimeSource(() => modeVideo.t, true); },
     videoAvance: (jusque) => { while (clock.now() < jusque && !game.ended) { if (window.__pilote) window.__pilote(); modeVideo.t += STEP; step(STEP); } },
     videoPas: (dt) => { const n = Math.max(1, Math.round(dt / STEP)); for (let i = 0; i < n && !game.ended; i++) { if (window.__pilote) window.__pilote(); modeVideo.t += STEP; step(STEP); } render(1); ambiance.pas(dt, etatSon(dt)); },

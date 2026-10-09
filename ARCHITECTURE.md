@@ -66,7 +66,9 @@ Une seule voie : plus de contournement, tout se règle en hauteur.
 - **Pièces** : une toutes les `ESPACEMENT` (3) rangées sur l'arc du saut au-dessus de chaque
   obstacle, à hauteur du buste ; pièce double au sommet d'un double saut ; aucune pièce sur le
   passage d'un véhicule ou d'un piéton (`balayageVisible`) — une pièce qu'un véhicule traverse
-  quand même est cachée le temps qu'il passe.
+  quand même est cachée le temps qu'il passe. La brique de lait ne se pose jamais sur une
+  rangée qu'un véhicule venu d'en face balaie à l'écran (mesuré avant : 32 briques sur 900
+  traversées ; après : 0 — `outils/pieces-piegees.mjs`).
 - **Vitesse** : doublement en `V_DOUBLING_S` jusqu'à `vitesseMax`, puis seconde accélération
   vers `vitesseFinale` sur les `accelDernieresS` dernières secondes.
 - **Simulation** (`simulation.js`) : le score parfait d'une graine, affiché au menu et à la fin.
@@ -149,6 +151,13 @@ parfois lent à démarrer) : s'il passe, il est signalé « instable » sans blo
 par test. `deploy.sh` refuse de mettre en ligne sur un échec.
 - Les i/s d'un Chrome sans écran suivent la charge de la machine : le test `build` ne les
   affiche qu'à titre indicatif ; la fluidité est gardée par `perf` (ms par image à CPU ×4).
+- `outils/rendu-identique.mjs [--reference]` : prouve qu'une réorganisation n'a pas changé
+  l'image. `__pote.videoAuDepart(rappel)` (posé avant JOUER) fait jouer la course pas à pas
+  dès sa première image, sur un départ toujours identique ; le test fige le hasard et
+  l'horloge murale au départ, coupe les autres boucles d'animation, remet la phase de pédalage
+  et le tirage des potes à zéro, puis compare 13 images (ligue de démo = même route) au pixel
+  près. Vérifié sensible : la couleur de la route changée d'une unité → 12 images sur 13
+  différentes.
 - `outils/commentaires-seuls.mjs [réf]` : prouve qu'une retouche n'a changé que des commentaires
   (esbuild sans commentaires ni espaces, avant/après, identiques au caractère près).
 

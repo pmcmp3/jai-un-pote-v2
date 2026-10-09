@@ -33,7 +33,7 @@ export function dureeCourse() {
 // les règles changent la route — les scores et fantômes d'une ligue sont
 // filtrés sur la graine, une nouvelle version repart donc sur un classement
 // vierge sans rien supprimer en base.
-export const VERSION_COURSE = 22; // entre dans graineLigue() : +1 = nouvelle route partout
+export const VERSION_COURSE = 23; // entre dans graineLigue() : +1 = nouvelle route partout
 export function graineDepuisTexte(txt) {
   let h = 7;
   for (const ch of String(txt)) h = (h * 31 + ch.charCodeAt(0)) % 100000;

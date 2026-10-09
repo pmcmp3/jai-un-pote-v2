@@ -214,6 +214,12 @@ export function drawRider(ctx, u, v, lift, P, pedal, alpha = 1, flip = 0, ombre 
     drawBox(ctx, hx - 0.01, hy - 0.01, 0.32, 0.32, 0.14, hatColor, hTete + 0.39);
     drawBox(ctx, hx - 0.16, hy - 0.16, 0.62, 0.62, 0.04, hatColor, hTete + 0.39);
     drawBox(ctx, hx - 0.01, hy - 0.01, 0.32, 0.32, 0.04, "#8a3a1a", hTete + 0.47);
+  } else if (hat === "couronne") {
+    // Bandeau doré, six pointes (trois devant, trois derrière : de profil on
+    // lit la silhouette en dents), un rubis côté caméra.
+    drawBox(ctx, hx - 0.02, hy - 0.02, 0.34, 0.34, 0.12, hatColor, hTete + 0.41);
+    for (const du of [0, 0.26]) for (const dv of [0, 0.13, 0.26]) drawBox(ctx, hx - 0.02 + du, hy - 0.02 + dv, 0.08, 0.08, 0.13, hatColor, hTete + 0.53);
+    drawBox(ctx, hx - 0.05, hy + 0.11, 0.04, 0.1, 0.07, "#e13e26", hTete + 0.43);
   }
   if (tourne) ctx.restore();
   if (alpha < 1) ctx.restore();
