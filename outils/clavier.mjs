@@ -12,6 +12,7 @@ import { createServer } from "vite";
 import { chromium } from "playwright-core";
 import { mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { verdict } from "./verdict.mjs";
 
 const racine = fileURLToPath(new URL("..", import.meta.url));
 const sorties = fileURLToPath(new URL("./sorties/", import.meta.url));
@@ -104,6 +105,6 @@ for (const cas of CAS) {
   console.log(`${bon ? "OK " : "NON"} ${cas.nom.padEnd(20)} zone ${zoneHaut}–${zoneBas} · carte ${ouvert.haut}–${ouvert.bas} (marges ${margeH} / ${margeB}) · trajet 1 : monte ${s1.monte} px, redescend ${s1.descend} px · 2e fois : monte ${s2.monte}, redescend ${s2.descend} · champ suivant ${champ2.haut - ouvert.haut >= 0 ? "+" : ""}${champ2.haut - ouvert.haut} px · fermé : carte ${ferme.haut}–${ferme.bas}, titre ${ferme.titre}${erreurs.length ? " · ERREURS " + erreurs.join(" | ") : ""}`);
   await contexte.close();
 }
-console.log(`${ok}/${CAS.length} cas conformes`);
+verdict(ok === CAS.length, `${ok}/${CAS.length} téléphones : la carte reste en vue sans faire le yoyo`);
 await navigateur.close();
 await serveur.close();

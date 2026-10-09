@@ -7,6 +7,7 @@
 import { createServer } from "vite";
 import { chromium } from "playwright-core";
 import { fileURLToPath } from "node:url";
+import { verdict } from "./verdict.mjs";
 const racine = fileURLToPath(new URL("..", import.meta.url));
 const serveur = await createServer({ root: racine, logLevel: "error", server: { port: 5193, strictPort: false, hmr: false, watch: { ignored: ["**/*"] } } });
 await serveur.listen();
@@ -71,3 +72,4 @@ for (const [nom, ts] of Object.entries(parNom).sort((a, b) => a[1][0] - b[1][0])
 const horsDecor = res.journal.filter((e) => (["mouette"].includes(e.nom) && e.biome !== "plage") || (["oiseau", "grillon"].includes(e.nom) && e.biome !== "route"));
 console.log(horsDecor.length ? `⚠️ hors de leur décor : ${JSON.stringify(horsDecor.slice(0, 5))}` : "Ambiances : toutes dans leur décor.");
 console.log(erreurs.length ? `⚠️ erreurs : ${erreurs.slice(0, 5).join(" | ")}` : "Aucune erreur dans la page.");
+verdict(res.journal.length > 50 && !horsDecor.length && !erreurs.length && res.fin > 160, `${res.journal.length} sons sur la course, ${horsDecor.length} hors de leur décor, ${erreurs.length} erreur(s) JS`);

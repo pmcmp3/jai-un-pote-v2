@@ -4,6 +4,7 @@
 import { createServer } from "vite";
 import { chromium } from "playwright-core";
 import { fileURLToPath } from "node:url";
+import { verdict } from "./verdict.mjs";
 const racine = fileURLToPath(new URL("..", import.meta.url));
 const serveur = await createServer({ root: racine, logLevel: "error", server: { port: 5189, strictPort: false, hmr: false, watch: { ignored: ["**/*"] } } });
 await serveur.listen();
@@ -35,4 +36,7 @@ const mesurer = (t) => page.evaluate((t) => {
 const debut = await mesurer(30);
 const plage = await mesurer(160);
 console.log(`Image (simulation + rendu, CPU ×4) : début ${debut.moy.toFixed(1)} ms (p95 ${debut.p95.toFixed(1)}) · plage ${plage.moy.toFixed(1)} ms (p95 ${plage.p95.toFixed(1)})`);
+// Seuil : la moitié d'une image à 60 i/s (8,3 ms) sur un téléphone moyen.
+const pire = Math.max(debut.moy, plage.moy);
+verdict(pire < 8.3, `image la plus chère ${pire.toFixed(1)} ms en moyenne (seuil 8,3 ms, CPU ×4)`);
 await navigateur.close(); await serveur.close();

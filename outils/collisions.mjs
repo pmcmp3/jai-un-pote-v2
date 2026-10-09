@@ -8,6 +8,7 @@
 import { createServer } from "vite";
 import { chromium } from "playwright-core";
 import { fileURLToPath } from "node:url";
+import { verdict } from "./verdict.mjs";
 const racine = fileURLToPath(new URL("..", import.meta.url));
 const serveur = await createServer({ root: racine, logLevel: "error", server: { port: 5187, strictPort: false, hmr: false, watch: { ignored: ["**/*"] } } });
 await serveur.listen();
@@ -64,4 +65,5 @@ for (const k of Object.keys(res.vus).sort()) console.log(`  ${k.padEnd(12)} ${re
 console.log(`Traversés SANS choc : ${res.ratees.length}`, res.ratees.join(" · "));
 console.log("Chocs sans coût :", res.pourquoi.join(" · "));
 console.log(`fin à ${res.fin.toFixed(1)} s`, erreurs.length ? `ERREURS ${erreurs.join(" | ")}` : "");
+verdict(!res.ratees.length && !erreurs.length && res.fin > 160, `${res.ratees.length} obstacle(s) traversé(s) sans choc, ${erreurs.length} erreur(s) JS, course jusqu'à ${res.fin.toFixed(0)} s`);
 await navigateur.close(); await serveur.close();

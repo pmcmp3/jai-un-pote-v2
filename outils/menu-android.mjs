@@ -7,6 +7,7 @@
 import { createServer } from "vite";
 import { chromium } from "playwright-core";
 import { fileURLToPath } from "node:url";
+import { verdict } from "./verdict.mjs";
 
 const racine = fileURLToPath(new URL("..", import.meta.url));
 const serveur = await createServer({ root: racine, logLevel: "error", server: { port: 5198, strictPort: false, hmr: false } });
@@ -40,7 +41,7 @@ const etat = () => page.evaluate(() => {
 // Un peu de défilement, comme quelqu'un qui descend vers « Chapeau ».
 await page.evaluate(() => { document.getElementById("overlay").scrollTop = 60; });
 await page.waitForTimeout(300);
-let bouge = 0;
+let bouge = 0, nonChoisi = 0;
 for (const [cle, k] of [["chapeau", 1], ["genre", 1], ["c1", 3], ["chapeau", 2], ["velo", 1], ["genre", 0]]) {
   const avant = await etat();
   const b = await page.evaluate(([cle, k]) => { const el = document.querySelectorAll(`#skin-options .chips[data-cle="${cle}"] .chip`)[k]; const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2, txt: el.textContent || el.title }; }, [cle, k]);
@@ -51,8 +52,9 @@ for (const [cle, k] of [["chapeau", 1], ["genre", 1], ["c1", 3], ["chapeau", 2],
   const ecart = Math.max(...pendant.map((p) => Math.abs(p.haut - avant.haut)));
   const retour = pendant.some((p) => p.retour);
   if (ecart > 2 || retour) bouge += 1;
+  if (!actif) nonChoisi += 1;
   console.log(`${ecart > 2 || retour ? "BOUGE" : "OK   "} ${cle.padEnd(8)} « ${b.txt} » choisi : ${actif ? "oui" : "NON"} · carte ${avant.haut} → max ${ecart} px d'écart · défilement ${avant.defile} → ${pendant[pendant.length - 1].defile}${retour ? " · animation de retour rejouée" : ""} · focus ${pendant[0].focus}`);
 }
-console.log(bouge ? `${bouge}/6 choix font bouger le menu` : "6/6 : la carte ne bouge pas");
+verdict(!bouge && !nonChoisi, bouge ? `${bouge}/6 choix font bouger le menu` : nonChoisi ? `${nonChoisi}/6 choix ne sont pas pris` : "6/6 : la puce est prise et la carte ne bouge pas");
 await navigateur.close();
 await serveur.close();

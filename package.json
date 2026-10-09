@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite --port 5175",
     "build": "vite build --base=./ --outDir=dist-pages --emptyOutDir",
-    "preview": "vite preview --port 5175"
+    "preview": "vite preview --port 5175",
+    "verif": "node outils/verif.mjs"
   },
   "devDependencies": {
     "playwright-core": "^1.63.0",

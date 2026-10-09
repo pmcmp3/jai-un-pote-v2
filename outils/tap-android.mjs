@@ -7,6 +7,7 @@
 import { createServer } from "vite";
 import { chromium } from "playwright-core";
 import { fileURLToPath } from "node:url";
+import { verdict } from "./verdict.mjs";
 
 const racine = fileURLToPath(new URL("..", import.meta.url));
 const serveur = await createServer({ root: racine, logLevel: "error", server: { port: 5197, strictPort: false, hmr: false } });
@@ -57,6 +58,6 @@ for (let essai = 0; essai < 5; essai++) {
   if (vu.double) doubles += 1;
   console.log(`tap ${essai + 1} : ${vu.double ? "DOUBLE SAUT" : "saut simple"} (hauteur ${vu.haut.toFixed(2)} u, salto ${vu.flip > 0 ? "oui" : "non"}) · reçu : ${vu.evts}`);
 }
-console.log(doubles ? `${doubles}/5 taps ont fait un double saut` : "5/5 : un tap = un saut");
+verdict(doubles === 0, doubles ? `${doubles}/5 taps ont fait un double saut` : "5/5 : un tap = un saut");
 await navigateur.close();
 await serveur.close();

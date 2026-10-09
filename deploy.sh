@@ -5,6 +5,7 @@
 #
 # Usage :  ./deploy.sh "message de commit"
 #          DEPLOY_DRY=1 ./deploy.sh "test"   → tout sauf les deux push
+#          VERIF=0 ./deploy.sh "msg"         → sans le filet (urgence seulement)
 #
 # Pousse avec le compte GitHub `pmcmp3` sans changer le compte actif du poste
 # (`gh auth switch`) : le mot de passe est fourni à git par `gh auth token
@@ -22,6 +23,12 @@ push() {
   if [ "${DEPLOY_DRY:-0}" = "1" ]; then echo "[dry] git push $*"; return; fi
   git -c credential.helper= -c credential.helper="$AIDE_GIT" push "$@"
 }
+
+# Le filet (npm run verif, ≈ 3 min) : rien ne part en ligne si un test échoue.
+# VERIF=0 ./deploy.sh "…" pour passer outre (urgence seulement).
+if [ "${VERIF:-1}" = "1" ]; then
+  npm run verif || { echo "❌ Le filet a trouvé un problème : rien n'est mis en ligne."; exit 1; }
+fi
 
 # 0. Source : historique normal (pas de snapshot orphelin, le dépôt est neuf).
 git add -A

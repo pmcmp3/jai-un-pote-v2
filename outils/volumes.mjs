@@ -6,6 +6,7 @@
 import { createServer } from "vite";
 import { chromium } from "playwright-core";
 import { fileURLToPath } from "node:url";
+import { verdict } from "./verdict.mjs";
 const racine = fileURLToPath(new URL("..", import.meta.url));
 const sorties = fileURLToPath(new URL("./sorties/", import.meta.url));
 const serveur = await createServer({ root: racine, logLevel: "error", server: { port: 5197, strictPort: false, hmr: false, watch: { ignored: ["**/*"] } } });
@@ -28,14 +29,16 @@ const regler = (id, v) => page.evaluate(([id, v]) => { const el = document.getEl
 await page.click("#mute-button");
 await page.waitForTimeout(400);
 await page.screenshot({ path: `${sorties}62-son-menu.png` });
-console.log("♪ du menu :", JSON.stringify(await etat()));
+const menu = await etat();
+console.log("♪ du menu :", JSON.stringify(menu));
 await regler("volume-musique", 40); await regler("volume-effets", 70);
 console.log("après réglage :", JSON.stringify(await etat()));
 await page.click("#son-fermer");
 await page.waitForTimeout(300);
 console.log("fermé :", JSON.stringify(await etat()));
 await page.reload(); await page.waitForTimeout(1500);
-console.log("après rechargement :", JSON.stringify(await etat()));
+const recharge = await etat();
+console.log("après rechargement :", JSON.stringify(recharge));
 // En course : le menu pause a les mêmes curseurs, et les gains suivent.
 await page.waitForFunction(() => !document.getElementById("play-button").disabled, null, { timeout: 20000 });
 await page.click("#play-button");
@@ -44,9 +47,13 @@ await page.waitForTimeout(4500);
 await page.click("#pause-button");
 await page.waitForTimeout(400);
 await page.screenshot({ path: `${sorties}63-son-pause.png` });
-console.log("pause :", JSON.stringify(await etat()));
+const pause = await etat();
+console.log("pause :", JSON.stringify(pause));
 await regler("volume-musique", 0);
 const gains = await page.evaluate(async () => { const a = await import("/src/audio.js"); const s = a.sfxOutput(); return { effets: s ? s.dest.gain.value : null }; });
 console.log("musique coupée, gain des effets :", JSON.stringify(gains));
 console.log(erreurs.length ? `⚠️ erreurs : ${erreurs.join(" | ")}` : "aucune erreur JS");
+const proche = (a, b) => Math.abs(a - b) < 0.01;
+verdict(menu.visible && menu.reglages && proche(recharge.musique, 0.4) && proche(recharge.effets, 0.7) && pause.visible && proche(gains.effets ?? -1, 0.7) && !erreurs.length,
+  `♪ ouvre le réglage : ${menu.visible && menu.reglages ? "oui" : "NON"} · gardé au rechargement : musique ${recharge.musique}, effets ${recharge.effets} · effets à ${gains.effets === null ? "?" : gains.effets.toFixed(2)} quand la musique est coupée · ${erreurs.length} erreur(s) JS`);
 await navigateur.close(); await serveur.close();

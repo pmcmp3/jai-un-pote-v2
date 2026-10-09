@@ -5,6 +5,7 @@ import { createServer } from "vite";
 import { chromium } from "playwright-core";
 import { mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { verdict } from "./verdict.mjs";
 
 const racine = fileURLToPath(new URL("..", import.meta.url));
 const sorties = fileURLToPath(new URL("./sorties/", import.meta.url));
@@ -86,4 +87,5 @@ await page.click("#step2-back"); await attendre(500);
 await photo("55-premiere-menu");
 console.log("boost :", await page.textContent("#boost-ligue"));
 console.log(erreurs.length ? "ERREURS :\n" + erreurs.join("\n") : "aucune erreur JS");
+verdict(!erreurs.length, `première visite de bout en bout, ${erreurs.length} erreur(s) JS`);
 await navigateur.close(); await serveur.close();

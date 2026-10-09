@@ -6,6 +6,7 @@
 import { createServer } from "vite";
 import { chromium } from "playwright-core";
 import { fileURLToPath } from "node:url";
+import { verdict } from "./verdict.mjs";
 
 const racine = fileURLToPath(new URL("..", import.meta.url));
 const serveur = await createServer({ root: racine, logLevel: "error", server: { port: 5199, strictPort: false, hmr: false } });
@@ -65,5 +66,7 @@ for (const v of res.vus) console.log(`  tuto ${v.famille.padEnd(6)} sur ${v.kind
 for (const x of res.rates) console.log("  RATÉ", JSON.stringify(x));
 console.log("chocs pendant ces 45 s :", res.chocs.length ? res.chocs.join(" · ") : "aucun");
 console.log(erreurs.length ? `ERREURS : ${erreurs.join(" | ")}` : "aucune erreur JS");
+const horsReserve = res.vus.filter((v) => !v.reserve).length;
+verdict(res.vus.length > 0 && !horsReserve && !res.rates.length && !erreurs.length, `${res.vus.length} tuto(s) vus, ${horsReserve} hors de la route dégagée, ${res.rates.length} raté(s), ${erreurs.length} erreur(s) JS`);
 await navigateur.close();
 await serveur.close();

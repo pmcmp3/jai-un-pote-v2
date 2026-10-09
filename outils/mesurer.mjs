@@ -5,10 +5,11 @@
 //   4. joueur idéal scripté : 0 obstacle touché (traversées armées comme en jeu) ;
 //      joueur immobile : touche TOUS les obstacles (la collision marche dans les deux sens).
 import { chargerConfig } from "./charger-config.mjs";
+import { verdict } from "./verdict.mjs";
 const C = chargerConfig();
 const { Route, KINDS, armer, delaiArmement, familleDe, montee, solAt, toitGare, ecartMin: ecartMinTheorique } = await import("../src/rows.js");
 const { scoreParfait, recenser } = await import("../src/simulation.js");
-const { V_UNIT, targetSpeed, dureeCourse } = await import("../src/regles.js");
+const { V_UNIT, targetSpeed, dureeCourse, vitesseAuRang } = await import("../src/regles.js");
 
 const N = Number(process.argv[2]) || 40;
 const graines = Array.from({ length: N }, (_, i) => 1000 + i * 2467);
@@ -21,6 +22,7 @@ for (const k of cles) { const vals = rec.map((r) => r[k] || 0); console.log(`  $
 
 // 2. Écart entre obstacles : jamais collés, jamais de longue ligne droite.
 let ecartMin = Infinity, ecartMax = 0, serres = 0;
+const vMax = V_UNIT * Math.max(C.vitesseMax, C.vitesseFinale || 0);
 for (const g of graines) {
   const route = new Route(g); let dernier = null, dernierKind = null;
   for (let r = 0; r < 1100; r++) {
@@ -33,7 +35,8 @@ for (const g of graines) {
       let halle = false;
       for (let q = dernier; q <= r && !halle; q++) if (solAt(q) > 0.05) halle = true;
       if (!halle) { ecartMin = Math.min(ecartMin, d); ecartMax = Math.max(ecartMax, d); }
-      if (d < ecartMinTheorique(dernierKind, row.kind)) serres += 1;
+      // Même vitesse que le générateur (vitesse locale, +8 %), pas le pire cas de fin.
+      if (d < ecartMinTheorique(dernierKind, row.kind, Math.min(vMax, vitesseAuRang(dernier + 20) * 1.08))) serres += 1;
     }
     dernier = r; dernierKind = row.kind;
   }
@@ -103,6 +106,11 @@ console.log(`— Joueur idéal scripté : ${idem.reduce((a, c) => a + c.touches,
 const detail = {}; for (const c of idem) for (const [k, n] of Object.entries(c.parEspece)) detail[k] = (detail[k] || 0) + n;
 if (Object.keys(detail).length) console.log("  détail :", JSON.stringify(detail));
 console.log(`— Joueur immobile : ${immo.reduce((a, c) => a + c.touches, 0)} touchés sur ${immo.reduce((a, c) => a + c.obstacles, 0)} rencontrés`);
+const tIdeal = idem.reduce((a, c) => a + c.touches, 0), tImmo = immo.reduce((a, c) => a + c.touches, 0), nImmo = immo.reduce((a, c) => a + c.obstacles, 0);
+// Les paires « serrées » restent une indication (quelques-unes viennent des
+// paquets et des piétons, placés par d'autres règles) : la garantie, c'est le
+// joueur idéal qui passe tout et le joueur immobile qui touche tout.
+verdict(tIdeal === 0 && tImmo === nImmo, `joueur idéal ${tIdeal} choc, joueur immobile ${tImmo}/${nImmo} chocs (${N} graines)`);
 console.log(`— Pièces du joueur idéal (qui ne vise QUE les obstacles) : ${Math.round(moy(idem.map((c) => c.pieces)))} ; apex maximal atteint ${moy(idem.map((c) => c.apexMax)).toFixed(2)} u`);
 const pot = C.potesPaliers.map((_, i) => { const t = idem.map((c) => c.tPotes[i]).filter((x) => x !== undefined); return t.length ? `${Math.round(moy(t))} s (${t.length}/${N})` : "jamais"; });
 console.log(`— Arrivée des potes (paliers ${C.potesPaliers.join(", ")}) : ${pot.join(" · ")}`);

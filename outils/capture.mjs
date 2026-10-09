@@ -13,6 +13,7 @@ import { createServer, preview } from "vite";
 import { chromium } from "playwright-core";
 import { mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { verdict } from "./verdict.mjs";
 
 const racine = fileURLToPath(new URL("..", import.meta.url));
 const sorties = fileURLToPath(new URL("./sorties/", import.meta.url));
@@ -846,5 +847,7 @@ for (const nom of liste) { if (SCENES[nom]) await SCENES[nom](); }
 const stats = await course(() => ({ v: Math.round(window.__pote.player.v), potes: window.__pote.friends.count(), fps: window.__pote.fps ? window.__pote.fps() : null, erreurs: window.__erreursJeu || [] }));
 console.log("État :", JSON.stringify(stats));
 if (erreurs.length) console.log("ERREURS :", erreurs.slice(0, 8));
+const toutes = [...erreurs, ...stats.erreurs];
+verdict(!toutes.length && (stats.fps === null || stats.fps >= 50), `${surBuild ? "build" : "sources"} : ${stats.fps ?? "?"} i/s, ${toutes.length} erreur(s)`);
 await navigateur.close();
 await (surBuild ? serveur.httpServer.close() : serveur.close());
