@@ -51,6 +51,11 @@ intégré d'Instagram d'abord**, portrait natif.
 ### Gestes et saut (`input.js`, `main.js`)
 - **Tap = saut, appui maintenu = saut plus haut, re-tap en l'air = double saut** (avec salto) ;
   swipe vers le bas = roue arrière (décoratif). Le saut part au toucher.
+- **Son du saut** : un tout petit clic au toucher (sol5), un autre au second tap (ré6) ; RIEN en
+  l'air (ni souffle ni roue libre — la roue libre ne joue qu'après l'arrivée).
+- **Écraser une petite bête** (poule, poule jetée, chat, chien, cochon, mouton) : lui retomber
+  dessus PAR LE DESSUS (on descend et on était au-dessus d'elle au pas d'avant) = rebond, aucun
+  coût, la bête s'aplatit (`parDessus`/`ecraser`, main.js). De face, elle fait toujours mal.
 - ⚠️ Android rejoue chaque toucher en événements souris : `input.js` ignore toute souris qui
   suit un toucher de moins d'une seconde (sinon un tap = un double saut).
 
@@ -67,6 +72,12 @@ intégré d'Instagram d'abord**, portrait natif.
   bonhommes), **bouchon** de voitures garées, **plage** sur les 30 dernières secondes (coucher
   de soleil, baigneurs, buggys). Véhicules en face (voiture, car, tracteur, chasse-neige, buggy),
   piétons en groupes grandissants.
+- **Mouettes** (dernière minute) : elles planent juste au-dessus de la tête (famille « sol » :
+  on passe DESSOUS en roulant, le moindre saut s'y cogne), pièces au sol de part et d'autre.
+  Posées entre deux obstacles sans double saut (⚠️ jamais à côté d'un véhicule à double saut,
+  demande de l'artiste) et dans les groupes de piétons, 4 fois sur 5, avec 0,3 s de grâce de
+  chaque côté : 5 à 11 par course. Le joueur idéal passe dessous, le test `regles` vérifie
+  qu'on les touche en sautant et jamais au sol. Pas de tuto.
 - **Chacun dans son décor** (`auDecor`, `aCheval`) : rien n'est habillé pour une autre rangée
   que la sienne, rien ne chevauche une frontière de biome.
 - Une **ligue = une graine** (`graineLigue`) : même route pour ses membres ; sans ligue, graine
@@ -77,13 +88,16 @@ intégré d'Instagram d'abord**, portrait natif.
 ### Pièces, potes, turbo
 - Les pièces **dessinent le geste** (arc au-dessus de chaque obstacle), pièce double au sommet
   d'un double saut. Paliers de potes, rachat et coût des chocs : `config.js`.
-- Chaque pote = +`potesBonusMetres` au multiplicateur. Un choc coûte des potes ; seul le joueur
-  meurt.
+- **Multiplicateur ENTIER** (`regles.multiplicateur`) : 3 potes = ×3, 5 potes = ×5, ×1 en
+  dessous de deux ; ×2 en plus au turbo. Jamais de demi-multiplication à l'écran (le boost de
+  ligue, lui, reste en pourcentage). Un choc coûte des potes ; seul le joueur meurt.
 - **Brique de lait** : turbo 5 s, invincible, points doublés ; ce qu'on percute est éjecté.
   Plus grande qu'une pièce, avec un halo qui pulse au rythme du morceau.
 - ⚠️ **Aucun conflit entre objets et récompenses** : aucune pièce ni brique de lait dans un
   obstacle, ni sur le passage d'un véhicule venu d'en face pendant qu'il est à l'écran
-  (`balayageVisible`, rows.js). Gardé par le test `conflits` du filet.
+  (`balayageVisible`, rows.js), et **aucune pièce à moins de 3 rangées d'une brique de lait**
+  (`LAIT_ISOLE` : on cherche une place loin des arcs, sinon les pièces voisines s'effacent — le
+  quota de 15 briques reste le même pour toutes les graines). Gardé par le test `conflits`.
 - **Jetpack** une partie sur cinq, posé hors du générateur (une course à jetpack peut dépasser
   le score parfait).
 
@@ -106,7 +120,13 @@ intégré d'Instagram d'abord**, portrait natif.
 ### Rendu (`scene.js`, `props.js`, `voxrider.js`, `humains.js`)
 - Sténopé de profil, tout en cubes ; un modèle = un `scene.groupe()` trié (ARCHITECTURE §5 bis).
 - Les humains (piétons, costard, fermier, baigneur, skieurs, marchands…) partagent le même corps
-  en cubes que le cycliste, avec une diversité tirée par rangée (`humains.js`).
+  en cubes que le cycliste, avec une diversité tirée par rangée (`humains.js`). Les villageois
+  du décor encouragent, les deux bras en l'air qui battent (`personnage`, scene.js).
+- **Phare avant** sur le VTT et le Grand Bi (`phareAvant`, voxrider.js) : verre crème le jour,
+  allumé et rayonnant la nuit (`setNuit`, posé par main.js).
+- ⚠️ **Dans un modèle, jamais deux cubes imbriqués** : `scene.groupe` ne sait pas les ordonner
+  (le chasse-neige perdait ses vitres, le rebord de la benne se peignait dessus). Empiler.
+- Le TER a un **nez** à trois marches avec pare-brise à chaque bout (`drawHalle`, couche train).
 - ⚠️ **Le canvas penché** : un index de tableau dérivé d'une position n'est jamais supposé
   entier ; `parseColor` rend du gris plutôt que de lever ; `render()` repart d'une matrice propre
   et chaque objet est dessiné dans un `try/catch` qui remet la matrice.
@@ -123,7 +143,9 @@ intégré d'Instagram d'abord**, portrait natif.
   tranche ce qui sonne faux.
 
 ### Menus, ligues, conversion (`screens.js`, `net.js`)
-- Premier passage : pseudo → mon cycliste (homme/femme, VTT / Grand Bi / vélo enfant, maillot,
+- Premier passage : pseudo (+ Insta et village facultatifs, avec une ligne qui dit pourquoi :
+  le village s'écrit sur le panneau en course, l'Insta sert à prévenir d'un lot — ⚠️ l'Insta
+  n'est envoyé nulle part aujourd'hui, à brancher avec la base) → mon cycliste (homme/femme, VTT / Grand Bi / vélo enfant, maillot,
   chapeau) → ma ligue (créer, rejoindre, ou jouer sans). Ensuite le cycliste est l'accueil.
 - **Ligues** : 21 membres maximum, complétées par 3 bots ; **boost de ligue** (+10 % par pote
   qui a joué au moins 30 s, jusqu'à ×3) ; relais de ligue ; sprint du dimanche ; au plus
@@ -160,6 +182,7 @@ chaque choc payé vibre.
 ## Points ouverts
 
 - **Base Supabase v2** à créer par l'artiste (ARCHITECTURE §5), puis **sous-domaine** (§4).
+  Avec elle : envoyer l'Insta (et le village) avec le score, sinon on ne peut prévenir personne.
 - **À juger sur un vrai téléphone** : clavier iOS dans Instagram, partage dans les navigateurs
   intégrés, lien `instagram://` vers @pmc.mp3, les sons à l'oreille.
 - **Mesurer le parcours des joueurs** (où ils décrochent : chargement, pseudo, 1re course,
@@ -172,12 +195,12 @@ chaque choc payé vibre.
 
 ## Le filet et les outils
 
-- **`npm run verif`** (≈ 3 min) : 13 tests du vrai jeu, chacun conclut par ✅ OK ou ❌ ÉCHEC
+- **`npm run verif`** (≈ 3 min) : 14 tests du vrai jeu, chacun conclut par ✅ OK ou ❌ ÉCHEC
   (`outils/verdict.mjs`) ; un test qui échoue est relancé une fois et signalé « instable » s'il
   passe au second essai. `npm run verif -- collisions clavier` pour n'en lancer que certains.
   Ce qu'il garantit : joueur idéal sans choc et joueur immobile qui touche tout (`regles`),
   aucune récompense dans un obstacle ou un véhicule (`conflits`), chaque obstacle percuté
-  coûte et vibre (`collisions`), un tap = un saut sur Android, tutos sur route
+  coûte et vibre (`collisions`), petite bête écrasée par le dessus sans coût (`ecraser`), un tap = un saut sur Android, tutos sur route
   dégagée, menu stable sur Android, clavier sur 6 téléphones, première visite façon Instagram,
   curseurs de son, course entière sans erreur avec les sons dans leur décor, < 8,3 ms par image
   à CPU ×4 (`perf` ; une machine très chargée peut le faire monter), page servie sans réseau quel

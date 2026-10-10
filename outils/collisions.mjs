@@ -56,6 +56,8 @@ const res = await page.evaluate(() => {
       dejaVus.add(r);
       vus[row.kind] = (vus[row.kind] || 0) + 1;
       const touche = P.chocs().some((x) => x.r === r);
+      // La mouette plane au-dessus de la tête : sans sauter, on passe dessous.
+      if (K.aerien) { if (touche) ratees.push(`${row.kind}@${r} TOUCHÉE AU SOL`); continue; }
       if (touche && payes.has(r)) touches[row.kind] = (touches[row.kind] || 0) + 1;
       else if (touche) invulnerables[row.kind] = (invulnerables[row.kind] || 0) + 1;
       else ratees.push(`${row.kind}@${r} t=${P.clock.now().toFixed(1)}`);

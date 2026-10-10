@@ -91,7 +91,7 @@
        partait de travers (« quand on clique une deuxième fois, ça va mieux »).
        Le titre et le lien de l'album s'effacent net, la carte monte en haut. */
     #overlay.visible.fige { transition: opacity 0.45s ease, visibility 0s; }
-    #overlay.clavier #menu-title, #overlay.clavier #beta-tag, #overlay.clavier #cta-link, #overlay.clavier ~ #mute-button { display: none; }
+    #overlay.clavier #menu-title, #overlay.clavier #champs-pourquoi, #overlay.clavier #beta-tag, #overlay.clavier #cta-link, #overlay.clavier ~ #mute-button { display: none; }
     /* Clavier ouvert (5 octobre 2026, troisième passe — « ça monte d'un seul
        coup et ça redescend », « les lignes se rétrécissent ») : la carte garde
        EXACTEMENT sa forme ; elle est posée par une translation (--saisie-y,
@@ -187,6 +187,7 @@
     #onboarding .step { display: none; }
     #onboarding[data-step="1"] .step[data-step="1"], #onboarding[data-step="2"] .step[data-step="2"], #onboarding[data-step="3"] .step[data-step="3"] { display: block; }
     .champ-row { display: flex; align-items: center; gap: 10px; width: 240px; margin-top: 12px; }
+    #champs-pourquoi { width: 240px; margin: 8px 0 14px; font: 500 12px/1.4 var(--police); color: rgba(0,0,0,0.55); text-align: left; }
     .champ-titre { width: 240px; margin: 22px 0 2px; font: 700 10.5px var(--police); letter-spacing: 0.14em; text-transform: uppercase; color: rgba(0,0,0,0.45); text-align: left; }
     #step1-next { margin-top: 24px; }
     .champ-row .icon { font: 700 11px var(--police); color: rgba(0,0,0,0.45); min-width: 16px; text-align: center; }
@@ -513,6 +514,7 @@
           <p class="champ-titre beta-off">Pour aller plus loin</p>
           <div class="champ-row beta-off"><span class="icon">IG</span><input type="text" id="insta-input" placeholder="ton Instagram (facultatif)" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="40" /></div>
           <div class="champ-row beta-off"><span class="icon">⌂</span><input type="text" id="ville-input" placeholder="ton village, ta ville (facultatif)" autocomplete="off" spellcheck="false" maxlength="24" /></div>
+          <p id="champs-pourquoi" class="beta-off">Ton <b>village</b> s'écrit sur le panneau quand tu le traverses en course. Ton <b>Insta</b>, c'est pour te prévenir si tu gagnes un lot.</p>
           <p id="beta-note" class="field-note hidden">Bêta-test : tout le monde court la <b>même course</b>. Écris ton pseudo, joue, et laisse-moi ton retour à la fin.</p>
           <button id="step1-next" class="btn btn-primary" type="button" disabled>Continuer</button>
         </div>
@@ -649,7 +651,7 @@
              de plus dans ta ligue = un cycliste de plus derrière toi, +10 %. -->
         <canvas id="expl-peloton" aria-hidden="true"></canvas>
         <p id="expl-mult">+0 %</p>
-        <p class="expl-texte">Crée ta ligue, invite tes potes&nbsp;: vous avez votre classement. <b>Chaque pote qui joue te donne +10&nbsp;% de points</b>, jusqu'à +200&nbsp;%.</p>
+        <p class="expl-texte">Crée ta ligue, invite tes potes&nbsp;: vous avez votre classement.</p>
       </div>
       <div id="expl-barre"><i></i></div>
     </div>

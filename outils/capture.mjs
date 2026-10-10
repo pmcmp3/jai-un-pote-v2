@@ -406,8 +406,8 @@ const SCENES = {
     const planches = [
       ["poule", "chat", "chien"], ["mouton", "botte", "cochon"], ["vache", "fermier", "voiture"],
       ["tracteur"], ["tracteurProche"], ["contresens"], ["poulejetee"], ["riders"],
-      ["decor:ble:10"], ["decor:village:135"], ["decor:villageSud:355"], ["decor:foret:230"], ["halle"],
-    ];
+      ["decor:ble:10"], ["decor:village:135"], ["decor:villageSud:355"], ["decor:foret:230"], ["halle"], ["chasseneige"], ["chasseneigeProche"], ["mouette"],
+    ].filter((p) => !process.env.GALERIE || process.env.GALERIE.split(",").includes(p[0]));
     for (let i = 0; i < planches.length; i++) {
       const noms = planches[i];
       await course(async (noms) => {
@@ -429,7 +429,7 @@ const SCENES = {
         scene.setCamera(decor ? Number(decor[2]) : nom === "halle" ? 20 : 0);
         scene.setDecorTime(1);
         // Zoom ×ZOOM autour du bord de la route (les modèles font ~50 px sinon).
-        const ZOOM = decor || nom === "halle" ? 1 : 2.2;
+        const ZOOM = decor || nom === "halle" ? 1 : nom === "chasseneigeProche" ? 4 : 2.2;
         const o = scene.project(0, scene.getVCentre(), 1.2);
         c.translate(W, H * 1.15); c.scale(ZOOM, ZOOM); c.translate(-o.x, -o.y);
         scene.renderGround(c, null);
@@ -451,6 +451,7 @@ const SCENES = {
               const K = rows.KINDS[n];
               if (n === "tracteur") items.push({ d: scene.depth(3, v), draw: () => props.drawCrosser(c, "tracteur", 3, v, -1, 1) });
               else if (n === "tracteurProche") items.push({ d: scene.depth(0, v), draw: () => props.drawCrosser(c, "tracteur", 0, v, -1, 1) });
+              else if (n === "chasseneige" || n === "chasseneigeProche") { if (n === "chasseneige" || dv === 0) items.push({ d: scene.depth(0, v), draw: () => props.drawChasseNeige(c, rows.KINDS.chasseneige, 0, v, 1) }); }
               else if (n === "contresens") items.push({ d: scene.depth(0, v), draw: () => props.drawVoiture(c, K, 0, v, -1, 1) });
               else if (n === "poulejetee") { items.push({ d: scene.depth(0, v), draw: () => props.drawPouleJetee(c, 0, v, 1) }); items.push({ d: scene.depth(1.65, v + 1.2), draw: () => props.drawLanceurFace(c, 1.65, v + 1.2, 1, dv < 0 ? null : 0.2) }); }
               else if (n === "riders") { const P = [PALETTES.pmc, { ...PALETTES.pmc, velo: "grandbi" }, { ...PALETTES.pmc, velo: "roller" }][pos.indexOf(dv)]; items.push({ d: scene.depth(0, v), draw: () => drawRider(c, 0, v, 0, P, 1, 1, 0) }); }

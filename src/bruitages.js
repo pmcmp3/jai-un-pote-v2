@@ -455,6 +455,8 @@ SONS.mouette = (ctx, out, t0, o) => {
     t += 0.3 + a() * 0.12;
   }
 };
+// La mouette-obstacle (rows.js) : le même cri, plus présent, partout où elle vole.
+SONS.cri_mouette = (ctx, out, t0, o) => SONS.mouette(ctx, out, t0, o);
 // La cloche du village : trois coups qui résonnent.
 SONS.cloche = (ctx, out, t0, o) => {
   const lp = filtre(ctx, "lowpass", 2600, 0.7);
@@ -623,12 +625,12 @@ SONS.planches = (ctx, out, t0) => { for (let i = 0; i < 10; i++) { jouerGrain(ct
 // --- Ce que chaque choc fait entendre --------------------------------------------
 const CHOCS = {
   poule: "poule", poulejetee: "poule", vache: "vache", mouton: "mouton", cochon: "cochon", chien: "chien", chat: "chat", botte: "botte",
-  pieton: "ouf", fermier: "ouf", baigneur: "ouf", costard: "costard", skieur: "skieur", bonhomme: "bonhomme",
+  mouette: "cri_mouette", pieton: "ouf", fermier: "ouf", baigneur: "ouf", costard: "costard", skieur: "skieur", bonhomme: "bonhomme",
   voiture: "carambolage", contresens: "carambolage", buggy: "carambolage", bus: "carambolage", tracteur: "carambolage", chasseneige: "carambolage",
 };
 const GROS = new Set(["bus", "tracteur", "chasseneige"]);
 // Ce qu'un animal dit en nous voyant arriver.
-export const APPELS = { poule: "glousse", vache: "meuh", mouton: "bee", cochon: "groin", chien: "ouaf", chat: "miaou" };
+export const APPELS = { poule: "glousse", vache: "meuh", mouton: "bee", cochon: "groin", chien: "ouaf", chat: "miaou", mouette: "cri_mouette" };
 
 // --- Niveaux ----------------------------------------------------------------------
 // Gain de chaque son, calé par outils/bruitages.mjs : la crête de son niveau
@@ -642,7 +644,7 @@ export const CIBLES = {
   botte: -24, ouf: -23, costard: -23, skieur: -23, bonhomme: -24, carambolage: -21,
   klaxon_contresens: -23, klaxon_voiture: -23, klaxon_bus: -23, klaxon_tracteur: -24, klaxon_chasseneige: -23, klaxon_buggy: -24,
   sonnette: -25, atterrissage: -27, train: -20, rail: -29, pschit: -28, carillon: -28, quilles: -24,
-  oiseau: -33, grillon: -35, chouette: -33, mouette: -31, cloche: -29,
+  oiseau: -33, grillon: -35, chouette: -33, mouette: -31, cri_mouette: -27, cloche: -29,
   // Continus, au niveau nominal (ambiance.js les module) : le vélo reste discret.
   couche_roulement: -33, roueLibre: -34, neigeRoule: -34, planches: -32, couche_vent: -36, couche_blizzard: -33, couche_vagues: -31,
   couche_jet: -26, couche_grondement: -28, couche_freins: -27, couche_boules: -33,
@@ -654,13 +656,13 @@ export const NIVEAUX = {
   miaou: 0.149, chat: 0.168, botte: 0.676, ouf: 0.631, costard: 0.603, skieur: 0.575, bonhomme: 0.638, carambolage: 0.305, klaxon_contresens: 0.186,
   klaxon_voiture: 0.186, klaxon_bus: 0.162, klaxon_tracteur: 0.248, klaxon_chasseneige: 0.151, klaxon_buggy: 0.229, sonnette: 0.077,
   atterrissage: 0.624, train: 0.26, rail: 0.422, pschit: 0.09, carillon: 0.108, quilles: 0.513, oiseau: 0.037, grillon: 0.066, chouette: 0.039,
-  mouette: 0.045, cloche: 0.052,
+  mouette: 0.045, cri_mouette: 0.07, cloche: 0.052,
   couche_roulement: 0.182, roueLibre: 0.193, neigeRoule: 0.153, planches: 0.195, couche_vent: 0.074, couche_blizzard: 0.24, couche_vagues: 0.232,
   couche_jet: 0.211, couche_grondement: 0.589, couche_freins: 0.061, couche_boules: 0.417,
   moteur_contresens: 0.146, moteur_bus: 0.191, moteur_tracteur: 0.412, moteur_chasseneige: 0.197, moteur_buggy: 0.394, moteur_skieur: 0.129,
 };
 // Durée d'un son (budget de voix simultanées).
-const DUREES = { vache: 1, meuh: 1.3, cloche: 5.5, train: 1.8, pschit: 1.6, chouette: 1.5, grillon: 2.1, mouette: 1.4, sonnette: 1, carillon: 1.3 };
+const DUREES = { vache: 1, meuh: 1.3, cloche: 5.5, train: 1.8, pschit: 1.6, chouette: 1.5, grillon: 2.1, mouette: 1.4, cri_mouette: 1.4, sonnette: 1, carillon: 1.3 };
 export const NOMS = Object.keys(SONS);
 
 // Rendu sur n'importe quel contexte (le jeu, ou hors ligne pour l'outil).

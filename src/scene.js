@@ -1196,13 +1196,21 @@ function arbre(ctx, u, v, h, sw) {
 // la projection.
 const PERSO_H = 1.75, ETAGE_H = 2.9;
 // La personne vient d'humains.js : peau, taille —
-// enfants compris, c'est le décor —, carrure, cheveux.
+// enfants compris, c'est le décor —, carrure, cheveux. Elle ENCOURAGE le
+// coureur, les deux bras en l'air qui s'agitent (comme au bord d'une étape
+// du Tour) : plantée les bras le long du corps, elle avait l'air d'une statue.
 function personnage(ctx, u, v, lift, haut, bas) {
   const M = humain(Math.round(v * 13 + u * 7) + 3000);
   const H = PERSO_H * M.taille, w = M.corpulence;
   const l = 0.42 * w;   // épaules
   drawBox(ctx, u, v, 0.3, l * 0.8, H * 0.46, bas, lift);                       // jambes
   drawBox(ctx, u - 0.05, v - 0.05, 0.4, l, H * 0.33, haut, lift + H * 0.46);   // buste
+  // Bras levés, hors du buste (jamais imbriqués), qui battent vers l'extérieur.
+  for (const [vb, sens, ph] of [[v - 0.16, -1, 0], [v - 0.05 + l, 1, 2.1]]) {
+    const ecart = 0.07 * (0.5 + 0.5 * Math.sin(decorT * 7 + v * 2.3 + ph)) * sens;
+    drawBox(ctx, u + 0.08, vb + ecart, 0.14, 0.11, H * 0.3, haut, lift + H * 0.72);
+    drawBox(ctx, u + 0.09, vb + ecart, 0.12, 0.11, H * 0.07, M.peau, lift + H * 1.02);
+  }
   teteVoxel(ctx, M, u + 0.02, v + 0.04, 0.3, 0.3, lift + H * 0.79, H * 0.21, { face: "camera" }); // tête
 }
 // Deux bourgs, deux régions. NORD : brique rouge, ardoise sombre, pignon à
@@ -1618,13 +1626,23 @@ export function drawHalle(ctx, rDebut, geo, rFrom = -Infinity, rTo = Infinity, c
       if (tv1 - tv0 > 0.9) drawBox(ctx, uR + 0.06, tv0 + 0.4, 1.88, tv1 - tv0 - 0.8, 0.7, "#2a3442", H + 1.1); // vitres
       for (let v = t0 + 1.6; v < t1 - 1; v += 4.2) if (v >= tv0 && v + 0.7 <= tv1) drawBox(ctx, uR + 0.05, v, 0.1, 0.7, 1.75, "#c8301c", H + 0.25); // portes (côté quai)
       drawBox(ctx, uR + 0.1, tv0, 1.8, tv1 - tv0, 0.2, "#b8bcc4", H + 2.4);          // toit
-      // Les deux nez : pare-brise sombre et phares (il ENTRE en gare : on le
-      // voit arriver) — seulement s'ils sont sur les rails.
-      for (const vc of [t0 >= a0 + 1 ? t0 - 0.05 : null, t1 <= a1 ? t1 : null]) {
-        if (vc === null) continue;
-        drawBox(ctx, uR + 0.25, vc, 1.5, 0.05, 0.75, "#2a3442", H + 1.15);
-        for (const du of [0.3, 1.48]) drawBox(ctx, uR + du, vc - 0.01, 0.22, 0.07, 0.16, "#fff3b0", H + 0.5);
-      }
+      // Les deux NEZ : la cabine s'abaisse en trois marches vers l'avant (le
+      // profil fuselé d'un TER), pare-brise sombre sur la pente, phares en bas
+      // — seulement ce qui est sorti du tunnel.
+      const nez = (vc, sens) => {
+        const marches = [[0, 0.5, 2.05], [0.5, 0.9, 1.5], [0.9, 1.25, 0.9]];
+        for (const [d0, d1, hh] of marches) {
+          const a = sens > 0 ? vc + d0 : vc - d1, b = sens > 0 ? vc + d1 : vc - d0;
+          if (a < a0 + 1 || b > a1) return;
+          drawBox(ctx, uR + 0.1, a, 1.8, b - a, hh, "#e8e6e0", H);
+          drawBox(ctx, uR + 0.08, a, 1.84, b - a, 0.35, "#1f3a78", H + 0.25);
+          if (hh > 1) drawBox(ctx, uR + 0.06, a, 1.88, b - a, Math.min(0.55, hh - 1.05), "#2a3442", H + hh - Math.min(0.55, hh - 1.05) - 0.08); // pare-brise
+        }
+        const bout = sens > 0 ? vc + 1.25 : vc - 1.25 - 0.07;
+        for (const du of [0.3, 1.48]) drawBox(ctx, uR + du, bout, 0.22, 0.07, 0.16, "#fff3b0", H + 0.5); // phares
+        drawBox(ctx, uR + 0.1, sens > 0 ? vc + 1.25 : vc - 1.4, 1.8, 0.15, 0.3, "#3a3d46", H); // attelage
+      };
+      nez(t1, 1); nez(t0, -1);
     }
     // Le tunnel : un mur de pierre au bout du quai, haut comme la halle, et sa
     // bouche sombre d'où sort la rame.

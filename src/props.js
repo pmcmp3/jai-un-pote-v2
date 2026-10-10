@@ -212,19 +212,25 @@ export function drawChasseNeige(ctx, K, uC, v, t) {
       ctx.restore();
     }
     for (const a of [0.25, 0.8]) for (const b of [-0.01, 0.84]) { drawDisque(ctx, x + b * W + 0.12, av + a * L, 0.46, 0.46, "#1a1a1e"); drawDisque(ctx, x + b * W + 0.118, av + a * L, 0.46, 0.22, "#5a5d66"); }
-    bloc(0.06, 0.94, 0.08, 0.84, 0.14, 0.18, "#2b2d33");      // châssis
-    bloc(0.1, 0.3, 0.04, 0.92, 0.68, 0.28, "#ee7a1a");        // cabine
-    bloc(0.1, 0.2, 0.02, 0.96, 0.26, 0.6, VITRE);             // vitres
-    bloc(0.1, 0.3, 0.04, 0.92, 0.04, 0.96, "#c95e0c");        // toit de cabine
-    bloc(0.42, 0.58, 0.02, 0.96, 0.64, 0.32, "#ee7a1a");      // benne à sel
-    bloc(0.42, 0.58, 0.0, 1.0, 0.07, 0.32, "#c95e0c");        // rebord bas
-    bloc(0.44, 0.54, 0.08, 0.84, 0.04, 0.96, "#e9ecef");      // le sel
-    bloc(0.03, 0.08, 0.1, 0.8, 0.07, 0.08, "#2b2d33");        // bras de lame
+    // ⚠️ Cubes EMPILÉS, jamais imbriqués : deux cubes qui s'interpénètrent
+    // n'ont pas d'ordre de peinture (scene.groupe) — les vitres disparaissaient
+    // dans la cabine et le dessus du rebord se peignait sur la benne.
+    bloc(0.06, 0.94, 0.08, 0.84, 0.14, 0.18, "#2b2d33");      // châssis (0,18 → 0,32)
+    bloc(0.1, 0.3, 0.04, 0.92, 0.28, 0.32, "#ee7a1a");        // bas de cabine (→ 0,60)
+    bloc(0.1, 0.03, 0.04, 0.92, 0.26, 0.6, "#ee7a1a");        // montant avant
+    bloc(0.13, 0.24, 0.04, 0.92, 0.26, 0.6, VITRE);           // vitres (→ 0,86)
+    bloc(0.37, 0.03, 0.04, 0.92, 0.26, 0.6, "#ee7a1a");       // montant arrière
+    bloc(0.1, 0.3, 0.04, 0.92, 0.1, 0.86, "#ee7a1a");         // haut de cabine (→ 0,96)
+    bloc(0.1, 0.3, 0.04, 0.92, 0.04, 0.96, "#c95e0c");        // toit de cabine (→ 1)
+    bloc(0.42, 0.58, 0.0, 1.0, 0.07, 0.32, "#c95e0c");        // rebord bas (→ 0,39)
+    bloc(0.42, 0.58, 0.02, 0.96, 0.57, 0.39, "#ee7a1a");      // benne à sel (→ 0,96)
+    bloc(0.44, 0.54, 0.08, 0.84, 0.04, 0.96, "#e9ecef");      // le sel (→ 1)
+    bloc(0.03, 0.07, 0.1, 0.8, 0.07, 0.08, "#2b2d33");        // bras de lame
     for (let i = 0; i < 6; i++) bloc(-0.02, 0.05, -0.06 + i * 0.187, 0.187, 0.34, 0.02, i % 2 ? "#1a1a1e" : "#f2c21c"); // la lame, à chevrons
     const on = Math.floor(t * 4) % 2 === 0;                   // gyrophare
     bloc(0.2, 0.07, 0.4, 0.2, 0.07, 1.0, on ? "#ffb21a" : "#a85a10");
     const nuit = getNight() > 0.2;
-    for (const b of [0.1, 0.74]) bloc(0.08, 0.03, b, 0.16, 0.07, 0.42, nuit ? "#fff6c8" : "#f4eed6");
+    for (const b of [0.1, 0.74]) bloc(0.07, 0.03, b, 0.16, 0.07, 0.42, nuit ? "#fff6c8" : "#f4eed6");
     ctx.save(); ctx.globalAlpha *= nuit ? 0.55 : 0.2;
     drawFlat(ctx, x - 0.1, av - 4.2, W + 0.2, 4.2, "#fff2b0", true);
     ctx.restore();
@@ -437,7 +443,30 @@ function voitureNue(ctx, K, uCenter, v, sens, t, couleur = null) {
 // bascule — la personne, elle, ne doit pas changer de tête en tombant).
 export function drawStatic(ctx, kind, uCenter, r, t, graine = Math.round(r)) {
   if (kind === "costard" || kind === "fermier" || kind === "baigneur") { debout(ctx, kind, uCenter, r, t, graine); return; }
+  if (kind === "mouette") { groupe(ctx, () => drawMouette(ctx, uCenter, r, t)); return; }
   groupe(ctx, () => staticNu(ctx, kind, uCenter, r, t));
+}
+
+// La MOUETTE, en cubes, tournée vers le joueur (tête côté −v), qui plane dans
+// sa boîte de collision (KINDS.mouette : de `bas` à `h`) en battant des ailes
+// — une aile de chaque côté du corps, jamais imbriquée (scene.groupe). Son
+// ombre au sol dit où elle est.
+function drawMouette(ctx, u, r, t) {
+  const K = KINDS.mouette, ph = t * 9 + r * 1.7;
+  const hc = (K.bas + K.h) / 2 - 0.12 + Math.sin(ph * 0.35) * 0.05;
+  drawShadow(ctx, u, r, 0.35, 0.4, 0.12);
+  drawBox(ctx, u - 0.18, r - 0.32, 0.36, 0.66, 0.26, "#f7f7f2", hc - 0.13);             // corps
+  drawBox(ctx, u - 0.13, r + 0.34, 0.26, 0.2, 0.09, "#cfd4db", hc - 0.02);               // queue
+  drawBox(ctx, u - 0.13, r - 0.56, 0.26, 0.24, 0.24, "#ffffff", hc + 0.02);              // tête
+  drawBox(ctx, u - 0.05, r - 0.68, 0.1, 0.12, 0.07, "#f2b21c", hc + 0.08);               // bec
+  drawBox(ctx, u - 0.14, r - 0.5, 0.01, 0.06, 0.06, "#1a1a1e", hc + 0.14);               // œil
+  // Les ailes : deux segments de part et d'autre, le bout bat plus que l'épaule.
+  const s = Math.sin(ph);
+  for (const sens of [-1, 1]) {
+    const u1 = sens < 0 ? u - 0.18 - 0.32 : u + 0.18, u2 = sens < 0 ? u1 - 0.3 : u1 + 0.32;
+    drawBox(ctx, u1, r - 0.18, 0.32, 0.4, 0.06, "#c9ced6", hc + 0.08 + 0.12 * s);
+    drawBox(ctx, u2, r - 0.14, 0.3, 0.34, 0.06, "#2b2d33", hc + 0.08 + 0.3 * s);
+  }
 }
 
 // Les personnages DEBOUT — costard, fermier, baigneur — en CUBES, de profil,

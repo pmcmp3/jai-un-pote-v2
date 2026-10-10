@@ -61,7 +61,7 @@ function course(seed, pilote) {
   M.double = M.haut + M.tDouble * 0.6;
   let v = 0, prevV = 0, speed = V_UNIT * C.vitesseBase, jumpY = 0, vy = 0, doubled = false, tHaut = 0, plan = null;
   const parEspece = {};
-  let touches = 0, obstacles = 0, pieces = 0, apexMax = 0;
+  let touches = 0, obstacles = 0, pieces = 0, apexMax = 0; const comptes = {}, touchesR = [];
   const tPotes = [];
   for (let now = 0; now < T; now += dt) {
     speed += (targetSpeed(now) - speed) * Math.min(1, 3 * dt);
@@ -92,13 +92,17 @@ function course(seed, pilote) {
     }
     if (jumpY <= sol) { jumpY = sol; vy = 0; doubled = false; tHaut = 0; plan = null; }
     for (const ev of route.checkMember("j", prevV, v, jumpY, now)) {
-      if (ev.type === "obstacle") { touches += 1; parEspece[ev.kind] = (parEspece[ev.kind] || 0) + 1; }
+      if (ev.type === "obstacle") { touches += 1; parEspece[ev.kind] = (parEspece[ev.kind] || 0) + 1; touchesR.push(ev.r); }
       if (ev.type === "piece") { pieces += 1; const p = C.potesPaliers[tPotes.length]; if (p !== undefined && pieces >= p) tPotes.push(now); }
     }
     const r = Math.floor(v + 0.5);
-    if (prevV < r && v >= r && route.rowAt(r).type !== "safe") obstacles += 1;
+    // La mouette plane au-dessus de la tête : l'immobile passe dessous (elle ne compte pas).
+    if (prevV < r && v >= r && route.rowAt(r).type !== "safe" && !KINDS[route.rowAt(r).kind].aerien) { obstacles += 1; comptes[route.rowAt(r).kind] = (comptes[route.rowAt(r).kind] || 0) + 1; }
   }
-  return { touches, obstacles, pieces, tPotes, parEspece, apexMax };
+  // Sur la ligne d'arrivée, un obstacle peut être touché (le vélo l'aborde)
+  // avant que la course s'arrête au milieu de lui : il compte comme rencontré.
+  for (const r of touchesR) if (r > Math.floor(v + 0.5)) { obstacles += 1; comptes[route.rowAt(r).kind] = (comptes[route.rowAt(r).kind] || 0) + 1; }
+  return { touches, obstacles, pieces, tPotes, parEspece, apexMax, comptes };
 }
 const idem = graines.map((gr) => course(gr, true));
 const immo = graines.map((gr) => course(gr, false));
@@ -106,11 +110,26 @@ console.log(`— Joueur idéal scripté : ${idem.reduce((a, c) => a + c.touches,
 const detail = {}; for (const c of idem) for (const [k, n] of Object.entries(c.parEspece)) detail[k] = (detail[k] || 0) + n;
 if (Object.keys(detail).length) console.log("  détail :", JSON.stringify(detail));
 console.log(`— Joueur immobile : ${immo.reduce((a, c) => a + c.touches, 0)} touchés sur ${immo.reduce((a, c) => a + c.obstacles, 0)} rencontrés`);
+if (process.env.DETAIL) immo.forEach((c, i) => { for (const k of new Set([...Object.keys(c.parEspece), ...Object.keys(c.comptes)])) if ((c.parEspece[k] || 0) !== (c.comptes[k] || 0)) console.log(`  graine ${graines[i]} ${k} : touchés ${c.parEspece[k] || 0}, comptés ${c.comptes[k] || 0}`); });
 const tIdeal = idem.reduce((a, c) => a + c.touches, 0), tImmo = immo.reduce((a, c) => a + c.touches, 0), nImmo = immo.reduce((a, c) => a + c.obstacles, 0);
 // Les paires « serrées » restent une indication (quelques-unes viennent des
 // paquets et des piétons, placés par d'autres règles) : la garantie, c'est le
 // joueur idéal qui passe tout et le joueur immobile qui touche tout.
-verdict(tIdeal === 0 && tImmo === nImmo, `joueur idéal ${tIdeal} choc, joueur immobile ${tImmo}/${nImmo} chocs (${N} graines)`);
+// La mouette : au sol on passe dessous, au moindre saut on la touche.
+let mouettes = 0, mouettesOk = 0;
+for (const gr of graines) {
+  const route = new Route(gr);
+  for (let r = 0; r < 2200; r++) {
+    const row = route.rowAt(r);
+    if (row.kind !== "mouette") continue;
+    mouettes += 1;
+    const sous = route.checkMember("sol", r - 0.05, r, solAt(r), 0).some((e) => e.type === "obstacle");
+    const saut = route.checkMember("saut", r - 0.05, r, solAt(r) + 0.4, 0).some((e) => e.type === "obstacle");
+    if (!sous && saut) mouettesOk += 1;
+  }
+}
+console.log(`— Mouettes : ${mouettes} sur ${N} graines, ${mouettesOk} qu'on passe dessous au sol et qu'on touche en sautant`);
+verdict(tIdeal === 0 && tImmo === nImmo && mouettes > 0 && mouettesOk === mouettes, `joueur idéal ${tIdeal} choc, joueur immobile ${tImmo}/${nImmo} chocs, mouettes ${mouettesOk}/${mouettes} (${N} graines)`);
 console.log(`— Pièces du joueur idéal (qui ne vise QUE les obstacles) : ${Math.round(moy(idem.map((c) => c.pieces)))} ; apex maximal atteint ${moy(idem.map((c) => c.apexMax)).toFixed(2)} u`);
 const pot = C.potesPaliers.map((_, i) => { const t = idem.map((c) => c.tPotes[i]).filter((x) => x !== undefined); return t.length ? `${Math.round(moy(t))} s (${t.length}/${N})` : "jamais"; });
 console.log(`— Arrivée des potes (paliers ${C.potesPaliers.join(", ")}) : ${pot.join(" · ")}`);

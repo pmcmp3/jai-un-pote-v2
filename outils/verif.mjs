@@ -13,6 +13,7 @@ const TESTS = [
   ["regles", ["outils/mesurer.mjs", "20"], {}, "joueur idéal sans choc, joueur immobile touche tout"],
   ["conflits", ["outils/pieces-piegees.mjs", "20"], {}, "aucune pièce ni brique de lait dans un obstacle ou un véhicule"],
   ["collisions", ["outils/collisions.mjs"], {}, "chaque obstacle percuté coûte"],
+  ["ecraser", ["outils/ecraser.mjs"], {}, "une petite bête prise par le dessus s’écrase sans rien coûter"],
   ["tap-android", ["outils/tap-android.mjs"], {}, "un tap = un saut sur Android"],
   ["tuto", ["outils/tuto-neuf.mjs"], {}, "chaque tuto tombe sur une route dégagée"],
   ["menu-android", ["outils/menu-android.mjs"], {}, "choisir une puce ne fait rien bouger"],

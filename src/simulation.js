@@ -112,7 +112,7 @@ export function scoreParfait(seed, potesMax) {
 // quotas (outil de mesure).
 export function recenser(seed, nRangees = 1100) {
   const route = new Route(seed);
-  const n = { dangers: 0, pieces: 0, piecesAir: 0, piecesDoubles: 0, laits: 0, grosses: 0, halles: 0, tap: 0, haut: 0, double: 0, ecartMin: 99, ecartMax: 0 };
+  const n = { dangers: 0, pieces: 0, piecesAir: 0, piecesDoubles: 0, laits: 0, grosses: 0, halles: 0, tap: 0, haut: 0, double: 0, sol: 0, ecartMin: 99, ecartMax: 0 };
   let dernier = null;
   for (let r = 0; r < nRangees; r++) {
     const row = route.rowAt(r);

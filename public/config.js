@@ -79,8 +79,7 @@ window.CONFIG = {
   // === SCORE (en « pts » : tout le monde fait la même distance sur la même
   // course, ce qui départage c'est les potes gardés et les pièces) ===
   metresParUnite: 1,      // 1 rangée = 1 pt de base (× potes, × turbo)
-  // Chaque pote ajoute ce pourcentage aux mètres gagnés (×1 seul, ×3 avec 8 potes).
-  potesBonusMetres: 0.25,
+  // Le multiplicateur des potes est ENTIER : 3 potes = ×3, 5 potes = ×5 (regles.js).
   // Mètres bonus par pièce ramassée (avant multiplicateur de potes).
   pieceMetres: 4,
 

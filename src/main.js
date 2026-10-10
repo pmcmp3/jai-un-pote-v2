@@ -31,7 +31,7 @@ import * as net from "./net.js";
 import * as debugOverlay from "./debug.js";
 import { consumeJumpPress, consumeWheelie, isHolding } from "./input.js";
 import { PALETTES, paletteDepuisSkin, couronner } from "./rider.js";
-import { drawRider, drawJetpack, RIDER_HEIGHT } from "./voxrider.js";
+import { drawRider, drawJetpack, RIDER_HEIGHT, setNuit as phareNuit } from "./voxrider.js";
 import { drawCoin } from "./coin.js";
 import { V_UNIT, LEAD_IN, targetSpeed as targetSpeedRegle, multiplicateur as multRegle, graineLigue, dureeCourse, rangAuTemps } from "./regles.js";
 import { scoreParfait } from "./simulation.js";
@@ -362,6 +362,7 @@ function conseilCherche(tm, vitesse) {
     const row = rows.rowAt(r);
     if (row.type !== "statique" && row.type !== "traverse" && row.type !== "contresens") continue;
     const f = rows.familleDe(row.kind);
+    if (f === "sol") return; // la mouette n'a pas de tuto : elle se lit (et c'est le dernier obstacle à voir)
     if (deja.has(f) || (vus[f] || 0) >= 1) continue; // UNE seule fois par famille
     // L'obstacle RÉSERVÉ au tuto (route dégagée, rows.degagerTutos) ne file
     // jamais, même si le joueur est en l'air : sinon le tuto partirait sur
@@ -586,7 +587,7 @@ function isGameStartRequested() { return startRequested; }
 function resetRun() {
   game.metres = 0; game.points = 0; game.potesGagnes = 0; game.etoiles = 0;
   game.ended = false; game.endReason = null; game.reviveOffered = false; game.sansFaute = true;
-  game.turbo = 0; game.finAge = -1; game.arriveeR = null; game.surHalle = false; tombes.clear(); ejectes.clear(); game.invincibleAnnonce = false;
+  game.turbo = 0; game.finAge = -1; game.arriveeR = null; game.surHalle = false; tombes.clear(); ejectes.clear(); ecrases.clear(); game.invincibleAnnonce = false;
   audio.oublierMarchand();
   game.startedAt = perfClock();
   player.u = 0; player.prevU = 0; player.v = 0; player.prevV = 0; cameraX = null;
@@ -779,12 +780,35 @@ function dessinerEjecte(ej, K, tm, dessin) {
   ctx.translate(c.x, c.y); ctx.rotate(ej.sens * 6.5 * a); ctx.translate(-c.x, -c.y);
   try { scene.avecLift(lift + rows.solAt(v), () => dessin(du, v)); } finally { ctx.restore(); }
 }
+// Une bête écrasée s'aplatit en 0,12 s autour de ses pieds, puis reste là.
+function aplati(r, age, dessin) {
+  const k = Math.min(1, Math.max(0, age) / 0.12), c = scene.project(0, r, 0); // dans surSol : le sol est déjà levé
+  ctx.save();
+  ctx.translate(c.x, c.y); ctx.scale(1 + 0.3 * k, 1 - 0.72 * k); ctx.translate(-c.x, -c.y);
+  try { dessin(); } finally { ctx.restore(); }
+}
 const KINDS_ROULANTS = new Set(["tracteur", "bus", "chasseneige", "skieur", "buggy", "pieton", "voiture", "contresens", "poulejetee"]);
 
+// Les PETITES BÊTES s'écrasent si on leur retombe dessus PAR LE DESSUS (le
+// joueur descend et était au-dessus d'elles au pas d'avant) : rebond, aucun
+// coût, comme dans Mario. De face, elles font toujours mal.
+const ECRASABLES = new Set(["poule", "poulejetee", "chat", "chien", "cochon", "mouton"]);
+const ecrases = new Map(); // rangée → instant (horloge du monde) où la bête a été aplatie
+function parDessus(ev) { return ECRASABLES.has(ev.kind) && ev.haut !== undefined && player.jumpVy < 0 && player.prevJumpY >= ev.haut - 0.3; }
+function ecraser(ev) {
+  bruitages.choc(ev.kind, { pan: -0.15 });
+  if (KINDS_ROULANTS.has(ev.kind)) ejecter(ev, tMonde()); else if (ev.r !== undefined) ecrases.set(ev.r, tMonde());
+  player.jumpY = Math.max(player.jumpY, ev.haut);
+  player.jumpVy = window.CONFIG.sautVitesse * 0.7; player.doubled = false; player.tHaut = window.CONFIG.sautTenueMaxS;
+  semerSparkles(player.u, player.v, 10, "#ffffff");
+  triggerShake(2, 0.15); vibrer(30);
+  pousserPopup("ÉCRASÉ !", JAUNE);
+}
 const chocs = []; // debug : les derniers chocs (auto-audit)
 function toucherJoueur(ev) {
-  chocs.push({ r: ev.r, kind: ev.kind, conseil: conseil.r }); if (chocs.length > 20) chocs.shift();
+  chocs.push({ r: ev.r, kind: ev.kind, conseil: conseil.r, dessus: parDessus(ev) }); if (chocs.length > 20) chocs.shift();
   if (conseil.r !== null && ev.r === conseil.r) { conseil.touche = true; return; } // l'obstacle expliqué ne fait pas mal
+  if (parDessus(ev)) { ecraser(ev); return; }
   // Le cri de ce qu'on a percuté (poule, vache…) ; pour un humain, la voix
   // suit la personne (homme / femme).
   bruitages.choc(ev.kind, { pan: -0.15, femme: ev.r !== undefined && humain(Math.round(ev.r), { enfants: false }).femme });
@@ -1427,6 +1451,7 @@ function peindreSol(now, v) {
   scene.renderGround(ctx, null);   // pas de boue
   // Phare du vélo la nuit : un faisceau chaud sur la route, devant le joueur.
   const nuitF = scene.getNight();
+  phareNuit(gameStarted ? nuitF : 0);
   if (gameStarted && nuitF > 0.25) {
     const a = scene.project(0, v + 1, 0), b = scene.project(0, v + 9, 0);
     const g = ctx.createRadialGradient(a.x, a.y, 4, a.x, a.y, Math.max(40, b.x - a.x));
@@ -1541,8 +1566,10 @@ function objetsDeLaRoute(items, from, to, now, tm, tAnim, vc, largeurRoute) {
       const ej = ejectes.get(r), K = rows.KINDS[row.kind];
       items.push({ d: scene.depth(0, r), draw: () => dessinerEjecte(ej, K, tm, (u, vv) => props.drawVoiture(ctx, K, u, vv, 1, tAnim, row.bouchon !== undefined ? props.COULEURS_BOUCHON[row.bouchon % 3] : null)) });
     } else if (row.type === "statique") {
-      const tombe = tombes.get(r);
-      items.push({ d: scene.depth(0, r), draw: () => surSol(r, () => (tombe !== undefined
+      const tombe = tombes.get(r), ecrase = ecrases.get(r);
+      items.push({ d: scene.depth(0, r), draw: () => surSol(r, () => (ecrase !== undefined
+        ? aplati(r, tm - ecrase, () => props.drawStatic(ctx, row.kind, 0, r, tAnim))
+        : tombe !== undefined
         ? props.drawStaticTombe(ctx, row.kind, 0, r, tAnim, Math.max(0, tm - tombe))
         : row.bouchon !== undefined
           ? (props.drawVoiture(ctx, rows.KINDS[row.kind], 0, r, 1, tAnim, props.COULEURS_BOUCHON[row.bouchon % 3]), props.drawFeuxDetresse(ctx, rows.KINDS[row.kind], 0, r, tAnim))
@@ -1695,7 +1722,7 @@ function interfaceDeCourse(now, tAnim) {
     const gaugeT = plein ? 1 : Math.max(0, Math.min(1, (game.points - palierPrecedent()) / Math.max(1, prochainPalier() - palierPrecedent())));
     hud.renderHud(ctx, width, height, {
       metres: game.metres, potes: friends.count(), potesMax: friends.max(), gaugeT,
-      mult: Math.round(multiplicateur() * 100) / 100, restant: plein ? 0 : Math.max(0, prochainPalier() - game.points), plein,
+      mult: multRegle(friends.count(), game.turbo > 0), restant: plein ? 0 : Math.max(0, prochainPalier() - game.points), plein,
       restantS: game.ended ? 0 : tempsRestant(), turbo: game.turbo > 0, safeTop, nuit: scene.getNight(), plage: plageFondu,
       avance: game.sprint ? Math.max(0, clock.now()) / (window.CONFIG.sprintDureeS || 60) : 1 - (game.ended ? 0 : tempsRestant()) / Math.max(1, window.CONFIG.dureeMorceau - departMorceau),
     });

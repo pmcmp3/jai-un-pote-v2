@@ -68,23 +68,14 @@ export function potePerdu() {
   tone(o.ctx, o.dest, { type: "square", f0: 196, f1: 98, t0: o.ctx.currentTime, dur: 0.22, gain: 0.07 }); // sol3 → sol2
 }
 
-// Saut : souffle court. Salto : souffle + montée.
-export function saut() {
+// Saut et salto : rien qu'un tout petit clic au TOUCHER (aucun souffle en
+// l'air) — sol5 pour le saut, ré6 pour le second tap qui lance le salto.
+function clic(f, gain) {
   const o = out(); if (!o) return;
-  const { ctx, dest } = o;
-  const t0 = ctx.currentTime;
-  const n = noise(ctx, 0.12);
-  const hp = ctx.createBiquadFilter(); hp.type = "highpass"; hp.frequency.value = 1800;
-  const g = ctx.createGain();
-  g.gain.setValueAtTime(0.05, t0); g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.12);
-  n.connect(hp); hp.connect(g); g.connect(dest);
-  n.start(t0); n.stop(t0 + 0.14);
+  tone(o.ctx, o.dest, { f0: f, t0: o.ctx.currentTime, dur: 0.045, gain });
 }
-export function salto() {
-  saut();
-  const o = out(); if (!o) return;
-  tone(o.ctx, o.dest, { f0: 493.88, f1: 1174.66, t0: o.ctx.currentTime, dur: 0.28, gain: 0.05 }); // si4 → ré6
-}
+export function saut() { clic(783.99, 0.03); }
+export function salto() { clic(1174.66, 0.035); }
 
 // Brique de lait : arpège rapide.
 export function lait() {

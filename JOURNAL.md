@@ -893,3 +893,33 @@ une couronne »), l'écart au suivant sur l'écran de fin, la vibration, le dép
     Corrigé : service worker retiré d'abord, caches vidés ensuite.
 - Test `hors-ligne` ajouté au filet (13 tests).
 
+## 10 octobre 2026 (soir) — partie en 5G : treize retours
+
+- « Pour la multiplication, si t'as 5 potes, ton score est multiplié par 5 [...] Fais pas des
+  demi-multiplications » → multiplicateur entier (×1 seul ou avec un pote, puis ×N).
+  `VERSION_COURSE` 24.
+- « Tu enlèves le son quand on est en l'air [...] ou alors un tout petit son au moment où on
+  appuie et un autre [...] une deuxième fois » → les deux petits clics ; souffle, roue libre et
+  vent renforcé en l'air retirés.
+- « J'aimerais bien qu'on puisse écraser le cochon [...] je l'ai pris de haut » → les petites
+  bêtes s'écrasent par le dessus (rebond, aucun coût).
+- « Attention au conflit entre les briques de lait et les pièces » → mesuré : 263 briques sur
+  300 avaient une pièce à moins de 3 rangées. Corrigé, 0 ; premier essai trop strict (11 à 15
+  briques selon la graine au lieu de 15) → repli qui efface les pièces voisines, 15/15.
+- « Le camion neige [...] quelques bugs » → cubes imbriqués dans le modèle : vitres invisibles,
+  dessus du rebord peint sur la benne. Modèle refait en cubes empilés.
+- « Des gens [...] juste debout, c'est très bizarre » → lu comme les villageois du décor,
+  plantés sans bras : ils encouragent maintenant, bras en l'air.
+- « Rajoute un phare avant sur les vélos » ; « un nez au train » → faits.
+- « Intensifie un peu la difficulté sur la fin [...] des mouettes [...] il faut pas sauter.
+  Attention, faut pas que t'aies une mouette et un camion en même temps » → mouettes dans la
+  dernière minute, jamais à côté d'un double saut. Mesuré avant : les dernières secondes
+  alignaient des baigneurs au même geste ; après : 5 à 11 mouettes sur les 60 dernières
+  secondes selon la graine.
+- Menu : une ligne qui dit pourquoi le village et l'Insta ; « Chaque pote qui joue te donne
+  +10 % » retiré de la carte « Joue avec tes potes » (le compteur +10 %, +20 % reste). Vérifié
+  en passant : l'Insta n'est envoyé nulle part tant que la base n'existe pas.
+- Filet : `perf` en échec ce soir-là, machine saturée (ffmpeg à 425 %, charge 22) — la version
+  en ligne mesurée dans les mêmes conditions faisait pire (10,2 ms contre 9,8). Mise en ligne
+  avec les 13 autres tests verts (dont `ecraser`, nouveau).
+

@@ -123,15 +123,16 @@ function velo(E, t) {
     // (ré-sol ou mi-la), toujours sur la gamme.
     rafale("sol", t, cadence, (tt) => B.jouerGrain(ctx, C.gSol, S.grain, tt, S.grain === "latte" ? (alea() < 0.5 ? 1 : 1.1225) : 0.85 + alea() * 0.3));
   } else rafales.sol = 0;
-  // La roue libre : « tic-tic-tic » en l'air, et après l'arrivée.
-  const roueLibre = (!E.auSol && E.tAir > 0.12) || E.etat === "fin";
+  // La roue libre : « tic-tic-tic » après l'arrivée seulement. En l'air, rien :
+  // le saut est silencieux, seul le toucher fait un petit clic (sfx.saut).
+  const roueLibre = E.etat === "fin";
   if (roueLibre) {
     C.gTic.gain.setTargetAtTime(NIV("roueLibre") * V * fin, t, 0.04);
     const cadence = E.etat === "fin" ? Math.max(6, 22 - E.finAge * 4) : 26 - 8 * Math.min(1, E.tAir / 1.6);
     rafale("roue", t, cadence, (tt) => B.jouerGrain(ctx, C.gTic, "tic", tt, alea() < 0.75 ? 1 : 0.8909)); // mi8, parfois ré8
   } else rafales.roue = 0;
-  // Le vent de la vitesse : plus fort en l'air, au turbo, en jetpack.
-  const souffle = vit * vit * (1 + (E.auSol ? 0 : 0.5) + (E.turbo ? 1.2 : 0) + (E.jetpack ? 0.8 : 0)) * fin;
+  // Le vent de la vitesse : plus fort au turbo, en jetpack (pas en l'air).
+  const souffle = vit * vit * (1 + (E.turbo ? 1.2 : 0) + (E.jetpack ? 0.8 : 0)) * fin;
   C.vent.gain.setTargetAtTime(NIV("couche_vent") * V * souffle, t, 0.25);
   C.vent.f.setTargetAtTime(450 + 700 * vit + (E.turbo ? 600 : 0), t, 0.3);
   // Le jetpack : il gronde quand on pousse, veilleuse sinon.

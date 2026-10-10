@@ -16,7 +16,9 @@ const { Route, KINDS, armer, delaiArmement, familleDe, montee, solAt, toitGare, 
 const N = Number(process.argv[2]) || 20;
 const graines = Array.from({ length: N }, (_, i) => 1000 + i * 2467);
 const parEspece = {}, exemples = [];
-let total = 0, piegees = 0, balayees = 0, laits = 0, laitsPieges = 0, laitsBalayes = 0;
+let total = 0, piegees = 0, balayees = 0, laits = 0, laitsPieges = 0, laitsBalayes = 0, laitsColles = 0;
+// Une brique de lait seule sur la route : aucune pièce à moins de LAIT_ISOLE rangées.
+const LAIT_ISOLE = 3;
 // Rangées visibles devant le joueur : il est à 25-30 % de la largeur, qui
 // montre `unitesVisibles` unités à la profondeur de la route.
 const DEVANT = 0.75 * (C.unitesVisibles || 14.5);
@@ -80,7 +82,10 @@ for (const seed of graines) {
     vues.add(q);
     const rowQ = route.rowAt(q);
     const objets = rowQ.coins.map((h) => ({ h, lait: false }));
-    if (rowQ.lait !== undefined) { objets.push({ h: rowQ.lait, lait: true }); laits += 1; }
+    if (rowQ.lait !== undefined) {
+      objets.push({ h: rowQ.lait, lait: true }); laits += 1;
+      for (let d = -LAIT_ISOLE; d <= LAIT_ISOLE; d++) if (d && route.rowAt(q + d).coins.length) { laitsColles += 1; break; }
+    }
     for (const { h, lait } of objets) {
       if (!lait) total += 1;
       for (let r = q - 6; r <= q + 6; r++) {
@@ -94,6 +99,8 @@ for (const seed of graines) {
         const rouesMax = h - CORPS_CENTRE + CORPS_DEMI;
         const dessus = hauteurAFranchir(row.kind) + solAt(centre);
         if (rouesMax >= dessus) continue;
+        // La mouette plane : on peut aussi la prendre en passant DESSOUS.
+        if (KINDS[row.kind].aerien && Math.max(solAt(q), h - CORPS_CENTRE - CORPS_DEMI) + R.HAUT_CYCLISTE <= KINDS[row.kind].bas + solAt(centre)) continue;
         if (lait) { laitsPieges += 1; if (exemples.length < 12) exemples.push(`graine ${seed} · LAIT rangée ${q} dans ${row.kind}`); break; }
         piegees += 1;
         parEspece[row.kind] = (parEspece[row.kind] || 0) + 1;
@@ -105,6 +112,6 @@ for (const seed of graines) {
 }
 console.log(`${piegees} pièce(s) piégée(s) sur ${total} (${N} graines)`, JSON.stringify(parEspece));
 console.log(`${balayees} pièce(s) traversée(s) à l'écran par un véhicule venu d'en face (cachées le temps qu'il passe)`);
-console.log(`Briques de lait : ${laits} rencontrées, ${laitsPieges} dans un obstacle, ${laitsBalayes} traversée(s) à l'écran par un véhicule venu d'en face`);
+console.log(`Briques de lait : ${laits} rencontrées, ${laitsPieges} dans un obstacle, ${laitsBalayes} traversée(s) à l'écran par un véhicule venu d'en face, ${laitsColles} collée(s) à des pièces (moins de ${LAIT_ISOLE} rangées)`);
 for (const e of exemples) console.log("  ", e);
-verdict(!piegees && !balayees && !laitsPieges && !laitsBalayes, `objets / récompenses : ${piegees + laitsPieges} prise(s) dans un obstacle, ${balayees + laitsBalayes} traversée(s) par un véhicule à l'écran (${total} pièces, ${laits} briques, ${N} graines)`);
+verdict(!piegees && !balayees && !laitsPieges && !laitsBalayes && !laitsColles, `objets / récompenses : ${piegees + laitsPieges} prise(s) dans un obstacle, ${balayees + laitsBalayes} traversée(s) par un véhicule à l'écran, ${laitsColles} brique(s) collée(s) à des pièces (${total} pièces, ${laits} briques, ${N} graines)`);

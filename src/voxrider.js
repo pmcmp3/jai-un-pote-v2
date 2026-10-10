@@ -89,6 +89,24 @@ function veloEnfant(ctx, um, y, lift, pedal) {
   drawBox(ctx, um + 0.1, y - 0.36 + Math.sin(pedal * 3) * 0.04, 0.03, 0.38, 0.24, "#ff7a1a", lift + 1.84);
 }
 
+// PHARE AVANT : un boîtier noir sous le guidon, verre crème le jour ; la nuit
+// (setNuit, posé par main.js à chaque image), le verre s'allume et rayonne.
+let nuitPhare = 0;
+export function setNuit(n) { nuitPhare = n; }
+function phareAvant(ctx, um, v, h) {
+  drawBox(ctx, um - 0.09, v, 0.18, 0.15, 0.16, "#1f1f25", h);
+  const allume = nuitPhare > 0.25;
+  drawBox(ctx, um - 0.095, v + 0.15, 0.19, 0.05, 0.13, allume ? "#fffbe0" : "#fff3b0", h + 0.015);
+  if (!allume) return;
+  const c = project(um - 0.095, v + 0.2, h + 0.08), R = 0.6 * echelle(um);
+  const g = ctx.createRadialGradient(c.x, c.y, 0, c.x, c.y, R);
+  g.addColorStop(0, `rgba(255,246,200,${0.9 * nuitPhare})`);
+  g.addColorStop(1, "rgba(255,236,170,0)");
+  ctx.save(); ctx.globalCompositeOperation = "lighter"; ctx.fillStyle = g;
+  ctx.beginPath(); ctx.arc(c.x, c.y, R, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+}
+
 const TIRE = "#151518", RIM = "#8a8d98", FRAME = "#1b1b21", SKIN_SHOE = "#565a66";
 
 // Ancré au sol en (u, v) = centre du vélo. `lift` = hauteur de saut.
@@ -168,6 +186,7 @@ export function drawRider(ctx, u, v, lift, P, pedal, alpha = 1, flip = 0, ombre 
     drawBox(ctx, um - 0.04, y + 0.3, 0.08, 0.6, 0.1, FRAME, liftSelle + 0.4);
     drawBox(ctx, um - 0.05, y + 0.85, 0.1, 0.1, 0.4, FRAME, liftSelle + 0.45);
   } else if (!roller && !enfant) cadre(ctx, um, y, L, lift, pedal, P);
+  if (!roller && !enfant) phareAvant(ctx, um, grandBi ? y + L - 0.3 : y + 0.95, grandBi ? lift + 0.6 : lift + 0.66);
   if (enfant) drawBox(ctx, um - 0.12, y + 0.3, 0.24, 0.18, 0.08, "#141418", liftSelle + 0.8); // la selle, tout en bas
   else if (!roller) {
     drawBox(ctx, x - 0.08, y + 0.92, W + 0.16, 0.08, 0.08, "#33333b", liftSelle + 0.85);

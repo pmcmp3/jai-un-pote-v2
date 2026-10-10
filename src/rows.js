@@ -97,6 +97,11 @@ export const KINDS = {
   // Le BONHOMME DE NEIGE de la montagne, gros, presque de la taille d'un bus.
   // Tête ronde : on ne roule pas dessus.
   bonhomme: { cout: 2, long: 1.7, larg: 1.7, h: 2.1, nom: "un bonhomme de neige" },
+  // La MOUETTE plane au-dessus de la route, juste au-dessus de la tête du
+  // cycliste (de `bas` à `h`) : on passe DESSOUS en roulant, le moindre saut
+  // s'y cogne. Famille « sol » : le geste, c'est de NE PAS sauter. Seulement
+  // dans la dernière minute, jamais à côté d'un double saut (etendreDangers).
+  mouette: { aerien: true, cout: 1, long: 1.0, larg: 0.9, bas: 2.2, h: 2.9, nom: "une mouette" },
 };
 
 // ⚠️ Les hauteurs `h` sont mesurées sur les DESSINS (capture.mjs hitbox, qui
@@ -114,6 +119,9 @@ export const KINDS = {
 export const VELO_DEMI = 0.44;
 export const MARGE_H = 0.04;
 export function hauteurAFranchir(kind) { return KINDS[kind].h + MARGE_H; }
+// Hauteur du cycliste, tête comprise (voxrider.RIDER_HEIGHT) : ce qui plane
+// (la mouette) ne touche que s'il descend sous `jumpY + HAUT_CYCLISTE`.
+export const HAUT_CYCLISTE = 1.9;
 // Les HUMAINS n'ont pas tous la même taille (humains.js) :
 // la collision lit la vraie hauteur de celui de la rangée r — un petit se
 // saute plus bas, jamais plus haut que K.h. Le planificateur (simulation,
@@ -151,7 +159,8 @@ function arcs() {
     pts.forEach((x, i) => { if (x > apex) { apex = x; iApex = i; } });
     return { pts, apex, tApex: iApex * PAS_ARC, duree: pts.length * PAS_ARC };
   };
-  ARCS = { tap: calcul("tap"), haut: calcul("haut"), double: calcul("double") };
+  // « sol » : ne pas sauter (la mouette) — aucun arc, aucune montée.
+  ARCS = { tap: calcul("tap"), haut: calcul("haut"), double: calcul("double"), sol: { pts: [0], apex: 0, tApex: 0, duree: 0 } };
   return ARCS;
 }
 export const FAMILLES = ["tap", "haut", "double"];
@@ -198,6 +207,7 @@ export function familleDe(kind) {
   if (!FAMILLE) {
     FAMILLE = {};
     for (const k of Object.keys(KINDS)) {
+      if (KINDS[k].aerien) { FAMILLE[k] = "sol"; continue; }
       const besoin = fenetreSecondes(k) + MARGE_FENETRE;
       const H = hauteurAFranchir(k);
       const calculee = FAMILLES.find((t) => tempsAuDessus(t, H) >= besoin) || "double";
@@ -254,6 +264,7 @@ export const ESPACEMENT = 3;
 const TRAINEE_MIN = 8;           // rangées libres d'affilée avant de poser une traînée au sol
 const TRAINEE_LONGUEUR = 2;      // pièces d'une traînée
 const LAIT_EVERY = 48;
+const LAIT_ISOLE = 3; // aucune pièce à moins de 3 rangées d'une brique de lait
 let FIN_LAIT = null;
 function rangFinLait() { if (FIN_LAIT === null) FIN_LAIT = Math.round(rangAuTemps(dureeCourse() - 55)); return FIN_LAIT; }
 const GROSSE_EVERY = 70;         // rangée réservée à la grosse pièce (laissée vide)
@@ -424,6 +435,12 @@ const PAQUETS = [
 // Seuls (~35 s), par deux (~75 s), par trois (~2 min), par quatre sur la
 // plage — la route se remplit à vue d'œil.
 function taillePietons(d) { return d < 3 ? 1 : d < 5 ? 2 : d < 6 ? 3 : 4; }
+// MOUETTES : sur les MOUETTES_DERNIERES_S dernières secondes, MOUETTES_PART
+// des places possibles. Avant et après elle, MOUETTE_GRACE_S de plus que la
+// physique : retomber un peu tard, ou sauter un peu tôt l'obstacle suivant,
+// ne doit pas suffire à la toucher — c'est sauter POUR RIEN qui est puni.
+const MOUETTES_DERNIERES_S = 60, MOUETTES_PART = 0.8, MOUETTE_GRACE_S = 0.3;
+function graceMouette(r) { return Math.ceil(MOUETTE_GRACE_S * vitesseAuRang(r)); }
 // Écart DANS un groupe : la physique du saut, plus une rangée de grâce.
 const PIETONS_GRACE = 1;
 // La course devient difficile dès ~40 s : 12 obstacles de départ, 12
@@ -568,13 +585,30 @@ export class Route {
       // Chacun dans son décor (voir auDecor) : posé avec l'espèce du paquet,
       // adapté au décor de la rangée TROUVÉE, re-posé (jamais plus tôt) si
       // l'adaptation change l'écart à tenir ou le trajet à l'écran.
-      let r = placer(kind, 0), choix = this.auDecor(kind, biomeDe(r));
+      // MOUETTE, dans la dernière minute : entre deux obstacles qui ne
+      // demandent pas de double saut (jamais une mouette et un véhicule l'un
+      // derrière l'autre), deux fois sur trois.
+      let mouette = null;
+      const finR = rangAuTemps(dureeCourse());
+      if (this.chaine.kind && this.chaine.kind !== "mouette" && !estDouble(this.chaine.kind) && !estDouble(kind) && !bouchon
+        && this.chaine.r >= rangAuTemps(dureeCourse() - MOUETTES_DERNIERES_S) && this.chaine.r < finR - 20 && this.hash(i * 53 + 7) < MOUETTES_PART) {
+        mouette = placer("mouette", 0) + graceMouette(this.chaine.r);
+        let garde = 0;
+        while (garde++ < 400 && !rangeeLibre(mouette, "mouette")) mouette += 1;
+        this.dangers.set(mouette, "mouette");
+        this.chaine = { r: mouette, kind: "mouette", i };
+      }
+      const apresMouette = (k) => mouette === null ? 0 : mouette + graceMouette(mouette) + ecartMin("mouette", k, Math.min(vMaxRangees(), vitesseAuRang(mouette + 20) * 1.08)) + jeu;
+      let r = placer(kind, apresMouette(kind)), choix = this.auDecor(kind, biomeDe(r));
       for (let n = 0; n < 6; n++) {
-        const r2 = placer(choix.kind, r), choix2 = this.auDecor(kind, biomeDe(r2));
+        const r2 = placer(choix.kind, Math.max(r, apresMouette(choix.kind))), choix2 = this.auDecor(kind, biomeDe(r2));
         r = r2;
         if (choix2.kind === choix.kind) break;
         choix = choix2;
       }
+      // Habillé pour son décor, l'obstacle d'après est devenu un double saut :
+      // la mouette s'envole (l'écart reste, il est juste plus large).
+      if (mouette !== null && estDouble(choix.kind)) this.dangers.delete(mouette);
       if (choix.compte === "face") this.nNeigeFace = (this.nNeigeFace || 0) + 1;
       if (choix.compte === "neige") this.nNeige = (this.nNeige || 0) + 1;
       kind = choix.kind;
@@ -592,8 +626,17 @@ export class Route {
       // pentes : le groupe s'arrête là).
       let dernier = r;
       for (let g = 1; g < groupe; g++) {
-        const rg = dernier + ecartMin(kind, kind, Math.min(vMaxRangees(), vitesseAuRang(dernier + 20) * 1.08)) + PIETONS_GRACE;
+        const vit = Math.min(vMaxRangees(), vitesseAuRang(dernier + 20) * 1.08);
+        let rg = dernier + ecartMin(kind, kind, vit) + PIETONS_GRACE;
+        // Une mouette entre deux piétons du groupe : saute, reste en bas, saute.
+        let m = null;
+        if (dernier >= rangAuTemps(dureeCourse() - MOUETTES_DERNIERES_S) && dernier < finR - 20 && this.hash(i * 61 + g * 13) < MOUETTES_PART) {
+          m = dernier + ecartMin(kind, "mouette", vit) + graceMouette(dernier);
+          rg = m + graceMouette(m) + ecartMin("mouette", kind, vit);
+          if (!rangeeLibre(m, "mouette")) m = null;
+        }
         if (!rangeeLibre(rg, kind) || biomeDe(rg) !== biomeDe(r)) break;
+        if (m !== null) this.dangers.set(m, "mouette");
         this.dangers.set(rg, kind);
         dernier = rg;
       }
@@ -606,6 +649,8 @@ export class Route {
   // les ESPACEMENT rangs, à la hauteur du buste. Suivre l'arc = tout ramasser.
   arcPieces(rObs, kind) {
     const tier = familleDe(kind);
+    // Sous une mouette : des pièces AU SOL de part et d'autre — « reste en bas ».
+    if (tier === "sol") return [-ESPACEMENT, ESPACEMENT].map((d) => ({ r: rObs + d, h: solAt(rObs + d) + PIECE_SOL }));
     const vit = Math.max(1, vitesseAuRang(rObs));
     const rDepart = rObs - montee(tier) * vit;
     const demi = demiLongueurRoute(kind) + 0.4;
@@ -700,12 +745,21 @@ export class Route {
     // Le lait et la grosse pièce se posent sur une rangée LIBRE et à l'écart :
     // jamais sur un arc (ça y ferait un trou) ni collée à un obstacle (elle
     // attirerait le joueur pile là où il ne faut pas être).
-    const dispo = (p) => {
+    const dispo = (p, isolee = true) => {
       if (p < 0 || p >= BLOC) return false;
       const row = rowsBloc[p];
       if (row.type !== "safe" || row.coins.length || row.lait !== undefined || row.grosse !== undefined) return false;
       if (dansHalle(r0 + p)) return false;
       for (let d = -3; d <= 3; d++) if (this.dangers.has(r0 + p + d)) return false;
+      // Seule sur la route : on cherche d'abord une place sans pièce d'ARC à
+      // moins de LAIT_ISOLE rangées (les lignes de pièces au sol, elles,
+      // s'effacent autour de la brique) ; à défaut, le bout d'arc s'efface
+      // aussi — le quota de briques reste le même pour toutes les graines.
+      for (let d = -LAIT_ISOLE; d <= LAIT_ISOLE; d++) {
+        const q = p + d;
+        if (q < 0 || q >= BLOC) { if (isolee) return false; continue; }
+        if (isolee && rowsBloc[q].coins.some((h) => h > solAt(r0 + q) + PIECE_SOL + 0.05)) return false;
+      }
       // Ni sur le passage d'un véhicule venu d'en face pendant qu'il est à
       // l'écran : il traverserait la brique sous les yeux du joueur.
       for (let r = r0 + p - BALAYAGE_MAX; r < r0 + p; r++) {
@@ -722,9 +776,10 @@ export class Route {
       const kind = r % LAIT_EVERY === LAIT_EVERY / 2 && r < rangFinLait() ? "lait" : null;
       if (!kind) continue;
       let q = null;
-      for (let d = 0; d < BLOC && q === null; d++) { if (dispo(p + d)) q = p + d; else if (dispo(p - d)) q = p - d; }
+      for (const isolee of [true, false]) for (let d = 0; d < BLOC && q === null; d++) { if (dispo(p + d, isolee)) q = p + d; else if (dispo(p - d, isolee)) q = p - d; }
       if (q === null) continue;
       rowsBloc[q][kind] = kind === "lait" ? solAt(r0 + q) + H_LAIT : solAt(r0 + q) + H_ROUGE;
+      for (let d = -LAIT_ISOLE; d <= LAIT_ISOLE; d++) if (d && rowsBloc[q + d]) rowsBloc[q + d].coins = [];
     }
     // 6. Aucune pièce qu'un véhicule venu d'en face TRAVERSE sous les yeux du
     //    joueur : elle semblerait imprenable, le meilleur score hors
@@ -831,9 +886,11 @@ export class Route {
       // le balayage protège d'un décrochage d'image).
       const proche = Math.max(Math.min(prevV, v), Math.min(Math.max(prevV, v), centre));
       if (Math.abs(proche - centre) >= demi) continue;
-      if (jumpY >= hauteurObstacle(row.kind, r) + solAt(centre)) continue;
+      const haut = hauteurObstacle(row.kind, r) + solAt(centre);
+      if (jumpY >= haut) continue;
+      if (K.aerien && jumpY + HAUT_CYCLISTE <= K.bas + solAt(centre)) continue; // passé dessous
       this.resolved.add(key);
-      events.push({ type: "obstacle", kind: row.kind, cout: K.cout, franchir: familleDe(row.kind), r });
+      events.push({ type: "obstacle", kind: row.kind, cout: K.cout, franchir: familleDe(row.kind), r, haut });
     }
     return events;
   }

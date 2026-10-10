@@ -17,8 +17,10 @@ export function targetSpeed(t) {
   }
   return V_UNIT * v;
 }
+// Multiplicateur ENTIER : 3 potes = ×3, 5 potes = ×5 (×1 tant qu'on en a
+// moins de deux), doublé par le turbo.
 export function multiplicateur(potes, turbo) {
-  return (1 + window.CONFIG.potesBonusMetres * potes) * (turbo ? 2 : 1);
+  return Math.max(1, potes) * (turbo ? 2 : 1);
 }
 // Durée de course effective : le morceau moins le temps du GO (le départ est
 // posé sur un temps du morceau, ≥ LEAD_IN après la position de lecture — ici
@@ -33,7 +35,7 @@ export function dureeCourse() {
 // les règles changent la route — les scores et fantômes d'une ligue sont
 // filtrés sur la graine, une nouvelle version repart donc sur un classement
 // vierge sans rien supprimer en base.
-export const VERSION_COURSE = 23; // entre dans graineLigue() : +1 = nouvelle route partout
+export const VERSION_COURSE = 24; // entre dans graineLigue() : +1 = nouvelle route partout
 export function graineDepuisTexte(txt) {
   let h = 7;
   for (const ch of String(txt)) h = (h * 31 + ch.charCodeAt(0)) % 100000;
