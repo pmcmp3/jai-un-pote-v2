@@ -1,0 +1,763 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <script>
+    // Lien « ?9 » (29 septembre 2026 : « un truc 9 qui fait que n'importe qui
+    // qui clique sur le lien, ça vide le cache ») : tout paramètre fait d'un
+    // NOMBRE (?9, ?10…) vide le cache du service worker, le désinscrit, remet
+    // le tuto au ralenti à zéro, puis recharge la page propre (les autres
+    // paramètres, ?ligue=… compris, sont gardés).
+    (function () {
+      try {
+        var u = new URL(location.href), num = null;
+        u.searchParams.forEach(function (v, k) { if (/^\d+$/.test(k)) num = k; });
+        if (num === null) return;
+        u.searchParams.delete(num);
+        try { localStorage.removeItem("jp2-appris"); localStorage.removeItem("jp2-conseils-vus"); } catch (e) {}
+        var fini = function () { location.replace(u.toString()); };
+        // Dans l'ordre : service worker retiré D'ABORD, caches vidés ENSUITE. Les deux
+        // en même temps laissaient Safari passer le rechargement par un service
+        // worker mourant dont le cache venait d'être vidé (« Returned response is null »).
+        var sw = navigator.serviceWorker ? navigator.serviceWorker.getRegistrations().then(function (rs) { return Promise.all(rs.map(function (r) { return r.unregister(); })); }) : Promise.resolve();
+        sw.then(function () { return window.caches && caches.keys().then(function (ks) { return Promise.all(ks.map(function (k) { return caches.delete(k); })); }); }).then(fini, fini);
+        setTimeout(fini, 2500);
+      } catch (e) {}
+    })();
+  </script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="theme-color" content="#0d0d10" />
+  <link rel="icon" type="image/png" href="favicon.png" />
+  <title>J'ai un pote v2 — PMC</title>
+  <meta property="og:title" content="J'ai un pote — le jeu" />
+  <meta property="og:description" content="Pédale sur la route de campagne le temps du morceau, ramasse des pièces, appelle tes potes. Le plus loin possible, avec le plus de potes." />
+  <meta property="og:image" content="https://la-ville-est-belle-pmc.fr/assets/cover-ep-og.jpg" />
+  <style>
+    /* Même DA que « La ville est belle » depuis le 4 septembre 2026 : l'e-card
+       de l'EP. Blanc, rouge de charte, serif noire condensée, stickers rouges
+       posés de travers, boutons rectangulaires à capitales espacées. */
+    @font-face { font-family: "Source Serif 2"; src: url("fonts/SourceSerif2-Black.woff2") format("woff2"); font-weight: 900; font-style: normal; font-display: block; }
+
+    :root {
+      --rouge: #e13e26;
+      --blanc: #ffffff;
+      --noir: #0d0d10;
+      --panneau-fond: #ffffff;
+      --panneau-bord: #0d0d10;
+      --rayon: 4px;
+      --police: "Helvetica Neue", Helvetica, Arial, system-ui, sans-serif; /* 8 septembre 2026 : « après, Helvetica, simple, efficace » */
+      --titre: "Source Serif 2", Georgia, "Times New Roman", serif;
+      --safe-top: env(safe-area-inset-top, 0px);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+      --safe-left: env(safe-area-inset-left, 0px);
+      --browser-chrome-bottom: 0px;
+    }
+
+    html, body {
+      margin: 0; padding: 0; width: 100%; height: 100%;
+      background: var(--noir);
+      overflow: hidden; overscroll-behavior: none; touch-action: none;
+      -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+    }
+    #app { position: fixed; inset: 0; }
+    #game-canvas { display: block; width: 100%; height: 100%; transition: filter 0.6s ease; filter: saturate(1.28) contrast(1.03); }
+    #game-canvas.game-over-bw { filter: grayscale(1) saturate(0); }
+    #game-canvas.danger { animation: canvas-danger 4s ease-in-out infinite; }
+    #game-canvas.turbo { filter: saturate(1.95) contrast(1.1); }
+    @keyframes canvas-danger { 0%, 15%, 100% { filter: grayscale(0); } 7.5% { filter: grayscale(0.8); } }
+
+    /* Plus de flou dans les coins (5 octobre 2026 : « tu peux enlever le flou
+       [...] en haut à droite, ce n'est pas très lisible ») : la vignette floutait
+       aussi le HUD dessiné dans le canvas. */
+    #vignette { display: none; }
+
+    /* --- Overlay des écrans hors-jeu ------------------------------------- */
+    #overlay {
+      position: fixed; inset: 0; z-index: 20;
+      display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+      padding: calc(16px + var(--safe-top) + var(--centre, 0px)) 20px calc(20px + var(--safe-bottom) + var(--browser-chrome-bottom));
+      box-sizing: border-box; overflow-y: auto; -webkit-overflow-scrolling: touch; touch-action: pan-y;
+      background: linear-gradient(180deg, rgba(13,13,16,0.1) 0%, rgba(13,13,16,0.3) 55%, rgba(13,13,16,0.5) 100%);
+      opacity: 0; visibility: hidden;
+      transition: opacity 0.45s ease, visibility 0s linear 0.45s;
+    }
+    #overlay.visible { opacity: 1; visibility: visible; transition: opacity 0.45s ease, visibility 0s, padding-top 0.35s ease; }
+    /* Clavier ouvert (4 octobre 2026, deuxième passe) : AUCUNE animation de mise
+       en page. La marge qui glissait en 0,35 s déplaçait le champ pendant que
+       Safari calculait son propre défilement vers lui : au premier tap, tout
+       partait de travers (« quand on clique une deuxième fois, ça va mieux »).
+       Le titre et le lien de l'album s'effacent net, la carte monte en haut. */
+    #overlay.visible.fige { transition: opacity 0.45s ease, visibility 0s; }
+    #overlay.clavier #menu-title, #overlay.clavier #champs-pourquoi, #overlay.clavier #beta-tag, #overlay.clavier #cta-link, #overlay.clavier ~ #mute-button { display: none; }
+    /* Clavier ouvert (5 octobre 2026, troisième passe — « ça monte d'un seul
+       coup et ça redescend », « les lignes se rétrécissent ») : la carte garde
+       EXACTEMENT sa forme ; elle est posée par une translation (--saisie-y,
+       screens.placerSaisie), centrée au-dessus du clavier. L'overlay ne
+       défile plus et n'a plus de marges : rien d'autre ne bouge. */
+    #overlay.clavier { padding-top: 0; padding-bottom: 0; overflow: hidden; }
+    #onboarding .step { transform: translateY(var(--saisie-y, 0px)); transition: transform 0.3s cubic-bezier(0.22, 0.8, 0.24, 1); }
+    #overlay.retour #menu-title { animation: titre-retour 0.35s ease both; }
+    @keyframes titre-retour { from { opacity: 0; } to { opacity: 1; } }
+    #overlay .fade { opacity: 0; transform: translateY(10px); transition: opacity 0.5s ease, transform 0.5s ease; }
+    #overlay.visible .fade { opacity: 1; transform: translateY(0); }
+    #overlay.visible .fade:nth-child(2) { transition-delay: 0.12s; }
+
+    #menu-title { position: relative; width: 100%; margin: 10px 0 24px; color: var(--blanc); text-align: center; }
+    #menu-title .titre-mot {
+      display: block; width: max-content; margin-left: 50%;
+      transform: translateX(-50%) scaleX(0.66); transform-origin: center bottom;
+      font: 900 clamp(52px, 17vw, 72px)/0.85 var(--titre); letter-spacing: -0.035em; white-space: nowrap;
+    }
+    #overlay.end-view #menu-title, #overlay.end-view #beta-tag { display: none; }
+    #overlay.end-view { overflow-y: auto; -webkit-overflow-scrolling: touch; justify-content: flex-start; touch-action: pan-y; padding-bottom: calc(24px + var(--safe-bottom) + var(--browser-chrome-bottom)); }
+    #end-screen.active { width: 100%; align-items: center; margin: auto 0; }
+
+    .view { display: none; flex-direction: column; align-items: center; }
+    .view.active { display: flex; animation: view-in 0.4s ease both; }
+    @keyframes view-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    #onboarding.active { width: 100%; flex: none; }
+    #onboarding .panel { margin: 0 auto; }
+    #onboarding .panel-body { padding: 26px 18px 16px; }
+
+    /* --- Carte + sticker ------------------------------------------------ */
+    .panel {
+      position: relative; width: 100%; max-width: 300px; box-sizing: border-box;
+      border-radius: var(--rayon); border: 1.5px solid var(--panneau-bord); background: var(--panneau-fond);
+    }
+    .panel-header {
+      position: absolute; top: 0; left: 50%;
+      transform: translate(-50%, -52%) rotate(-2deg);
+      padding: 7px 14px; background: var(--rouge); border-radius: 2px; white-space: nowrap; text-align: center;
+    }
+    .panel-body { padding: 30px 22px 24px; display: flex; flex-direction: column; align-items: center; }
+    .step-eyebrow { margin: 0; font: 700 11.5px var(--police); letter-spacing: 0.14em; text-transform: uppercase; color: var(--blanc); }
+
+    /* --- Boutons -------------------------------------------------------- */
+    .btn {
+      display: block; width: 228px; min-height: 46px; margin: 0; padding: 11px 18px;
+      border-radius: var(--rayon); border: 1.5px solid transparent;
+      font: 700 13px var(--police); letter-spacing: 0.12em; text-transform: uppercase; text-align: center;
+      touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+      transition: transform 0.08s ease, filter 0.08s ease, background 0.2s ease, opacity 0.2s ease;
+    }
+    .btn-primary { background: var(--rouge); color: var(--blanc); border-color: var(--rouge); }
+    .btn-primary:active { transform: scale(0.96); filter: brightness(0.85); }
+    .btn-secondary { background: var(--blanc); color: var(--panneau-bord); border-color: var(--panneau-bord); }
+    .btn-secondary:active { transform: scale(0.96); background: rgba(0,0,0,0.06); }
+    a.btn { display: flex; align-items: center; justify-content: center; gap: 8px; box-sizing: border-box; text-decoration: none; }
+    a.btn svg { flex: none; opacity: 0.8; }
+    .btn-primary:disabled { background: #cccccc; border-color: #bbbbbb; color: var(--blanc); cursor: not-allowed; transform: none; filter: none; }
+    .link-minimal {
+      display: inline-block; padding: 0; border: none; background: none;
+      color: rgba(0,0,0,0.55); font: 500 13px var(--police); text-decoration: underline; text-underline-offset: 4px;
+      touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+    }
+    .locked { opacity: 0.45; }
+    .hidden { display: none !important; }
+
+    /* --- Menu ----------------------------------------------------------- */
+    #pseudo-row { display: flex; align-items: center; gap: 10px; width: 240px; margin-top: 6px; }
+    #pseudo-row .icon { font: 500 14px var(--police); color: rgba(0,0,0,0.45); }
+    #pseudo-input {
+      flex: 1; min-width: 0; background: transparent; border: none; border-bottom: 1.5px solid rgba(0,0,0,0.4);
+      color: var(--noir); font: 500 16px var(--police); padding: 5px 2px; -webkit-appearance: none;
+    }
+    #pseudo-input::placeholder { color: rgba(0,0,0,0.32); }
+    #pseudo-input:focus { outline: none; border-bottom-color: var(--rouge); }
+    .field-note { width: 240px; margin: 12px 0 18px; font: 500 13px/1.4 var(--police); color: var(--noir); text-align: center; text-wrap: balance; }
+    .regle { width: 240px; margin: 0 0 18px; padding: 0; list-style: none; font: 500 12.5px/1.5 var(--police); color: rgba(0,0,0,0.7); }
+    .regle li { display: flex; gap: 8px; }
+    .regle b { font-weight: 900; color: var(--noir); min-width: 62px; }
+    #splash { position: fixed; inset: 0; z-index: 200; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; background: var(--rouge); transition: opacity 0.45s ease, visibility 0s linear 0.45s; }
+    #splash.fini { opacity: 0; visibility: hidden; pointer-events: none; }
+    /* Logo FIXE (4 octobre 2026 : « vu qu'il y a le petit bonhomme qui fait du
+       vélo, fais pas tourner la ville ») : c'est le cycliste qui bouge. */
+    #splash-logo img { display: block; width: 150px; height: auto; }
+    #splash-velo { width: 200px; height: 110px; margin-top: -4px; }
+    #loading { display: flex; flex-direction: column; align-items: center; gap: 8px; width: 200px; }
+    #loading.failed #loading-track { display: none; }
+    #loading-track { width: 100%; height: 3px; border-radius: 999px; background: rgba(255,255,255,0.3); overflow: hidden; }
+    #loading-fill { width: 0%; height: 100%; background: #fff; transition: width 0.25s linear; }
+    #loading-label { font: 500 13px var(--police); color: rgba(255,255,255,0.85); font-variant-numeric: tabular-nums; }
+
+    /* --- Menu en trois étapes ------------------------------------------- */
+    #onboarding .step { display: none; }
+    #onboarding[data-step="1"] .step[data-step="1"], #onboarding[data-step="2"] .step[data-step="2"], #onboarding[data-step="3"] .step[data-step="3"] { display: block; }
+    .champ-row { display: flex; align-items: center; gap: 10px; width: 240px; margin-top: 12px; }
+    #champs-pourquoi { width: 240px; margin: 8px 0 14px; font: 500 12px/1.4 var(--police); color: rgba(0,0,0,0.55); text-align: left; }
+    .champ-titre { width: 240px; margin: 22px 0 2px; font: 700 10.5px var(--police); letter-spacing: 0.14em; text-transform: uppercase; color: rgba(0,0,0,0.45); text-align: left; }
+    #step1-next { margin-top: 24px; }
+    .champ-row .icon { font: 700 11px var(--police); color: rgba(0,0,0,0.45); min-width: 16px; text-align: center; }
+    .champ-row input { flex: 1; min-width: 0; background: transparent; border: none; border-bottom: 1.5px solid rgba(0,0,0,0.25); color: var(--noir); font: 500 16px var(--police); padding: 5px 2px; -webkit-appearance: none; }
+    .champ-row input:focus { outline: none; border-bottom-color: var(--rouge); }
+    #step3-links { margin-top: 10px; }
+    #step3-links { display: flex; gap: 18px; }
+    /* ⚠️ Le canvas fait 240×140 et s'affiche en 240×140 : il était dessiné en
+       220×200 et affiché en 200×120, donc écrasé de 34 % en hauteur (« mon
+       bonhomme, il est écrasé dans le menu de base », 27 septembre 2026). */
+    /* Menu COMPACT (29 septembre 2026 : « c'est trop grand, j'ai besoin de
+       scroller pour voir que l'album est sorti ») : aperçu réduit, écarts serrés. */
+    #skin-canvas { display: block; width: 178px; height: 104px; margin: -14px 0 2px; }
+    #skin-options { display: flex; flex-direction: column; gap: 8px; width: 256px; margin-bottom: 12px; }
+    /* Libellé AU-DESSUS de ses pastilles (27 septembre 2026 : « laisse plus de
+       place entre maillot, chapeau et engin ») : chaque réglage tient sur une
+       ligne et se lit comme un bloc. */
+    .skin-row { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+    .skin-label { flex: none; font: 700 10px var(--police); letter-spacing: 0.1em; text-transform: uppercase; color: rgba(0,0,0,0.55); }
+    .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .chip { min-width: 24px; height: 26px; padding: 0 6px; border-radius: 3px; border: 1.5px solid rgba(0,0,0,0.25); background: #fff; font: 700 10px var(--police); letter-spacing: 0.06em; text-transform: uppercase; color: var(--noir); -webkit-tap-highlight-color: transparent; }
+    .chip.couleur { padding: 0; width: 26px; }
+    .chip.actif { border-color: var(--noir); box-shadow: 0 0 0 2px #ffcf2e; }
+    #sprint-button { margin-top: 8px; }
+    /* Boost de ligue (29 septembre 2026) : sticker jaune sous JOUER. */
+    #explication { position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; padding: 24px; background: rgba(13,13,16,0.55); }
+    #explication.hidden { display: none; }
+    #overlay.visible.estompe { opacity: 0.5; } /* « on voit encore ma ligue derrière, ça perturbe » */
+    #expl-carte { position: relative; width: min(300px, 100%); box-sizing: border-box; padding: 30px 20px 16px; background: #fff; border: 1.5px solid var(--noir); border-radius: var(--rayon); text-align: center; animation: expl-in 0.35s ease-out both; }
+    .expl-etape { display: none; }
+    .expl-etape.on { display: block; animation: expl-in 0.3s ease-out both; }
+    .expl-titre { margin: 4px 0 12px; font: 900 27px/1.05 var(--titre); color: var(--noir); }
+    .expl-texte { margin: 0 0 12px; font: 500 13.5px/1.45 var(--police); color: var(--noir); }
+    #expl-main { position: relative; width: 96px; height: 96px; margin: 0 auto 10px; }
+    /* Main et haut-parleur DESSINÉS (4 octobre 2026, nuit) : les emojis 👆 🔊
+       changeaient de tête selon le téléphone (Samsung ≠ iPhone). */
+    #expl-main .doigt { position: absolute; left: 26px; top: 18px; width: 44px; height: 44px; animation: expl-tape 0.9s ease-in-out infinite; }
+    #expl-main .onde { position: absolute; left: 30px; top: 6px; width: 36px; height: 36px; border: 3px solid var(--rouge); border-radius: 50%; animation: expl-onde 0.9s ease-out infinite; }
+    @keyframes expl-tape { 0%, 100% { transform: translateY(14px); } 45% { transform: translateY(0); } 55% { transform: translateY(0) scale(0.92); } }
+    @keyframes expl-onde { 0%, 45% { transform: scale(0.2); opacity: 0; } 55% { opacity: 1; } 100% { transform: scale(1.6); opacity: 0; } }
+    #expl-arrivee { height: 64px; margin: 0 auto 12px; width: 220px; background: repeating-conic-gradient(#0d0d10 0 25%, #f4efe4 0 50%) 0 0 / 16px 16px; border: 1.5px solid var(--noir); display: flex; align-items: center; justify-content: center; }
+    #expl-arrivee span { padding: 5px 12px; background: var(--rouge); color: #fff; font: 900 16px var(--police); letter-spacing: 0.14em; }
+    #expl-peloton { display: block; width: 260px; max-width: 100%; height: 124px; margin: 0 auto; }
+    #expl-son { position: relative; width: 120px; height: 90px; margin: 0 auto 10px; }
+    #expl-son .hp { position: absolute; left: 10px; top: 20px; width: 48px; height: 48px; }
+    #expl-son .onde { position: absolute; left: 50px; top: 20px; width: 44px; height: 44px; border: 3px solid var(--rouge); border-left-color: transparent; border-bottom-color: transparent; border-radius: 50%; transform: rotate(45deg); opacity: 0; animation: expl-son 1.2s ease-out infinite; }
+    #expl-son .o2 { animation-delay: 0.25s; } #expl-son .o3 { animation-delay: 0.5s; }
+    @keyframes expl-son { 0% { opacity: 0; transform: rotate(45deg) scale(0.5); } 30% { opacity: 1; } 100% { opacity: 0; transform: rotate(45deg) scale(1.5); } }
+    #expl-mult { margin: 10px 0 8px; font: 900 44px/1 var(--titre); color: var(--rouge); }
+    #expl-mult.pop { animation: expl-pop 0.25s ease-out; }
+    #expl-tag { display: inline-block; margin: 0 0 10px; padding: 7px 12px; background: #ffcf2e; border: 1.5px solid var(--noir); transform: rotate(6deg); font: 900 13px var(--police); letter-spacing: 0.06em; text-transform: uppercase; color: var(--noir); animation: expl-pop 0.3s ease-out; }
+    #expl-barre { height: 4px; background: rgba(0,0,0,0.12); overflow: hidden; }
+    #expl-barre i { display: block; height: 100%; width: 0; background: var(--rouge); }
+    #explication { flex-direction: column; }
+    #expl-passer { position: absolute; left: 0; right: 0; bottom: calc(28px + env(safe-area-inset-bottom, 0px)); margin: 0; font: 900 13px var(--police); letter-spacing: 0.14em; text-transform: uppercase; color: #fff; text-align: center; animation: expl-clignote 1.2s ease-in-out infinite; }
+    @keyframes expl-clignote { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
+    @keyframes expl-in { from { transform: scale(0.9); opacity: 0; } to { transform: none; opacity: 1; } }
+    @keyframes expl-pop { 0% { transform: scale(1.25); } 100% { transform: scale(1); } }
+    #boost-ligue { margin-top: 8px; width: 100%; padding: 8px 10px; border: 1.5px solid var(--noir); border-radius: 3px; background: #ffcf2e; color: var(--noir); font: 500 11px/1.35 var(--police); text-align: left; -webkit-tap-highlight-color: transparent; }
+    #boost-ligue b { font-weight: 900; letter-spacing: 0.06em; }
+    #boost-ligue small { display: block; margin-top: 3px; font: 600 10.5px/1.35 var(--police); color: rgba(0,0,0,0.7); }
+    #end-rang { margin: 0; padding: 4px 10px; background: #ffcf2e; border: 1.5px solid var(--noir); transform: rotate(-1.5deg); font: 900 13px var(--police); letter-spacing: 0.08em; text-transform: uppercase; color: var(--noir); }
+    #sprint-note { margin: 6px 0 0; font: 500 11px var(--police); color: rgba(0,0,0,0.55); text-align: center; }
+    #end-max { margin: 4px 0 0; font: 500 12px/1.4 var(--police); color: rgba(0,0,0,0.65); text-align: center; }
+    #end-max b { color: var(--rouge); font-weight: 900; }
+    #end-ligue-liste .fantome { margin-left: 4px; font-size: 11px; opacity: 0.7; }
+    #end-relais { margin: 4px 0 0; font: 500 12px/1.4 var(--police); color: rgba(0,0,0,0.65); text-align: center; }
+
+    /* --- Bêta fermée (16 septembre 2026) ---------------------------------- */
+    body.beta .beta-off { display: none !important; }
+    #beta-tag { margin: 0 0 26px; padding: 5px 10px; background: var(--rouge); color: var(--blanc); border-radius: 2px; transform: rotate(-1.5deg); font: 900 10.5px var(--police); letter-spacing: 0.12em; text-transform: uppercase; }
+    #end-retour { margin-top: 2px; }
+    #retour-sheet { position: fixed; inset: 0; z-index: 49; display: flex; align-items: center; justify-content: center; padding: 24px; visibility: hidden; transition: visibility 0s linear 0.25s; }
+    #retour-sheet.visible { visibility: visible; transition: visibility 0s; }
+    #retour-veil { position: absolute; inset: 0; background: rgba(13,13,16,0.62); opacity: 0; transition: opacity 0.25s ease; }
+    #retour-sheet.visible #retour-veil { opacity: 1; }
+    #retour-card { position: relative; box-sizing: border-box; width: min(320px, 100%); padding: 30px 20px 18px; border-radius: var(--rayon); border: 1.5px solid var(--panneau-bord); background: var(--panneau-fond); display: flex; flex-direction: column; align-items: center; gap: 10px; transform: scale(0.9); opacity: 0; transition: transform 0.25s ease, opacity 0.25s ease; }
+    #retour-sheet.visible #retour-card { transform: scale(1); opacity: 1; }
+    #retour-title { margin: 2px 0 0; font: 900 26px/1.05 var(--titre); color: var(--noir); text-align: center; text-wrap: balance; }
+    #retour-text { margin: 0; font: 500 12.5px/1.5 var(--police); color: rgba(0,0,0,0.7); text-align: center; text-wrap: balance; }
+    #retour-input { box-sizing: border-box; width: 100%; min-height: 108px; resize: none; border: 1.5px solid rgba(0,0,0,0.35); border-radius: var(--rayon); padding: 10px; font: 500 14px/1.45 var(--police); color: var(--noir); background: transparent; -webkit-appearance: none; }
+    #retour-input:focus { outline: none; border-color: var(--rouge); }
+    #retour-input, #pseudo-input, .champ-row input, #ligue-input { -webkit-user-select: text; user-select: text; -webkit-touch-callout: default; }
+    #retour-compteur { margin: -6px 0 0; align-self: flex-end; font: 500 11px var(--police); color: rgba(0,0,0,0.45); font-variant-numeric: tabular-nums; }
+    #retour-envoyer { width: 100%; }
+    #retour-form { display: flex; flex-direction: column; align-items: center; gap: 10px; width: 100%; }
+    #retour-ok { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+    #retour-ok .coche { width: 46px; height: 46px; border-radius: 50%; background: var(--rouge); color: var(--blanc); display: flex; align-items: center; justify-content: center; font: 900 24px var(--police); }
+
+    /* --- Ligue ---------------------------------------------------------- */
+    #ligue-bloc { width: 240px; margin: 0 0 16px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+    #ligue-bloc.hidden { display: none; }
+    #ligue-row { display: flex; gap: 8px; width: 100%; }
+    #ligue-input { flex: 1; min-width: 0; box-sizing: border-box; border: 1.5px solid rgba(0,0,0,0.35); border-radius: var(--rayon); padding: 7px 10px; font: 700 16px var(--police); letter-spacing: 0.1em; text-transform: uppercase; color: var(--noir); background: transparent; -webkit-appearance: none; }
+    #ligue-input:focus { outline: none; border-color: var(--rouge); }
+    #ligue-row .btn { width: auto; min-height: 38px; padding: 8px 12px; font-size: 11px; }
+    #ligue-sans, #ligue-avec { display: flex; flex-direction: column; align-items: center; gap: 8px; width: 100%; }
+    #ligue-titre { margin: 0; font: 700 11px var(--police); letter-spacing: 0.14em; text-transform: uppercase; color: rgba(0,0,0,0.6); }
+    #end-ligue-titre b { color: var(--rouge); font-weight: 900; font-size: 15px; letter-spacing: 0.18em; }
+    #ligue-membres { margin: 0; font: 500 12px/1.4 var(--police); color: var(--noir); text-align: center; }
+    #ligue-actions { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 100%; }
+    #ligue-actions .btn { width: 100%; min-height: 40px; padding: 8px 12px; font-size: 12px; }
+    #ligue-places { margin: -4px 0 0; font: 500 11px var(--police); color: rgba(0,0,0,0.5); text-align: center; }
+    .share-inner { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; }
+    .share-apps { display: flex; align-items: center; justify-content: center; gap: 7px; opacity: 0.55; }
+    .share-apps svg { display: block; flex: none; }
+    #ligue-intro { margin: 0 0 6px; font: 500 13px/1.4 var(--police); color: var(--noir); text-align: center; text-wrap: balance; }
+    #ligue-intro b { font-weight: 900; }
+    #ligue-sans > #ligue-creer { width: 100%; }
+    .lp-sep { position: relative; width: 100%; margin: 4px 0 0; text-align: center; font: 700 10px var(--police); letter-spacing: 0.14em; text-transform: uppercase; color: rgba(0,0,0,0.4); }
+    .lp-sep::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; border-top: 1px solid rgba(0,0,0,0.15); }
+    .lp-sep span { position: relative; padding: 0 8px; background: #fff; }
+    .lp-ou { margin: 0 0 -2px; font: 700 12px var(--police); color: var(--noir); }
+    #ligue-code-btn { display: flex; flex-direction: column; align-items: center; gap: 2px; margin: -2px 0 2px; padding: 6px 14px; border: 1.5px dashed rgba(0,0,0,0.35); border-radius: var(--rayon); background: none; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+    #ligue-code-btn b { font: 900 34px/1 var(--police); letter-spacing: 0.16em; color: var(--rouge); -webkit-user-select: all; user-select: all; }
+    #ligue-code-btn small { font: 600 10px var(--police); letter-spacing: 0.1em; text-transform: uppercase; color: rgba(0,0,0,0.5); }
+    #ligue-code-btn:active { transform: scale(0.97); }
+    #ligue-avec #ligue-partager { width: 100%; min-height: 76px; font-size: 15px; }
+    #ligue-avec #ligue-partager .share-inner { gap: 9px; }
+    #ligue-avec #ligue-partager .share-apps { gap: 16px; opacity: 0.9; }
+    #ligue-code-btn { width: 100%; box-sizing: border-box; }
+    #ligue-avec, #ligue-sans { gap: 10px; }
+    #ligue-peloton { display: flex; flex-wrap: wrap; justify-content: center; gap: 5px; width: 100%; margin: 2px 0 0; padding: 0; list-style: none; }
+    #ligue-peloton li { padding: 4px 8px; border: 1.5px solid var(--noir); border-radius: 3px; font: 700 11.5px var(--police); color: var(--noir); }
+    #ligue-peloton li.moi { background: #ffcf2e; }
+    #ligue-peloton li.bot { border-style: dashed; border-color: rgba(0,0,0,0.3); color: rgba(0,0,0,0.4); font-weight: 600; }
+    #ligue-peloton li.nouveau { animation: expl-pop 0.3s ease-out; }
+    .btn.btn-petit { min-height: 38px; padding: 8px 14px; font-size: 11px; width: auto; }
+    #step2-liens { display: flex; gap: 26px; justify-content: center; align-items: center; margin-top: 14px; }
+    #step2-liens .link-minimal { margin: 0; line-height: 1.2; }
+    [data-step="2"] #step2-next { width: 100%; margin-top: 12px; }
+    [data-step="2"] #step2-next.btn-petit { width: auto; }
+    #ligue-msg { width: 100%; box-sizing: border-box; margin: 0; font: 700 12.5px/1.35 var(--police); color: var(--rouge); text-align: center; }
+    #ligue-statut { width: 100%; box-sizing: border-box; margin: 0; padding: 8px 10px; background: #ffcf2e; border: 1.5px solid var(--noir); border-radius: 3px; font: 700 13px/1.35 var(--police); color: var(--noir); text-align: center; }
+    #end-ligue { width: 100%; margin: 0 0 12px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+    #end-ligue-titre { margin: 0; padding: 0; border: none; background: none; font: 700 11px var(--police); letter-spacing: 0.14em; text-transform: uppercase; color: rgba(0,0,0,0.6); cursor: pointer; -webkit-tap-highlight-color: transparent; }
+    #end-ligue-titre b { text-decoration: underline; text-underline-offset: 4px; }
+    #end-ligue-titre small { font: 600 10px var(--police); letter-spacing: 0.08em; color: rgba(0,0,0,0.45); text-decoration: underline; text-underline-offset: 3px; }
+    #ligue-titre { margin: 0; }
+    #end-ligue-liste { width: 100%; margin: 0; padding: 0; list-style: none; font: 500 13px var(--police); color: var(--noir); }
+    #end-ligue-liste li { display: flex; gap: 8px; padding: 5px 4px; border-bottom: 1px solid rgba(0,0,0,0.08); }
+    #end-ligue-liste li.moi { background: rgba(255,207,46,0.35); border-radius: 3px; font-weight: 900; }
+    #end-ligue-liste .rang { width: 18px; color: rgba(0,0,0,0.45); font-weight: 900; }
+    #end-ligue-liste .rang .couronne { width: 16px; height: 12px; vertical-align: -1px; }
+    #end-ecart { margin: 0; font: 600 13px/1.35 var(--police); text-align: center; color: var(--noir); }
+    #end-ecart b { font-weight: 900; color: var(--rouge); }
+    #end-ligue-liste .nom { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #end-ligue-liste .m { font-variant-numeric: tabular-nums; font-weight: 900; }
+    #end-ligue .btn { width: 100%; padding: 8px 10px; min-height: 40px; font-size: 12px; }
+
+    #cta-link {
+      position: relative; margin: 10px auto 0; flex: none;
+      display: flex; align-items: center; justify-content: center; gap: 8px; width: 240px; box-sizing: border-box; padding: 11px 22px;
+      border: 1.5px solid var(--noir); border-radius: var(--rayon); background: var(--blanc); color: var(--noir);
+      font: 700 13px var(--police); letter-spacing: 0.12em; text-transform: uppercase; text-decoration: none; white-space: nowrap;
+      touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+    }
+    #cta-link svg { flex: none; opacity: 0.75; }
+    #cta-link:active { transform: scale(0.96); }
+
+    /* --- Écran de fin --------------------------------------------------- */
+    #end-screen .panel { max-width: 280px; }
+    #end-screen .panel-body { padding: 28px 16px 18px; }
+    #end-screen .btn { width: 100%; padding: 9px 10px; min-height: 44px; white-space: nowrap; }
+    #end-hero { text-align: center; margin: 2px 0 14px; }
+    #score-num { font: 900 clamp(52px, 16vw, 64px)/0.9 var(--titre); color: var(--noir); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; display: block; }
+    #score-num small { font: 700 16px var(--police); letter-spacing: 0.06em; margin-left: 4px; }
+    #end-sub { margin: 8px 0 0; font: 500 13px/1.4 var(--police); color: rgba(0,0,0,0.65); text-align: center; text-wrap: balance; }
+    /* « Nouveau record » : sticker en haut à droite de la carte (6 septembre 2026). */
+    #end-best {
+      position: absolute; top: 22px; right: -16px; margin: 0; padding: 6px 10px;
+      transform: rotate(8deg); background: var(--rouge); color: var(--blanc); border-radius: 2px;
+      font: 900 10.5px var(--police); letter-spacing: 0.12em; text-transform: uppercase; white-space: nowrap;
+    }
+    #end-credit { margin: 10px 0 0; font: 500 10px/1.4 var(--police); color: rgba(0,0,0,0.45); text-align: center; text-wrap: balance; }
+    #end-ecouter { margin-top: 2px; }
+    #end-links { display: flex; justify-content: space-between; width: 100%; margin-top: 6px; }
+    #end-links .link-minimal { font: 500 13px var(--police); color: rgba(0,0,0,0.6); text-decoration: underline; }
+    #end-credit a { color: var(--rouge); font-weight: 900; text-decoration: none; }
+    #end-actions { display: flex; flex-direction: column; align-items: center; gap: 10px; width: 100%; }
+    #end-note { margin: 10px 0 0; font: 500 11px var(--police); color: rgba(0,0,0,0.55); text-align: center; }
+    #end-note a { color: var(--rouge); font-weight: 900; text-decoration: none; }
+
+    /* --- Carte de mort -------------------------------------------------- */
+    #revive-sheet { position: fixed; inset: 0; z-index: 45; display: flex; align-items: center; justify-content: center; padding: 24px; visibility: hidden; transition: visibility 0s linear 0.25s; }
+    #revive-sheet.visible { visibility: visible; transition: visibility 0s; }
+    #revive-veil { position: absolute; inset: 0; background: rgba(13,13,16,0.62); opacity: 0; transition: opacity 0.25s ease; }
+    #revive-sheet.visible #revive-veil { opacity: 1; }
+    #revive-card {
+      position: relative; box-sizing: border-box; width: min(300px, 100%); padding: 32px 20px 18px;
+      border-radius: var(--rayon); border: 1.5px solid var(--panneau-bord); background: var(--panneau-fond);
+      display: flex; flex-direction: column; align-items: center; gap: 10px;
+      transform: scale(0.9); opacity: 0; transition: transform 0.25s ease, opacity 0.25s ease;
+    }
+    #revive-sheet.visible #revive-card { transform: scale(1); opacity: 1; }
+    #revive-timer, #gate-timer { position: relative; width: 76px; height: 76px; }
+    #revive-timer svg, #gate-timer svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+    #revive-timer .piste, #gate-timer .piste { fill: none; stroke: rgba(225,62,38,0.18); stroke-width: 6; }
+    #revive-arc, #gate-arc { fill: none; stroke: var(--rouge); stroke-width: 6; stroke-linecap: round; stroke-dasharray: 207.3; stroke-dashoffset: 0; }
+    #revive-timer-num, #gate-timer-num { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font: 900 30px var(--police); color: var(--noir); font-variant-numeric: tabular-nums; }
+    #revive-title, #gate-title { margin: 2px 0 6px; font: 900 clamp(22px, 6.5vw, 28px)/1.05 var(--titre); color: var(--noir); text-align: center; text-wrap: balance; }
+    #revive-text, #gate-text { margin: 0 0 4px; font: 500 13.5px/1.5 var(--police); color: rgba(0,0,0,0.7); text-align: center; }
+    #revive-cta, #revive-replay, #gate-cta, #gate-go, #gate-later { width: 100%; }
+    #gate-later { margin-top: 4px; }
+
+    /* --- Tiroir album --------------------------------------------------- */
+    #gate-sheet, #partage-sheet { position: fixed; inset: 0; z-index: 50; visibility: hidden; transition: visibility 0s linear 0.3s; }
+    #partage-sheet { z-index: 55; }
+    #gate-sheet.visible, #partage-sheet.visible { visibility: visible; transition: visibility 0s; }
+    #gate-veil, #partage-veil { position: absolute; inset: 0; background: rgba(13,13,16,0.62); opacity: 0; transition: opacity 0.3s ease; }
+    #gate-sheet.visible #gate-veil, #partage-sheet.visible #partage-veil { opacity: 1; }
+    #gate-card, #partage-card {
+      position: absolute; left: 0; right: 0; bottom: 0; box-sizing: border-box; max-width: 460px; margin: 0 auto;
+      max-height: 88vh; overflow-y: auto; -webkit-overflow-scrolling: touch;
+      padding: 20px 24px calc(18px + var(--safe-bottom) + var(--browser-chrome-bottom));
+      border-radius: var(--rayon) var(--rayon) 0 0; border: 1.5px solid var(--panneau-bord); border-bottom: none; background: var(--panneau-fond);
+      display: flex; flex-direction: column; align-items: center; gap: 9px;
+      transform: translateY(105%); transition: transform 0.3s ease;
+    }
+    #gate-sheet.visible #gate-card, #partage-sheet.visible #partage-card { transform: translateY(0); }
+    @media (min-width: 700px) and (min-height: 600px) {
+      #gate-card, #partage-card { bottom: 28px; border-radius: var(--rayon); border-bottom: 1.5px solid var(--panneau-bord); padding-bottom: 22px; max-height: min(84vh, 760px); }
+    }
+    /* Même sticker rouge de travers que toutes les cartes (28 septembre 2026,
+       « je veux une cohérence dans les menus »). */
+    #gate-eyebrow, #partage-eyebrow { margin: 0 0 4px; padding: 7px 14px; background: var(--rouge); border-radius: 2px; transform: rotate(-2deg); font: 700 11.5px var(--police); letter-spacing: 0.14em; text-transform: uppercase; color: var(--blanc); text-align: center; }
+    #gate-platforms { width: 100%; display: flex; flex-direction: column; gap: 7px; margin: 2px 0 0; }
+    .plat-btn {
+      display: flex; align-items: center; gap: 10px; width: 100%; box-sizing: border-box; padding: 11px 14px;
+      border: 1.5px solid var(--panneau-bord); border-radius: var(--rayon); background: #fff; color: var(--noir);
+      font: 700 14px var(--police); text-decoration: none; -webkit-tap-highlight-color: transparent;
+    }
+    .plat-btn:active { transform: translateY(1px); background: rgba(0,0,0,0.04); }
+    .plat-btn .plat-dot { width: 11px; height: 11px; border-radius: 50%; flex: 0 0 auto; }
+    .plat-btn .plat-nom { flex: 1 1 auto; text-align: left; }
+    .plat-btn .plat-fleche { flex: 0 0 auto; opacity: 0.4; font-size: 13px; }
+    #gate-platforms .plat-sep { margin: 3px 0 1px; font: 500 10px var(--police); letter-spacing: 0.18em; text-transform: uppercase; color: rgba(0,0,0,0.38); text-align: center; }
+    #gate-hint { margin: 4px 0 0; font: 500 12px/1.45 var(--police); color: rgba(0,0,0,0.55); text-align: center; }
+    /* --- Tiroir de partage (5 octobre 2026, navigateurs intégrés) --------- */
+    #partage-title { margin: 2px 0 2px; font: 900 clamp(22px, 6.5vw, 26px)/1.05 var(--titre); color: var(--noir); text-align: center; text-wrap: balance; }
+    #partage-text { margin: 0 0 4px; font: 500 13px/1.45 var(--police); color: rgba(0,0,0,0.65); text-align: center; }
+    #partage-lien {
+      width: 100%; box-sizing: border-box; margin: 0; padding: 11px 12px; border: 1.5px dashed rgba(0,0,0,0.32); border-radius: var(--rayon);
+      background: #f7f5f0; font: 600 13px/1.3 var(--police); color: var(--noir); text-align: center; word-break: break-all;
+      -webkit-user-select: all; user-select: all; -webkit-touch-callout: default;
+    }
+    #partage-copier, #partage-plus { width: 100%; }
+    #partage-copier.fait { background: #1f8a4c; border-color: #1f8a4c; }
+    #partage-hint { margin: 0; font: 700 12.5px/1.4 var(--police); color: #1f8a4c; text-align: center; }
+    #partage-hint.echec { color: var(--rouge); }
+    #partage-apps { width: 100%; display: flex; flex-direction: column; gap: 7px; }
+    #partage-apps .plat-sep { margin: 3px 0 1px; font: 500 10px var(--police); letter-spacing: 0.18em; text-transform: uppercase; color: rgba(0,0,0,0.38); text-align: center; }
+    #partage-apps .plat-dot.snap { box-shadow: inset 0 0 0 1px rgba(0,0,0,0.25); }
+
+    /* --- Boutons flottants + pause -------------------------------------- */
+    #mute-button, #pause-button {
+      position: fixed; left: calc(14px + var(--safe-left)); top: calc(14px + var(--safe-top)); z-index: 30;
+      width: 44px; height: 44px; border-radius: 6px; border: 1.5px solid rgba(255,255,255,0.6);
+      background: rgba(13,13,16,0.7); color: var(--blanc); font: 900 14px var(--police);
+      touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+    }
+    #mute-button { font-weight: 500; font-size: 16px; }
+    #mute-button[hidden], #pause-button[hidden] { display: none; }
+    #mute-button.muted { color: rgba(255,255,255,0.4); border-color: rgba(255,255,255,0.18); }
+    #pause-screen {
+      position: fixed; inset: 0; z-index: 25; display: flex; align-items: center; justify-content: center; padding: 24px; box-sizing: border-box;
+      background: rgba(13,13,16,0.45); opacity: 0; visibility: hidden; transition: opacity 0.25s ease, visibility 0s linear 0.25s;
+    }
+    #pause-screen.visible { opacity: 1; visibility: visible; transition: opacity 0.25s ease, visibility 0s; }
+    /* Deux curseurs (4 octobre 2026, nuit : « un réglage pour la musique et un
+       réglage pour les effets sonores ») ; le bouton ♪ du menu ouvre le même
+       panneau, sans Reprendre ni Recommencer (classe .reglages). */
+    #pause-volume { display: flex; flex-direction: column; gap: 14px; width: 250px; margin: 4px 0 24px; }
+    .volume-row { display: flex; align-items: center; gap: 12px; }
+    .volume-row .skin-label { width: 62px; }
+    #son-fermer { display: none; }
+    #pause-screen.reglages #resume-button, #pause-screen.reglages #pause-replay-button { display: none; }
+    #pause-screen.reglages #son-fermer { display: block; }
+    #pause-actions { display: flex; flex-direction: column; align-items: center; gap: 16px; }
+    .volume-range { height: 18px; margin: 0; -webkit-appearance: none; appearance: none; background: transparent; cursor: pointer; width: 100%; }
+    .volume-range::-webkit-slider-runnable-track { height: 3px; background: rgba(0,0,0,0.15); border-radius: 2px; }
+    .volume-range::-moz-range-track { height: 3px; background: rgba(0,0,0,0.15); border-radius: 2px; }
+    .volume-range::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 16px; height: 16px; margin-top: -6.5px; border-radius: 50%; background: var(--rouge); border: 1.5px solid var(--noir); }
+    .volume-range::-moz-range-thumb { width: 16px; height: 16px; border-radius: 50%; background: var(--rouge); border: 1.5px solid var(--noir); }
+
+    @media (prefers-reduced-motion: reduce) {
+      #overlay, #overlay .fade, .btn { transition-duration: 0.01s; }
+      .view.active { animation-duration: 0.01s; }
+      #game-canvas.danger { animation: none; filter: grayscale(0.6); }
+    }
+  </style>
+  <script type="module" crossorigin src="./assets/index-CWnRadMV.js"></script>
+</head>
+<body>
+  <!-- Écran de chargement (3 octobre 2026 : « le logo de la ville est belle
+       qui tourne en 360° sur un axe horizontal ») : opaque tant que le
+       morceau et le moteur ne sont pas prêts, puis fondu vers le menu. -->
+  <div id="splash">
+    <div id="splash-logo"><img src="assets/logo-lveb.webp" alt="la ville est belle" width="150" height="218" /></div>
+    <canvas id="splash-velo" width="200" height="110" aria-hidden="true"></canvas>
+    <div id="loading">
+      <div id="loading-track"><div id="loading-fill"></div></div>
+      <span id="loading-label">0 %</span>
+    </div>
+  </div>
+  <div id="app"><canvas id="game-canvas"></canvas></div>
+  <div id="safe-probe" aria-hidden="true" style="position:fixed;left:0;top:var(--safe-top);width:0;height:0;pointer-events:none"></div>
+  <div id="vignette" aria-hidden="true"></div>
+
+  <div id="overlay" inert>
+    <h1 id="menu-title" class="fade"><span class="titre-mot">j'ai un pote</span></h1>
+
+    <p id="beta-tag" class="fade hidden">Bêta-test</p>
+
+    <div id="onboarding" class="view active" data-step="1">
+      <!-- Menu en TROIS ÉTAPES (7 septembre 2026, ordre demandé : inscription →
+           ma ligue → mon cycliste). Un habitué arrive directement à l'étape 3. -->
+      <div class="panel step" data-step="1">
+        <div class="panel-header"><p class="step-eyebrow">Qui es-tu ?</p></div>
+        <div class="panel-body">
+          <div id="pseudo-row">
+            <span class="icon">@</span>
+            <input type="text" id="pseudo-input" placeholder="ton pseudo" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="32" />
+          </div>
+          <p class="champ-titre beta-off">Pour aller plus loin</p>
+          <div class="champ-row beta-off"><span class="icon">IG</span><input type="text" id="insta-input" placeholder="ton Instagram (facultatif)" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="40" /></div>
+          <div class="champ-row beta-off"><span class="icon">⌂</span><input type="text" id="ville-input" placeholder="ton village, ta ville (facultatif)" autocomplete="off" spellcheck="false" maxlength="24" /></div>
+          <p id="champs-pourquoi" class="beta-off">Ton <b>village</b> s'écrit sur le panneau quand tu le traverses en course. Ton <b>Insta</b>, c'est pour te prévenir si tu gagnes un lot.</p>
+          <p id="beta-note" class="field-note hidden">Bêta-test : tout le monde court la <b>même course</b>. Écris ton pseudo, joue, et laisse-moi ton retour à la fin.</p>
+          <button id="step1-next" class="btn btn-primary" type="button" disabled>Continuer</button>
+        </div>
+      </div>
+
+      <div class="panel step" data-step="2">
+        <div class="panel-header"><p class="step-eyebrow">Ma ligue</p></div>
+        <div class="panel-body">
+          <!-- Ligue entre potes (7 septembre 2026), réécrite le 3 octobre 2026 :
+               une phrase de pourquoi, deux chemins (créer / rejoindre), puis
+               le code en gros, Inviter en gros, le peloton avec ses bots. -->
+          <div id="ligue-bloc">
+            <div id="ligue-sans">
+              <p id="ligue-intro">Plus tes potes jouent, plus tu marques de points. <b>Deviens le meilleur score de ta ligue de potes.</b></p>
+              <button id="ligue-creer" type="button" class="btn btn-primary">Créer ma ligue</button>
+              <p class="lp-sep"><span>ou</span></p>
+              <p class="lp-ou">Un pote t'a donné un code&nbsp;?</p>
+              <div id="ligue-row">
+                <input type="text" id="ligue-input" placeholder="CODE" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="6" />
+                <button id="ligue-rejoindre" class="btn btn-secondary" type="button">Rejoindre</button>
+              </div>
+              <p id="ligue-msg" class="hidden"></p>
+            </div>
+            <div id="ligue-avec" class="hidden">
+              <p id="ligue-titre">Ma ligue</p>
+              <button id="ligue-code-btn" type="button" aria-label="Copier le code de la ligue"><b id="ligue-code">—</b><small id="ligue-code-aide">Touche pour copier</small></button>
+              <p id="ligue-statut" class="hidden"></p>
+              <button id="ligue-partager" class="btn btn-primary share-btn" type="button"><span class="share-inner"><span>Inviter tes potes</span><span class="share-apps" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="24" height="24" focusable="false"><path d="M12 3a9 9 0 0 0-7.75 13.55L3 21l4.6-1.2A9 9 0 1 0 12 3z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M8.3 8.4c-.3.6-.5 1.3-.2 2.3.5 1.9 2.9 4.3 4.8 4.8 1 .3 1.7.1 2.3-.2.4-.2.9-.7 1-1.1.1-.3 0-.5-.2-.6l-1.7-.8c-.2-.1-.4 0-.5.1l-.5.6c-.1.1-.3.2-.5.1-.7-.3-2-1.6-2.3-2.3-.1-.2 0-.4.1-.5l.6-.5c.1-.1.2-.3.1-.5l-.8-1.7c-.1-.2-.3-.3-.6-.2-.4.1-.9.6-1.1 1z" fill="currentColor" stroke="none"/></svg>
+                <svg viewBox="0 0 24 24" width="24" height="24" focusable="false"><rect x="3" y="3" width="18" height="18" rx="5" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="17.2" cy="6.8" r="1" fill="currentColor"/></svg>
+                <svg viewBox="0 0 24 24" width="24" height="24" focusable="false"><path d="M4 5h16a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H9l-4 3.5V16H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+                <svg viewBox="0 0 24 24" width="24" height="24" focusable="false"><path d="M12 4c2.4 0 3.9 1.9 3.8 4.4l-.1 1.7c.4.2.9.3 1.4.2.4-.1.8.2.7.6-.1.5-.7.9-1.3 1.2.1.5.6.9 1.4 1.1.4.1.5.6.2.9-.3.3-.9.5-1.4.7-.1.3-.1.6-.3.9-.2.4-.7.4-1.2.3-.5-.1-1-.1-1.5.2-.5.4-1.1 1-1.7 1-.6 0-1.2-.6-1.7-1-.5-.3-1-.3-1.5-.2-.5.1-1 .1-1.2-.3-.2-.3-.2-.6-.3-.9-.5-.2-1.1-.4-1.4-.7-.3-.3-.2-.8.2-.9.8-.2 1.3-.6 1.4-1.1-.6-.3-1.2-.7-1.3-1.2-.1-.4.3-.7.7-.6.5.1 1-.1 1.4-.2l-.1-1.7C8.1 5.9 9.6 4 12 4z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/></svg>
+              </span></span></button>
+              <ul id="ligue-peloton"></ul>
+              <p id="ligue-membres"></p>
+            </div>
+          </div>
+          <button id="step2-next" class="btn btn-primary" type="button">Jouer</button>
+          <div id="step2-liens"><button id="step2-back" type="button" class="link-minimal">Mon cycliste</button><button id="ligue-quitter" type="button" class="link-minimal hidden">Quitter la ligue</button></div>
+        </div>
+      </div>
+
+      <div class="panel step" data-step="3">
+        <div class="panel-header"><p class="step-eyebrow">Mon cycliste</p></div>
+        <div class="panel-body">
+          <canvas id="skin-canvas" width="240" height="140" aria-label="Aperçu de ton cycliste"></canvas>
+          <div id="skin-options">
+            <div class="skin-row"><span class="skin-label">Je suis</span><div class="chips" data-cle="genre"></div></div>
+            <div class="skin-row"><span class="skin-label">Maillot</span><div class="chips" data-cle="c1"></div></div>
+            <div class="skin-row"><span class="skin-label">Chapeau</span><div class="chips" data-cle="chapeau"></div></div>
+            <div class="skin-row"><span class="skin-label">Engin</span><div class="chips" data-cle="velo"></div></div>
+          </div>
+          <button id="play-button" class="btn btn-primary" type="button" disabled>Jouer</button>
+          <button id="boost-ligue" type="button"></button>
+          <button id="sprint-button" class="btn btn-secondary hidden beta-off" type="button">Sprint du dimanche · 60 s</button>
+          <p id="sprint-note" class="hidden"></p>
+          <div id="step3-links"><button id="step3-ligue" type="button" class="link-minimal beta-off">Ma ligue</button><button id="step3-profil" type="button" class="link-minimal">Mon profil</button></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="end-screen" class="view">
+      <div class="panel">
+        <div class="panel-header"><p class="step-eyebrow" id="end-eyebrow">Ta course</p></div>
+        <div class="panel-body">
+          <p id="end-best" class="hidden">Nouveau record</p>
+          <div id="end-hero">
+            <div id="score-num"><span id="score-val">0</span><small>pts</small></div>
+            <p id="end-sub"></p>
+            <p id="end-max" class="hidden"></p>
+          </div>
+          <div id="end-ligue" class="hidden">
+            <p id="end-rang" class="hidden"></p>
+            <p id="end-ecart" class="hidden"></p>
+            <button id="end-ligue-titre" type="button">Ligue <b id="end-ligue-code">—</b> <small id="end-ligue-copier">· copier</small></button>
+            <ol id="end-ligue-liste"></ol>
+            <p id="end-relais" class="hidden"></p>
+          </div>
+          <div id="end-actions">
+            <button id="replay-button" class="btn btn-primary" type="button">Rejouer</button>
+            <button id="end-retour" class="btn btn-secondary hidden" type="button">Laisser un retour</button>
+            <button id="end-ligue-partager" class="btn btn-secondary share-btn" type="button"><span class="share-inner"><span>Inviter des potes</span><span class="share-apps" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="13" height="13" focusable="false"><path d="M12 3a9 9 0 0 0-7.75 13.55L3 21l4.6-1.2A9 9 0 1 0 12 3z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M8.3 8.4c-.3.6-.5 1.3-.2 2.3.5 1.9 2.9 4.3 4.8 4.8 1 .3 1.7.1 2.3-.2.4-.2.9-.7 1-1.1.1-.3 0-.5-.2-.6l-1.7-.8c-.2-.1-.4 0-.5.1l-.5.6c-.1.1-.3.2-.5.1-.7-.3-2-1.6-2.3-2.3-.1-.2 0-.4.1-.5l.6-.5c.1-.1.2-.3.1-.5l-.8-1.7c-.1-.2-.3-.3-.6-.2-.4.1-.9.6-1.1 1z" fill="currentColor" stroke="none"/></svg>
+                <svg viewBox="0 0 24 24" width="13" height="13" focusable="false"><rect x="3" y="3" width="18" height="18" rx="5" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="17.2" cy="6.8" r="1" fill="currentColor"/></svg>
+                <svg viewBox="0 0 24 24" width="13" height="13" focusable="false"><path d="M4 5h16a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H9l-4 3.5V16H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+                <svg viewBox="0 0 24 24" width="13" height="13" focusable="false"><path d="M12 4c2.4 0 3.9 1.9 3.8 4.4l-.1 1.7c.4.2.9.3 1.4.2.4-.1.8.2.7.6-.1.5-.7.9-1.3 1.2.1.5.6.9 1.4 1.1.4.1.5.6.2.9-.3.3-.9.5-1.4.7-.1.3-.1.6-.3.9-.2.4-.7.4-1.2.3-.5-.1-1-.1-1.5.2-.5.4-1.1 1-1.7 1-.6 0-1.2-.6-1.7-1-.5-.3-1-.3-1.5-.2-.5.1-1 .1-1.2-.3-.2-.3-.2-.6-.3-.9-.5-.2-1.1-.4-1.4-.7-.3-.3-.2-.8.2-.9.8-.2 1.3-.6 1.4-1.1-.6-.3-1.2-.7-1.3-1.2-.1-.4.3-.7.7-.6.5.1 1-.1 1.4-.2l-.1-1.7C8.1 5.9 9.6 4 12 4z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/></svg>
+              </span></span></button>
+            <div id="end-links">
+              <a id="end-cta" class="link-minimal" href="#" role="button">Écouter l'album</a>
+              <button id="end-menu" class="link-minimal" type="button">Menu</button>
+              <a id="credit-insta" class="link-minimal" href="#" target="_blank" rel="noopener noreferrer">@pmc.mp3</a>
+            </div>
+          </div>
+          <a id="insta-link" href="#" class="hidden" target="_blank" rel="noopener noreferrer">@pmc.mp3</a>
+        </div>
+      </div>
+    </div>
+
+    <a id="cta-link" href="#">
+      <span>L'album est sorti</span>
+      <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true" focusable="false"><path d="M14 4h6v6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 4l-8.5 8.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="M18 14.5V19a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 4 19V8a1.5 1.5 0 0 1 1.5-1.5H10" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </a>
+  </div>
+
+  <!-- Tiroir de RETOUR (bêta fermée, 16 septembre 2026) : le testeur écrit,
+       envoie, et une confirmation s'affiche dans la même carte. Le retour
+       part avec son pseudo, son score et le numéro de sa partie. -->
+  <!-- Explication du boost au lancement (30 septembre 2026 : « il faut une
+       animation explicative au lancement du jeu pour expliquer vite fait le
+       concept, et après bam, lancement de partie »). -->
+  <div id="explication" class="hidden" aria-live="polite">
+    <div id="expl-carte">
+      <div class="panel-header"><p class="step-eyebrow" id="expl-eyebrow">Comment jouer · 1/4</p></div>
+      <!-- Ordre du 5 octobre 2026 : « Monte le son » EN PREMIER (« je le mettrais
+           en tout premier, et après 2, 3, 4 »). -->
+      <div class="expl-etape" data-e="son">
+        <p class="expl-titre">Monte le son&nbsp;!</p>
+        <div id="expl-son"><svg class="hp" viewBox="0 0 48 48" width="48" height="48" aria-hidden="true"><path d="M6 18h10l13-10v32L16 30H6z" fill="#0d0d10" stroke="#0d0d10" stroke-width="2" stroke-linejoin="round"/></svg><span class="onde o1"></span><span class="onde o2"></span><span class="onde o3"></span></div>
+        <p class="expl-texte"><b>Les klaxons t'annoncent les voitures.</b> Écoute-les, ils arrivent avant elles.</p>
+      </div>
+      <div class="expl-etape" data-e="tap">
+        <p class="expl-titre">1 tap = 1 saut</p>
+        <div id="expl-main"><span class="onde"></span><svg class="doigt" viewBox="0 0 48 48" width="44" height="44" aria-hidden="true"><g fill="#fff" stroke="#0d0d10" stroke-width="2.4" stroke-linejoin="round"><rect x="8" y="25" width="9" height="14" rx="4.5" transform="rotate(-28 12.5 32)"/><rect x="14" y="23" width="27" height="19" rx="7"/><rect x="25" y="18" width="8" height="12" rx="4"/><rect x="31" y="20" width="7" height="11" rx="3.5"/><rect x="17" y="3" width="9" height="27" rx="4.5"/><rect x="17" y="40" width="21" height="6" rx="1.5" fill="#e13e26"/></g></svg></div>
+        <p class="expl-texte">Tape n'importe où sur l'écran, <b>pas besoin de glisser.</b> Re-tape en l'air = double saut.</p>
+      </div>
+      <div class="expl-etape" data-e="arrivee">
+        <div id="expl-arrivee"><span>ARRIVÉE</span></div>
+        <p class="expl-texte">La course dure le temps de la musique. <b>Tiens jusqu'à la ligne d'arrivée.</b></p>
+      </div>
+      <div class="expl-etape" data-e="potes">
+        <p class="expl-titre">Joue avec tes potes</p>
+        <!-- Des CYCLISTES, dessinés par le moteur du jeu, plus des carrés de
+             couleur (« incompréhensible avec les tags de couleur ») : un pote
+             de plus dans ta ligue = un cycliste de plus derrière toi, +10 %. -->
+        <canvas id="expl-peloton" aria-hidden="true"></canvas>
+        <p id="expl-mult">+0 %</p>
+        <p class="expl-texte">Crée ta ligue, invite tes potes&nbsp;: vous avez votre classement.</p>
+      </div>
+      <div id="expl-barre"><i></i></div>
+    </div>
+    <p id="expl-passer">Touche pour continuer</p>
+  </div>
+  <div id="retour-sheet" aria-hidden="true">
+    <div id="retour-veil"></div>
+    <div id="retour-card" role="dialog" aria-modal="true" aria-labelledby="retour-title">
+      <div class="panel-header"><p class="step-eyebrow">Bêta-test</p></div>
+      <div id="retour-form">
+        <h2 id="retour-title">Ton retour</h2>
+        <p id="retour-text">Ce qui t'a plu, ce qui t'a saoulé, ce qui bugue. Écris tout, c'est exactement ce qu'il me faut.</p>
+        <textarea id="retour-input" maxlength="1200" placeholder="Écris ton retour ici…" autocomplete="off" spellcheck="true"></textarea>
+        <p id="retour-compteur">0/1200</p>
+        <button id="retour-envoyer" class="btn btn-primary" type="button" disabled>Envoyer</button>
+        <button id="retour-fermer" type="button" class="link-minimal">Plus tard</button>
+      </div>
+      <div id="retour-ok" class="hidden">
+        <div class="coche" aria-hidden="true">✓</div>
+        <h2 id="retour-ok-title">Retour enregistré</h2>
+        <p id="retour-ok-text">Merci, c'est envoyé. Tu peux en laisser d'autres après chaque partie.</p>
+        <button id="retour-ok-fermer" class="btn btn-primary" type="button">Fermer</button>
+      </div>
+    </div>
+  </div>
+
+  <button id="mute-button" type="button" aria-label="Son">♪</button>
+  <button id="pause-button" type="button" aria-label="Pause" hidden>❚❚</button>
+
+  <div id="pause-screen">
+    <div class="panel">
+      <div class="panel-header"><p class="step-eyebrow">Pause</p></div>
+      <div class="panel-body">
+        <div id="pause-volume">
+          <div class="volume-row"><span class="skin-label">Musique</span><input type="range" id="volume-musique" class="volume-range" min="0" max="100" value="100" aria-label="Volume de la musique" /></div>
+          <div class="volume-row"><span class="skin-label">Effets</span><input type="range" id="volume-effets" class="volume-range" min="0" max="100" value="100" aria-label="Volume des effets sonores" /></div>
+        </div>
+        <div id="pause-actions">
+          <button id="resume-button" class="btn btn-primary" type="button">Reprendre</button>
+          <button id="pause-replay-button" type="button" class="link-minimal">Recommencer la course</button>
+          <button id="son-fermer" class="btn btn-primary" type="button">OK</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="revive-sheet" aria-hidden="true">
+    <div id="revive-veil"></div>
+    <div id="revive-card">
+      <div class="panel-header"><p class="step-eyebrow">Tombé !</p></div>
+      <div id="revive-timer">
+        <svg viewBox="0 0 76 76" aria-hidden="true"><circle class="piste" cx="38" cy="38" r="33"></circle><circle id="revive-arc" cx="38" cy="38" r="33"></circle></svg>
+        <span id="revive-timer-num">10</span>
+      </div>
+      <p id="revive-title">Tes potes t'attendent</p>
+      <p id="revive-text"></p>
+      <button id="revive-cta" class="btn btn-primary" type="button">Continuer la course</button>
+      <button id="revive-replay" type="button" class="link-minimal">Rejouer depuis le début</button>
+      <button id="revive-decline" type="button" class="link-minimal">Voir ma course</button>
+    </div>
+  </div>
+
+  <div id="gate-sheet" aria-hidden="true">
+    <div id="gate-veil"></div>
+    <div id="gate-card">
+      <p id="gate-eyebrow">POUR CONTINUER TA COURSE</p>
+      <div id="gate-timer" class="hidden">
+        <svg viewBox="0 0 76 76" aria-hidden="true"><circle class="piste" cx="38" cy="38" r="33"></circle><circle id="gate-arc" cx="38" cy="38" r="33"></circle></svg>
+        <span id="gate-timer-num">5</span>
+      </div>
+      <p id="gate-title">Ouvre l'album de PMC</p>
+      <p id="gate-text"></p>
+      <div id="gate-platforms" class="hidden"></div>
+      <p id="gate-hint" class="hidden"></p>
+      <a id="gate-cta" class="btn btn-primary" href="#" target="_blank" rel="noopener noreferrer"><span id="gate-cta-label">S'abonner à PMC</span></a>
+      <button id="gate-go" type="button" class="btn btn-primary hidden">Continuer ma course</button>
+      <button id="gate-later" type="button" class="btn btn-secondary">Fermer</button>
+    </div>
+  </div>
+
+  <!-- Tiroir de partage (5 octobre 2026 : « Inviter tes potes, ça ne marche
+       pas dans le navigateur Instagram ») : les navigateurs intégrés n'ont pas
+       de partage natif — copier le lien affiché marche partout, les boutons
+       ouvrent directement l'appli. -->
+  <div id="partage-sheet" aria-hidden="true">
+    <div id="partage-veil"></div>
+    <div id="partage-card">
+      <p id="partage-eyebrow">Invite tes potes</p>
+      <p id="partage-title">Envoie-leur le lien</p>
+      <p id="partage-text">Chaque pote qui joue te rapporte des points en plus.</p>
+      <p id="partage-lien"></p>
+      <button id="partage-copier" type="button" class="btn btn-primary">Copier le lien</button>
+      <p id="partage-hint" class="hidden"></p>
+      <div id="partage-apps">
+        <p class="plat-sep">ou envoie-le directement</p>
+        <a id="partage-whatsapp" class="plat-btn" href="#" target="_blank" rel="noopener noreferrer"><span class="plat-dot" style="background:#25d366"></span><span class="plat-nom">WhatsApp</span><span class="plat-fleche">→</span></a>
+        <a id="partage-sms" class="plat-btn" href="#"><span class="plat-dot" style="background:#34c759"></span><span class="plat-nom">Messages</span><span class="plat-fleche">→</span></a>
+        <a id="partage-snap" class="plat-btn" href="#" target="_blank" rel="noopener noreferrer"><span class="plat-dot snap" style="background:#fffc00"></span><span class="plat-nom">Snapchat</span><span class="plat-fleche">→</span></a>
+        <button id="partage-insta" class="plat-btn" type="button"><span class="plat-dot" style="background:#d62976"></span><span class="plat-nom">Instagram (en DM)</span><span class="plat-fleche">copier</span></button>
+      </div>
+      <button id="partage-plus" type="button" class="btn btn-secondary hidden">Autres applis…</button>
+      <button id="partage-fermer" type="button" class="link-minimal">Fermer</button>
+    </div>
+  </div>
+
+  <script src="config.js"></script>
+</body>
+</html>
