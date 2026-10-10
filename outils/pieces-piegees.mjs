@@ -66,7 +66,8 @@ for (const seed of graines) {
       for (let q = Math.ceil(c - demi); q <= Math.floor(c + demi); q++) {
         if (q <= v + 1) continue;
         const rq = route.rowAt(q);
-        const sous = (h) => h - solAt(q) < KINDS[row.kind].h + 0.3;
+        const K = KINDS[row.kind];
+        const sous = (h) => (K.aerien ? h - solAt(q) > K.bas - 0.3 : true) && h - solAt(q) < K.h + 0.3; // la mouette vole au-dessus du sol
         if (rq.lait !== undefined && sous(rq.lait)) {
           const cle = `${seed}:${q}:lait`;
           if (!vuesBalayage.has(cle)) { vuesBalayage.add(cle); laitsBalayes += 1; if (exemples.length < 12) exemples.push(`graine ${seed} · LAIT rangée ${q} traversé par ${row.kind} · t ${now.toFixed(1)} s`); }

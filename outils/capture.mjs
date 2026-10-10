@@ -42,7 +42,7 @@ await page.addInitScript(([parties, neuf, genre, velo]) => {
   localStorage.setItem("jp2-appris", '["tap","haut","double"]'); // pas de conseil hors des scènes qui le testent
   localStorage.setItem("jp2Pseudo", "pmc");
   localStorage.setItem("jp2LigueVue", "1");
-  localStorage.setItem("jp2-conseils-vus", '{"lait":1,"alerte":1}'); // projecteurs : seulement dans la scène qui les teste
+  localStorage.setItem("jp2-conseils-vus", '{"lait":1,"alerte":1,"mouette":1}'); // projecteurs : seulement dans la scène qui les teste
   localStorage.setItem("jp2Parties", parties);
   if (!neuf) { localStorage.setItem("jp2MorceauOuvert", "1"); localStorage.setItem("jp2PmcSuivi", "1"); }
 }, [process.env.PARTIES || "5", process.env.NEUF === "1", process.env.GENRE || "", process.env.VELO || ""]);
@@ -629,7 +629,7 @@ const SCENES = {
   tutoHaut: async () => {
     await page.waitForFunction(() => window.__pote.player.v > 2, null, { timeout: 15000 }); // fin du décompte
     for (const essai of [0, 1, 2]) {
-      await course(() => { localStorage.setItem("jp2-appris", '["tap","double"]'); localStorage.removeItem("jp2-conseils-vus"); localStorage.setItem("jp2-conseils-vus", '{"lait":1,"alerte":1}'); });
+      await course(() => { localStorage.setItem("jp2-appris", '["tap","double"]'); localStorage.removeItem("jp2-conseils-vus"); localStorage.setItem("jp2-conseils-vus", '{"lait":1,"alerte":1,"mouette":1}'); });
       const cible = await course(() => { const p = window.__pote; for (let r = Math.ceil(p.player.v) + 30; r < 4000; r++) { const row = p.rows.rowAt(r); if (row.type === "statique" && p.rows.familleDe(row.kind) === "haut") return { r, kind: row.kind }; } return null; });
       await course((r) => { const p = window.__pote.player; p.v = r - 18; p.prevV = p.v; }, cible.r);
       let c = null;
@@ -733,6 +733,20 @@ const SCENES = {
     console.log("PLAGE à partir de la rangée", r0);
     await page.keyboard.press("KeyD");
   },
+  // MOUETTES : la première de la course (projecteur), puis une sur la plage,
+  // en vol vers le joueur.
+  mouettes: async () => {
+    await page.waitForFunction(() => window.__pote.player.v > 2, null, { timeout: 15000 });
+    await page.keyboard.press("KeyD");
+    const rs = await course(() => { const p = window.__pote, out = []; for (let r = 300; r < 3000 && out.length < 2; r++) { if (p.rows.rowAt(r).kind === "mouette" && (!out.length || p.rows.enPlage(r))) out.push(r); } return out; });
+    for (const [k, r] of rs.entries()) {
+      await course(([v, t]) => { const p = window.__pote; p.clock.jumpBy(t - p.clock.now()); p.player.v = v; p.player.prevV = v; p.player.jumpY = p.rows.solAt(v); }, [r - 20, k ? 158 : 120]);
+      for (let i = 0; i < 3; i++) { await attendre(450); await photo(`64-mouette-${k}-${i}`); }
+      await page.mouse.click(180, 400); // referme le projecteur s'il est là
+    }
+    console.log("MOUETTES rangées", rs.join(", "));
+    await page.keyboard.press("KeyD");
+  },
   // PIÉTONS et BAIGNEURS (5 octobre 2026) : vraie course en accéléré (mode
   // vidéo + pilote automatique), photos aux moments où ils sont à l'écran.
   pietons: async () => {
@@ -798,6 +812,12 @@ const SCENES = {
       await aller(d + dv);
       await attendre(1200); await photo(nom);
     }
+    // L'arrivée de la neige (plaques sur la prairie), la bataille de boules de
+    // neige, le skieur qui file au fond.
+    const z = await course(() => { const p = window.__pote; let a = null, enf = null, sk = null; for (let r = 200; r < 3000; r++) { if (p.rows.enMontagne(r)) { if (a === null) a = r; if (enf === null && r % 29 === 11 && r > a + 10) enf = r; if (sk === null && r % 97 === 50) sk = r; } } return { a, enf, sk }; });
+    if (z.a) { await aller(z.a - 22); await attendre(500); await photo("49a-neige-arrive"); }
+    if (z.enf) { await aller(z.enf - 4); await attendre(500); await photo("49i-boules-de-neige"); }
+    if (z.sk) { await aller(z.sk - 1); await attendre(150); await photo("49j-skieur-fonce"); }
     // Le chasse-neige et le gros bonhomme de neige sur la route.
     const trouve = await course(() => { const p = window.__pote, o = {}; for (let r = 300; r < 3000; r++) { const row = p.rows.rowAt(r); if (!o[row.kind] && (row.kind === "chasseneige" || row.kind === "bonhomme" || row.kind === "skieur")) o[row.kind] = r; } return o; });
     console.log("MONTAGNE premiers", JSON.stringify(trouve), "· sol", JSON.stringify(await course((t) => Object.fromEntries(Object.entries(t).map(([k, r]) => [k, window.__pote.rows.solAt(r).toFixed(2)])), trouve)));

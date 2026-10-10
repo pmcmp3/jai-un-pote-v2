@@ -101,7 +101,9 @@ export const KINDS = {
   // cycliste (de `bas` à `h`) : on passe DESSOUS en roulant, le moindre saut
   // s'y cogne. Famille « sol » : le geste, c'est de NE PAS sauter. Seulement
   // dans la dernière minute, jamais à côté d'un double saut (etendreDangers).
-  mouette: { aerien: true, cout: 1, long: 1.0, larg: 0.9, bas: 2.2, h: 2.9, nom: "une mouette" },
+  // Elle VOLE vers le joueur (vitesse > voiture en face), annoncée par le
+  // panneau « attention ».
+  mouette: { aerien: true, contresens: true, cout: 1, vitesse: 3.2, arme: 5.5, long: 1.0, larg: 0.9, bas: 2.2, h: 2.9, nom: "une mouette" },
 };
 
 // ⚠️ Les hauteurs `h` sont mesurées sur les DESSINS (capture.mjs hitbox, qui
@@ -362,11 +364,12 @@ function penteAutour(r) {
 }
 
 // --- Moments de course -----------------------------------------------------------
-// Le CONVOI : trois cars scolaires d'affilée à T_CONVOI. Le BOUCHON, 15 s
-// avant la fin : trois voitures garées pare-chocs contre pare-chocs (2,8 de
-// long tous les 3 rangs : le toit porte d'une voiture à l'autre, toitSous),
-// feux de détresse, pièces sur les toits — on saute dessus et on y roule.
-const T_CONVOI = 100, CONVOI_N = 3, T_BOUCHON_AVANT_FIN = 15;
+// Le CONVOI : trois cars scolaires d'affilée à T_CONVOI. Le BOUCHON, DEUX
+// fois — à T_BOUCHON_1 puis 15 s avant la fin : trois voitures garées
+// pare-chocs contre pare-chocs (2,8 de long tous les 3 rangs : le toit porte
+// d'une voiture à l'autre, toitSous), feux de détresse, pièces sur les toits
+// — on saute dessus et on y roule.
+const T_CONVOI = 100, CONVOI_N = 3, T_BOUCHON_1 = 85, T_BOUCHON_AVANT_FIN = 15;
 export const BOUCHON_PAS = 3;
 // Toit d'une voiture GARÉE sous v (les simulations : roule sur le bouchon).
 export function toitGare(route, v, jumpY) {
@@ -439,8 +442,15 @@ function taillePietons(d) { return d < 3 ? 1 : d < 5 ? 2 : d < 6 ? 3 : 4; }
 // des places possibles. Avant et après elle, MOUETTE_GRACE_S de plus que la
 // physique : retomber un peu tard, ou sauter un peu tôt l'obstacle suivant,
 // ne doit pas suffire à la toucher — c'est sauter POUR RIEN qui est puni.
-const MOUETTES_DERNIERES_S = 60, MOUETTES_PART = 0.8, MOUETTE_GRACE_S = 0.3;
+const MOUETTES_DERNIERES_S = 60, MOUETTES_PART = 0.8, MOUETTE_GRACE_S = 0.4;
 function graceMouette(r) { return Math.ceil(MOUETTE_GRACE_S * vitesseAuRang(r)); }
+// Avant la mouette, on compte la retombée d'un saut TENU au moins : un joueur
+// qui garde l'appui sur une petite bête retombe plus loin que le tap prévu,
+// et ne doit pas atterrir dans la mouette.
+function ecartAvantMouette(kind, v) {
+  const f = FAMILLES.indexOf(familleDe(kind)) < FAMILLES.indexOf("haut") ? "haut" : familleDe(kind);
+  return Math.ceil(retombee(f) * v + demiLongueurRoute(kind) + demiLongueurRoute("mouette")) + 1;
+}
 // Écart DANS un groupe : la physique du saut, plus une rangée de grâce.
 const PIETONS_GRACE = 1;
 // La course devient difficile dès ~40 s : 12 obstacles de départ, 12
@@ -567,10 +577,11 @@ export class Route {
       // dernières secondes —, la vache devient un baigneur : auDecor.)
       if (KINDS[kind].contresens && this.chaine.r > rangAuTemps(dureeCourse() - 8)) kind = "vache";
       const groupe = kind === "pieton" ? taillePietons(Math.floor(i / 12)) : 1;
-      if (!this.evts) this.evts = { convoi: 0, convoiFait: false, bouchonFait: false };
+      if (!this.evts) this.evts = { convoi: 0, convoiFait: false, nBouchons: 0 };
       if (!this.evts.convoiFait && this.chaine.r >= rangAuTemps(T_CONVOI)) { this.evts.convoiFait = true; this.evts.convoi = CONVOI_N; }
       if (this.evts.convoi > 0) { kind = "bus"; this.evts.convoi -= 1; }
-      const bouchon = !this.evts.bouchonFait && this.chaine.r >= rangAuTemps(dureeCourse() - T_BOUCHON_AVANT_FIN);
+      const tBouchon = [T_BOUCHON_1, dureeCourse() - T_BOUCHON_AVANT_FIN][this.evts.nBouchons];
+      const bouchon = tBouchon !== undefined && this.chaine.r >= rangAuTemps(tBouchon);
       if (bouchon) kind = "voiture";
       const t = Math.min(1, Math.max(0, this.chaine.r / RAMP_ROWS));
       const mou = Math.round(MOU_DEBUT + (MOU_FIN - MOU_DEBUT) * t);
@@ -579,7 +590,10 @@ export class Route {
         const base = this.chaine.kind ? ecartMin(this.chaine.kind, k, Math.min(vMaxRangees(), vitesseAuRang(this.chaine.r + 20) * 1.08)) : 6;
         let r = Math.max(plancher, this.chaine.r + base + jeu);
         let garde = 0;
-        while (garde++ < 400 && !rangeeLibre(r, k)) r += 1;
+        // Le bouchon : les TROIS voitures sur une route libre et plate (sinon
+        // leurs toits ne sont plus à la même hauteur : on s'y cogne).
+        const libre = (q) => rangeeLibre(q, k) && (!bouchon || [1, 2].every((n) => rangeeLibre(q + n * BOUCHON_PAS, k) && Math.abs(solAt(q + n * BOUCHON_PAS) - solAt(q)) < 1e-6 && !penteAutour(q + n * BOUCHON_PAS)));
+        while (garde++ < 400 && !libre(r)) r += 1;
         return r;
       };
       // Chacun dans son décor (voir auDecor) : posé avec l'espèce du paquet,
@@ -587,12 +601,12 @@ export class Route {
       // l'adaptation change l'écart à tenir ou le trajet à l'écran.
       // MOUETTE, dans la dernière minute : entre deux obstacles qui ne
       // demandent pas de double saut (jamais une mouette et un véhicule l'un
-      // derrière l'autre), deux fois sur trois.
+      // derrière l'autre), quatre fois sur cinq.
       let mouette = null;
       const finR = rangAuTemps(dureeCourse());
       if (this.chaine.kind && this.chaine.kind !== "mouette" && !estDouble(this.chaine.kind) && !estDouble(kind) && !bouchon
         && this.chaine.r >= rangAuTemps(dureeCourse() - MOUETTES_DERNIERES_S) && this.chaine.r < finR - 20 && this.hash(i * 53 + 7) < MOUETTES_PART) {
-        mouette = placer("mouette", 0) + graceMouette(this.chaine.r);
+        mouette = this.chaine.r + ecartAvantMouette(this.chaine.kind, Math.min(vMaxRangees(), vitesseAuRang(this.chaine.r + 20) * 1.08)) + graceMouette(this.chaine.r);
         let garde = 0;
         while (garde++ < 400 && !rangeeLibre(mouette, "mouette")) mouette += 1;
         this.dangers.set(mouette, "mouette");
@@ -614,7 +628,7 @@ export class Route {
       kind = choix.kind;
       this.dangers.set(r, kind);
       if (bouchon) {
-        this.evts.bouchonFait = true;
+        this.evts.nBouchons += 1;
         for (let k = 0; k < 3; k++) { this.dangers.set(r + k * BOUCHON_PAS, "voiture"); this.bouchons.set(r + k * BOUCHON_PAS, k); }
         // + 6 rangées : un double saut lancé depuis un TOIT vole plus longtemps
         // que l'écart physique (calculé pour un départ au sol) ne le prévoit.
@@ -631,7 +645,7 @@ export class Route {
         // Une mouette entre deux piétons du groupe : saute, reste en bas, saute.
         let m = null;
         if (dernier >= rangAuTemps(dureeCourse() - MOUETTES_DERNIERES_S) && dernier < finR - 20 && this.hash(i * 61 + g * 13) < MOUETTES_PART) {
-          m = dernier + ecartMin(kind, "mouette", vit) + graceMouette(dernier);
+          m = dernier + ecartAvantMouette(kind, vit) + graceMouette(dernier);
           rg = m + graceMouette(m) + ecartMin("mouette", kind, vit);
           if (!rangeeLibre(m, "mouette")) m = null;
         }
@@ -764,7 +778,7 @@ export class Route {
       // l'écran : il traverserait la brique sous les yeux du joueur.
       for (let r = r0 + p - BALAYAGE_MAX; r < r0 + p; r++) {
         const k = this.dangers.get(r);
-        if (k && KINDS[k].contresens && !KINDS[k].lanceur && r0 + p - r <= balayageVisible(r, k)) return false;
+        if (k && KINDS[k].contresens && !KINDS[k].lanceur && !KINDS[k].aerien && r0 + p - r <= balayageVisible(r, k)) return false;
       }
       return true;
     };
@@ -799,7 +813,9 @@ export class Route {
         if (!K.contresens || K.lanceur) continue;
         const d = q - r, demi = demiLongueurRoute(kind);
         if (d <= demi + 0.4 || d > balayageVisible(r, kind)) continue;
-        if (row.coins[0] - solAt(q) < K.h + 0.3) { row.coins = []; row.double = false; break; }
+        // La mouette vole au-dessus : seules les pièces à SA hauteur sont traversées.
+        const hc = row.coins[0] - solAt(q);
+        if (K.aerien ? hc > K.bas - 0.3 && hc < K.h + 0.3 : hc < K.h + 0.3) { row.coins = []; row.double = false; break; }
       }
     }
     for (let p = 0; p < BLOC; p++) { const r = r0 + p; if (!this.cache.has(r) && !this.dansFenetre(r)) this.cache.set(r, rowsBloc[p]); }
@@ -886,6 +902,10 @@ export class Route {
       // le balayage protège d'un décrochage d'image).
       const proche = Math.max(Math.min(prevV, v), Math.min(Math.max(prevV, v), centre));
       if (Math.abs(proche - centre) >= demi) continue;
+      // Déjà au-dessus au pas d'avant (sans choc) et dépassé maintenant : on le
+      // QUITTE, ce n'est pas un choc (rouler hors du toit de la dernière voiture
+      // du bouchon touchait sa carrosserie, via le balayage du pas).
+      if (prevV > centre - demi && v - centre >= demi) continue;
       const haut = hauteurObstacle(row.kind, r) + solAt(centre);
       if (jumpY >= haut) continue;
       if (K.aerien && jumpY + HAUT_CYCLISTE <= K.bas + solAt(centre)) continue; // passé dessous

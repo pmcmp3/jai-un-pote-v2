@@ -1349,6 +1349,15 @@ export function init(d) {
   pseudoInput.addEventListener("keydown", (e) => { if (e.key === "Enter" && !step1Next.disabled) { e.preventDefault(); pseudoInput.blur(); step1Next.click(); } });
   brancherCentrage();
   syncPlay();
+  // La boucle du début du morceau tourne pendant le menu : elle part au
+  // PREMIER toucher (iOS n'autorise le son qu'après un geste), en phase de
+  // capture pour passer avant tout stopPropagation des champs.
+  const GESTES = ["touchend", "click", "keydown"];
+  const premierGeste = () => {
+    GESTES.forEach((t) => document.removeEventListener(t, premierGeste, true));
+    if (!deps.isGameStartRequested()) audio.lancerBoucleMenu();
+  };
+  GESTES.forEach((t) => document.addEventListener(t, premierGeste, true));
   [pseudoInput, instaInput, villeInput].forEach((inp) => ["pointerdown", "touchstart", "touchmove", "mousedown"].forEach((t) => inp.addEventListener(t, (e) => e.stopPropagation())));
   step1Next.addEventListener("click", () => { if (!getPseudo()) { pseudoInput.focus(); return; } enregistrerProfil(); setStep(3); });
   $("step2-next").addEventListener("click", () => { if (!loadingDone) return; lsSet(CLE_LIGUE_VUE, "1"); if (getPseudo().length === 0) { setStep(1); return; } startGame(); });

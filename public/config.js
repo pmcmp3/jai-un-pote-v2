@@ -48,7 +48,7 @@ window.CONFIG = {
   vitesseMax: 2.6,
   // DEUXIÈME ACCÉLÉRATION : sur les `accelDernieresS` dernières secondes, la
   // vitesse repart de vitesseMax vers vitesseFinale, atteinte ~15 s avant la fin.
-  vitesseFinale: 4.4,
+  vitesseFinale: 5.0,
   accelDernieresS: 120,          // durée de la 2e accélération (s), comptée depuis la fin du morceau
 
   // === VUE DE PROFIL ===
@@ -105,9 +105,10 @@ window.CONFIG = {
   poteRachatPieces: 6,
   // … et de plus en plus cher : `poteRachatPieces` jusqu'à 60 s, puis jusqu'à
   // `poteRachatPiecesFin` à 160 s. Et passé `chocPlusUnApres` (fraction de la
-  // course), chaque choc coûte UN pote de plus.
-  poteRachatPiecesFin: 17,
+  // course), chaque choc coûte UN pote de plus ; passé `chocPlusDeuxApres`, DEUX.
+  poteRachatPiecesFin: 22,
   chocPlusUnApres: 0.5,
+  chocPlusDeuxApres: 0.8,
   // Sans ligue, le peloton c'est la LIGUE DE DÉMO : Paul et ses quatre potes,
   // avec leurs skins, dans l'ordre d'arrivée. Dans une ligue, ce sont les membres.
   potesDefaut: [

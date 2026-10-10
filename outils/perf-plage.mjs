@@ -14,7 +14,7 @@ const contexte = await navigateur.newContext({ viewport: { width: 375, height: 8
 const page = await contexte.newPage();
 await page.addInitScript(() => {
   localStorage.setItem("jp2-appris", '["tap","haut","double"]'); localStorage.setItem("jp2Pseudo", "pmc"); localStorage.setItem("jp2LigueVue", "1");
-  localStorage.setItem("jp2-conseils-vus", '{"lait":1,"alerte":1}'); localStorage.setItem("jp2Parties", "5");
+  localStorage.setItem("jp2-conseils-vus", '{"lait":1,"alerte":1,"mouette":1}'); localStorage.setItem("jp2Parties", "5");
   localStorage.setItem("jp2MorceauOuvert", "1"); localStorage.setItem("jp2PmcSuivi", "1");
 });
 await page.goto(`http://localhost:${port}/?debug&dpr=2`);

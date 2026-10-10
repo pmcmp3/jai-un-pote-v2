@@ -52,7 +52,9 @@ console.log(`  pièces prises ${Math.round(moy(sp.map((s) => s.pieces)))}, sauts
 console.log(`  score parfait seul : ${Math.round(moy(graines.map((g) => scoreParfait(g, 0).score)))}`);
 
 // 4. Joueurs scriptés, avec traversées armées comme dans main.js.
-function course(seed, pilote) {
+// `maladroit` : le joueur idéal, mais qui TIENT chaque saut (même pour une
+// petite bête) et saute 0,1 s en retard — il ne doit jamais toucher une mouette.
+function course(seed, pilote, maladroit = false) {
   const route = new Route(seed);
   const dt = 1 / 120, T = dureeCourse();
   const tTenue = C.sautTenueMaxS;
@@ -78,7 +80,7 @@ function course(seed, pilote) {
         const row = route.rowAt(r);
         if (row.type === "safe") continue;
         const type = familleDe(row.kind);
-        if (r - v <= speed * montee(type)) { plan = { r, type }; jumpY = sol + 0.001; vy = C.sautVitesse; doubled = false; tHaut = 0; }
+        if (type !== "sol" && r - v <= speed * (montee(type) - (maladroit ? 0.1 : 0))) { plan = { r, type: maladroit && type === "tap" ? "haut" : type }; jumpY = sol + 0.001; vy = C.sautVitesse; doubled = false; tHaut = 0; }
         break;
       }
     }
@@ -106,6 +108,9 @@ function course(seed, pilote) {
 }
 const idem = graines.map((gr) => course(gr, true));
 const immo = graines.map((gr) => course(gr, false));
+const mala = graines.map((gr) => course(gr, true, true));
+const mouettesMaladroit = mala.reduce((a, c) => a + (c.parEspece.mouette || 0), 0);
+console.log(`— Joueur maladroit (tient tous ses sauts, 0,1 s en retard) : ${mouettesMaladroit} mouette(s) touchée(s)`);
 console.log(`— Joueur idéal scripté : ${idem.reduce((a, c) => a + c.touches, 0)} obstacle(s) touché(s) sur ${idem.reduce((a, c) => a + c.obstacles, 0)} franchis (${N} graines)`);
 const detail = {}; for (const c of idem) for (const [k, n] of Object.entries(c.parEspece)) detail[k] = (detail[k] || 0) + n;
 if (Object.keys(detail).length) console.log("  détail :", JSON.stringify(detail));
@@ -123,13 +128,14 @@ for (const gr of graines) {
     const row = route.rowAt(r);
     if (row.kind !== "mouette") continue;
     mouettes += 1;
-    const sous = route.checkMember("sol", r - 0.05, r, solAt(r), 0).some((e) => e.type === "obstacle");
-    const saut = route.checkMember("saut", r - 0.05, r, solAt(r) + 0.4, 0).some((e) => e.type === "obstacle");
+    armer(row, 0, 1); // elle vole : posée pour croiser la rangée r à t = 1
+    const sous = route.checkMember("sol", r - 0.05, r, solAt(r), 1).some((e) => e.type === "obstacle");
+    const saut = route.checkMember("saut", r - 0.05, r, solAt(r) + 0.4, 1).some((e) => e.type === "obstacle");
     if (!sous && saut) mouettesOk += 1;
   }
 }
 console.log(`— Mouettes : ${mouettes} sur ${N} graines, ${mouettesOk} qu'on passe dessous au sol et qu'on touche en sautant`);
-verdict(tIdeal === 0 && tImmo === nImmo && mouettes > 0 && mouettesOk === mouettes, `joueur idéal ${tIdeal} choc, joueur immobile ${tImmo}/${nImmo} chocs, mouettes ${mouettesOk}/${mouettes} (${N} graines)`);
+verdict(tIdeal === 0 && tImmo === nImmo && mouettes > 0 && mouettesOk === mouettes && mouettesMaladroit === 0, `joueur idéal ${tIdeal} choc, joueur immobile ${tImmo}/${nImmo} chocs, mouettes ${mouettesOk}/${mouettes}, maladroit ${mouettesMaladroit} mouette(s) touchée(s) (${N} graines)`);
 console.log(`— Pièces du joueur idéal (qui ne vise QUE les obstacles) : ${Math.round(moy(idem.map((c) => c.pieces)))} ; apex maximal atteint ${moy(idem.map((c) => c.apexMax)).toFixed(2)} u`);
 const pot = C.potesPaliers.map((_, i) => { const t = idem.map((c) => c.tPotes[i]).filter((x) => x !== undefined); return t.length ? `${Math.round(moy(t))} s (${t.length}/${N})` : "jamais"; });
 console.log(`— Arrivée des potes (paliers ${C.potesPaliers.join(", ")}) : ${pot.join(" · ")}`);

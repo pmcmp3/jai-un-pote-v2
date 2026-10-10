@@ -28,7 +28,7 @@ const erreurs = [];
 page.on("pageerror", (e) => erreurs.push(e.message));
 await page.addInitScript(() => {
   localStorage.setItem("jp2-appris", '["tap","haut","double"]'); localStorage.setItem("jp2Pseudo", "pmc"); localStorage.setItem("jp2LigueVue", "1");
-  localStorage.setItem("jp2-conseils-vus", '{"lait":1}'); localStorage.setItem("jp2Parties", "5");
+  localStorage.setItem("jp2-conseils-vus", '{"lait":1,"mouette":1}'); localStorage.setItem("jp2Parties", "5");
   localStorage.setItem("jp2MorceauOuvert", "1"); localStorage.setItem("jp2PmcSuivi", "1");
   // Figés au départ de la course (le menu et le chargement en ont besoin
   // avant) : le hasard repart d'une graine fixe, l'horloge murale ne bouge plus.

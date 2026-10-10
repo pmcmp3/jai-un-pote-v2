@@ -458,6 +458,7 @@ const PROJECTEURS = {
   // On dit ce que la brique FAIT (l'invincibilité surtout, c'est ce qui se
   // voit en jeu), pas seulement ce qu'elle est.
   lait: { titre: "BRIQUE DE LAIT = TURBO", sous: "Attrape-la : pendant 5 s, tu fonces, rien ne peut te toucher et tes points comptent double" },
+  mouette: { titre: "ATTENTION, LES MOUETTES !", sous: "Elles volent à hauteur de saut : ne saute pas, roule dessous" },
 };
 const projo = { type: null, x: 0, y: 0, r: 40, age: 0 };
 function projoLancer(type, x, y, r) {
@@ -787,7 +788,7 @@ function aplati(r, age, dessin) {
   ctx.translate(c.x, c.y); ctx.scale(1 + 0.3 * k, 1 - 0.72 * k); ctx.translate(-c.x, -c.y);
   try { dessin(); } finally { ctx.restore(); }
 }
-const KINDS_ROULANTS = new Set(["tracteur", "bus", "chasseneige", "skieur", "buggy", "pieton", "voiture", "contresens", "poulejetee"]);
+const KINDS_ROULANTS = new Set(["tracteur", "bus", "chasseneige", "skieur", "buggy", "pieton", "voiture", "contresens", "poulejetee", "mouette"]);
 
 // Les PETITES BÊTES s'écrasent si on leur retombe dessus PAR LE DESSUS (le
 // joueur descend et était au-dessus d'elles au pas d'avant) : rebond, aucun
@@ -827,8 +828,10 @@ function toucherJoueur(ev) {
   marquerTombe(ev, tMonde());
   bruitages.aie(); // « Pfff… aïe ! » : la voix du joueur, à chaque choc qui fait mal
   if (friends.count() > 0) {
-    // Deuxième moitié du morceau : chaque choc coûte un pote de plus.
-    const cout = ev.cout + (clock.now() > dureeCourse() * (window.CONFIG.chocPlusUnApres || 2) ? 1 : 0);
+    // Deuxième moitié du morceau : chaque choc coûte un pote de plus ; dernier
+    // cinquième : deux de plus.
+    const avance = clock.now() / dureeCourse(), C = window.CONFIG;
+    const cout = ev.cout + (avance > (C.chocPlusDeuxApres || 2) ? 2 : avance > (C.chocPlusUnApres || 2) ? 1 : 0);
     const perdus = friends.lose(cout);
     game.sansFaute = false;
     triggerShake(6, 0.45);
@@ -1071,7 +1074,7 @@ function sauter(dt, now, tm, phys) {
   if (player.flip > 0) {
     player.flip = Math.min(Math.PI * 2, player.flip + dt * (Math.PI * 2 / 0.55));
     const last = ghosts[ghosts.length - 1];
-    if (!last || last.t + 0.04 < now) ghosts.push({ u: player.u, v: player.v, h: player.jumpY, flip: player.flip, age: 0, t: now });
+    if (!last || last.t + 0.015 < now) ghosts.push({ u: player.u, v: player.v, h: player.jumpY, flip: player.flip, age: 0, t: now });
   }
   // Roue arrière (swipe vers le bas) : purement décoratif, au sol seulement.
   if (consumeWheelie() && player.jumpY <= 0 && player.roue <= 0) { player.roue = 0.001; sfx.saut(); }
@@ -1233,7 +1236,6 @@ function drawPiece(r, h, now, kind) {
   const bob = Math.sin(now * 3 + r * 0.7) * 0.05;
   const spin = (now * Math.PI * 2) / (clock.beatPeriod * 2) + r * 0.9 + h;
   if (kind === "lait") {
-    { const p = scene.project(0, r, h + 0.3); if (p.x < width * 0.82) projoLancer("lait", p.x, p.y, 46); projoSuivre("lait", p.x, p.y); }
     // Brique de lait : une VRAIE boîte qui tourne autour de son axe vertical
     // (scene.drawBoxR). ⚠️ Pas drawBox avec une largeur au cosinus : drawBox ne
     // peint que des boîtes alignées sur les axes, la brique s'écraserait au
@@ -1241,6 +1243,8 @@ function drawPiece(r, h, now, kind) {
     // 20 % plus grande qu'une pièce ne le laisserait croire, et elle BRILLE :
     // c'est le bonus le plus fort du jeu, il doit se voir de loin.
     const k = 1.2, bas = h - 0.42 * k + bob;
+    // Le projecteur vise le CENTRE de la brique, flottement compris.
+    { const p = scene.project(0, r, bas + 0.44 * k); if (p.x < width * 0.82) projoLancer("lait", p.x, p.y, Math.max(34, scene.scale() * 0.75)); projoSuivre("lait", p.x, p.y); }
     halo(r, bas + 0.45 * k, now, "248,252,255", "120,190,255");
     scene.avecLift(rows.solAt(r), () => scene.drawShadow(ctx, 0, r, 0.22 * k, 0.22 * k, 0.18));
     scene.drawBoxR(ctx, 0, r, 0.42 * k, 0.42 * k, 0.74 * k, "#f8f8f4", bas, spin);
@@ -1541,10 +1545,13 @@ function objetsDeLaRoute(items, from, to, now, tm, tAnim, vc, largeurRoute) {
           : row.kind === "skieur" ? props.drawSkieur(ctx, inst.K, u, vv, t, r)
           : row.kind === "buggy" ? props.drawBuggy(ctx, inst.K, u, vv, t, r)
           : row.kind === "pieton" ? props.drawPieton(ctx, inst.K, u, vv, t, r, rows.enPlage(r))
+          : row.kind === "mouette" ? props.drawStatic(ctx, "mouette", u, vv, t)
           : props.drawVoiture(ctx, inst.K, u, vv, -1, t));
         const ej = ejectes.get(r);
         if (ej) items.push({ d: scene.depth(0, ej.v), draw: () => dessinerEjecte(ej, inst.K, t, dessinA) });
         else items.push({ d: scene.depth(0, inst.v), draw: () => surSol(inst.v, () => dessinA(0, inst.v), true) });
+        // Première mouette : le projecteur l'explique (une fois par joueur).
+        if (row.kind === "mouette" && !ej) { const p = scene.project(0, inst.v, rows.solAt(inst.v) + (inst.K.bas + inst.K.h) / 2); if (p.x < width * 0.82) projoLancer("mouette", p.x, p.y, Math.max(34, scene.scale() * 0.85)); projoSuivre("mouette", p.x, p.y); }
         if (debugAlertes) { const px = scene.project(0, inst.v, 0).x; if (px > 0 && px < width) { const e = debugAlertes.get(r) || { kind: row.kind, alerte: 0, vu: 0 }; e.vu += 1; debugAlertes.set(r, e); } }
       }
     }
@@ -1594,6 +1601,20 @@ function objetsDeLaRoute(items, from, to, now, tm, tAnim, vc, largeurRoute) {
     items.push({ d: scene.depth(-RH - 0.6, ra), draw: () => drapeau(-RH - 0.6) });
   }
 }
+// La traînée du salto : UN trait blanc qui suit la TÊTE pendant qu'elle fait
+// le tour (une boucle qui s'efface), au lieu de copies transparentes du
+// cycliste — avec tout le peloton, les copies se mélangeaient aux potes.
+function traineeSalto() {
+  const R = scene.scale() * 0.95;
+  const pts = ghosts.map((g) => { const c = scene.project(g.u, g.v, g.h + 0.9); return { x: c.x + R * Math.sin(g.flip), y: c.y - R * Math.cos(g.flip), a: 1 - g.age / 0.35 }; });
+  ctx.save(); ctx.lineCap = "round";
+  for (let i = 1; i < pts.length; i++) {
+    const a = Math.max(0, Math.min(pts[i - 1].a, pts[i].a));
+    ctx.strokeStyle = `rgba(255,255,255,${0.7 * a})`; ctx.lineWidth = Math.max(1, scene.scale() * 0.22 * a);
+    ctx.beginPath(); ctx.moveTo(pts[i - 1].x, pts[i - 1].y); ctx.lineTo(pts[i].x, pts[i].y); ctx.stroke();
+  }
+  ctx.restore();
+}
 // La meute, les pièces du jetpack, le fantôme, la traînée du salto et le joueur.
 function objetsCyclistes(items, alpha, u, v, jy, pedal, flip, now, tm, tAnim, vc, largeurRoute) {
   if (gameStarted) for (const dr of friends.drawables(ctx, pedal, penteSol)) items.push({ d: scene.depth(dr.u, dr.v), draw: dr.draw });
@@ -1615,7 +1636,7 @@ function objetsCyclistes(items, alpha, u, v, jy, pedal, flip, now, tm, tAnim, vc
     ctx.fillText(`@${ghost.pseudo} · fantôme`, g.x, g.y);
     ctx.restore();
   } });
-  for (const g of ghosts) items.push({ d: scene.depth(g.u + 0.01, g.v), draw: () => drawRider(ctx, g.u, g.v, g.h, paletteJoueur, pedal, 0.22 * (1 - g.age / 0.35), g.flip, false) });
+  if (ghosts.length > 1) items.push({ d: scene.depth(player.u + 0.01, player.v), draw: traineeSalto });
   items.push({ d: scene.depth(u, v), draw: () => {
     // Pas d'ombre sur la route quand on roule sur une halle ou un toit de voiture.
     drawRider(ctx, u, v, jy, paletteJoueur, pedal, 1, flip, solSous(v, jy) < 0.05, player.prevRoue + (player.roue - player.prevRoue) * alpha,

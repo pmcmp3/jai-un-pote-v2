@@ -923,3 +923,36 @@ une couronne »), l'écart au suivant sur l'écran de fin, la vibration, le dép
   en ligne mesurée dans les mêmes conditions faisait pire (10,2 ms contre 9,8). Mise en ligne
   avec les 13 autres tests verts (dont `ecraser`, nouveau).
 
+## 10 octobre 2026 (nuit) — deuxième partie en 5G
+
+- « De la musique qui tourne en boucle, juste la première boucle du début, pendant tout le
+  menu » → boucle du début dès le premier toucher (iOS interdit le son avant un geste), coupée
+  au départ de la course.
+- « Les traces pendant le double saut [...] quand on est beaucoup, c'est bizarre » → un trait
+  blanc qui suit la tête au lieu de huit cyclistes transparents.
+- « Le cercle autour de la bouteille de lait [...] mal centré [...] un fondu entre 70 % et
+  100 % » → dégradé radial, visé sur le centre réel (il visait 0,3 au-dessus, sans le
+  flottement).
+- « Premières traces de neige [...] des enfants qui font des batailles de boules de neige
+  [...] un mec qui passe en ski derrière, hyper vite » → faits.
+- « Les personnages ont encore des contours noirs » → retirés.
+- « Le nombre de points soit centré » → centré sur l'écran (il l'était entre les deux blocs).
+- « Les bonhommes changent toutes les demi-secondes » → vrai bug : la personne était tirée de
+  sa position, qui bouge avec l'animation. Graine fixe.
+- « Le nez du train est mal modélisé [...] un petit peu en biais, ça ne marche pas » → cubes
+  imbriqués peints dans l'ordre du code ; refait en cubes empilés, triés, peint du bon côté de
+  la caisse.
+- « Bowling : je vois pas des gens en train de jouer [...] boules plus grosses » → un joueur
+  par piste, vraies boules.
+- « Les mouettes, faut qu'elles aillent plus vite [...] le tuto [...] j'ai dû me prendre la
+  mouette » → elles volent, projecteur à la première. Cause du choc trouvée en mesurant :
+  l'écart supposait un petit saut avant la mouette ; un saut tenu ou un peu tardif retombait
+  dedans (107 mouettes touchées par un « joueur maladroit » simulé, 0 après correction).
+- « Visibilité des mouettes sur la plage » → goéland : dos et ailes ardoise, bouts noirs.
+- « Les trois voitures [...] un truc avant ? » → deuxième bouchon vers 85 s. En le testant :
+  rouler hors du toit de la dernière voiture comptait un choc (balayage du pas) — corrigé.
+- « J'ai terminé la course sans effort [...] avec 5 potes » → vitesse finale 4,4 → 5,0, +2
+  potes par choc sur le dernier cinquième, rachat jusqu'à 22 pièces.
+- Filet : 14 tests verts (`perf` compris). `ecraser` rendu robuste (départ trop bas, colline
+  oubliée, bête longue survolée à pleine vitesse : des défauts du test, pas du jeu).
+

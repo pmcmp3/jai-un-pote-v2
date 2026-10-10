@@ -11,7 +11,7 @@
 // Le mouton fait un 360 sur lui-même : vraie rotation 3D autour de
 // l'axe vertical, via scene.drawBoxR.
 
-import { drawBox, drawShadow, drawFlat, drawDisque, getNight, project, groupe, echelle, CONTOUR_PERSO, teteVoxel } from "./scene.js";
+import { drawBox, drawShadow, drawFlat, drawDisque, getNight, project, groupe, echelle, teteVoxel } from "./scene.js";
 import { KINDS } from "./rows.js";
 import { humain } from "./humains.js";
 
@@ -271,7 +271,7 @@ export function drawSkieur(ctx, K, uC, v, t, r = 0) {
     if (M.barbe) b(uC - 0.146, v - 0.41, 0.292, 0.07, 0.08, M.cheveux, 1.38);
     b(uC - 0.15, v - 0.41, 0.3, 0.3, 0.13, "#f2c21c", 1.58);                    // bonnet
     b(uC - 0.05, v - 0.31, 0.1, 0.1, 0.1, "#ffffff", 1.71);                     // pompon
-  }, CONTOUR_PERSO);
+  });
 }
 
 // Le PIÉTON qui marche vers le joueur. Même grammaire que le skieur : jambes
@@ -279,8 +279,7 @@ export function drawSkieur(ctx, K, uC, v, t, r = 0) {
 // la rangée — la baguette sous le bras, le téléphone devant le nez, le
 // footing, le cabas —, et en maillot sur la plage.
 // ⚠️ La PERSONNE vient d'humains.js : peau, cheveux, coiffure, taille,
-// corpulence, âge. Cernée d'un liseré sombre pour se détacher sur les fonds
-// clairs.
+// corpulence, âge. Sans liseré (pas de contour noir autour des personnages).
 const HAUTS = ["#c8301c", "#7a828e", "#2f9a6a", "#1f5fb8", "#f2c21c", "#8a3fd4", "#2b2d38", "#e8742e", "#3f8a8a", "#d8d2c4"];
 const BAS = ["#23252e", "#2f4f9a", "#1a1a1e", "#5a4632", "#4a5260", "#7a2e3a"];
 const OBJETS_VILLE = ["baguette", "telephone", "joggeur", "cabas"];
@@ -373,7 +372,7 @@ export function drawPieton(ctx, K, uC, v, t, r, plage = false) {
     } else if (objet === "canne") drawBox(ctx, uBc + 0.02, v - 0.28 + pench, 0.04, 0.04, H0 + 0.1 * sy, "#5a3a22");
     else if (plage) drawBox(ctx, uH - 0.02, vH - 0.015, td + 0.04, 0.04, 0.06, "#0d0d10", HT + TE * 0.5); // lunettes de soleil
     if (objet === "serviette") drawBox(ctx, uBf - 0.02, v - 0.12, 0.06, 0.3, 0.5 * sy, "#f4efe4", H0 + 0.4 * sy); // serviette sur l'épaule
-  }, CONTOUR_PERSO);
+  });
   // Peints après le corps (hors du tri des boîtes) : ils sont devant/au-dessus.
   if (objet === "ballon") ballonPlage(ctx, uC - 0.03, v, HT + TE + 0.56 + 0.03 * Math.sin(t * 5 + r), 0.3, t + r);
   else if (objet === "raquette") {
@@ -452,26 +451,31 @@ export function drawStatic(ctx, kind, uCenter, r, t, graine = Math.round(r)) {
 // — une aile de chaque côté du corps, jamais imbriquée (scene.groupe). Son
 // ombre au sol dit où elle est.
 function drawMouette(ctx, u, r, t) {
-  const K = KINDS.mouette, ph = t * 9 + r * 1.7;
-  const hc = (K.bas + K.h) / 2 - 0.12 + Math.sin(ph * 0.35) * 0.05;
-  drawShadow(ctx, u, r, 0.35, 0.4, 0.12);
-  drawBox(ctx, u - 0.18, r - 0.32, 0.36, 0.66, 0.26, "#f7f7f2", hc - 0.13);             // corps
-  drawBox(ctx, u - 0.13, r + 0.34, 0.26, 0.2, 0.09, "#cfd4db", hc - 0.02);               // queue
-  drawBox(ctx, u - 0.13, r - 0.56, 0.26, 0.24, 0.24, "#ffffff", hc + 0.02);              // tête
-  drawBox(ctx, u - 0.05, r - 0.68, 0.1, 0.12, 0.07, "#f2b21c", hc + 0.08);               // bec
-  drawBox(ctx, u - 0.14, r - 0.5, 0.01, 0.06, 0.06, "#1a1a1e", hc + 0.14);               // œil
+  // Un GOÉLAND : dos et ailes gris ardoise, bouts noirs — le sombre se lit sur
+  // le ciel clair de la plage, le blanc sur le reste. Un peu plus grand que
+  // sa boîte n'en a l'air : il doit se voir de loin.
+  const K = KINDS.mouette, ph = t * 11;
+  const hc = (K.bas + K.h) / 2 - 0.12 + Math.sin(t * 3.1) * 0.05;
+  drawShadow(ctx, u, r, 0.4, 0.45, 0.16);
+  drawBox(ctx, u - 0.2, r - 0.36, 0.4, 0.72, 0.28, "#f7f7f2", hc - 0.14);              // ventre et flancs
+  drawBox(ctx, u - 0.16, r - 0.3, 0.32, 0.6, 0.06, "#5d6670", hc + 0.14);              // le dos, ardoise
+  drawBox(ctx, u - 0.14, r + 0.36, 0.28, 0.22, 0.1, "#1a1a1e", hc - 0.02);             // queue noire
+  drawBox(ctx, u - 0.14, r - 0.62, 0.28, 0.26, 0.26, "#ffffff", hc + 0.02);            // tête
+  drawBox(ctx, u - 0.05, r - 0.72, 0.1, 0.1, 0.08, "#f2b21c", hc + 0.08);              // bec
+  drawBox(ctx, u - 0.05, r - 0.78, 0.1, 0.06, 0.08, "#e13e26", hc + 0.08);             // sa pointe rouge
+  drawBox(ctx, u - 0.15, r - 0.55, 0.01, 0.07, 0.07, "#1a1a1e", hc + 0.15);            // œil
   // Les ailes : deux segments de part et d'autre, le bout bat plus que l'épaule.
   const s = Math.sin(ph);
   for (const sens of [-1, 1]) {
-    const u1 = sens < 0 ? u - 0.18 - 0.32 : u + 0.18, u2 = sens < 0 ? u1 - 0.3 : u1 + 0.32;
-    drawBox(ctx, u1, r - 0.18, 0.32, 0.4, 0.06, "#c9ced6", hc + 0.08 + 0.12 * s);
-    drawBox(ctx, u2, r - 0.14, 0.3, 0.34, 0.06, "#2b2d33", hc + 0.08 + 0.3 * s);
+    const u1 = sens < 0 ? u - 0.2 - 0.38 : u + 0.2, u2 = sens < 0 ? u1 - 0.36 : u1 + 0.38;
+    drawBox(ctx, u1, r - 0.2, 0.38, 0.46, 0.07, "#5d6670", hc + 0.1 + 0.14 * s);
+    drawBox(ctx, u2, r - 0.16, 0.36, 0.4, 0.07, "#141418", hc + 0.1 + 0.36 * s);
   }
 }
 
 // Les personnages DEBOUT — costard, fermier, baigneur — en CUBES, de profil,
 // tournés vers le joueur, dans le même univers que le cycliste et les
-// piétons : même corps que le piéton (jambes, buste, tête teteVoxel, liseré),
+// piétons : même corps que le piéton (jambes, buste, tête teteVoxel),
 // mais planté là, qui respire, et ce qui le fait reconnaître — la mallette et
 // le bras qui s'agite, la fourche et le chapeau de paille, le slip et le ballon.
 // ⚠️ Les bras sont une CHAÎNE de cubes qui pivote à l'épaule (brasCubes) :
@@ -590,7 +594,7 @@ function debout(ctx, kind, uC, v, t, graine) {
       teteVoxel(ctx, M, uH, vH, td, tw, HT, TE);
       drawBox(ctx, uH - 0.02, vH - 0.015, td + 0.04, 0.04, 0.06, "#0d0d10", HT + TE * 0.5);       // les lunettes de soleil
     }
-  }, CONTOUR_PERSO);
+  });
   if (apres) apres();
 }
 function staticNu(ctx, kind, uCenter, r, t) {

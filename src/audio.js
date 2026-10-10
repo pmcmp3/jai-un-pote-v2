@@ -201,6 +201,43 @@ function stopReviveLoop(immediat = false) {
   try { src.stop(t + LOOP_FONDU + 0.05); } catch (e) { /* déjà terminée */ }
 }
 
+// --- La boucle du MENU ---------------------------------------------------------
+// Pendant tout le menu, avant que le morceau commence : la boucle du début (les
+// 4 mesures de la boucle de mort, sans filtre), jusqu'au départ de la course.
+// iOS n'autorise le son qu'après un GESTE : elle part au premier toucher du
+// menu (screens.js), ou dès que le morceau est décodé si ce toucher a eu lieu.
+let menuSource = null, menuGain = null, menuVoulu = false;
+const MENU_VOLUME = 0.8, MENU_FONDU = 0.8;
+export function lancerBoucleMenu() { // dans la pile d'appel d'un geste
+  if (started) return;
+  menuVoulu = true;
+  unlock();
+  demarrerBoucleMenu();
+}
+function demarrerBoucleMenu() {
+  if (!menuVoulu || started || menuSource || !audioCtx || !buffer) return;
+  const r = loopReglages(), t = audioCtx.currentTime;
+  menuGain = audioCtx.createGain();
+  menuGain.gain.setValueAtTime(0, t);
+  menuGain.gain.linearRampToValueAtTime(pendingMusique * MENU_VOLUME, t + MENU_FONDU);
+  menuSource = audioCtx.createBufferSource();
+  menuSource.buffer = buffer;
+  menuSource.loop = true;
+  menuSource.loopStart = r.debut;
+  menuSource.loopEnd = Math.min(buffer.duration, r.debut + r.duree);
+  menuSource.connect(menuGain);
+  menuGain.connect(audioCtx.destination);
+  menuSource.start(t, r.debut);
+}
+export function arreterBoucleMenu() {
+  menuVoulu = false;
+  if (!menuSource || !audioCtx) return;
+  const src = menuSource, g = menuGain, t = audioCtx.currentTime;
+  menuSource = null; menuGain = null;
+  g.gain.cancelScheduledValues(t); g.gain.setValueAtTime(g.gain.value, t); g.gain.linearRampToValueAtTime(0, t + 0.3);
+  try { src.stop(t + 0.35); } catch (e) { /* déjà arrêtée */ }
+}
+
 // Safari a longtemps n'accepté que la forme à callbacks de decodeAudioData ;
 // les navigateurs récents renvoient une Promise. On accepte les deux.
 function decodeWith(ctx, data) {
@@ -214,6 +251,7 @@ function onDecoded(decoded) {
   buffer = decoded;
   rawCopy = null; // plus besoin de la copie de secours
   progress = 1;
+  demarrerBoucleMenu(); // le joueur a déjà touché le menu : la boucle part maintenant
 
   const ecart = Math.abs(decoded.duration - window.CONFIG.dureeMorceau);
   if (ecart > 0.3) {
@@ -466,6 +504,7 @@ export function unlock() {
 // un décompte) : le contexte est déjà créé/débloqué à ce stade, donc plus
 // besoin d'un geste utilisateur pour démarrer une source sur ce contexte.
 export function play() {
+  arreterBoucleMenu();
   waitForRunningThenPlay();
 }
 
@@ -477,6 +516,7 @@ export function restart() {
   // course » lancé depuis le menu pause repartirait avec l'horloge gelée et
   // le filtre encore fermé.
   mode = "running";
+  arreterBoucleMenu();
   stopReviveLoop(true); // une relance efface aussi la boucle de mort restée en fond
   pauseAnchor = null;
   clockShift = 0; // le retard accumulé pendant les pauses de la partie précédente ne se transmet pas
@@ -546,7 +586,7 @@ function regler(gainNode, v) {
   if (!gainNode || !audioCtx) return;
   gainNode.gain.setTargetAtTime(v, audioCtx.currentTime, 0.03); // glisser le curseur ne grésille pas
 }
-export function setVolumeMusique(v) { pendingMusique = Math.max(0, Math.min(1, v)); regler(musiqueGain, pendingMusique); }
+export function setVolumeMusique(v) { pendingMusique = Math.max(0, Math.min(1, v)); regler(musiqueGain, pendingMusique); regler(menuGain, pendingMusique * MENU_VOLUME); }
 export function getVolumeMusique() { return pendingMusique; }
 export function setVolumeEffets(v) { pendingEffets = Math.max(0, Math.min(1, v)); regler(effetsGain, pendingEffets); }
 export function getVolumeEffets() { return pendingEffets; }

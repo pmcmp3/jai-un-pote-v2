@@ -86,10 +86,12 @@ export function renderHud(ctx, width, height, hud) {
     ctx.fillText(`${hud.restant} PIÈCE${hud.restant > 1 ? "S" : ""}`, xD, y1 + 43);
   }
 
-  // --- Centre : les points ---------------------------------------------------
+  // --- Centre : les points, au MILIEU DE L'ÉCRAN (pas entre les deux blocs :
+  // avec « ×5 5 POTES » à droite, ils partaient vers la gauche). Ils
+  // rapetissent plutôt que de toucher le bouton pause ou le bloc de droite.
   const leftEnd = 14 + 46 + 10, rightStart = gaucheDroite - 10;
-  const centerW = rightStart - leftEnd;
-  const cx = (leftEnd + rightStart) / 2;
+  const cx = width / 2;
+  const centerW = 2 * Math.min(cx - leftEnd, rightStart - cx);
   const num = formatMetres(hud.metres);
   let taille = 40;
   ctx.font = `900 ${taille}px ${POLICE_TITRE}`;
@@ -399,10 +401,13 @@ export function renderProjecteur(ctx, width, height, p, info, t) {
   const r = p.r * (1 + 0.06 * Math.sin(t * 6));
   ctx.save();
   ctx.globalAlpha = a;
-  ctx.fillStyle = "rgba(8,8,12,0.74)";
-  ctx.beginPath(); ctx.rect(0, 0, width, height); ctx.arc(p.x, p.y, r, 0, Math.PI * 2, true); ctx.fill("evenodd");
-  ctx.strokeStyle = JAUNE; ctx.lineWidth = 3;
-  ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.stroke();
+  // Pas de cercle net : l'écran s'assombrit à 70 %, et autour de l'objet
+  // l'assombrissement s'efface en FONDU jusqu'à 0 (l'objet à 100 %).
+  const voile = ctx.createRadialGradient(p.x, p.y, r * 0.6, p.x, p.y, r * 2.6);
+  voile.addColorStop(0, "rgba(8,8,12,0)");
+  voile.addColorStop(1, "rgba(8,8,12,0.7)");
+  ctx.fillStyle = voile;
+  ctx.fillRect(0, 0, width, height);
   // Texte sous l'objet, ou au-dessus s'il est bas dans l'écran.
   const dessous = p.y < height * 0.55;
   ctx.font = `700 18px ${POLICE}`;

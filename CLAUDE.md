@@ -72,12 +72,19 @@ intégré d'Instagram d'abord**, portrait natif.
   bonhommes), **bouchon** de voitures garées, **plage** sur les 30 dernières secondes (coucher
   de soleil, baigneurs, buggys). Véhicules en face (voiture, car, tracteur, chasse-neige, buggy),
   piétons en groupes grandissants.
-- **Mouettes** (dernière minute) : elles planent juste au-dessus de la tête (famille « sol » :
-  on passe DESSOUS en roulant, le moindre saut s'y cogne), pièces au sol de part et d'autre.
-  Posées entre deux obstacles sans double saut (⚠️ jamais à côté d'un véhicule à double saut,
-  demande de l'artiste) et dans les groupes de piétons, 4 fois sur 5, avec 0,3 s de grâce de
-  chaque côté : 5 à 11 par course. Le joueur idéal passe dessous, le test `regles` vérifie
-  qu'on les touche en sautant et jamais au sol. Pas de tuto.
+- **Mouettes** (dernière minute) : elles VOLENT vers le joueur (type « contresens », panneau
+  attention) juste au-dessus de la tête (famille « sol » : on passe DESSOUS en roulant, le
+  moindre saut s'y cogne), pièces au sol de part et d'autre. Projecteur à la première
+  (« Attention, les mouettes ! »). Posées entre deux obstacles sans double saut (⚠️ jamais à
+  côté d'un véhicule à double saut) et dans les groupes de piétons, 4 fois sur 5 : 4 à 10 par
+  course. ⚠️ Écart AVANT compté sur la retombée d'un saut TENU (au moins) + 0,4 s, APRÈS
+  + 0,4 s : avec la retombée d'un simple tap et 0,3 s, un joueur qui tenait son saut retombait
+  dans la mouette (vécu par l'artiste ; le « joueur maladroit » de `mesurer.mjs` en touchait
+  107 sur 20 graines, 0 maintenant — vérifié par le test `regles`).
+- **Bouchon** (3 voitures garées, on roule sur les toits) DEUX fois : vers 85 s et 15 s avant
+  la fin, les trois voitures sur une route libre et plate.
+- ⚠️ **Quitter un obstacle n'est pas un choc** (checkMember) : rouler hors du toit de la
+  dernière voiture du bouchon touchait sa carrosserie par le balayage du pas.
 - **Chacun dans son décor** (`auDecor`, `aCheval`) : rien n'est habillé pour une autre rangée
   que la sienne, rien ne chevauche une frontière de biome.
 - Une **ligue = une graine** (`graineLigue`) : même route pour ses membres ; sans ligue, graine
@@ -88,6 +95,9 @@ intégré d'Instagram d'abord**, portrait natif.
 ### Pièces, potes, turbo
 - Les pièces **dessinent le geste** (arc au-dessus de chaque obstacle), pièce double au sommet
   d'un double saut. Paliers de potes, rachat et coût des chocs : `config.js`.
+- **Difficulté qui monte** : vitesse finale 5,0 (on lit moins longtemps ce qui arrive), un choc
+  coûte +1 pote après la moitié de la course et +2 sur le dernier cinquième
+  (`chocPlusDeuxApres`), racheter un pote coûte jusqu'à 22 pièces en fin de course.
 - **Multiplicateur ENTIER** (`regles.multiplicateur`) : 3 potes = ×3, 5 potes = ×5, ×1 en
   dessous de deux ; ×2 en plus au turbo. Jamais de demi-multiplication à l'écran (le boost de
   ligue, lui, reste en pourcentage). Un choc coûte des potes ; seul le joueur meurt.
@@ -113,6 +123,8 @@ intégré d'Instagram d'abord**, portrait natif.
 - **Tuto contextuel au ralenti** : la première fois qu'une famille d'obstacle arrive, le monde
   ralentit, la consigne s'affiche, le temps repart sur le bon geste ; l'obstacle expliqué ne fait
   jamais mal et la route est dégagée autour (`rows.degagerTutos`).
+- **Projecteur** (brique de lait, première mouette) : l'écran s'assombrit à 70 % avec un FONDU
+  jusqu'à l'objet (dégradé radial, pas de cercle net), visé sur le centre réel de l'objet.
 - **Explication au lancement** en étapes (`EXPL_ETAPES`, screens.js) : 3 premières parties et
   toujours en ligue démo. Projecteur une fois par joueur sur la première brique de lait. Le
   panneau « attention » n'a PAS de tuto : il se comprend seul (retour de joueurs).
@@ -122,11 +134,23 @@ intégré d'Instagram d'abord**, portrait natif.
 - Les humains (piétons, costard, fermier, baigneur, skieurs, marchands…) partagent le même corps
   en cubes que le cycliste, avec une diversité tirée par rangée (`humains.js`). Les villageois
   du décor encouragent, les deux bras en l'air qui battent (`personnage`, scene.js).
+  ⚠️ La personne se tire d'une GRAINE FIXE (sa place), jamais de sa position animée : tirée de
+  `v` qui bouge, elle changeait de tête à chaque image (« régénérée toutes les demi-secondes »).
+- **Aucun contour noir** autour des personnages (demandé) ; `groupe(ctx, fn, contour)` reste
+  disponible mais n'est plus utilisé.
+- **La neige s'annonce** : plaques de neige sur 45 rangées avant et après la montagne
+  (`plaqueNeige`) ; enfants qui se lancent des boules de neige ; un skieur qui file au fond.
+- **Bowling** : un joueur de dos au départ de chaque piste (il lance quand la boule part),
+  vraies boules sombres à trois trous.
+- **Traînée du salto** : un trait blanc qui suit la tête pendant le tour (plus de copies
+  transparentes du cycliste, illisibles avec le peloton).
 - **Phare avant** sur le VTT et le Grand Bi (`phareAvant`, voxrider.js) : verre crème le jour,
   allumé et rayonnant la nuit (`setNuit`, posé par main.js).
 - ⚠️ **Dans un modèle, jamais deux cubes imbriqués** : `scene.groupe` ne sait pas les ordonner
   (le chasse-neige perdait ses vitres, le rebord de la benne se peignait dessus). Empiler.
-- Le TER a un **nez** à trois marches avec pare-brise à chaque bout (`drawHalle`, couche train).
+- Le TER a un **nez** à trois marches avec pare-brise à chaque bout (`drawHalle`, couche train),
+  en cubes empilés dans un groupe trié, peint avant ou après la caisse selon le côté de l'écran
+  (sinon il n'était juste que pile dans l'axe de la caméra).
 - ⚠️ **Le canvas penché** : un index de tableau dérivé d'une position n'est jamais supposé
   entier ; `parseColor` rend du gris plutôt que de lever ; `render()` repart d'une matrice propre
   et chaque objet est dessiné dans un `try/catch` qui remet la matrice.
@@ -137,6 +161,8 @@ intégré d'Instagram d'abord**, portrait natif.
   klaxon de chaque véhicule qui entre à l'écran, train, quilles, ambiances par décor.
 - ⚠️ **Tout ce qui a une hauteur joue la pentatonique de sol** (sol la si ré mi) : le morceau
   est en mi mineur / sol majeur (`outils/gamme.py`).
+- **Musique du menu** : la boucle du début du morceau tourne pendant tout le menu, du premier
+  toucher (iOS exige un geste) jusqu'au départ (`lancerBoucleMenu`/`arreterBoucleMenu`, audio.js).
 - Niveaux calés en LUFS contre le morceau (`outils/bruitages.mjs`). Deux curseurs **Musique** et
   **Effets** (menu pause et bouton ♪), retenus d'une visite à l'autre.
 - ⚠️ Vérifiés à la mesure et au spectrogramme, pas à l'oreille : c'est au téléphone qu'on
@@ -157,6 +183,7 @@ intégré d'Instagram d'abord**, portrait natif.
 - **Couronne** : le premier de la ligue la porte à la place de son chapeau, dans la course de
   ses potes (et sur soi si c'est soi), et devant son nom sur l'écran de fin. Retenu par ligue
   (`jp2Leader`) ; en démo, avant toute course finie, c'est le premier pote fictif.
+- **HUD** : les points au centre de l'ÉCRAN (ils rapetissent plutôt que de toucher les blocs).
 - **Écran de fin** : « Il te manque X pts pour passer devant @pseudo » (ou « La couronne est à
   toi »), sous le rang.
 - **Fantôme** du meilleur de la ligue : en sommeil (la trace part avec le score ; le
