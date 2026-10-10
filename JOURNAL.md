@@ -878,3 +878,18 @@ une couronne »), l'écart au suivant sur l'écran de fin, la vibration, le dép
   fonctions nommées : 13 images sur 13 identiques au pixel près, filet vert, scènes rares
   (fantôme, jetpack, éjection, nuit, fin) sans erreur.
 
+## 10 octobre 2026 — « Returned response is null » sur le lien de test
+
+- L'artiste colle `?9&premiere` et obtient sur Safari « FetchEvent.respondWith received an
+  error: Returned response is null ». Le site répondait bien (200 partout) : c'était le
+  service worker. Deux défauts mesurés :
+  - hors réseau, la page n'était cherchée en cache que sous son lien EXACT : tout lien avec
+    paramètres (`?premiere`, `?ligue=…`, `?demo`) ne trouvait rien, le service worker
+    répondait « rien » (reproduit sous Chrome : 1 lien sur 4 servi). Corrigé : page rangée sous
+    `./`, repli `ignoreSearch`, et `Response.error()` plutôt que rien → 4 sur 4 ;
+  - `?9` vidait les caches ET retirait le service worker en même temps, puis rechargeait : le
+    rechargement pouvait passer par un service worker mourant au cache vide — le scénario le
+    plus probable du message vu sur Safari (pas de WebKit sur la machine pour le rejouer).
+    Corrigé : service worker retiré d'abord, caches vidés ensuite.
+- Test `hors-ligne` ajouté au filet (13 tests).
+

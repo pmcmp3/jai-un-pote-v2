@@ -28,6 +28,9 @@ intégré d'Instagram d'abord**, portrait natif.
 - Mise en ligne : **`./deploy.sh "message"`** — il lance d'abord le filet (`npm run verif`) et
   refuse de déployer si un test échoue. Après chaque mise en ligne : vérifier le nom du cache
   dans le `sw.js` servi (`jp2-vNN`, à incrémenter dans `public/sw.js` à chaque version).
+  Le service worker range la page sous `./` quel que soit le lien : ne jamais remettre un repli
+  `caches.match(req)` nu sur une navigation (hors réseau, `?ligue=…` ne trouvait rien → page
+  blanche, « Returned response is null » sur Safari).
 - La v1 (`jai-un-pote/` du dépôt `pmcmp3/la-ville-est-belle`, où tourne la bêta fermée) ne
   reçoit pas les changements de la v2.
 
@@ -148,7 +151,7 @@ Choc 60 ms, chute, nouveau pote, brique de lait, salto, fin. Le test `collisions
 chaque choc payé vibre.
 
 ### Liens et touches
-- URL : `?9` (vide caches et service worker), `?premiere` (première visite), `?demo` (ligue de
+- URL : `?9` (retire le service worker PUIS vide les caches — dans cet ordre, voir `index.html`), `?premiere` (première visite), `?demo` (ligue de
   démo pleine), `?neuf` (paliers de conversion à zéro), `?zero` (tout effacer), `?jetpack`,
   `?ligue=CODE`, `?debug`.
 - Avec `?debug` : I invincible, G mourir, F terminer, P/O pote ±1, L lait, N nuit, S saison,
@@ -169,7 +172,7 @@ chaque choc payé vibre.
 
 ## Le filet et les outils
 
-- **`npm run verif`** (≈ 3 min) : 12 tests du vrai jeu, chacun conclut par ✅ OK ou ❌ ÉCHEC
+- **`npm run verif`** (≈ 3 min) : 13 tests du vrai jeu, chacun conclut par ✅ OK ou ❌ ÉCHEC
   (`outils/verdict.mjs`) ; un test qui échoue est relancé une fois et signalé « instable » s'il
   passe au second essai. `npm run verif -- collisions clavier` pour n'en lancer que certains.
   Ce qu'il garantit : joueur idéal sans choc et joueur immobile qui touche tout (`regles`),
@@ -177,7 +180,8 @@ chaque choc payé vibre.
   coûte et vibre (`collisions`), un tap = un saut sur Android, tutos sur route
   dégagée, menu stable sur Android, clavier sur 6 téléphones, première visite façon Instagram,
   curseurs de son, course entière sans erreur avec les sons dans leur décor, < 8,3 ms par image
-  à CPU ×4 (`perf` ; une machine très chargée peut le faire monter), build qui tourne.
+  à CPU ×4 (`perf` ; une machine très chargée peut le faire monter), page servie sans réseau quel
+  que soit le lien et `?9` qui recharge proprement (`hors-ligne`), build qui tourne.
 - **Réorganiser du code sans changer l'image** : `node outils/rendu-identique.mjs --reference`
   AVANT, puis `node outils/rendu-identique.mjs` APRÈS — 13 images d'une même course (départ
   reproductible `__pote.videoAuDepart`) comparées au pixel près. Pas dans le filet : sa

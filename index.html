@@ -15,10 +15,11 @@
         u.searchParams.delete(num);
         try { localStorage.removeItem("jp2-appris"); localStorage.removeItem("jp2-conseils-vus"); } catch (e) {}
         var fini = function () { location.replace(u.toString()); };
-        var etapes = [];
-        if (window.caches) etapes.push(caches.keys().then(function (ks) { return Promise.all(ks.map(function (k) { return caches.delete(k); })); }));
-        if (navigator.serviceWorker) etapes.push(navigator.serviceWorker.getRegistrations().then(function (rs) { return Promise.all(rs.map(function (r) { return r.unregister(); })); }));
-        Promise.all(etapes).then(fini, fini);
+        // Dans l'ordre : service worker retiré D'ABORD, caches vidés ENSUITE. Les deux
+        // en même temps laissaient Safari passer le rechargement par un service
+        // worker mourant dont le cache venait d'être vidé (« Returned response is null »).
+        var sw = navigator.serviceWorker ? navigator.serviceWorker.getRegistrations().then(function (rs) { return Promise.all(rs.map(function (r) { return r.unregister(); })); }) : Promise.resolve();
+        sw.then(function () { return window.caches && caches.keys().then(function (ks) { return Promise.all(ks.map(function (k) { return caches.delete(k); })); }); }).then(fini, fini);
         setTimeout(fini, 2500);
       } catch (e) {}
     })();

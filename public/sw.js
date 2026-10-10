@@ -2,7 +2,7 @@
 // la page sont mis en cache au premier passage.
 // Page et config : réseau d'abord (une mise à jour est vue tout de suite),
 // repli cache hors ligne. Tout le reste : cache d'abord, puis réseau.
-const CACHE = "jp2-v35"; // à incrémenter à chaque mise en ligne : les anciens caches sont effacés à l'activation
+const CACHE = "jp2-v36"; // à incrémenter à chaque mise en ligne : les anciens caches sont effacés à l'activation
 const PRECACHE = ["./", "./config.js", "./assets/jai-un-pote.mp3", "./assets/pff-aie.mp3", "./fonts/SourceSerif2-Black.woff2", "./fonts/StageGrotesk-Medium.otf", "./fonts/StageGrotesk-Black.otf"];
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(PRECACHE)).then(() => self.skipWaiting()));
@@ -15,7 +15,12 @@ self.addEventListener("fetch", (e) => {
   if (req.method !== "GET" || new URL(req.url).origin !== location.origin) return;
   const reseauDabord = req.mode === "navigate" || req.url.endsWith("config.js");
   if (reseauDabord) {
-    e.respondWith(fetch(req).then((r) => { const copie = r.clone(); caches.open(CACHE).then((c) => c.put(req, copie)); return r; }).catch(() => caches.match(req)));
+    // La page est rangée sous « ./ » quel que soit le lien (?9, ?ligue=…) : sans ça,
+    // hors réseau, un lien avec paramètres ne trouvait aucune copie et le service
+    // worker répondait « rien » (Safari : « Returned response is null »).
+    const cle = req.mode === "navigate" ? "./" : req;
+    e.respondWith(fetch(req).then((r) => { if (r.ok) { const copie = r.clone(); caches.open(CACHE).then((c) => c.put(cle, copie)); } return r; })
+      .catch(() => caches.match(cle, { ignoreSearch: true }).then((hit) => hit || Response.error())));
   } else {
     e.respondWith(caches.match(req).then((hit) => hit || fetch(req).then((r) => { if (r.ok) { const copie = r.clone(); caches.open(CACHE).then((c) => c.put(req, copie)); } return r; })));
   }
