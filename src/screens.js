@@ -130,6 +130,16 @@ export function niveauConversionCourant() { return `rejouer:${niveauPour("rejoue
 // Événement de funnel avec ses détails (colonne `details`, schema-v2.sql).
 function suivi(type, details = {}) { net.evenement(type, { pseudo: getPseudo() || null, ligue: ligue ? ligue.code : null, source: getSource(), details: { partie: getParties(), ...details } }); }
 
+// OÙ en est le joueur — pour savoir à quel endroit on quitte le jeu.
+export function ou() {
+  if (!loadingDone) return "chargement";
+  if (reviveSheet.classList.contains("visible")) return "mort";
+  if (pauseScreen.classList.contains("visible")) return "pause";
+  const ex = $("explication");
+  if (ex && !ex.classList.contains("hidden")) return "explication";
+  if (overlay.classList.contains("visible")) return endScreenEl.classList.contains("active") ? "fin" : `menu-${["", "pseudo", "ligue", "cycliste"][Number(onboarding.dataset.step)] || onboarding.dataset.step}`;
+  return deps && deps.isGameStartRequested && deps.isGameStartRequested() ? "course" : "menu";
+}
 export function getPseudo() { return pseudoInput.value.trim().replace(/^@+/, ""); }
 const instaInput = $("insta-input"), villeInput = $("ville-input");
 export function getInsta() { return instaInput.value.trim().replace(/^@+/, ""); }
@@ -184,8 +194,10 @@ function construireSkinUi() {
 
 // --- Menu en trois étapes ----------------------------------------------------
 const onboarding = $("onboarding");
+let derniereEtape = null;
 export function setStep(n) {
   if (enBeta() && n === 2) n = 3; // pas d'étape « ma ligue » en bêta : elle est imposée
+  if (n !== derniereEtape) { derniereEtape = n; suivi("menu_etape", { etape: ["", "pseudo", "ligue", "cycliste"][n] || n }); }
   onboarding.dataset.step = String(n); if (n === 3) construireSkinUi(); majSprint(); majBoutonJouer();
   requestAnimationFrame(centrerMenu);
 }
@@ -840,7 +852,7 @@ function fermerPartage() {
   partageSheet.setAttribute("aria-hidden", "true");
 }
 function partageFait(via) {
-  net.evenement("invitation_envoyee", { pseudo: getPseudo(), ligue: ligue ? ligue.code : null, source: getSource(), details: { via, integre: NAVIGATEUR_INTEGRE } });
+  net.evenement("invitation_envoyee", { pseudo: getPseudo(), ligue: ligue ? ligue.code : null, source: getSource(), details: { via, integre: NAVIGATEUR_INTEGRE, depuis: ou() } });
   // Démo : les potes fictifs n'arrivent qu'une fois le lien vraiment parti.
   if (demo) simulerArrivees();
 }
@@ -874,6 +886,7 @@ function initPartage() {
 // fin enverrait « …?ligue= » avec un code vide à tous ceux qui n'ont pas de
 // ligue (donc à tout le monde tant que la base n'est pas en place).
 async function partagerLigue(texte, texteSansLigue = "Viens jouer à « J'ai un pote », le jeu de PMC : plus on est de potes, plus on marque") {
+  suivi("partage_ouvert", { depuis: ou() });
   const vraie = !!(ligue && !ligue.enAttente && !demo && ligue.code);
   const code = vraie ? ligue.code : "";
   const url = vraie ? lienLigue(code) : (window.CONFIG.lienJeu || location.origin + location.pathname);
@@ -1073,6 +1086,7 @@ export function syncLoadingUi() {
     loadingDone = true;
     loadingBlock.classList.add("failed");
     loadingLabel.textContent = "Son indisponible, le jeu reste jouable";
+    suivi("chargement_fini", { secondes: Math.round((performance.now() - loadingT0) / 100) / 10, son: false });
     playButton.disabled = false;
     setTimeout(finSplash, 1500);
     return;
@@ -1084,7 +1098,7 @@ export function syncLoadingUi() {
   const pct = Math.round(p * 100);
   loadingFill.style.width = `${pct}%`;
   loadingLabel.textContent = `${ETAPES[Math.min(ETAPES.length - 1, Math.floor(p * ETAPES.length))]} · ${pct} %`;
-  if (p >= 1) { loadingDone = true; loadingBlock.classList.add("done"); finSplash(); majBoutonJouer(); }
+  if (p >= 1) { loadingDone = true; loadingBlock.classList.add("done"); finSplash(); majBoutonJouer(); suivi("chargement_fini", { secondes: Math.round((performance.now() - loadingT0) / 100) / 10, son: true }); }
 }
 // Le menu reste INERTE (ni tap ni focus possibles) tant que l'écran de
 // chargement est là, et jusqu'à la fin de son fondu : dans Instagram, le
@@ -1098,6 +1112,7 @@ function finSplash() {
 
 // --- Fin de partie -----------------------------------------------------------
 export function showEndScreen({ metres, potesMax, record, fin, sprint, scoreMax }) {
+  suivi("fin_vue", { score: Math.floor(metres), potes: potesMax, arrivee: !!fin, sprint: !!sprint, record: !!record, temps: Math.round(deps.tempsCourse ? deps.tempsCourse() : 0) });
   scoreVal.textContent = Math.floor(metres).toLocaleString("fr-FR");
   derniereCourse = { metres: Math.floor(metres), potes: potesMax, fin: !!fin };
   // Ligne d'encouragement (meilleur score à battre) et rappel du boost de
@@ -1213,6 +1228,7 @@ function openPauseMenu() {
   pauseScreen.classList.remove("reglages");
   pauseScreen.querySelector(".step-eyebrow").textContent = "Pause";
   pauseScreen.classList.add("visible");
+  suivi("pause", { temps: Math.round(deps.tempsCourse ? deps.tempsCourse() : 0) });
 }
 function closePauseMenu() {
   if (!deps.isManuallyPaused()) return;
@@ -1349,6 +1365,13 @@ export function init(d) {
   pseudoInput.addEventListener("keydown", (e) => { if (e.key === "Enter" && !step1Next.disabled) { e.preventDefault(); pseudoInput.blur(); step1Next.click(); } });
   brancherCentrage();
   syncPlay();
+  // Page cachée (appli quittée, onglet fermé, retour à Instagram) puis
+  // revenue : où, et à quel moment de la course. La dernière « cachée » d'une
+  // visite, c'est l'endroit où l'on a quitté le jeu.
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") suivi("cachee", { ou: ou(), temps: Math.round(deps.tempsCourse ? deps.tempsCourse() : 0) });
+    else suivi("revenue", { ou: ou() });
+  });
   // La boucle du début du morceau tourne pendant le menu : elle part au
   // PREMIER toucher (iOS n'autorise le son qu'après un geste), en phase de
   // capture pour passer avant tout stopPropagation des champs.

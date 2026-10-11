@@ -384,6 +384,20 @@ SONS.pschit = (ctx, out, t0, o) => {
   contour(g.gain, t0, [[0, 0], [0.03, 1], [0.5, 0.75], [1.5, 0]]);
   n.connect(hp); hp.connect(bp); bp.connect(g); g.connect(out);
 };
+// Le lampadaire détraqué qui grésille : un bourdon électrique sur sol (98 Hz,
+// la gamme du morceau) et ses harmoniques, haché de petits claquements.
+SONS.gresille = (ctx, out, t0, o) => {
+  const g = gain(ctx, 0);
+  contour(g.gain, t0, [[0, 0], [0.01, 1], [0.12, 0.6], [0.32, 0]]);
+  for (const [f, a] of [[98, 0.5], [196, 0.35], [392, 0.18]]) {
+    const osc = ctx.createOscillator(); osc.type = "sawtooth"; osc.frequency.value = f;
+    const ga = gain(ctx, a); osc.connect(ga); ga.connect(g); osc.start(t0); osc.stop(t0 + 0.35);
+  }
+  const n = sourceBruit(ctx, t0, 0.3, o.alea), bp = filtre(ctx, "bandpass", 3200, 1.2), gn = gain(ctx, 0);
+  contour(gn.gain, t0, [[0, 0], [0.005, 0.9], [0.03, 0], [0.09, 0], [0.095, 0.7], [0.12, 0], [0.2, 0], [0.205, 0.5], [0.23, 0]]);
+  n.connect(bp); bp.connect(gn); gn.connect(out);
+  g.connect(out);
+};
 // Le carillon des annonces (deux notes, rien de plus).
 SONS.carillon = (ctx, out, t0) => {
   for (const [dt, f] of [[0, n("B5")], [0.42, n("G5")]]) partiels(ctx, out, t0 + dt, [[f, 0.7, 0.5], [f * 2, 0.15, 0.25], [f * 4, 0.06, 0.15]], 0.004);
@@ -643,7 +657,7 @@ export const CIBLES = {
   aie: -18, // la voix du joueur : ~8 LU sous la musique, on l'entend à chaque choc
   botte: -24, ouf: -23, costard: -23, skieur: -23, bonhomme: -24, carambolage: -21,
   klaxon_contresens: -23, klaxon_voiture: -23, klaxon_bus: -23, klaxon_tracteur: -24, klaxon_chasseneige: -23, klaxon_buggy: -24,
-  sonnette: -25, atterrissage: -27, train: -20, rail: -29, pschit: -28, carillon: -28, quilles: -24,
+  sonnette: -25, atterrissage: -27, train: -20, rail: -29, pschit: -28, gresille: -34, carillon: -28, quilles: -24,
   oiseau: -33, grillon: -35, chouette: -33, mouette: -31, cri_mouette: -27, cloche: -29,
   // Continus, au niveau nominal (ambiance.js les module) : le vélo reste discret.
   couche_roulement: -33, roueLibre: -34, neigeRoule: -34, planches: -32, couche_vent: -36, couche_blizzard: -33, couche_vagues: -31,
@@ -655,7 +669,7 @@ export const NIVEAUX = {
   poule: 0.313, glousse: 0.549, meuh: 0.35, vache: 0.496, bee: 0.403, mouton: 0.646, groin: 0.513, cochon: 0.178, ouaf: 0.212, chien: 0.316,
   miaou: 0.149, chat: 0.168, botte: 0.676, ouf: 0.631, costard: 0.603, skieur: 0.575, bonhomme: 0.638, carambolage: 0.305, klaxon_contresens: 0.186,
   klaxon_voiture: 0.186, klaxon_bus: 0.162, klaxon_tracteur: 0.248, klaxon_chasseneige: 0.151, klaxon_buggy: 0.229, sonnette: 0.077,
-  atterrissage: 0.624, train: 0.26, rail: 0.422, pschit: 0.09, carillon: 0.108, quilles: 0.513, oiseau: 0.037, grillon: 0.066, chouette: 0.039,
+  atterrissage: 0.624, train: 0.26, rail: 0.422, pschit: 0.09, gresille: 0.05, carillon: 0.108, quilles: 0.513, oiseau: 0.037, grillon: 0.066, chouette: 0.039,
   mouette: 0.045, cri_mouette: 0.07, cloche: 0.052,
   couche_roulement: 0.182, roueLibre: 0.193, neigeRoule: 0.153, planches: 0.195, couche_vent: 0.074, couche_blizzard: 0.24, couche_vagues: 0.232,
   couche_jet: 0.211, couche_grondement: 0.589, couche_freins: 0.061, couche_boules: 0.417,

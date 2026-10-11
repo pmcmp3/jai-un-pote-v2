@@ -577,6 +577,7 @@ function requestGameStart(opts = {}) {
   game.sonAnnonce = screens.consommerAnnonceSon(); // la carte « Monte le son » vient de passer : le décompte ne le répète pas
   semerCourse();
   preparerJoueur();
+  net.evenement("course_debut", { pseudo: screens.getPseudo() || null, source: screens.getSource(), ligue: screens.getLigue() ? screens.getLigue().code : null, details: { partie: screens.getParties(), sprint: !!opts.sprint, rejouer: false } });
   if (screens.getParties() === 0) net.evenement("premiere_course", { pseudo: screens.getPseudo(), source: screens.getSource(), ligue: screens.getLigue() ? screens.getLigue().code : null });
   conseilReset();
   screens.compterPartie();
@@ -605,6 +606,7 @@ function resetRun() {
 }
 
 function restartGame(opts = {}) {
+  net.evenement("course_debut", { pseudo: screens.getPseudo() || null, source: screens.getSource(), ligue: screens.getLigue() ? screens.getLigue().code : null, details: { partie: screens.getParties(), sprint: !!opts.sprint, rejouer: true } });
   screens.preparerLigue();
   preparerJoueur();
   game.sprint = !!opts.sprint; // REJOUER après un sprint = une vraie course ; le menu peut relancer un sprint
@@ -679,7 +681,7 @@ function terminer() {
   if (record) screens.setRecord(game.metres);
   screens.showEndScreen({ metres: game.metres, potesMax: friends.maxReached(), record, fin: true, sprint: game.sprint, scoreMax: game.scoreMax });
   screens.finLigue(game.metres, friends.maxReached(), game.sprint ? "sprint" : "course", bilanCourse());
-  net.evenement("course_finie", { pseudo: screens.getPseudo(), source: screens.getSource(), ligue: screens.getLigue() ? screens.getLigue().code : null, details: { partie: screens.getParties(), score: Math.floor(game.metres), potes: friends.maxReached() } });
+  net.evenement("course_finie", { pseudo: screens.getPseudo(), source: screens.getSource(), ligue: screens.getLigue() ? screens.getLigue().code : null, details: { partie: screens.getParties(), score: Math.floor(game.metres), potes: friends.maxReached(), potesFin: friends.count(), temps: Math.round(Math.max(0, clock.now())) } });
 }
 
 function endGame(reason) {
@@ -1545,13 +1547,13 @@ function objetsDeLaRoute(items, from, to, now, tm, tAnim, vc, largeurRoute) {
           : row.kind === "skieur" ? props.drawSkieur(ctx, inst.K, u, vv, t, r)
           : row.kind === "buggy" ? props.drawBuggy(ctx, inst.K, u, vv, t, r)
           : row.kind === "pieton" ? props.drawPieton(ctx, inst.K, u, vv, t, r, rows.enPlage(r))
-          : row.kind === "mouette" ? props.drawStatic(ctx, "mouette", u, vv, t)
+          : row.kind === "mouette" ? props.drawStatic(ctx, "mouette", u, vv, t, r)
           : props.drawVoiture(ctx, inst.K, u, vv, -1, t));
         const ej = ejectes.get(r);
         if (ej) items.push({ d: scene.depth(0, ej.v), draw: () => dessinerEjecte(ej, inst.K, t, dessinA) });
         else items.push({ d: scene.depth(0, inst.v), draw: () => surSol(inst.v, () => dessinA(0, inst.v), true) });
         // Première mouette : le projecteur l'explique (une fois par joueur).
-        if (row.kind === "mouette" && !ej) { const p = scene.project(0, inst.v, rows.solAt(inst.v) + (inst.K.bas + inst.K.h) / 2); if (p.x < width * 0.82) projoLancer("mouette", p.x, p.y, Math.max(34, scene.scale() * 0.85)); projoSuivre("mouette", p.x, p.y); }
+        if (row.kind === "mouette" && !ej) { const p = scene.project(0, inst.v, rows.solAt(inst.v) + (rows.basObstacle("mouette", r) + rows.hauteurObstacle("mouette", r)) / 2); if (p.x < width * 0.82) projoLancer("mouette", p.x, p.y, Math.max(34, scene.scale() * 0.85)); projoSuivre("mouette", p.x, p.y); }
         if (debugAlertes) { const px = scene.project(0, inst.v, 0).x; if (px > 0 && px < width) { const e = debugAlertes.get(r) || { kind: row.kind, alerte: 0, vu: 0 }; e.vu += 1; debugAlertes.set(r, e); } }
       }
     }
@@ -1691,7 +1693,7 @@ function effetsDeScene(from, to, tm, tAnim) {
     for (const l of scene.lampsIn(from, to)) {
       const p = scene.project(l.u, l.v, l.h);
       const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, scene.scale() * 2.6);
-      g.addColorStop(0, `rgba(255,236,170,${0.55 * a})`);
+      g.addColorStop(0, `rgba(255,236,170,${0.55 * a * l.eclat})`);
       g.addColorStop(1, "rgba(255,236,170,0)");
       ctx.fillStyle = g;
       ctx.fillRect(p.x - scene.scale() * 2.6, p.y - scene.scale() * 2.6, scene.scale() * 5.2, scene.scale() * 5.2);
@@ -1974,6 +1976,7 @@ function frameInterne(nowMs) {
 }
 
 screens.init({
+  tempsCourse: () => (gameStarted ? Math.max(0, clock.now()) : 0),
   dessinerPeloton,
   game,
   requestGameStart,

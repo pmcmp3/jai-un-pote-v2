@@ -92,6 +92,19 @@ export function pas(dt, E) {
   gare(E, t);
   bowling(E, t);
   nature(E, t);
+  lampadaires(E, t);
+}
+// Les lampadaires détraqués grésillent quand ils clignotent, la nuit, à l'écran.
+const lampesEteintes = new Map();
+function lampadaires(E, t) {
+  if (E.nuit < 0.3) return;
+  for (const l of scene.lampsIn(Math.floor(E.v) - 2, Math.floor(E.v) + 12)) {
+    if (!l.cassee) continue;
+    const eteinte = l.eclat < 0.5, avant = lampesEteintes.get(l.v);
+    lampesEteintes.set(l.v, eteinte);
+    if (eteinte && avant === false) B.jouer("gresille", { pan: clamp(2 * E.ecranX(l.v) - 1, -0.6, 0.9), volume: 0.8 });
+  }
+  if (lampesEteintes.size > 40) lampesEteintes.clear();
 }
 
 // --- Le vélo ---------------------------------------------------------------------

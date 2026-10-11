@@ -12,7 +12,7 @@
 // l'axe vertical, via scene.drawBoxR.
 
 import { drawBox, drawShadow, drawFlat, drawDisque, getNight, project, groupe, echelle, teteVoxel } from "./scene.js";
-import { KINDS } from "./rows.js";
+import { KINDS, envolMouette } from "./rows.js";
 import { humain } from "./humains.js";
 
 const ROUSSE = "#b8612c", ROUSSE_AILE = "#8a4420";
@@ -442,7 +442,7 @@ function voitureNue(ctx, K, uCenter, v, sens, t, couleur = null) {
 // bascule — la personne, elle, ne doit pas changer de tête en tombant).
 export function drawStatic(ctx, kind, uCenter, r, t, graine = Math.round(r)) {
   if (kind === "costard" || kind === "fermier" || kind === "baigneur") { debout(ctx, kind, uCenter, r, t, graine); return; }
-  if (kind === "mouette") { groupe(ctx, () => drawMouette(ctx, uCenter, r, t)); return; }
+  if (kind === "mouette") { groupe(ctx, () => drawMouette(ctx, uCenter, r, t, graine)); return; }
   groupe(ctx, () => staticNu(ctx, kind, uCenter, r, t));
 }
 
@@ -450,12 +450,12 @@ export function drawStatic(ctx, kind, uCenter, r, t, graine = Math.round(r)) {
 // sa boîte de collision (KINDS.mouette : de `bas` à `h`) en battant des ailes
 // — une aile de chaque côté du corps, jamais imbriquée (scene.groupe). Son
 // ombre au sol dit où elle est.
-function drawMouette(ctx, u, r, t) {
+function drawMouette(ctx, u, r, t, rangee = Math.round(r)) {
   // Un GOÉLAND : dos et ailes gris ardoise, bouts noirs — le sombre se lit sur
   // le ciel clair de la plage, le blanc sur le reste. Un peu plus grand que
   // sa boîte n'en a l'air : il doit se voir de loin.
   const K = KINDS.mouette, ph = t * 11;
-  const hc = (K.bas + K.h) / 2 - 0.12 + Math.sin(t * 3.1) * 0.05;
+  const hc = (K.bas + K.h) / 2 + envolMouette(rangee) - 0.12 + Math.sin(t * 3.1) * 0.05;
   drawShadow(ctx, u, r, 0.4, 0.45, 0.16);
   drawBox(ctx, u - 0.2, r - 0.36, 0.4, 0.72, 0.28, "#f7f7f2", hc - 0.14);              // ventre et flancs
   drawBox(ctx, u - 0.16, r - 0.3, 0.32, 0.6, 0.06, "#5d6670", hc + 0.14);              // le dos, ardoise

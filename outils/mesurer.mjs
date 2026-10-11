@@ -130,7 +130,7 @@ for (const gr of graines) {
     mouettes += 1;
     armer(row, 0, 1); // elle vole : posée pour croiser la rangée r à t = 1
     const sous = route.checkMember("sol", r - 0.05, r, solAt(r), 1).some((e) => e.type === "obstacle");
-    const saut = route.checkMember("saut", r - 0.05, r, solAt(r) + 0.4, 1).some((e) => e.type === "obstacle");
+    const saut = route.checkMember("saut", r - 0.05, r, solAt(r) + 1.2, 1).some((e) => e.type === "obstacle");
     if (!sous && saut) mouettesOk += 1;
   }
 }

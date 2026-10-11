@@ -945,6 +945,14 @@ let masque = () => 0;
 export function setMasqueDecor(f) { masque = typeof f === "function" ? f : () => 0; }
 export const SANS_LAMPE = 1, DANS_HALLE = 2, SANS_DECOR = 4, ETALS = 8;
 function lampeIci(r) { return r % 12 === 3 && !(masque(r) & (SANS_LAMPE | DANS_HALLE)); }
+// Un lampadaire sur cinq est DÉTRAQUÉ : il clignote par à-coups irréguliers
+// (et grésille, ambiance.js). 1 = allumé, ~0 = éteint un instant.
+export function lampeCassee(r) { return hash(r * 91.7 + 3) < 0.2; }
+export function eclatLampe(r) {
+  if (!lampeCassee(r)) return 1;
+  const x = Math.sin(decorT * 17 + r) + Math.sin(decorT * 29.3 + r * 1.7) + 0.8 * Math.sin(decorT * 3.1 + r);
+  return x > 1.15 ? 0.06 : 1;
+}
 function poteauIci(r) { return r % 5 === 0 && !(masque(r) & DANS_HALLE) && !(masque(r + 5) & DANS_HALLE); }
 
 export function rowDecor(ctx, r, clear) {
@@ -1068,7 +1076,7 @@ export function rowDecor(ctx, r, clear) {
       drawBox(ctx, u - 0.3, v - 0.02, 0.4, 0.3, 0.5, "#3a3a40", LAMPE_H - 0.9);
       drawBox(ctx, u - 0.75, v - 0.04, 0.5, 0.34, 0.4, "#3a3a40", LAMPE_H - 0.5);
       drawBox(ctx, u - 1.0, v - 0.22, 0.42, 0.72, 0.22, "#4a4a52", LAMPE_H - 0.3);
-      drawBox(ctx, u - 0.98, v - 0.2, 0.38, 0.68, 0.1, night > 0.2 ? "#fff1b0" : "#d8d4c6", LAMPE_H - 0.4);
+      drawBox(ctx, u - 0.98, v - 0.2, 0.38, 0.68, 0.1, night > 0.2 ? (eclatLampe(r) > 0.5 ? "#fff1b0" : "#6b6650") : "#d8d4c6", LAMPE_H - 0.4);
     });
   }
   // Premier plan : herbes, fleurs, épis, clôture — jamais plus haut que la route.
@@ -1493,6 +1501,18 @@ function etalMarche(ctx, u, v, n, t) {
     ctx.fillStyle = "#0d0d10"; ctx.textAlign = "left"; ctx.textBaseline = "middle";
     ctx.fillText(txt, x + 6, y + h / 2 + 0.5);
     ctx.restore();
+  }
+  // Un marchand sur trois LANCE un légume par-dessus son étal (une courgette,
+  // ou une tomate) : il monte au-dessus de la bâche, retombe sur le bas-côté
+  // et y reste un instant avant d'être ramassé.
+  if (sorte === 1) {
+    const f = ((t * 0.36 + n * 0.29) % 1 + 1) % 1, vol = Math.min(1, f / 0.42);
+    if (f < 0.85) {
+      const tomate = n % 2 === 0, uSol = u - 0.45, vD = v + L * 0.72, vA = vD - 0.9;
+      const uu = uM + (uSol - uM) * vol, vv = vD + (vA - vD) * vol, hh = f < 0.42 ? 1.75 + 2.1 * Math.sin(Math.PI * vol) - 1.6 * vol : 0.08;
+      if (tomate) { drawBox(ctx, uu, vv, 0.32, 0.32, 0.3, "#e13e26", hh); drawBox(ctx, uu + 0.1, vv + 0.1, 0.12, 0.12, 0.06, "#2f7a2a", hh + 0.3); }
+      else drawBox(ctx, uu, vv - 0.36, 0.22, 0.72, 0.22, "#2f7a2a", hh);
+    }
   }
 }
 // Une pastèque entière : un gros ovale vert foncé zébré.
@@ -1940,13 +1960,67 @@ export function drawBosse(ctx, d, geo, rFrom = -Infinity, rTo = Infinity, couche
       ruban(0, 0.42, teintes("#c9d2dc", 0).plat);
       ruban(0, 0.3, teintes("#f6f8fa", 0).plat);
     });
+    // Au milieu du plateau, creusée dans le versant : la grotte du YÉTI.
+    const vC = d + long / 2;
+    if (vC > rFrom - 4 && vC < rTo + 4) caverneYeti(ctx, vC, sol(vC));
   }
+}
+// La GROTTE DU YÉTI, peinte à plat sur le versant enneigé de la colline (le
+// grand blanc du bas de l'écran) : une bouche sombre en marches, bordée de
+// neige, la lueur d'un feu de camp, et le yéti qui grelotte en se chauffant
+// les mains. Tout en rectangles, comme le reste du jeu en cubes.
+function caverneYeti(ctx, v, hPlateau) {
+  // Placée par l'ÉCRAN : au tiers haut du blanc visible, sous la crête (on
+  // cherche la hauteur du versant qui tombe là). Plus bas, trop près de la
+  // caméra, elle traverserait l'écran en un éclair.
+  const sur = (h) => { const uS = -ROAD_HALF - (hPlateau - h) * PENTE_VERSANT; return { uS, p: project(uS, v, h) }; };
+  const yCrete = project(-ROAD_HALF, v, hPlateau).y, cibleY = yCrete + 0.36 * (H - yCrete);
+  let lo = 0, hi = hPlateau;
+  for (let i = 0; i < 24; i++) { const m = (lo + hi) / 2; if (sur(m).p.y > cibleY) lo = m; else hi = m; }
+  const { uS, p: c } = sur((lo + hi) / 2), t = decorT;
+  const R = Math.min(1.5 * echelle(uS), 0.2 * (H - yCrete));
+  if (c.y - R > H || c.x + 2 * R < 0 || c.x - 2 * R > W) return;
+  const rect = (x, y, w, h, col) => { ctx.fillStyle = col; ctx.fillRect(Math.round(c.x + x * R), Math.round(c.y + y * R), Math.ceil(w * R), Math.ceil(h * R)); };
+  ctx.save();
+  // Bourrelet de neige autour de la bouche, puis la bouche en arche à marches.
+  const neige = teintes("#f6f8fa", 0).plat;
+  rect(-1.25, -0.95, 2.5, 1.65, neige); rect(-1.05, -1.15, 2.1, 0.25, neige); rect(-0.7, -1.3, 1.4, 0.2, neige);
+  const noir = "#1b1f2b";
+  rect(-0.95, -0.35, 1.9, 0.95, noir); rect(-0.8, -0.6, 1.6, 0.3, noir); rect(-0.55, -0.8, 1.1, 0.25, noir); rect(-0.3, -0.92, 0.6, 0.15, noir);
+  // La lueur du feu, qui vacille, dans la bouche seulement.
+  const vac = 0.75 + 0.25 * Math.sin(t * 13) * Math.sin(t * 7.3 + 1);
+  ctx.save();
+  ctx.beginPath(); ctx.rect(c.x - 0.95 * R, c.y - 0.92 * R, 1.9 * R, 1.52 * R); ctx.clip();
+  const g = ctx.createRadialGradient(c.x - 0.25 * R, c.y + 0.45 * R, 0, c.x - 0.25 * R, c.y + 0.45 * R, 1.1 * R);
+  g.addColorStop(0, `rgba(255,170,70,${0.75 * vac})`); g.addColorStop(1, "rgba(255,120,40,0)");
+  ctx.fillStyle = g; ctx.fillRect(c.x - R, c.y - R, 2 * R, 2 * R);
+  ctx.restore();
+  // Le feu : deux bûches en croix, trois flammes qui dansent.
+  rect(-0.5, 0.45, 0.5, 0.08, "#5a3a1f"); rect(-0.42, 0.4, 0.34, 0.07, "#6b4526");
+  [[-0.42, "#ff7a1a", 0.32], [-0.3, "#ffcf2e", 0.42], [-0.18, "#ff7a1a", 0.28]].forEach(([x, col, hmax], i) => {
+    const hh = hmax * (0.65 + 0.35 * Math.sin(t * (11 + i * 3) + i * 2));
+    rect(x, 0.42 - hh, 0.12, hh, col);
+  });
+  // Le yéti, assis à droite du feu, qui grelotte : fourrure blanche, visage
+  // bleu-gris, bras tendus vers les flammes.
+  const tr = Math.sin(t * 38) * 0.015;
+  const fourrure = "#eef2f6", ombre = "#c9d3dd";
+  rect(0.12 + tr, -0.2, 0.55, 0.78, fourrure);                 // corps
+  rect(0.12 + tr, 0.36, 0.55, 0.22, ombre);                    // jambes repliées
+  rect(0.2 + tr, -0.55, 0.42, 0.4, fourrure);                  // tête
+  rect(0.24 + tr, -0.45, 0.3, 0.22, "#8fa3b8");                // visage
+  rect(0.27 + tr, -0.41, 0.06, 0.06, "#14161c"); rect(0.43 + tr, -0.41, 0.06, 0.06, "#14161c"); // yeux
+  rect(0.32 + tr, -0.3, 0.14, 0.04, "#14161c");                // bouche qui claque des dents
+  rect(-0.12 + tr, 0.05, 0.28, 0.12, fourrure);                // bras vers le feu
+  rect(-0.17 + tr, 0.05, 0.08, 0.1, "#8fa3b8");                // la main
+  for (let i = 0; i < 4; i++) rect(0.12 + i * 0.14 + tr, -0.25, 0.07, 0.07, fourrure); // fourrure hirsute
+  ctx.restore();
 }
 
 // Lampadaires visibles (halos peints par-dessus la nuit, main.js).
 export function lampsIn(from, to) {
   const out = [];
-  for (let r = from; r <= to; r++) if (lampeIci(r)) out.push({ u: ROAD_HALF - 0.2, v: r, h: LAMPE_H - 0.2 });
+  for (let r = from; r <= to; r++) if (lampeIci(r)) out.push({ u: ROAD_HALF - 0.2, v: r, h: LAMPE_H - 0.2, eclat: eclatLampe(r), cassee: lampeCassee(r) });
   return out;
 }
 

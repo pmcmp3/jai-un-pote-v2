@@ -812,6 +812,9 @@ const SCENES = {
       await aller(d + dv);
       await attendre(1200); await photo(nom);
     }
+    // La grotte du yéti, au milieu du plateau : une rafale d'images au passage.
+    await aller(d + 31);
+    for (let k = 0; k < 6; k++) { await attendre(160); await photo(`49k-grotte-yeti-${k}`); }
     // L'arrivée de la neige (plaques sur la prairie), la bataille de boules de
     // neige, le skieur qui file au fond.
     const z = await course(() => { const p = window.__pote; let a = null, enf = null, sk = null; for (let r = 200; r < 3000; r++) { if (p.rows.enMontagne(r)) { if (a === null) a = r; if (enf === null && r % 29 === 11 && r > a + 10) enf = r; if (sk === null && r % 97 === 50) sk = r; } } return { a, enf, sk }; });

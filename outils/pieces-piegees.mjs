@@ -67,7 +67,7 @@ for (const seed of graines) {
         if (q <= v + 1) continue;
         const rq = route.rowAt(q);
         const K = KINDS[row.kind];
-        const sous = (h) => (K.aerien ? h - solAt(q) > K.bas - 0.3 : true) && h - solAt(q) < K.h + 0.3; // la mouette vole au-dessus du sol
+        const sous = (h) => (K.aerien ? h - solAt(q) > R.basObstacle(row.kind, r) - 0.3 && h - solAt(q) < R.hauteurObstacle(row.kind, r) + 0.3 : h - solAt(q) < K.h + 0.3); // la mouette vole au-dessus du sol
         if (rq.lait !== undefined && sous(rq.lait)) {
           const cle = `${seed}:${q}:lait`;
           if (!vuesBalayage.has(cle)) { vuesBalayage.add(cle); laitsBalayes += 1; if (exemples.length < 12) exemples.push(`graine ${seed} · LAIT rangée ${q} traversé par ${row.kind} · t ${now.toFixed(1)} s`); }
@@ -101,7 +101,7 @@ for (const seed of graines) {
         const dessus = hauteurAFranchir(row.kind) + solAt(centre);
         if (rouesMax >= dessus) continue;
         // La mouette plane : on peut aussi la prendre en passant DESSOUS.
-        if (KINDS[row.kind].aerien && Math.max(solAt(q), h - CORPS_CENTRE - CORPS_DEMI) + R.HAUT_CYCLISTE <= KINDS[row.kind].bas + solAt(centre)) continue;
+        if (KINDS[row.kind].aerien && Math.max(solAt(q), h - CORPS_CENTRE - CORPS_DEMI) + R.HAUT_CYCLISTE <= R.basObstacle(row.kind, r) + solAt(centre)) continue;
         if (lait) { laitsPieges += 1; if (exemples.length < 12) exemples.push(`graine ${seed} · LAIT rangée ${q} dans ${row.kind}`); break; }
         piegees += 1;
         parEspece[row.kind] = (parEspece[row.kind] || 0) + 1;

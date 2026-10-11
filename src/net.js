@@ -129,9 +129,22 @@ export async function classementSprint(jour) {
 }
 
 // Événements du funnel : fire-and-forget.
+// Chaque événement porte la VISITE (une par chargement de page) et le JOUEUR
+// (identifiant anonyme gardé dans le téléphone) : le tableau de bord en tire
+// les parcours, les durées et l'endroit où l'on quitte. `keepalive` : l'envoi
+// part même quand la page se ferme. `window.__evenements` garde la liste de la
+// visite (tests et ?debug), base branchée ou non.
+const VISITE = Math.random().toString(36).slice(2, 10);
+function joueurId() {
+  try { let j = localStorage.getItem("jp2Joueur"); if (!j) { j = Math.random().toString(36).slice(2, 10); localStorage.setItem("jp2Joueur", j); } return j; } catch (e) { return null; }
+}
 export function evenement(type, infos = {}) {
+  const ligne = { type, ...infos, details: { ...(infos.details || {}), visite: VISITE, joueur: joueurId(), depuisChargement: Math.round(performance.now() / 1000) } };
+  (window.__evenements = window.__evenements || []).push(ligne);
   if (!configured()) return;
-  post("evenements", { type, ...infos }).then(() => {}, () => {});
+  try {
+    fetch(url("evenements"), { method: "POST", keepalive: true, headers: headers({ Prefer: "return=minimal" }), body: JSON.stringify(ligne) }).catch(() => {});
+  } catch (e) { /* pas de réseau */ }
 }
 
 // Retour d'un testeur (bêta fermée) : écrit depuis l'écran de fin, lié au

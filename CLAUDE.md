@@ -73,7 +73,7 @@ intégré d'Instagram d'abord**, portrait natif.
   de soleil, baigneurs, buggys). Véhicules en face (voiture, car, tracteur, chasse-neige, buggy),
   piétons en groupes grandissants.
 - **Mouettes** (dès ~70 s, les 100 dernières secondes) : elles VOLENT vers le joueur (type « contresens », panneau
-  attention) juste au-dessus de la tête (famille « sol » : on passe DESSOUS en roulant, le
+  attention) au-dessus de la tête, à DEUX hauteurs (`envolMouette` : bas à 2,4 ou 2,9) (famille « sol » : on passe DESSOUS en roulant, le
   moindre saut s'y cogne), pièces au sol de part et d'autre. Projecteur à la première
   (« Attention, les mouettes ! »). Posées entre deux obstacles sans double saut (⚠️ jamais à
   côté d'un véhicule à double saut) et dans les groupes de piétons, 4 fois sur 5 : 4 à 10 par
@@ -81,6 +81,11 @@ intégré d'Instagram d'abord**, portrait natif.
   + 0,4 s : avec la retombée d'un simple tap et 0,3 s, un joueur qui tenait son saut retombait
   dans la mouette (vécu par l'artiste ; le « joueur maladroit » de `mesurer.mjs` en touchait
   107 sur 20 graines, 0 maintenant — vérifié par le test `regles`).
+- ⚠️ **Toutes les pièces sont prenables** : aucune pièce AU SOL entre le décollage et
+  l'atterrissage d'un obstacle (rows.js, étape 4 ter). Mesuré par `outils/pieces-timing.mjs` :
+  le joueur parfait n'en prenait que 95,9 % ; 100 % maintenant (le bouchon se prend par un
+  PETIT saut sur la première voiture, puis on roule sur les toits — le score parfait,
+  `simulation.js`, suit ce chemin). Une erreur de timing de ±0,1 s garde 99 % des pièces.
 - **Bouchon** (3 voitures garées, on roule sur les toits) DEUX fois : vers 85 s et 15 s avant
   la fin, les trois voitures sur une route libre et plate.
 - ⚠️ **Quitter un obstacle n'est pas un choc** (checkMember) : rouler hors du toit de la
@@ -144,6 +149,10 @@ intégré d'Instagram d'abord**, portrait natif.
   disponible mais n'est plus utilisé.
 - **La neige s'annonce** : plaques de neige sur 45 rangées avant et après la montagne
   (`plaqueNeige`) ; enfants qui se lancent des boules de neige ; un skieur qui file au fond.
+- **Détails** : un lampadaire sur cinq détraqué (il clignote et grésille la nuit,
+  `eclatLampe`, son `gresille`) ; au marché, un marchand sur trois lance une tomate ou une
+  courgette par-dessus son étal ; sur le versant de la colline enneigée, la grotte d'un yéti
+  qui se chauffe au feu (`caverneYeti`, placée par l'écran : au tiers haut du blanc visible).
 - **Bowling** : un joueur de dos au départ de chaque piste (il lance quand la boule part),
   vraies boules sombres à trois trous.
 - **Traînée du salto** : un trait blanc qui suit la tête pendant le tour (plus de copies
@@ -190,6 +199,17 @@ intégré d'Instagram d'abord**, portrait natif.
 - **HUD** : les points au centre de l'ÉCRAN (ils rapetissent plutôt que de toucher les blocs).
 - **Écran de fin** : « Il te manque X pts pour passer devant @pseudo » (ou « La couronne est à
   toi »), sous le rang.
+- **Suivi** (`net.evenement`) : chaque événement porte `details.visite` (un chargement de
+  page) et `details.joueur` (identifiant anonyme, `jp2Joueur`), part en `keepalive`, et reste
+  dans `window.__evenements` (tests, base absente). Événements : arrivee, chargement_fini,
+  menu_etape, inscription, course_debut, premiere_course, pause, mort, mort_choix,
+  course_finie, porte_vue, clic_album, clic_suivre, ecouter_album, continuer, rejouer,
+  fin_vue, partage_ouvert, invitation_envoyee (avec `depuis`), invitation_ouverte,
+  invitation_acceptee, cachee/revenue (avec `ou` : chargement, menu-…, explication, course,
+  pause, mort, fin), retour_beta.
+- **Tableau de bord** : `public/tableau-de-bord.html` (en ligne à côté du jeu), lit les vues
+  AGRÉGÉES de `supabase/tableau-de-bord.sql` (jamais un pseudo) ; `?exemple` = chiffres
+  inventés, signalés. ⚠️ Vide tant que la base v2 n'existe pas.
 - **Fantôme** du meilleur de la ligue : en sommeil (la trace part avec le score ; le
   chargement `chargerFantome` est à rebrancher quand la base existera).
 - **Porte de conversion** (`niveauPour`) : une demande à la fois — l'album d'abord, puis
@@ -213,6 +233,7 @@ chaque choc payé vibre.
 ## Points ouverts
 
 - **Base Supabase v2** à créer par l'artiste (ARCHITECTURE §5), puis **sous-domaine** (§4).
+  Après `schema-v2.sql`, exécuter `supabase/tableau-de-bord.sql` (les vues du tableau de bord).
   Avec elle : envoyer l'Insta (et le village) avec le score, sinon on ne peut prévenir personne.
 - **À juger sur un vrai téléphone** : clavier iOS dans Instagram, partage dans les navigateurs
   intégrés, lien `instagram://` vers @pmc.mp3, les sons à l'oreille.

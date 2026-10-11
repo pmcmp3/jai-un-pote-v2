@@ -28,10 +28,14 @@ function montees(C) {
 // Ce que demande une rangée : null, "tap", "haut" ou "double". Les pièces en
 // l'air DESSINENT l'arc d'un obstacle voisin : le pilote ne les vise pas
 // séparément, il les ramasse en sautant.
-function cibleDe(route, r) {
+// Le bouchon : un PETIT saut sur le toit de la première voiture, puis on roule
+// sur les toits (« roule » : rien à faire, sans viser plus loin). La mouette :
+// on passe dessous (« sol »).
+function cibleDe(route, r, surToit) {
   const row = route.rowAt(r);
-  if (row.type !== "safe") return familleDe(row.kind);
-  return null;
+  if (row.type === "safe") return null;
+  if (row.bouchon !== undefined) return surToit ? "roule" : row.bouchon === 0 ? "tap" : familleDe(row.kind);
+  return familleDe(row.kind);
 }
 
 export function scoreParfait(seed, potesMax) {
@@ -57,8 +61,9 @@ export function scoreParfait(seed, potesMax) {
     // Pilote : au sol, il vise la prochaine cible et part au bon moment.
     if (jumpY <= sol + 0.02 && !plan) {
       for (let r = Math.floor(v) + 1; r <= Math.floor(v) + REGARD; r++) {
-        const c = cibleDe(route, r);
+        const c = cibleDe(route, r, sol > solAt(v) + 0.5);
         if (!c) continue;
+        if (c === "roule" || c === "sol") break;
         if (r - v <= vitesse * montee(c)) {
           plan = { r, type: c };
           jumpY = sol + 0.001; vy = C.sautVitesse; doubled = false; tHaut = 0; stats.sauts += 1;

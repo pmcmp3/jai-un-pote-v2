@@ -972,3 +972,24 @@ une couronne »), l'écart au suivant sur l'écran de fin, la vibration, le dép
 - Carte « Joue avec tes potes » : « Plus tu as de potes dans ta ligue qui jouent au jeu, plus
   tu as de chances de faire le meilleur score. »
 
+## 11 octobre 2026 (suite) — détails, mouettes, pièces, suivi
+
+- « Un lampadaire qui bugue de temps en temps avec le sound design qui va avec » → un sur
+  cinq clignote et grésille (bourdon sur sol 98 Hz).
+- « Au marché, quelqu'un qui lance une courgette par-dessus son stand ou des tomates » → fait.
+- « Une fausse cavité entourée de neige [...] une grotte avec un yeti dedans en train de se
+  faire un feu » → sur le versant de la colline. Premier essai invisible : posée trop bas sur
+  le versant, trop près de la caméra, elle passait sous l'écran ; placée par l'écran au tiers
+  haut du blanc, elle reste ~1 s à l'image.
+- « Les mouettes un peu plus haut [...] varier la hauteur » → deux hauteurs (2,4 et 2,9 au
+  lieu de 2,2), toujours infranchissables en sautant, jamais gênantes au sol.
+- « Il y a des moments où on ne peut pas prendre du tout toutes les pièces » → mesuré
+  (`outils/pieces-timing.mjs`) : le timing n'y était pour rien (±0,1 s garde 99 %), mais le
+  joueur PARFAIT ne prenait que 95,9 % des pièces — des pièces au sol posées là où l'on est
+  forcément en l'air. Retirées : 100 %. Le score parfait suit le bon chemin du bouchon.
+- « Je veux des tracking partout [...] un dashboard » → visite et joueur anonymes sur chaque
+  événement, nouveaux événements (chargement, étapes du menu, chaque course, pause, écran de
+  fin, partage et d'où, page quittée avec l'endroit), vues agrégées SQL, page
+  `tableau-de-bord.html`. Rien n'arrive tant que la base v2 n'existe pas.
+- `VERSION_COURSE` 26.
+

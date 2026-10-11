@@ -103,7 +103,8 @@ export const KINDS = {
   // dans la dernière minute, jamais à côté d'un double saut (etendreDangers).
   // Elle VOLE vers le joueur (vitesse > voiture en face), annoncée par le
   // panneau « attention ».
-  mouette: { aerien: true, contresens: true, cout: 1, vitesse: 3.2, arme: 5.5, long: 1.0, larg: 0.9, bas: 2.2, h: 2.9, nom: "une mouette" },
+  // Deux hauteurs de vol (envolMouette) : basse, ou un demi-mètre plus haut.
+  mouette: { aerien: true, contresens: true, cout: 1, vitesse: 3.2, arme: 5.5, long: 1.0, larg: 0.9, bas: 2.4, h: 3.1, nom: "une mouette" },
 };
 
 // ⚠️ Les hauteurs `h` sont mesurées sur les DESSINS (capture.mjs hitbox, qui
@@ -129,7 +130,12 @@ export const HAUT_CYCLISTE = 1.9;
 // saute plus bas, jamais plus haut que K.h. Le planificateur (simulation,
 // joueur idéal) garde hauteurAFranchir, le cas le plus haut.
 const HUMAINS = new Set(["pieton", "costard", "fermier", "baigneur", "skieur"]);
-export function hauteurObstacle(kind, r) { return HUMAINS.has(kind) ? KINDS[kind].h * tailleObstacle(r) + MARGE_H : hauteurAFranchir(kind); }
+export function hauteurObstacle(kind, r) { return HUMAINS.has(kind) ? KINDS[kind].h * tailleObstacle(r) + MARGE_H : hauteurAFranchir(kind) + (kind === "mouette" ? envolMouette(r) : 0); }
+// La mouette de la rangée r vole à sa hauteur de base, ou un demi-mètre plus
+// haut (une sur deux, au hasard de la rangée) : pas toujours exactement pareil.
+export function envolMouette(r) { const x = Math.sin(Math.round(r) * 12.9898) * 43758.5453; return x - Math.floor(x) < 0.5 ? 0 : 0.5; }
+// Bas d'un obstacle qui VOLE (sous lui, on passe en roulant).
+export function basObstacle(kind, r) { return (KINDS[kind].bas || 0) + (kind === "mouette" ? envolMouette(r) : 0); }
 // Demi-longueur d'un obstacle LE LONG DE LA ROUTE (un traversant barre la
 // route sur sa largeur, pas sur sa longueur).
 export function demiLongueurRoute(kind) {
@@ -755,6 +761,22 @@ export class Route {
       const hToit = KINDS.voiture.h + MARGE_H + PIECE_SOL;
       for (const k of [1, 2, 4, 5]) { const q = rb + k; const row = q - r0 >= 0 && q - r0 < BLOC ? rowsBloc[q - r0] : null; if (row) row.coins = []; pose(q, hToit, false); }
     }
+    // 4 ter. Aucune pièce AU SOL là où le joueur est forcément en l'air pour
+    //    franchir un obstacle (entre son décollage et son atterrissage) : elle
+    //    serait imprenable — mesuré : 4 % des pièces l'étaient, même pour le
+    //    joueur parfait (outils/pieces-timing.mjs).
+    for (let p = -12; p < BLOC + 12; p++) {
+      const kind = this.dangers.get(r0 + p);
+      // Le bouchon se prend par un PETIT saut sur la première voiture, puis on roule.
+      const rangBouchon = this.bouchons.get(r0 + p);
+      if (!kind || (rangBouchon !== undefined && rangBouchon > 0) || familleDe(kind) === "sol") continue;
+      const f = rangBouchon === 0 ? "tap" : familleDe(kind), vit = Math.max(1, vitesseAuRang(r0 + p));
+      const a = Math.floor(r0 + p - montee(f) * vit), b = Math.ceil(r0 + p + retombee(f) * vit);
+      for (let q = a + 1; q < b; q++) {
+        const row = rowsBloc[q - r0];
+        if (row && row.type === "safe" && row.coins.length && row.coins[0] - solAt(q) < PIECE_SOL + 0.3) { row.coins = []; row.double = false; }
+      }
+    }
     // 5. Lait et grosse pièce sur leurs rangées réservées, sinon au plus près.
     // Le lait et la grosse pièce se posent sur une rangée LIBRE et à l'écart :
     // jamais sur un arc (ça y ferait un trou) ni collée à un obstacle (elle
@@ -815,7 +837,7 @@ export class Route {
         if (d <= demi + 0.4 || d > balayageVisible(r, kind)) continue;
         // La mouette vole au-dessus : seules les pièces à SA hauteur sont traversées.
         const hc = row.coins[0] - solAt(q);
-        if (K.aerien ? hc > K.bas - 0.3 && hc < K.h + 0.3 : hc < K.h + 0.3) { row.coins = []; row.double = false; break; }
+        if (K.aerien ? hc > basObstacle(kind, r) - 0.3 && hc < hauteurObstacle(kind, r) + 0.3 : hc < K.h + 0.3) { row.coins = []; row.double = false; break; }
       }
     }
     for (let p = 0; p < BLOC; p++) { const r = r0 + p; if (!this.cache.has(r) && !this.dansFenetre(r)) this.cache.set(r, rowsBloc[p]); }
@@ -908,7 +930,7 @@ export class Route {
       if (prevV > centre - demi && v - centre >= demi) continue;
       const haut = hauteurObstacle(row.kind, r) + solAt(centre);
       if (jumpY >= haut) continue;
-      if (K.aerien && jumpY + HAUT_CYCLISTE <= K.bas + solAt(centre)) continue; // passé dessous
+      if (K.aerien && jumpY + HAUT_CYCLISTE <= basObstacle(row.kind, r) + solAt(centre)) continue; // passé dessous
       this.resolved.add(key);
       events.push({ type: "obstacle", kind: row.kind, cout: K.cout, franchir: familleDe(row.kind), r, haut });
     }
