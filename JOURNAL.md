@@ -956,3 +956,19 @@ une couronne »), l'écart au suivant sur l'écran de fin, la vibration, le dép
 - Filet : 14 tests verts (`perf` compris). `ecraser` rendu robuste (départ trop bas, colline
   oubliée, bête longue survolée à pleine vitesse : des défauts du test, pas du jeu).
 
+## 11 octobre 2026 — « Le jeu est encore trop facile »
+
+- « J'ai fait 12 000 points, et vraiment, en one shot, je n'ai pas réussi à mourir. Donc,
+  augmente la difficulté, s'il te plaît. C'est le plus important. »
+- Cause mesurée (`outils/difficulte.mjs`, nouveau) : on ne meurt que d'un choc sans pote, et
+  après ~55 s chaque pote perdu se rachetait 6 à 22 pièces pour ~200 pièces ramassées — un
+  bon joueur ne pouvait pas mourir. Le joueur qui rate 5 % des obstacles mourait dans 7 % des
+  courses.
+- Changé : vitesse max 2,6 → 2,9, finale 5,0 → 5,6 ; paquet « finale » un paquet plus tôt ;
+  mouettes sur les 100 dernières secondes au lieu de 60 ; +1 pote par choc dès 30 % (50 %
+  avant), +2 dès 65 % (80 %) ; rachat 12 → 35 pièces (6 → 22). Résultat : 23 % de morts à 5 %
+  de ratés, 63 % à 10 %. Le joueur idéal passe toujours tout, le maladroit ne touche aucune
+  mouette. `VERSION_COURSE` 25.
+- Carte « Joue avec tes potes » : « Plus tu as de potes dans ta ligue qui jouent au jeu, plus
+  tu as de chances de faire le meilleur score. »
+

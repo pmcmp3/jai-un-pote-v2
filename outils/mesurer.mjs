@@ -103,7 +103,7 @@ function course(seed, pilote, maladroit = false) {
   }
   // Sur la ligne d'arrivée, un obstacle peut être touché (le vélo l'aborde)
   // avant que la course s'arrête au milieu de lui : il compte comme rencontré.
-  for (const r of touchesR) if (r > Math.floor(v + 0.5)) { obstacles += 1; comptes[route.rowAt(r).kind] = (comptes[route.rowAt(r).kind] || 0) + 1; }
+  for (const r of touchesR) if (r > v) { obstacles += 1; comptes[route.rowAt(r).kind] = (comptes[route.rowAt(r).kind] || 0) + 1; }
   return { touches, obstacles, pieces, tPotes, parEspece, apexMax, comptes };
 }
 const idem = graines.map((gr) => course(gr, true));

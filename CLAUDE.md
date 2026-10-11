@@ -72,7 +72,7 @@ intégré d'Instagram d'abord**, portrait natif.
   bonhommes), **bouchon** de voitures garées, **plage** sur les 30 dernières secondes (coucher
   de soleil, baigneurs, buggys). Véhicules en face (voiture, car, tracteur, chasse-neige, buggy),
   piétons en groupes grandissants.
-- **Mouettes** (dernière minute) : elles VOLENT vers le joueur (type « contresens », panneau
+- **Mouettes** (dès ~70 s, les 100 dernières secondes) : elles VOLENT vers le joueur (type « contresens », panneau
   attention) juste au-dessus de la tête (famille « sol » : on passe DESSOUS en roulant, le
   moindre saut s'y cogne), pièces au sol de part et d'autre. Projecteur à la première
   (« Attention, les mouettes ! »). Posées entre deux obstacles sans double saut (⚠️ jamais à
@@ -95,9 +95,13 @@ intégré d'Instagram d'abord**, portrait natif.
 ### Pièces, potes, turbo
 - Les pièces **dessinent le geste** (arc au-dessus de chaque obstacle), pièce double au sommet
   d'un double saut. Paliers de potes, rachat et coût des chocs : `config.js`.
-- **Difficulté qui monte** : vitesse finale 5,0 (on lit moins longtemps ce qui arrive), un choc
-  coûte +1 pote après la moitié de la course et +2 sur le dernier cinquième
-  (`chocPlusDeuxApres`), racheter un pote coûte jusqu'à 22 pièces en fin de course.
+- **Difficulté qui monte** : vitesse max 2,9 puis finale 5,6 (on lit moins longtemps ce qui
+  arrive), le paquet « finale » (presque tout roule) dès le 4e paquet, un choc coûte +1 pote
+  dès 30 % de la course et +2 dès 65 % (`chocPlusDeuxApres`), racheter un pote coûte 12 puis
+  jusqu'à 35 pièces. Mesuré par `outils/difficulte.mjs` (joueur qui rate 5/10/15/20 % des
+  obstacles, vraie économie) : à 5 % de ratés il meurt dans 23 % des courses (7 % avant), à
+  10 % dans 63 % (40 % avant). ⚠️ Mourir = un choc SANS pote : tant que le rachat est bon
+  marché, un bon joueur est immortel — c'est l'économie qu'il faut regarder d'abord.
 - **Multiplicateur ENTIER** (`regles.multiplicateur`) : 3 potes = ×3, 5 potes = ×5, ×1 en
   dessous de deux ; ×2 en plus au turbo. Jamais de demi-multiplication à l'écran (le boost de
   ligue, lui, reste en pourcentage). Un choc coûte des potes ; seul le joueur meurt.

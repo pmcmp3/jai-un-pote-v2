@@ -438,11 +438,11 @@ const PAQUETS = [
 // Seuls (~35 s), par deux (~75 s), par trois (~2 min), par quatre sur la
 // plage — la route se remplit à vue d'œil.
 function taillePietons(d) { return d < 3 ? 1 : d < 5 ? 2 : d < 6 ? 3 : 4; }
-// MOUETTES : sur les MOUETTES_DERNIERES_S dernières secondes, MOUETTES_PART
+// MOUETTES : sur les MOUETTES_DERNIERES_S dernières secondes (dès ~70 s), MOUETTES_PART
 // des places possibles. Avant et après elle, MOUETTE_GRACE_S de plus que la
 // physique : retomber un peu tard, ou sauter un peu tôt l'obstacle suivant,
 // ne doit pas suffire à la toucher — c'est sauter POUR RIEN qui est puni.
-const MOUETTES_DERNIERES_S = 60, MOUETTES_PART = 0.8, MOUETTE_GRACE_S = 0.4;
+const MOUETTES_DERNIERES_S = 100, MOUETTES_PART = 0.8, MOUETTE_GRACE_S = 0.4;
 function graceMouette(r) { return Math.ceil(MOUETTE_GRACE_S * vitesseAuRang(r)); }
 // Avant la mouette, on compte la retombée d'un saut TENU au moins : un joueur
 // qui garde l'appui sur une petite bête retombe plus loin que le tap prévu,
@@ -455,7 +455,7 @@ function ecartAvantMouette(kind, v) {
 const PIETONS_GRACE = 1;
 // La course devient difficile dès ~40 s : 12 obstacles de départ, 12
 // intermédiaires, 36 de fin, puis la finale.
-function paquetPour(d) { return PAQUETS[d < 1 ? 0 : d < 2 ? 1 : d < 5 ? 2 : 3]; }
+function paquetPour(d) { return PAQUETS[d < 1 ? 0 : d < 2 ? 1 : d < 4 ? 2 : 3]; }
 function estDouble(kind) { return familleDe(kind) === "double"; }
 
 // --- Chacun dans son décor ---------------------------------------------------------
