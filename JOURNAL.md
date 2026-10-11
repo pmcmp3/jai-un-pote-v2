@@ -993,3 +993,12 @@ une couronne »), l'écart au suivant sur l'écran de fin, la vibration, le dép
   `tableau-de-bord.html`. Rien n'arrive tant que la base v2 n'existe pas.
 - `VERSION_COURSE` 26.
 
+
+## 11 octobre 2026 (soir) — base Supabase v2 branchée (v41)
+
+L'artiste a créé le projet Supabase et collé le SQL (« je suis un peu con », donc un seul
+fichier à coller : `supabase/A-COLLER-DANS-SUPABASE.sql` = schéma + vues du tableau de bord).
+Ligues et membres de la v1 recopiés (`outils/copier-ligues-v1-vers-v2.mjs` : 6 ligues, 29
+membres, pas de scores). `apiBase`/`apiKey` remplis (clé publishable `sb_publishable_…`,
+acceptée en `apikey` ET en `Bearer`, vérifié). Garde-fou ajouté dans `net.js` : aucun appel
+en local ni sous navigateur piloté, pour que les 14 tests ne polluent pas le tableau de bord.

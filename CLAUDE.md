@@ -190,9 +190,12 @@ intégré d'Instagram d'abord**, portrait natif.
   qui a joué au moins 30 s, jusqu'à ×3) ; relais de ligue ; sprint du dimanche ; au plus
   `liguesParVague` nouvelles ligues par semaine. Partage : natif d'abord, tiroir maison si
   absent (Instagram sur Android).
-- ⚠️ **Tout ce qui est en ligne est INERTE** tant que la base Supabase v2 n'existe pas
-  (`apiBase` vide) : ni ligue réelle, ni classement, ni boost, ni événements de funnel. Le jeu
-  tourne alors avec la ligue de démo.
+- **Base Supabase v2 BRANCHÉE depuis le 11 octobre 2026** (projet `khlxublwgcqihuezzsam`,
+  clé publishable dans `config.js`) : `schema-v2.sql` + `tableau-de-bord.sql` exécutés (fusionnés
+  dans `supabase/A-COLLER-DANS-SUPABASE.sql`), 6 ligues / 29 membres recopiés de la v1.
+  ⚠️ `net.js` ne contacte JAMAIS la base depuis un serveur local (localhost, 127., 10., 192.168.,
+  .local) ni un navigateur piloté (`navigator.webdriver` : les tests de `npm run verif`) —
+  sinon ils rempliraient le tableau de bord de fausses courses. `?base` dans l'adresse force.
 - **Couronne** : le premier de la ligue la porte à la place de son chapeau, dans la course de
   ses potes (et sur soi si c'est soi), et devant son nom sur l'écran de fin. Retenu par ligue
   (`jp2Leader`) ; en démo, avant toute course finie, c'est le premier pote fictif.
@@ -209,7 +212,7 @@ intégré d'Instagram d'abord**, portrait natif.
   pause, mort, fin), retour_beta.
 - **Tableau de bord** : `public/tableau-de-bord.html` (en ligne à côté du jeu), lit les vues
   AGRÉGÉES de `supabase/tableau-de-bord.sql` (jamais un pseudo) ; `?exemple` = chiffres
-  inventés, signalés. ⚠️ Vide tant que la base v2 n'existe pas.
+  inventés, signalés.
 - **Fantôme** du meilleur de la ligue : en sommeil (la trace part avec le score ; le
   chargement `chargerFantome` est à rebrancher quand la base existera).
 - **Porte de conversion** (`niveauPour`) : une demande à la fois — l'album d'abord, puis
@@ -232,14 +235,10 @@ chaque choc payé vibre.
 
 ## Points ouverts
 
-- **Base Supabase v2** à créer par l'artiste (ARCHITECTURE §5), puis **sous-domaine** (§4).
-  Après `schema-v2.sql`, exécuter `supabase/tableau-de-bord.sql` (les vues du tableau de bord).
-  Avec elle : envoyer l'Insta (et le village) avec le score, sinon on ne peut prévenir personne.
+- **Sous-domaine** (§4). Envoyer l'Insta (et le village) avec le score, sinon on ne peut
+  prévenir personne.
 - **À juger sur un vrai téléphone** : clavier iOS dans Instagram, partage dans les navigateurs
   intégrés, lien `instagram://` vers @pmc.mp3, les sons à l'oreille.
-- **Mesurer le parcours des joueurs** (où ils décrochent : chargement, pseudo, 1re course,
-  2e course, clic album) : voulu par l'artiste. Les événements sont codés ; il faut la base v2,
-  puis une page de tableau de bord.
 - **Défi à un ami** (lien avec un score à battre) : prévu, pas commencé.
 - Idées de lots pour les champions de ligue (maillot jaune du leader, nom du champion dans le
   jeu, finale du dimanche, règle des 5 potes actifs, blocage des scores impossibles) : proposées

@@ -4,7 +4,12 @@
 // supabase-migration-ligues.sql. Jamais bloquant : sans réseau ou sans
 // table, tout renvoie null et le jeu tourne avec les prénoms par défaut.
 
-function configured() { return Boolean(window.CONFIG.apiBase && window.CONFIG.apiKey); }
+// Jamais d'appel depuis un serveur local ni un navigateur piloté (les 14 tests
+// de `npm run verif` jouent de vraies parties) : ils rempliraient le tableau de
+// bord de fausses courses. `?base` dans l'adresse force le branchement.
+const HORS_BASE = typeof location === "undefined" || (!/[?&]base\b/.test(location.search) &&
+  (navigator.webdriver || /^(localhost|127\.|10\.|192\.168\.|\[::1\]|.*\.local$)/.test(location.hostname)));
+function configured() { return !HORS_BASE && Boolean(window.CONFIG.apiBase && window.CONFIG.apiKey); }
 function url(table, query = "") { return `${window.CONFIG.apiBase}/${table}${query}`; }
 function headers(extra = {}) {
   return { "Content-Type": "application/json", apikey: window.CONFIG.apiKey, Authorization: `Bearer ${window.CONFIG.apiKey}`, ...extra };

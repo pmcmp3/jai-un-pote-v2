@@ -172,14 +172,13 @@ window.CONFIG = {
   // ⚠️ La v2 a SA PROPRE base Supabase, jamais celle de la v1 (où tourne la
   // bêta fermée : ses classements, son relais et ses événements ne doivent pas
   // recevoir de courses v2).
-  // Tant que le projet Supabase v2 n'existe pas, les deux champs restent VIDES :
-  // net.js ne fait alors aucun appel, le jeu tourne avec la ligue de démo
-  // (potesDefaut), sans ligue ni classement. Pour brancher la base : créer le
-  // projet, exécuter supabase/schema-v2.sql, copier les ligues
-  // (outils/copier-ligues-v1-vers-v2.mjs), puis coller ici l'URL REST
-  // (https://<ref>.supabase.co/rest/v1) et la clé « anon public ».
-  apiBase: "",
-  apiKey: "",
+  // Projet Supabase v2 créé le 11 octobre 2026 (schema-v2.sql + tableau-de-bord.sql
+  // exécutés, ligues et membres de la v1 recopiés). Clé « publishable » : publique
+  // par nature, jamais la secret/service_role ici. Vider les deux champs coupe
+  // tout appel (le jeu tourne alors avec la ligue de démo). En local et sous
+  // les tests, net.js ne contacte jamais la base (sauf `?base` dans l'adresse).
+  apiBase: "https://khlxublwgcqihuezzsam.supabase.co/rest/v1",
+  apiKey: "sb_publishable_RnguGhkGNTjclChOhgLP8g_tqUxO_v9",
   // Base des liens de ligue (?ligue=CODE). L'adresse github.io reste valable
   // quand le sous-domaine sera branché : GitHub la redirige alors (301).
   lienJeu: "https://pmcmp3.github.io/jai-un-pote-v2/",
