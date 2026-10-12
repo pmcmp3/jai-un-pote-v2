@@ -32,7 +32,7 @@ const navigateur = await chromium.launch({ channel: "chrome", headless: true, ar
 // ECRAN=petit : iPhone SE / 8 (375×667), le pire cas pour le menu.
 const petit = process.env.ECRAN === "petit";
 const i16 = process.env.ECRAN === "i16";
-const contexte = await navigateur.newContext({ viewport: { width: i16 ? 393 : 375, height: petit ? 667 : i16 ? 852 : 812 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+const contexte = await navigateur.newContext({ viewport: { width: i16 ? 393 : 375, height: petit ? 667 : i16 ? 852 : 812 }, deviceScaleFactor: Number(process.env.DPR) || 2, isMobile: true, hasTouch: true });
 const page = await contexte.newPage();
 const erreurs = [];
 page.on("pageerror", (e) => erreurs.push(e.stack || e.message));
@@ -147,6 +147,13 @@ const SCENES = {
   panneau: async () => {
     await course(() => { const p = window.__pote; let r = Math.ceil(p.player.v) + 30; while (r % 45 !== 20) r++; p.player.v = r - 5; p.player.prevV = r - 5; });
     await attendre(500); await photo("08b-panneau");
+  },
+  // Fond de l'image de story (public/story-test.html) : peloton complet, sans overlay.
+  story: async () => {
+    await attendre(5000); // les potes ajoutés pendant le décompte repartent à zéro au départ
+    for (let i = 0; i < 8; i++) await page.keyboard.press("KeyP");
+    await page.keyboard.press("KeyD"); // après : l'overlay masqué coupe aussi les touches de debug
+    for (const [ms, nom] of [[3000, "a"], [3000, "b"], [3000, "c"], [4000, "d"]]) { await attendre(ms); await photo(`70${nom}-story-fond`); }
   },
   turbo: async () => { await page.keyboard.press("KeyL"); await attendre(300); await photo("09-turbo"); await attendre(5000); },
   nuit: async () => { await page.keyboard.press("KeyN"); await attendre(1500); await photo("10-nuit"); },

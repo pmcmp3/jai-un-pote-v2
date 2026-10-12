@@ -210,6 +210,12 @@ intégré d'Instagram d'abord**, portrait natif.
   fin_vue, partage_ouvert, invitation_envoyee (avec `depuis`), invitation_ouverte,
   invitation_acceptee, cachee/revenue (avec `ou` : chargement, menu-…, explication, course,
   pause, mort, fin), retour_beta.
+- **Banc d'essai du partage en story** : `public/story-test.html` (en ligne, PAS encore dans le
+  jeu). Image 1080×1920 dessinée sur une vraie capture (`assets/story-fond.webp`, refaite par
+  `DPR=3 ECRAN=i16 node outils/capture.mjs story`), lien de ligue copié dans le même geste que
+  le partage de l'image. ⚠️ Une page web ne peut pas poser le sticker lien (schéma
+  `instagram-stories://` réservé aux applis natives) : le joueur colle lui-même. Le centre de
+  l'image (y ≈ 960, là où Instagram pose un sticker) reste libre.
 - **Tableau de bord** : `public/tableau-de-bord.html` (en ligne à côté du jeu), lit les vues
   AGRÉGÉES de `supabase/tableau-de-bord.sql` (jamais un pseudo) ; `?exemple` = chiffres
   inventés, signalés.

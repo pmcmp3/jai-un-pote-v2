@@ -1002,3 +1002,13 @@ Ligues et membres de la v1 recopiés (`outils/copier-ligues-v1-vers-v2.mjs` : 6 
 membres, pas de scores). `apiBase`/`apiKey` remplis (clé publishable `sb_publishable_…`,
 acceptée en `apikey` ET en `Bearer`, vérifié). Garde-fou ajouté dans `net.js` : aucun appel
 en local ni sous navigateur piloté, pour que les 14 tests ne polluent pas le tableau de bord.
+
+## 12 octobre 2026 — banc d'essai du partage en story (v42)
+
+« Si je partage sur Instagram, je peux ajouter en story directement avec possibilité de mettre
+un lien direct ? Ou même envoyer à une amie ? » Réponse : la story oui, le lien posé tout seul
+non (réservé aux applis natives). Page `story-test.html` : image story aux couleurs du jeu,
+« Partager en story » envoie l'image ET copie le lien de ligue (sticker → Lien → coller),
+« Envoyer à une amie » envoie image + texte + lien, diagnostic et journal visibles à l'écran
+pour voir ce que chaque téléphone accepte (Safari, navigateur d'Instagram, Android). À brancher
+dans l'écran de fin une fois testé sur téléphone.
