@@ -21,7 +21,7 @@ await page.addInitScript(() => {
   // Espion : chaque appel à la vibration (Android) est noté.
   window.__vibrations = [];
   Object.defineProperty(Navigator.prototype, "vibrate", { value: (m) => { window.__vibrations.push(m); return true; }, configurable: true });
-  localStorage.setItem("jp2-appris", '["tap","haut","double"]'); localStorage.setItem("jp2Pseudo", "pmc"); localStorage.setItem("jp2LigueVue", "1");
+  localStorage.setItem("jp2-appris", '["tap","haut","double"]'); localStorage.setItem("jp2Pseudo", "pmc"); localStorage.setItem("jp2Insta", "pmc.mp3"); localStorage.setItem("jp2LigueVue", "1");
   localStorage.setItem("jp2-conseils-vus", '{"lait":1,"alerte":1,"mouette":1}'); localStorage.setItem("jp2Parties", "5");
   localStorage.setItem("jp2MorceauOuvert", "1"); localStorage.setItem("jp2PmcSuivi", "1");
 });

@@ -31,7 +31,7 @@ for (const [parties, album, suivi, nom, attendu] of CAS) {
     if (sessionStorage.getItem("pose")) return;
     sessionStorage.setItem("pose", "1");
     localStorage.clear();
-    localStorage.setItem("jp2Pseudo", "test"); localStorage.setItem("jp2LigueVue", "1");
+    localStorage.setItem("jp2Pseudo", "test"); localStorage.setItem("jp2Insta", "test.mp3"); localStorage.setItem("jp2LigueVue", "1");
     localStorage.setItem("jp2-appris", '["tap","haut","double"]'); localStorage.setItem("jp2-conseils-vus", '{"lait":1,"alerte":1,"mouette":1}');
     localStorage.setItem("jp2Parties", String(parties));
     if (album) localStorage.setItem("jp2MorceauOuvert", "1");

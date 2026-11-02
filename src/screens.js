@@ -69,6 +69,7 @@ const CLE_RECORD = "jp2Record";
 const CLE_PARTIES = "jp2Parties";
 const CLE_LIGUE = "jp2Ligue";
 const CLE_INSTA = "jp2Insta", CLE_VILLE = "jp2Ville", CLE_SKIN = "jp2Skin", CLE_SOURCE = "jp2Source", CLE_SPRINT = "jp2Sprint";
+const CLE_EMAIL = "jp2Email", CLE_NEWSLETTER = "jp2News", CLE_FICHE = "jp2Fiche";
 
 // --- Bêta fermée -------------------------------------------------------------
 // Une seule ligue pour les testeurs : on arrive par
@@ -142,8 +143,11 @@ export function ou() {
 }
 export function getPseudo() { return pseudoInput.value.trim().replace(/^@+/, ""); }
 const instaInput = $("insta-input"), villeInput = $("ville-input");
+const emailInput = $("email-input"), newsletterInput = $("newsletter-input");
 export function getInsta() { return instaInput.value.trim().replace(/^@+/, ""); }
 export function getVille() { return villeInput.value.trim(); }
+export function getEmail() { return emailInput ? emailInput.value.trim() : ""; }
+function getNewsletter() { return Boolean(newsletterInput && newsletterInput.checked); }
 export function getSource() { return lsGet(CLE_SOURCE) || null; }
 // Skin du joueur (personnalisation, étape 3 du menu).
 let skin = null;
@@ -219,7 +223,21 @@ export function stepCourante() { return Number(onboarding.dataset.step) || 1; }
 function enregistrerProfil() {
   const nouveau = !lsGet(CLE_PSEUDO);
   lsSet(CLE_PSEUDO, getPseudo()); lsSet(CLE_INSTA, getInsta()); lsSet(CLE_VILLE, getVille());
+  lsSet(CLE_EMAIL, getEmail()); lsSet(CLE_NEWSLETTER, getNewsletter() ? "1" : "");
   if (nouveau) net.evenement("inscription", { pseudo: getPseudo(), source: getSource(), ligue: ligue ? ligue.code : null });
+  envoyerFiche();
+}
+// La FICHE DE CONTACT : la seule chose qui permettra de prévenir la ligue
+// gagnante. Elle ne part que quand elle CHANGE (sinon une ligne par partie), et
+// seulement si elle porte de quoi joindre quelqu'un. Table en insertion seule :
+// ni le jeu ni personne ne peut la relire avec la clé publique.
+function envoyerFiche() {
+  const insta = getInsta(), email = getEmail();
+  if (!getPseudo() || (!insta && !email)) return;
+  const empreinte = [getPseudo(), insta, email, getNewsletter() ? 1 : 0, getVille(), ligue ? ligue.code : ""].join("|");
+  if (lsGet(CLE_FICHE) === empreinte) return;
+  lsSet(CLE_FICHE, empreinte);
+  net.enregistrerJoueur({ pseudo: getPseudo(), insta, email, newsletter: getNewsletter(), ville: getVille(), ligue: ligue ? ligue.code : null });
 }
 export function getRecord() { return Number(lsGet(CLE_RECORD)) || 0; }
 export function getParties() { return Number(lsGet(CLE_PARTIES)) || 0; }
@@ -492,9 +510,19 @@ function reprendreDecompteRevive(restant) {
 let gateEtat = null;
 let gateRetourTimer = 0;
 
+// Le TITRE « J'ai un pote » d'abord : c'est lui qu'on pousse, une seule
+// destination. L'album sert de repli si la liste du titre est vide.
+// A/B : la variante « spotify » ne montre qu'une plateforme — on mesure si le
+// choix entre trois freine le clic ou s'il l'aide.
 function plateformes() {
-  const l = window.CONFIG.plateformesAlbum;
-  return Array.isArray(l) ? l.filter((p) => p && p.url && p.nom) : [];
+  const C = window.CONFIG;
+  const brut = Array.isArray(C.plateformesTitre) && C.plateformesTitre.length ? C.plateformesTitre : C.plateformesAlbum;
+  const liste = Array.isArray(brut) ? brut.filter((p) => p && p.url && p.nom) : [];
+  if (net.variante("ecoute") === "spotify") {
+    const un = liste.find((p) => p.id === "spotify");
+    if (un) return [un];
+  }
+  return liste;
 }
 function construirePlateformes() {
   const liste = plateformes();
@@ -528,12 +556,12 @@ function gateTextes(action, niveau) {
   const presave = niveau === "presave";
   return {
     // Sticker rouge, comme toutes les cartes (cohérence des menus).
-    eyebrow: presave ? "L'album est sorti" : "Dernière étape",
+    eyebrow: presave ? "Le son du jeu" : "Dernière étape",
     titre: presave
-      ? (continuer ? "Ajoute l'album à ta bibliothèque pour continuer la partie" : "Ajoute l'album à ta bibliothèque pour rejouer")
+      ? (continuer ? "Ajoute « J'ai un pote » à ta bibliothèque pour continuer la partie" : "Ajoute « J'ai un pote » à ta bibliothèque pour rejouer")
       : (continuer ? "Abonne-toi à PMC sur Spotify pour continuer la partie" : "Abonne-toi à PMC sur Spotify, et rejoue autant que tu veux"),
     texte: "",
-    ctaLabel: presave ? "Écouter l'album" : "S'abonner à PMC",
+    ctaLabel: presave ? "Écouter le son" : "S'abonner à PMC",
     goLabel: continuer ? "Continuer ma course" : "Rejouer",
   };
 }
@@ -744,7 +772,13 @@ function afficherLigue() {
   suivant.classList.toggle("btn-primary", !!ligue && !seul);
   suivant.classList.toggle("btn-secondary", !ligue || seul);
   suivant.classList.toggle("btn-petit", !ligue);
-  if (!ligue) { pelotonAffiche = new Set(); statutLigue = ""; return; }
+  if (!ligue) {
+    pelotonAffiche = new Set(); statutLigue = "";
+    const nom = $("ligue-nom");
+    if (nom && !nom.value && getPseudo()) nom.placeholder = `Ligue de ${getPseudo()}`;
+    majConcoursMenu();
+    return;
+  }
   ligueCodeEl.textContent = ligue.code;
   $("ligue-titre").textContent = ligue.enAttente ? "Tu rejoins la ligue" : "Ma ligue";
   liguePartager.classList.toggle("hidden", !!ligue.enAttente);
@@ -765,6 +799,8 @@ function afficherLigue() {
     ? `${autres.length} pote${autres.length > 1 ? "s" : ""} dans ta ligue : ils pédalent derrière toi.`
     : "En attendant tes vrais potes, des bots jouent avec toi. Quand tes potes auront fait une partie, ils remplaceront les bots.";
   majStatut();
+  majArrivees();
+  majConcoursMenu();
 }
 function ligueDispo() { return (net.estConfigure() || demo) && !enBeta(); }
 function memoriserLigue() { if (ligue) lsSet(CLE_LIGUE, JSON.stringify(ligue)); else { try { localStorage.removeItem(CLE_LIGUE); } catch (e) { /* rien */ } } }
@@ -785,7 +821,8 @@ async function rejoindre(code, creer = false) {
   }
   ligueMessage("…");
   const invitation = !!(ligue && ligue.enAttente);
-  const r = creer ? await net.creerLigue(code, pseudo, getSkin()) : await net.rejoindreLigue(code, pseudo, getSkin());
+  const nomEl = $("ligue-nom");
+  const r = creer ? await net.creerLigue(code, pseudo, getSkin(), nomEl ? nomEl.value : "") : await net.rejoindreLigue(code, pseudo, getSkin());
   if (r.erreur) {
     ligueMessage(r.erreur === "complete" ? `Cette ligue est complète (${net.LIGUE_MAX} max).` : r.erreur === "inexistante" ? "Cette ligue n'existe pas." : r.erreur === "vague" ? `${window.CONFIG.liguesParVague || 5} ligues sont déjà en course cette semaine. La tienne démarre lundi : réessaie à ce moment-là.` : "Pas de réseau, réessaie.");
     if (ligue && ligue.enAttente) { ligue = null; memoriserLigue(); afficherLigue(); }
@@ -797,6 +834,164 @@ async function rejoindre(code, creer = false) {
   return true;
 }
 function lienLigue(code) { return `${window.CONFIG.lienJeu || location.origin + location.pathname}?ligue=${code}`; }
+
+// --- LE CONCOURS DE LIGUES -----------------------------------------------------
+// LA RÈGLE, en une phrase : le score d'une ligue, c'est la somme des meilleurs
+// scores de ses membres. À la clôture, la ligue n°1 gagne un son écrit sur elle.
+// Tout est additionné par la base (vue `concours_ligues`) : le jeu ne voit que
+// son propre score, il ne pourrait rien totaliser.
+let concoursInfo = null;      // { debut, fin, plafond_score } — lu une fois
+let concoursLigues = null;    // le classement, gardé pour le tiroir
+
+// « 9 jours », « 6 heures », « 12 min » : l'unité qui reste lisible d'un coup
+// d'œil. Jamais un compte à rebours à la seconde — ça ne se lit pas, et ça
+// obligerait à repeindre l'écran en permanence.
+function formaterRestant(ms) {
+  if (ms === null) return null;
+  if (ms <= 0) return "Concours terminé";
+  const jours = Math.floor(ms / 86400000);
+  if (jours >= 2) return `${jours} jours restants`;
+  const heures = Math.floor(ms / 3600000);
+  if (heures >= 2) return `${heures} heures restantes`;
+  return `${Math.max(1, Math.round(ms / 60000))} min restantes`;
+}
+function tempsRestant() { return formaterRestant(net.restantMs(concoursInfo)); }
+function concoursOuvert() { const r = net.restantMs(concoursInfo); return r === null || r > 0; }
+
+async function chargerConcours() {
+  concoursInfo = await net.concours();
+  majConcoursMenu();
+}
+// Sous le peloton, dans « Ma ligue » : la règle, puis le temps qui reste.
+function majConcoursMenu() {
+  const el = $("ligue-concours");
+  if (!el) return;
+  const t = tempsRestant();
+  if (!t || !ligue || ligue.enAttente || demo) { el.classList.add("hidden"); return; }
+  el.textContent = "";
+  const b = document.createElement("b");
+  b.textContent = t;
+  el.append("Vos meilleurs scores s'additionnent. ", b);
+  el.classList.remove("hidden");
+}
+
+// Sur l'écran de fin : « Ta ligue a besoin de toi » — son rang parmi TOUTES les
+// ligues, et ce qui manque pour passer celle du dessus. C'est le seul endroit
+// où inviter un pote a une conséquence chiffrée et visible.
+async function afficherConcours(code) {
+  const bloc = $("end-concours");
+  if (!bloc) return;
+  bloc.classList.add("hidden");
+  if (!code || demo || !net.estConfigure()) return;
+  const rows = await net.classementLigues();
+  if (!rows || !rows.length) return;
+  concoursLigues = rows;
+  const i = rows.findIndex((r) => r.code === code);
+  if (i < 0) return;
+  const moi = rows[i];
+  const rang = $("end-concours-rang");
+  rang.textContent = "";
+  const place = document.createElement("b"), total = document.createElement("b");
+  place.textContent = `${i + 1}${i === 0 ? "re" : "e"}`;
+  total.textContent = pts(moi.total);
+  rang.append("Ta ligue est ", place, ` sur ${rows.length}, avec `, total);
+  const ecart = $("end-concours-ecart");
+  ecart.textContent = "";
+  if (i > 0) {
+    const devant = rows[i - 1];
+    const manque = Math.max(1, Math.floor(Number(devant.total)) - Math.floor(Number(moi.total)) + 1);
+    const b = document.createElement("b");
+    b.textContent = pts(manque);
+    ecart.append("Il vous manque ", b, " pour passer devant ", devant.nom || devant.code);
+  } else ecart.textContent = rows.length > 1 ? "Vous êtes premiers. Tenez la place jusqu'à la clôture." : "Vous êtes la première ligue en course.";
+  ecart.classList.remove("hidden");
+  const temps = $("end-concours-temps"), t = tempsRestant();
+  temps.textContent = t || "";
+  temps.classList.toggle("hidden", !t);
+  bloc.classList.remove("hidden");
+}
+
+// --- Tiroir du classement général ----------------------------------------------
+// Deux vues : les ligues (le concours) et les 50 meilleurs joueurs (la « super
+// ligue », un classement bonus dont on ne parle pas en vidéo).
+const classementSheet = $("classement-sheet");
+let classementVue = "ligues";
+function ouvrirClassement() {
+  suivi("classement_vu", { vue: classementVue });
+  classementSheet.classList.add("visible");
+  classementSheet.setAttribute("aria-hidden", "false");
+  remplirClassement();
+}
+function fermerClassement() {
+  classementSheet.classList.remove("visible");
+  classementSheet.setAttribute("aria-hidden", "true");
+}
+async function remplirClassement() {
+  const liste = $("classement-liste"), vide = $("classement-vide"), regle = $("classement-regle");
+  const ligues = classementVue === "ligues";
+  for (const b of $("classement-onglets").children) b.classList.toggle("actif", (b.dataset.vue === "ligues") === ligues);
+  regle.textContent = ligues
+    ? `Le score d'une ligue, c'est la somme des meilleurs scores de ses membres. À la clôture, la ligue n°1 gagne ${window.CONFIG.concoursLot || "le lot"}. `
+    : "Les 50 meilleurs scores individuels, toutes ligues confondues. ";
+  if (window.CONFIG.reglementUrl) {
+    const a = document.createElement("a");
+    a.href = window.CONFIG.reglementUrl; a.target = "_blank"; a.rel = "noopener";
+    a.textContent = "Règlement";
+    regle.appendChild(a);
+  }
+  liste.textContent = "";
+  vide.classList.add("hidden");
+  const rows = ligues ? (concoursLigues || await net.classementLigues()) : await net.top50();
+  if (ligues && rows) concoursLigues = rows;
+  if (!rows || !rows.length) { vide.classList.remove("hidden"); return; }
+  const monCode = ligue && !ligue.enAttente ? ligue.code : null, monPseudo = getPseudo();
+  rows.slice(0, 50).forEach((r, i) => {
+    const li = document.createElement("li");
+    if (ligues ? r.code === monCode : r.pseudo === monPseudo) li.className = "moi";
+    const rang = document.createElement("span"); rang.className = "rang"; rang.textContent = `${i + 1}`;
+    const nom = document.createElement("span"); nom.className = "nom";
+    if (ligues) {
+      nom.textContent = r.nom || r.code;
+      const sous = document.createElement("small");
+      sous.textContent = `${r.joueurs} joueur${r.joueurs > 1 ? "s" : ""}`;
+      nom.appendChild(sous);
+    } else nom.textContent = `@${r.pseudo}`;
+    const m = document.createElement("span"); m.className = "m"; m.textContent = pts(ligues ? r.total : r.metres);
+    li.append(rang, nom, m);
+    liste.appendChild(li);
+  });
+}
+function initClassement() {
+  const voir = $("end-concours-voir");
+  if (voir) voir.addEventListener("click", ouvrirClassement);
+  for (const b of $("classement-onglets").children) {
+    b.addEventListener("click", () => { classementVue = b.dataset.vue; suivi("classement_vu", { vue: classementVue }); remplirClassement(); });
+  }
+  $("classement-fermer").addEventListener("click", fermerClassement);
+  $("classement-veil").addEventListener("click", fermerClassement);
+}
+
+// --- « @x a rejoint ta ligue » --------------------------------------------------
+// Récompense l'invitant : sans ça, inviter ne se voit jamais. Mémorisé PAR
+// ligue, et la première fois qu'on regarde une ligue on ne crie pas que tout le
+// monde vient d'arriver.
+const CLE_VUS = "jp2LigueVus";
+function majArrivees() {
+  const el = $("ligue-arrivees");
+  if (!el) return;
+  if (!ligue || ligue.enAttente) { el.classList.add("hidden"); return; }
+  const moi = getPseudo();
+  const noms = ligue.membres.map((m) => m.nom).filter((n) => n !== moi);
+  let vus = null;
+  try { const j = JSON.parse(lsGet(CLE_VUS) || "null"); if (j && j.code === ligue.code && Array.isArray(j.noms)) vus = j.noms; } catch (e) { vus = null; }
+  lsSet(CLE_VUS, JSON.stringify({ code: ligue.code, noms }));
+  const nouveaux = vus ? noms.filter((n) => !vus.includes(n)) : [];
+  if (!nouveaux.length) { el.classList.add("hidden"); return; }
+  el.textContent = nouveaux.length === 1
+    ? `@${nouveaux[0]} a rejoint ta ligue !`
+    : `${nouveaux.length} potes ont rejoint ta ligue !`;
+  el.classList.remove("hidden");
+}
 
 // --- Partage --------------------------------------------------------------------
 // ⚠️ Dans certains navigateurs INTÉGRÉS (Instagram…), le partage natif manque
@@ -831,15 +1026,67 @@ function copierTexte(t) {
   if (!ok && navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(t).then(() => true, () => false);
   return Promise.resolve(ok);
 }
+// Le MESSAGE d'invitation : ce qu'on écrit à son pote. Le ton est celui du
+// morceau — on dit à ses potes qu'on les aime sans le dire. Celui qui s'ouvre
+// par défaut est tiré de la variante A/B du joueur ; il peut en choisir un
+// autre, et c'est le message RÉELLEMENT envoyé qui est mesuré.
+const CLE_MSG = "jp2Msg";
+function messagesInvitation() {
+  const l = window.CONFIG.messagesInvitation;
+  return Array.isArray(l) ? l.filter((m) => m && m.id && m.texte) : [];
+}
+let messageChoisi = null;
+function messageDefaut() {
+  const liste = messagesInvitation();
+  if (!liste.length) return null;
+  const garde = lsGet(CLE_MSG);
+  if (garde && liste.some((m) => m.id === garde)) return garde;
+  const v = net.variante("invitation");
+  return liste.some((m) => m.id === v) ? v : liste[0].id;
+}
+function texteMessage() {
+  const liste = messagesInvitation();
+  const m = liste.find((x) => x.id === messageChoisi);
+  return m ? m.texte : null;
+}
+function construireMessages(avecLigue) {
+  const box = $("partage-messages");
+  if (!box) return;
+  const liste = avecLigue ? messagesInvitation() : [];
+  box.textContent = "";
+  box.classList.toggle("hidden", !liste.length);
+  if (!liste.length) return;
+  liste.forEach((m) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = `msg-choix${m.id === messageChoisi ? " actif" : ""}`;
+    b.textContent = m.texte;
+    b.addEventListener("click", () => {
+      messageChoisi = m.id;
+      lsSet(CLE_MSG, m.id);
+      construireMessages(true);
+      if (partageEtat) { partageEtat.texte = m.texte; appliquerPartage(); }
+    });
+    box.appendChild(b);
+  });
+}
+
 const partageSheet = $("partage-sheet"), partageHint = $("partage-hint"), partageCopier = $("partage-copier");
 let partageEtat = null;
-function ouvrirPartage(texte, url) {
-  partageEtat = { texte, url, message: `${texte} ${url}` };
+// Le lien et les trois applis se recalculent dès que le message change.
+function appliquerPartage() {
+  if (!partageEtat) return;
+  const { texte, url } = partageEtat;
+  partageEtat.message = `${texte} ${url}`;
   $("partage-lien").textContent = url;
   $("partage-whatsapp").href = `https://wa.me/?text=${encodeURIComponent(partageEtat.message)}`;
   // iOS veut « sms:&body= », Android « sms:?body= ».
   $("partage-sms").href = `sms:${IOS ? "&" : "?"}body=${encodeURIComponent(partageEtat.message)}`;
   $("partage-snap").href = `https://www.snapchat.com/scan?attachmentUrl=${encodeURIComponent(url)}`;
+}
+function ouvrirPartage(texte, url) {
+  partageEtat = { texte, url, message: `${texte} ${url}` };
+  appliquerPartage();
   $("partage-plus").classList.toggle("hidden", !navigator.share);
   partageHint.classList.add("hidden");
   partageCopier.textContent = "Copier le lien";
@@ -852,7 +1099,7 @@ function fermerPartage() {
   partageSheet.setAttribute("aria-hidden", "true");
 }
 function partageFait(via) {
-  net.evenement("invitation_envoyee", { pseudo: getPseudo(), ligue: ligue ? ligue.code : null, source: getSource(), details: { via, integre: NAVIGATEUR_INTEGRE, depuis: ou() } });
+  net.evenement("invitation_envoyee", { pseudo: getPseudo(), ligue: ligue ? ligue.code : null, source: getSource(), details: { via, message: messageChoisi, integre: NAVIGATEUR_INTEGRE, depuis: ou() } });
   // Démo : les potes fictifs n'arrivent qu'une fois le lien vraiment parti.
   if (demo) simulerArrivees();
 }
@@ -890,7 +1137,10 @@ async function partagerLigue(texte, texteSansLigue = "Viens jouer à « J'ai un 
   const vraie = !!(ligue && !ligue.enAttente && !demo && ligue.code);
   const code = vraie ? ligue.code : "";
   const url = vraie ? lienLigue(code) : (window.CONFIG.lienJeu || location.origin + location.pathname);
-  const msg = vraie ? texte : texteSansLigue;
+  messageChoisi = vraie ? messageDefaut() : null;
+  const perso = vraie ? texteMessage() : null;
+  const msg = vraie ? (perso || texte) : texteSansLigue;
+  construireMessages(vraie);
   $("partage-text").textContent = vraie || demo ? "Chaque pote qui joue te rapporte des points en plus." : "Envoie-leur le jeu : qui fera le meilleur score ?";
   net.evenement("invitation_ouverte", { pseudo: getPseudo(), ligue: code || null, source: getSource(), details: { integre: NAVIGATEUR_INTEGRE } });
   // Le partage natif du téléphone d'abord, partout où il existe — y compris
@@ -966,6 +1216,7 @@ export async function finLigue(metres, potes, mode = "course", bilan = {}) {
   endRelais.classList.remove("hidden");
   endRelais.textContent = `Relais : ${Number(relais.metres).toLocaleString("fr-FR")} / ${objectif.toLocaleString("fr-FR")} pts`;
   afficherClassement(ligue.code, rows);
+  await afficherConcours(ligue.code);
 }
 // Classement de la ligue sur l'écran de fin, avec le rang du joueur en tête
 // de carte (« Tu es 1er de ta ligue ! »).
@@ -1021,6 +1272,8 @@ function afficherClassement(code, rows, titre = null) {
 }
 function initLigue() {
   initPartage();
+  initClassement();
+  setTimeout(chargerConcours, 0);
   setTimeout(rafraichirLeader, 0);
   afficherBoost();
   rafraichirBoost();
@@ -1357,12 +1610,18 @@ export function init(d) {
   try { const src = new URLSearchParams(location.search).get("src"); if (src) lsSet(CLE_SOURCE, src.slice(0, 32)); } catch (e) { /* rien */ }
   pseudoInput.value = lsGet(CLE_PSEUDO) || "";
   instaInput.value = lsGet(CLE_INSTA) || "";
+  if (emailInput) emailInput.value = lsGet(CLE_EMAIL) || "";
+  if (newsletterInput) newsletterInput.checked = lsGet(CLE_NEWSLETTER) === "1";
   villeInput.value = lsGet(CLE_VILLE) || "";
   const step1Next = $("step1-next");
-  const syncPlay = () => { majBoutonJouer(); step1Next.disabled = getPseudo().length === 0; };
+  const syncPlay = () => { majBoutonJouer(); step1Next.disabled = getPseudo().length === 0 || getInsta().length === 0; };
+  // « Continuer » dépend du pseudo ET de l'Insta : les deux champs réveillent
+  // le bouton, sinon on pourrait remplir l'Insta sans qu'il s'allume.
   pseudoInput.addEventListener("input", syncPlay);
-  // Entrée sur le pseudo = Continuer (le clavier se ferme, la carte se recentre).
-  pseudoInput.addEventListener("keydown", (e) => { if (e.key === "Enter" && !step1Next.disabled) { e.preventDefault(); pseudoInput.blur(); step1Next.click(); } });
+  instaInput.addEventListener("input", syncPlay);
+  // Entrée sur le pseudo = passer à l'Insta ; Entrée sur l'Insta = Continuer.
+  pseudoInput.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); instaInput.focus(); } });
+  instaInput.addEventListener("keydown", (e) => { if (e.key === "Enter" && !step1Next.disabled) { e.preventDefault(); instaInput.blur(); step1Next.click(); } });
   brancherCentrage();
   syncPlay();
   // Page cachée (appli quittée, onglet fermé, retour à Instagram) puis
@@ -1381,8 +1640,12 @@ export function init(d) {
     if (!deps.isGameStartRequested()) audio.lancerBoucleMenu();
   };
   GESTES.forEach((t) => document.addEventListener(t, premierGeste, true));
-  [pseudoInput, instaInput, villeInput].forEach((inp) => ["pointerdown", "touchstart", "touchmove", "mousedown"].forEach((t) => inp.addEventListener(t, (e) => e.stopPropagation())));
-  step1Next.addEventListener("click", () => { if (!getPseudo()) { pseudoInput.focus(); return; } enregistrerProfil(); setStep(3); });
+  [pseudoInput, instaInput, villeInput, emailInput].filter(Boolean).forEach((inp) => ["pointerdown", "touchstart", "touchmove", "mousedown"].forEach((t) => inp.addEventListener(t, (e) => e.stopPropagation())));
+  step1Next.addEventListener("click", () => {
+    if (!getPseudo()) { pseudoInput.focus(); return; }
+    if (!getInsta()) { instaInput.focus(); return; }
+    enregistrerProfil(); setStep(3);
+  });
   $("step2-next").addEventListener("click", () => { if (!loadingDone) return; lsSet(CLE_LIGUE_VUE, "1"); if (getPseudo().length === 0) { setStep(1); return; } startGame(); });
   $("step2-back").addEventListener("click", () => setStep(3));
   $("step3-ligue").addEventListener("click", () => setStep(2));
@@ -1471,5 +1734,5 @@ export function init(d) {
   appliquerModeBeta();
   setView("onboarding");
   // Habitué → directement « Mon cycliste » ; invitation → « Ma ligue » ; sinon l'inscription.
-  setStep(!lsGet(CLE_PSEUDO) ? 1 : (ligue && ligue.enAttente) ? 2 : 3);
+  setStep(!lsGet(CLE_PSEUDO) || !lsGet(CLE_INSTA) ? 1 : (ligue && ligue.enAttente) ? 2 : 3);
 }

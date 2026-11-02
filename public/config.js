@@ -121,15 +121,24 @@ window.CONFIG = {
   potesNoms: ["paul", "lea", "marius", "ines", "hugo"],
   ligueDemo: "PMCMP",       // code de la ligue de démo (jamais ouverte au public)
   // === LIGUE DE TEST (bêta) ===
-  // Arriver par `lienJeu?ligue=<ligueBeta>` met le joueur dans cette ligue ET
-  // simplifie tout le menu (plus de choix de ligue, plus de sprint, plus de
-  // tiroir album) : on ne joue QUE dans cette ligue. Les autres visiteurs
-  // gardent le jeu normal. C'est elle qui déclenche le menu simplifié, le
-  // plafond de membres et le bouton « Laisser un retour ».
-  // ⚠️ Créée par supabase/ligue-test-v2.sql, À EXÉCUTER avant de partager le lien.
-  ligueBeta: "TESTV2",
+  // "" = pas de bêta fermée : tout le monde a le jeu complet, avec le concours.
+  // Remettre un code ici (et le créer en base) rebranche le menu simplifié
+  // (pseudo → cycliste → JOUER, sans choix de ligue) et le bouton « Laisser un
+  // retour » — utile pour un tour de test privé, jamais pendant le concours.
+  ligueBeta: "",
   ligueBetaPlafond: 60,
   betaRetours: true,        // le bouton « Laisser un retour » sur l'écran de fin
+
+  // === LE CONCOURS DE LIGUES ===
+  // LA RÈGLE, en une phrase : le score d'une ligue, c'est la somme des
+  // meilleurs scores de ses membres. À la clôture, la ligue n°1 gagne un son
+  // écrit sur elle par PMC.
+  // ⚠️ La DATE qui fait foi est celle de la table `concours` de la base
+  // (supabase/CONCOURS-A-COLLER.sql) : le jeu la lit au chargement. Celle-ci
+  // n'est que le repli quand la base ne répond pas. Les deux doivent coïncider.
+  concoursFin: "2026-11-22T12:00:00+01:00",
+  concoursLot: "un son écrit sur votre bande de potes",
+  reglementUrl: "reglement.html",
   liguesParVague: 5,        // 5 ligues jouables en même temps, au-delà : lundi prochain
   relaisDistance: 30000,    // mètres cumulés d'une ligue pour gagner le relais
   sprintDureeS: 60,         // le sprint du dimanche : 60 s, même route pour tous
@@ -158,6 +167,16 @@ window.CONFIG = {
   ],
 
   // === LIENS (identiques au premier jeu) ===
+  // LE TITRE « J'ai un pote » — c'est lui qu'on pousse, une seule destination.
+  // ⚠️ URL nettoyées à la main : pas de `/intl-fr/` sur Spotify (il force la
+  // page web au lieu de l'app), pas de `?si=` (jeton de partage qui piste
+  // l'expéditeur), jamais le schéma `spotify:` (confirmation iOS).
+  // Vide → repli sur `plateformesAlbum`.
+  plateformesTitre: [
+    { id: "spotify",     nom: "Spotify",     couleur: "#1DB954", geste: "appuie sur ＋ Ajouter", url: "https://open.spotify.com/track/4zIV5SC0pyVbtGb8XMH9gt" },
+    { id: "deezer",      nom: "Deezer",      couleur: "#A238FF", geste: "appuie sur ♥",          url: "https://link.deezer.com/s/34Qs1hb9uH9PuTh6k78P7" },
+    { id: "apple-music", nom: "Apple Music", couleur: "#FA243C", geste: "appuie sur ＋",          url: "https://music.apple.com/fr/song/jai-un-pote/6795043227" },
+  ],
   plateformesAlbum: [
     { id: "spotify",      nom: "Spotify",       couleur: "#1DB954", geste: "appuie sur ＋ Ajouter",  url: "https://open.spotify.com/album/5nR4uZiJgNJCIRaRAo6qcX" },
     { id: "deezer",       nom: "Deezer",        couleur: "#A238FF", geste: "appuie sur ♥",           url: "https://www.deezer.com/album/1039050902" },
@@ -182,6 +201,30 @@ window.CONFIG = {
   // Base des liens de ligue (?ligue=CODE). L'adresse github.io reste valable
   // quand le sous-domaine sera branché : GitHub la redirige alors (301).
   lienJeu: "https://pmcmp3.github.io/jai-un-pote-v2/",
+
+  // === A/B TEST ===
+  // Chaque joueur tombe dans UNE variante par test, tirée de son identifiant
+  // anonyme (jp2Joueur) : stable d'une visite à l'autre, et la variante part
+  // dans `details.ab` de CHAQUE événement. Les vues `ab_ecoute` et
+  // `ab_invitation` (CONCOURS-A-COLLER.sql) comparent les taux.
+  // Mettre une seule valeur dans une liste = test éteint, tout le monde dessus.
+  abTests: {
+    // Comment on propose le morceau : le panneau des 3 plateformes, ou Spotify seul.
+    ecoute: ["panneau", "spotify"],
+    // Quel message d'invitation s'ouvre par défaut (les identifiants de
+    // `messagesInvitation`). Le joueur peut toujours en choisir un autre : ce
+    // qui est mesuré, c'est le message réellement envoyé.
+    invitation: ["jamais-su", "pote-ou-pas", "manque-toi", "trente-s"],
+  },
+  // Messages d'invitation proposés au joueur. Le PREMIER est celui qui s'ouvre
+  // par défaut ; le joueur peut en choisir un autre, et son choix part dans
+  // l'événement (vue `ab_invitation`) — c'est ça qu'on mesure.
+  messagesInvitation: [
+    { id: "jamais-su", texte: "J'ai jamais su te le dire, alors rejoins ma ligue." },
+    { id: "pote-ou-pas", texte: "T'es mon pote ou pas ? On va vérifier." },
+    { id: "manque-toi", texte: "On y est déjà, il nous manque plus que toi." },
+    { id: "trente-s", texte: "30 secondes de ton temps et ma ligue monte au classement." },
+  ],
 
   toucheDebug: "d",
 };

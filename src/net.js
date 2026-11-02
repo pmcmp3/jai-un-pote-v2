@@ -30,6 +30,29 @@ async function post(table, body, extra = {}, query = "") {
   } catch (e) { return false; }
 }
 
+// --- Le joueur, son appareil, sa variante ------------------------------------
+// Identifiant anonyme tiré au sort au premier chargement et gardé dans le
+// téléphone : il ne dit pas QUI joue. Il sert à deux choses — reconnaître un
+// parcours d'un bout à l'autre dans le tableau de bord, et repérer vingt
+// pseudos d'une même ligue qui sortent d'un seul téléphone.
+export function joueurId() {
+  try { let j = localStorage.getItem("jp2Joueur"); if (!j) { j = Math.random().toString(36).slice(2, 10); localStorage.setItem("jp2Joueur", j); } return j; } catch (e) { return null; }
+}
+
+// A/B TEST : la variante d'un joueur est TIRÉE DE SON IDENTIFIANT, pas au
+// hasard à chaque fois — sinon il verrait une version différente à chaque
+// visite et la mesure ne voudrait rien dire. Même joueur, même variante,
+// toujours. Une seule valeur dans la liste = test éteint.
+export function variante(test) {
+  const liste = (window.CONFIG.abTests || {})[test];
+  if (!Array.isArray(liste) || !liste.length) return null;
+  if (liste.length === 1) return liste[0];
+  const cle = `${test}:${joueurId() || ""}`;
+  let h = 2166136261;
+  for (let i = 0; i < cle.length; i++) { h ^= cle.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return liste[Math.abs(h) % liste.length];
+}
+
 export function estConfigure() { return configured(); }
 export function normaliserCode(c) { return String(c || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6); }
 
@@ -41,10 +64,12 @@ export function genererCode() {
   return c;
 }
 
-export async function creerLigue(code, pseudo, skin = null) {
+export async function creerLigue(code, pseudo, skin = null, nom = "") {
   const n = await liguesCetteSemaine();
   if (n !== null && n >= (window.CONFIG.liguesParVague || 5)) return { erreur: "vague" };
-  const ok = await post("ligues", { code, nom: `Ligue de ${pseudo}`, createur: pseudo });
+  // Le nom s'affiche dans le classement du concours : un code à cinq lettres
+  // ne se reconnaît pas, « les Bonnets » si.
+  const ok = await post("ligues", { code, nom: String(nom || "").trim().slice(0, 28) || `Ligue de ${pseudo}`, createur: pseudo });
   if (!ok) return { erreur: "reseau" };
   return rejoindreLigue(code, pseudo, skin);
 }
@@ -99,7 +124,7 @@ export function debutSemaine(d = new Date()) {
 export async function envoyerScore(code, pseudo, metres, potes, mode = "course", extra = null) {
   const base = { code, pseudo, metres: Math.floor(metres), potes, mode };
   if (extra && extra.graine !== undefined && extra.graine !== null) {
-    const ok = await post("ligue_scores", { ...base, graine: extra.graine, trace: extra.trace || null, duree_s: Math.floor(extra.duree || 0) });
+    const ok = await post("ligue_scores", { ...base, graine: extra.graine, trace: extra.trace || null, duree_s: Math.floor(extra.duree || 0), appareil: joueurId() });
     if (ok) return true;
   }
   return post("ligue_scores", base);
@@ -140,11 +165,8 @@ export async function classementSprint(jour) {
 // part même quand la page se ferme. `window.__evenements` garde la liste de la
 // visite (tests et ?debug), base branchée ou non.
 const VISITE = Math.random().toString(36).slice(2, 10);
-function joueurId() {
-  try { let j = localStorage.getItem("jp2Joueur"); if (!j) { j = Math.random().toString(36).slice(2, 10); localStorage.setItem("jp2Joueur", j); } return j; } catch (e) { return null; }
-}
 export function evenement(type, infos = {}) {
-  const ligne = { type, ...infos, details: { ...(infos.details || {}), visite: VISITE, joueur: joueurId(), depuisChargement: Math.round(performance.now() / 1000) } };
+  const ligne = { type, ...infos, details: { ...(infos.details || {}), visite: VISITE, joueur: joueurId(), ab: variante("ecoute"), depuisChargement: Math.round(performance.now() / 1000) } };
   (window.__evenements = window.__evenements || []).push(ligne);
   if (!configured()) return;
   try {
@@ -189,4 +211,51 @@ export async function classement(code, graine) {
     }
   }
   return get("ligue_classement", `?code=eq.${encodeURIComponent(code)}&select=pseudo,metres,potes,parties&order=metres.desc&limit=50`);
+}
+
+// --- LE CONCOURS DE LIGUES -----------------------------------------------------
+// La règle : le score d'une ligue, c'est la somme des meilleurs scores de ses
+// membres pendant le concours. Tout est calculé par la base (vues
+// `concours_ligues` et `concours_joueurs`, CONCOURS-A-COLLER.sql) : le jeu ne
+// fait que lire, il ne pourrait pas additionner ce qu'il ne voit pas.
+
+// Dates et plafond, lus une fois par chargement. La base fait foi ; sans
+// réseau, repli sur `config.concoursFin` pour que le compte à rebours
+// s'affiche quand même.
+let concoursCache;
+export async function concours() {
+  if (concoursCache !== undefined) return concoursCache;
+  const rows = await get("concours", "?id=eq.1&select=debut,fin,plafond_score");
+  const repli = window.CONFIG.concoursFin ? { debut: null, fin: window.CONFIG.concoursFin, plafond_score: null } : null;
+  concoursCache = rows && rows.length ? rows[0] : repli;
+  return concoursCache;
+}
+// Reste-t-il du temps ? (null = on ne sait pas, donc on n'affiche rien.)
+export function restantMs(c, maintenant = Date.now()) {
+  if (!c || !c.fin) return null;
+  const fin = Date.parse(c.fin);
+  return Number.isFinite(fin) ? fin - maintenant : null;
+}
+
+// Classement des ligues, la plus forte d'abord. Les ligues de test en sont
+// exclues par la base (colonne `ligues.concours`), jamais par le jeu.
+export async function classementLigues(limite = 100) {
+  return get("concours_ligues", `?select=code,nom,joueurs,total&order=total.desc,code.asc&limit=${limite}`);
+}
+
+// Le top 50 individuel (la « super ligue »).
+export async function top50() {
+  return get("concours_joueurs", "?select=pseudo,metres&order=metres.desc&limit=50");
+}
+
+// La fiche de contact du joueur : c'est la SEULE chose qui permettra de
+// prévenir la ligue gagnante. Table en insertion seule, illisible avec la clé
+// publique — une ligne de plus à chaque enregistrement, la plus récente fait foi.
+export async function enregistrerJoueur({ pseudo, insta, email, newsletter, ville, ligue }) {
+  if (!pseudo) return false;
+  return post("joueurs", {
+    pseudo, insta: insta || null, email: email || null,
+    newsletter: Boolean(newsletter), ville: ville || null, ligue: ligue || null,
+    appareil: joueurId(),
+  });
 }

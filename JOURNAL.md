@@ -1012,3 +1012,55 @@ non (réservé aux applis natives). Page `story-test.html` : image story aux cou
 « Envoyer à une amie » envoie image + texte + lien, diagnostic et journal visibles à l'écran
 pour voir ce que chaque téléphone accepte (Safari, navigateur d'Instagram, Android). À brancher
 dans l'écran de fin une fois testé sur téléphone.
+
+## 2 novembre 2026 — le concours de ligues (v43)
+
+L'artiste arrive avec un brief écrit dans une autre conversation : le jeu devient l'outil de
+l'arc promo du single, une règle unique (« le score de ta ligue, c'est la somme des meilleurs
+scores de tous ses membres »), deux semaines, et pour la ligue n°1 un son écrit sur elle.
+« La récompense ultime, c'est je fais un son pour le meilleur groupe de potes avec eux pour le
+kiff. » Demande : « tu peux t'assurer que le système soit mis en place dans le jeu ? Tu peux
+virer les ligues test etc ou me donner les copier-coller à faire pour que ça marche ? »
+
+Trois points du brief écartés ou corrigés, discutés avec lui :
+
+1. **La somme + aucun compte = ferme à triche triviale.** Rien n'authentifie un joueur : une
+   personne peut inscrire vingt pseudos dans sa ligue depuis un téléphone. La règle est gardée
+   (c'est sa promesse en vidéo), avec deux garde-fous que seule la v2 permet — un PLAFOND de
+   vraisemblance (`outils/plafond.mjs` : score parfait maximal 18 476 sur 400 graines, ×3 de
+   boost de ligue = 55 428 ; plafond posé à 75 000, trigger Postgres) et l'IDENTIFIANT
+   D'APPAREIL rangé à côté de chaque score (vue `ligues_suspectes` : vingt pseudos, un
+   appareil). Détection, pas prévention : c'est lui qui remet le lot.
+2. **L'email obligatoire avant la première partie, écarté.** Clavier dans le navigateur
+   d'Instagram, avant le moindre plaisir, alors que son canal d'acquisition est le DM Insta.
+   Et surtout un vrai défaut : l'Insta saisi n'était envoyé NULLE PART, donc il ne pouvait
+   contacter personne. Arbitrage retenu : Insta obligatoire, email facultatif avec case
+   newsletter séparée. Table `joueurs` en insertion seule, SANS règle de lecture — les contacts
+   sont illisibles avec la clé publique, ils se lisent dans le Table editor (vue `contacts`).
+3. **« Tout pointe vers le single »** : il a donné les trois liens (Spotify, Deezer, Apple
+   Music). `plateformesTitre` les porte, `/intl-fr/` retiré du lien Spotify (il forçait la page
+   web au lieu de l'app). Le Deezer reste un lien court `link.deezer.com` — une redirection de
+   plus, à remplacer par le `deezer.com/track/…` quand il l'aura.
+
+**« Est-ce qu'on peut pas lier différemment ? Ce que je veux savoir c'est pour faire de l'A/B
+test, savoir ce qui fonctionne et ce qui fonctionne pas. »** D'où `abTests` dans `config.js` :
+la variante d'un joueur est TIRÉE DE SON IDENTIFIANT (même joueur, même variante, toujours —
+tirée au hasard à chaque visite, la mesure ne voudrait rien dire), et elle part dans
+`details.ab` de chaque événement. Deux tests : `ecoute` (panneau de trois plateformes vs
+Spotify seul) et `invitation` (quel message s'ouvre par défaut). Vues `ab_ecoute` et
+`ab_invitation`.
+
+Posé aussi : le classement général des ligues et le top 50 individuel (tiroir
+`#classement-sheet`, deux onglets), « Ta ligue a besoin de toi » sur l'écran de fin (rang de la
+ligue, points qui manquent pour passer celle du dessus, temps restant), le compte à rebours, le
+nom de ligue libre, quatre messages d'invitation au choix sur le ton du morceau, « @x a rejoint
+ta ligue », le règlement (`public/reglement.html`), et la ligue de test éteinte
+(`ligueBeta: ""`, drapeau `ligues.concours` en base).
+
+⚠️ **Un piège évité au passage** : le service worker rangeait TOUTE navigation sous « ./ ».
+Ouvrir le règlement aurait écrasé la copie hors ligne du jeu, et le jeu se serait ouvert sur le
+règlement. `cleDeNavigation()` ne garde « ./ » que pour la page du jeu.
+
+Un joueur ne compte que pour UNE ligue, celle où il a fait son meilleur score (`distinct on`
+dans la vue) : sans ça, cinq potes qui rejoignent les cinq ligues les uns des autres feraient
+monter les cinq d'un coup.

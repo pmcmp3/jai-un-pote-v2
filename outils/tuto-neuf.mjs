@@ -20,7 +20,7 @@ await page.addInitScript(() => {
   if (sessionStorage.getItem("pose")) return;
   sessionStorage.setItem("pose", "1");
   localStorage.clear();
-  localStorage.setItem("jp2Pseudo", "neuf"); localStorage.setItem("jp2LigueVue", "1"); localStorage.setItem("jp2Parties", "3");
+  localStorage.setItem("jp2Pseudo", "neuf"); localStorage.setItem("jp2Insta", "neuf.mp3"); localStorage.setItem("jp2LigueVue", "1"); localStorage.setItem("jp2Parties", "3");
   localStorage.setItem("jp2MorceauOuvert", "1"); localStorage.setItem("jp2PmcSuivi", "1");
 });
 await page.goto(`http://localhost:${port}/?debug`);

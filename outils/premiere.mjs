@@ -31,7 +31,7 @@ const sfx = petit ? "-petit" : "";
 const photo = async (nom) => { await page.screenshot({ path: `${sorties}${nom}${sfx}.png` }); console.log("  →", `outils/sorties/${nom}${sfx}.png`); };
 // Un ancien joueur : `?premiere` doit tout effacer.
 await page.goto(`http://localhost:${port}/`);
-await page.evaluate(() => { localStorage.setItem("jp2Pseudo", "ancien"); localStorage.setItem("jp2Parties", "9"); });
+await page.evaluate(() => { localStorage.setItem("jp2Pseudo", "ancien"); localStorage.setItem("jp2Insta", "ancien.mp3"); localStorage.setItem("jp2Parties", "9"); });
 await page.goto(`http://localhost:${port}/?premiere`);
 await attendre(700);
 await photo("49-premiere-chargement");
@@ -59,6 +59,8 @@ await page.setViewportSize({ width: 375, height: hauteur }); await attendre(700)
 await photo("50d-premiere-clavier-ferme");
 console.log("clavier fermé :", JSON.stringify(await mesureChamp("#pseudo-input")), "centre", await page.evaluate(() => getComputedStyle(document.getElementById("overlay")).getPropertyValue("--centre")));
 await page.fill("#pseudo-input", "paul");
+// L'Insta est obligatoire depuis le concours : sans lui, « Continuer » reste éteint.
+await page.fill("#insta-input", "paul.mp3");
 await page.click("#step1-next"); await attendre(400);
 await photo("51a-premiere-cycliste");
 console.log("bouton cycliste :", await page.textContent("#play-button"));

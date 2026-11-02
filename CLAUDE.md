@@ -182,14 +182,58 @@ intégré d'Instagram d'abord**, portrait natif.
   tranche ce qui sonne faux.
 
 ### Menus, ligues, conversion (`screens.js`, `net.js`)
-- Premier passage : pseudo (+ Insta et village facultatifs, avec une ligne qui dit pourquoi :
-  le village s'écrit sur le panneau en course, l'Insta sert à prévenir d'un lot — ⚠️ l'Insta
-  n'est envoyé nulle part aujourd'hui, à brancher avec la base) → mon cycliste (homme/femme, VTT / Grand Bi / vélo enfant, maillot,
-  chapeau) → ma ligue (créer, rejoindre, ou jouer sans). Ensuite le cycliste est l'accueil.
+- Premier passage : pseudo + **Insta OBLIGATOIRE** (c'est par là qu'on prévient la ligue
+  gagnante), email et village facultatifs, case newsletter séparée, lien vers le règlement →
+  mon cycliste (homme/femme, VTT / Grand Bi / vélo enfant, maillot, chapeau) → ma ligue (créer
+  avec un nom libre, rejoindre, ou jouer sans). Ensuite le cycliste est l'accueil. Un habitué
+  sans Insta repasse UNE fois par l'étape 1.
+- **Fiche de contact** (`net.enregistrerJoueur`, table `joueurs`) : elle ne part que quand elle
+  CHANGE, et seulement si elle porte de quoi joindre quelqu'un. ⚠️ Table en insertion seule,
+  AUCUNE règle de lecture : les contacts sont illisibles avec la clé publique, ils se lisent
+  dans le Table editor (vue `contacts`).
 - **Ligues** : 21 membres maximum, complétées par 3 bots ; **boost de ligue** (+10 % par pote
   qui a joué au moins 30 s, jusqu'à ×3) ; relais de ligue ; sprint du dimanche ; au plus
   `liguesParVague` nouvelles ligues par semaine. Partage : natif d'abord, tiroir maison si
   absent (Instagram sur Android).
+- **LE CONCOURS DE LIGUES** (`supabase/CONCOURS-A-COLLER.sql`). La règle, en une phrase : *le
+  score d'une ligue, c'est la somme des meilleurs scores de ses membres* ; à la clôture, la
+  ligue n°1 gagne un son écrit sur elle. Clôture le **dimanche 22 novembre 2026 à 12 h**.
+  - Tout est additionné par la BASE (vues `concours_ligues` et `concours_joueurs`) : le jeu ne
+    voit que son propre score, il ne pourrait rien totaliser. Il lit, il n'écrit pas.
+  - ⚠️ Un joueur ne compte que pour **UNE** ligue, celle où il a fait son meilleur score
+    (`distinct on` dans la vue) : sans ça, cinq potes qui rejoignent les cinq ligues les uns
+    des autres feraient monter les cinq d'un coup.
+  - ⚠️ La **date qui fait foi** est celle de la table `concours`, lue au chargement ;
+    `config.concoursFin` n'est que le repli hors réseau. Les deux doivent coïncider.
+  - Les ligues de test sortent du classement par la colonne `ligues.concours`, jamais par le
+    jeu. La ligue de démo reste en base : c'est le peloton de ceux qui jouent sans ligue.
+  - **Anti-triche** : plafond de vraisemblance et cadence vérifiés par un trigger Postgres
+    (`score_vraisemblable`) ; identifiant d'appareil à côté de chaque score, vue
+    `ligues_suspectes` (vingt pseudos, un appareil). Détection, pas prévention — c'est l'artiste
+    qui remet le lot. Plafond mesuré par `outils/plafond.mjs`, à relever d'un `update` si le
+    score parfait grimpe. ⚠️ Un plafond trop bas refuserait une vraie partie EN SILENCE.
+  - Écran de fin : **« Ta ligue a besoin de toi »** (rang de la ligue sur toutes les ligues,
+    points qui manquent pour passer celle du dessus, temps restant) au-dessus du classement
+    interne. Tiroir `#classement-sheet` : les ligues, et le top 50 individuel (la « super
+    ligue », classement bonus dont on ne parle pas en vidéo).
+  - **Messages d'invitation** (`config.messagesInvitation`) : quatre formulations sur le ton du
+    morceau, celle qui s'ouvre vient de la variante A/B, le joueur peut en choisir une autre, et
+    c'est le message RÉELLEMENT envoyé qui est mesuré (`details.message`).
+  - **« @x a rejoint ta ligue »** sous le peloton : mémorisé par ligue (`jp2LigueVus`), et la
+    première fois qu'on regarde une ligue on ne crie pas que tout le monde vient d'arriver.
+  - **Règlement** : `public/reglement.html`, lié depuis l'inscription et le classement.
+    ⚠️ Il reste des `[À COMPLÉTER]` surlignés : identité de l'organisateur, SIRET, adresse,
+    email de contact.
+- **A/B TEST** (`config.abTests`, `net.variante`) : la variante d'un joueur est **tirée de son
+  identifiant anonyme**, pas au hasard à chaque fois — sinon il verrait une version différente à
+  chaque visite et la mesure ne voudrait rien dire. Elle part dans `details.ab` de chaque
+  événement. Deux tests : `ecoute` (panneau de trois plateformes vs Spotify seul) et
+  `invitation` (message par défaut). Vues `ab_ecoute` et `ab_invitation`. Une seule valeur dans
+  la liste = test éteint.
+- **Les boutons d'écoute pointent vers le TITRE** (`config.plateformesTitre` : Spotify, Deezer,
+  Apple Music), l'album en repli si la liste est vide. ⚠️ URL nettoyées à la main : pas de
+  `/intl-fr/` (il force la page web au lieu de l'app), pas de `?si=`, jamais le schéma
+  `spotify:`.
 - **Base Supabase v2 BRANCHÉE depuis le 11 octobre 2026** (projet `khlxublwgcqihuezzsam`,
   clé publishable dans `config.js`) : `schema-v2.sql` + `tableau-de-bord.sql` exécutés (fusionnés
   dans `supabase/A-COLLER-DANS-SUPABASE.sql`), 6 ligues / 29 membres recopiés de la v1.
@@ -226,13 +270,16 @@ intégré d'Instagram d'abord**, portrait natif.
   porte. ⚠️ Le titre « Ajoute l'album à ta bibliothèque pour continuer la partie » est le choix
   de l'artiste ; le premier jeu l'évitait (règle Spotify : pas de contrepartie contre un ajout).
   Risque connu, assumé.
-- Ligue de test `TESTV2` (`config.ligueBeta`) : menu simplifié et bouton « Laisser un retour ».
+- Ligue de test : **éteinte** (`config.ligueBeta: ""`). Remettre un code (et le créer en base)
+  rebranche le menu simplifié et le bouton « Laisser un retour » — jamais pendant le concours.
 
 ### Vibrations (Android seulement : aucune API web ne fait vibrer un iPhone)
 Choc 60 ms, chute, nouveau pote, brique de lait, salto, fin. Le test `collisions` vérifie que
 chaque choc payé vibre.
 
 ### Liens et touches
+- Pages : le jeu (`index.html`), le règlement (`reglement.html`), le tableau de bord
+  (`tableau-de-bord.html`), le banc d'essai story (`story-test.html`).
 - URL : `?9` (retire le service worker PUIS vide les caches — dans cet ordre, voir `index.html`), `?premiere` (première visite), `?demo` (ligue de
   démo pleine), `?neuf` (paliers de conversion à zéro), `?zero` (tout effacer), `?jetpack`,
   `?ligue=CODE`, `?debug`.
@@ -241,8 +288,13 @@ chaque choc payé vibre.
 
 ## Points ouverts
 
-- **Sous-domaine** (§4). Envoyer l'Insta (et le village) avec le score, sinon on ne peut
-  prévenir personne.
+- **Sous-domaine** (§4).
+- **Le règlement attend ses mentions** : identité de l'organisateur, SIRET, adresse, email de
+  contact (`public/reglement.html`, surlignés en jaune). Sans elles, le concours tourne mais le
+  règlement n'est pas opposable.
+- **Le lien Deezer est un lien court** (`link.deezer.com/s/…`) : une redirection de plus avant
+  l'app, à remplacer par le `deezer.com/track/…`. TIDAL et YouTube Music n'ont pas de lien du
+  titre : ils ne sont plus proposés.
 - **À juger sur un vrai téléphone** : clavier iOS dans Instagram, partage dans les navigateurs
   intégrés, lien `instagram://` vers @pmc.mp3, les sons à l'oreille.
 - **Défi à un ami** (lien avec un score à battre) : prévu, pas commencé.
@@ -273,7 +325,7 @@ chaque choc payé vibre.
   spectrogramme de chaque son), `sons-course.mjs [--reel]`, `gamme.py` (tonalité d'un morceau),
   `video.mjs` (vidéo 9:16), `voix-megaphone.sh` (mémo vocal → cri au mégaphone),
   `marchand.mjs`, `alertes.mjs`, `pieces-piegees.mjs`, `porte-echelle.mjs`, `familles.mjs`,
-  `commentaires-seuls.mjs`.
+  `commentaires-seuls.mjs`, `plafond.mjs` (plafond de vraisemblance du concours).
 - ⚠️ La preview de l'IDE ne peut pas jouer le jeu (l'`AudioContext` fige l'onglet) : passer par
   les outils, puis par un vrai téléphone.
 

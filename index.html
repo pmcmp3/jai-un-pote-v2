@@ -473,6 +473,67 @@
     .volume-range::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 16px; height: 16px; margin-top: -6.5px; border-radius: 50%; background: var(--rouge); border: 1.5px solid var(--noir); }
     .volume-range::-moz-range-thumb { width: 16px; height: 16px; border-radius: 50%; background: var(--rouge); border: 1.5px solid var(--noir); }
 
+    /* --- Le concours de ligues ------------------------------------------- */
+    /* Replié, et ABSENT pendant la saisie du pseudo ou de l'Insta : la carte doit
+       tenir au-dessus du clavier d'un petit iPhone (outils/clavier.mjs). */
+    #plus-contact { width: 240px; margin-top: 10px; }
+    #plus-contact summary { cursor: pointer; font: 700 12px var(--police); color: rgba(0,0,0,0.55); list-style: none; padding: 4px 0; }
+    #plus-contact summary::-webkit-details-marker { display: none; }
+    #overlay.clavier #plus-contact:not(:focus-within) { display: none; }
+    #newsletter-row { display: flex; align-items: flex-start; gap: 8px; width: 240px; margin-top: 11px; font: 500 12px/1.35 var(--police); color: rgba(0,0,0,0.7); text-align: left; }
+    #newsletter-row input { width: 16px; height: 16px; margin: 0; flex: 0 0 auto; accent-color: var(--rouge); }
+    #pourquoi-contact { width: 240px; margin: 9px 0 0; font: 500 11.5px/1.4 var(--police); color: rgba(0,0,0,0.5); text-align: left; }
+    #pourquoi-contact a, #classement-regle a { color: var(--rouge); font-weight: 700; text-decoration: underline; text-underline-offset: 2px; }
+    #ligue-nom-row { width: 100%; margin: 0 0 11px; }
+    #ligue-arrivees { margin: 4px 0 0; padding: 5px 10px; background: #ffcf2e; border: 1.5px solid var(--noir); border-radius: 3px; font: 700 12px/1.35 var(--police); color: var(--noir); text-align: center; }
+    #ligue-concours { margin: 6px 0 0; font: 600 12px/1.4 var(--police); color: rgba(0,0,0,0.65); text-align: center; }
+    #ligue-concours b { color: var(--rouge); font-weight: 900; }
+
+    #end-concours { width: 100%; margin: 0 0 12px; padding: 11px 12px; box-sizing: border-box; border: 1.5px solid var(--noir); border-radius: var(--rayon); background: rgba(255,207,46,0.22); display: flex; flex-direction: column; align-items: center; gap: 5px; }
+    #end-concours-titre { margin: 0; font: 900 12px var(--police); letter-spacing: 0.1em; text-transform: uppercase; color: var(--noir); }
+    #end-concours-rang { margin: 0; font: 500 13.5px/1.35 var(--police); color: var(--noir); text-align: center; }
+    #end-concours-rang b { font-weight: 900; }
+    #end-concours-ecart { margin: 0; font: 600 13px/1.35 var(--police); color: var(--noir); text-align: center; }
+    #end-concours-ecart b { font-weight: 900; color: var(--rouge); }
+    #end-concours-temps { margin: 0; font: 600 11.5px var(--police); letter-spacing: 0.06em; text-transform: uppercase; color: rgba(0,0,0,0.55); }
+    #end-concours-voir { margin-top: 1px; }
+
+    /* Même tiroir que l'album et le partage : une seule grammaire. */
+    #classement-sheet { position: fixed; inset: 0; z-index: 56; visibility: hidden; transition: visibility 0s linear 0.3s; }
+    #classement-sheet.visible { visibility: visible; transition: visibility 0s; }
+    #classement-veil { position: absolute; inset: 0; background: rgba(13,13,16,0.62); opacity: 0; transition: opacity 0.3s ease; }
+    #classement-sheet.visible #classement-veil { opacity: 1; }
+    #classement-card {
+      position: absolute; left: 0; right: 0; bottom: 0; box-sizing: border-box; max-width: 460px; margin: 0 auto;
+      max-height: 88vh; overflow-y: auto; -webkit-overflow-scrolling: touch;
+      padding: 20px 24px calc(18px + var(--safe-bottom) + var(--browser-chrome-bottom));
+      border-radius: var(--rayon) var(--rayon) 0 0; border: 1.5px solid var(--panneau-bord); border-bottom: none; background: var(--panneau-fond);
+      display: flex; flex-direction: column; align-items: center; gap: 9px;
+      transform: translateY(105%); transition: transform 0.3s ease;
+    }
+    #classement-sheet.visible #classement-card { transform: translateY(0); }
+    @media (min-width: 700px) and (min-height: 600px) {
+      #classement-card { bottom: 28px; border-radius: var(--rayon); border-bottom: 1.5px solid var(--panneau-bord); padding-bottom: 22px; max-height: min(84vh, 760px); }
+    }
+    #classement-eyebrow { margin: 0 0 4px; padding: 7px 14px; background: var(--rouge); border-radius: 2px; transform: rotate(-2deg); font: 700 11.5px var(--police); letter-spacing: 0.14em; text-transform: uppercase; color: var(--blanc); text-align: center; }
+    #classement-title { margin: 0; font: 900 19px var(--police); color: var(--noir); text-align: center; }
+    #classement-onglets { display: flex; gap: 6px; margin: 2px 0 0; }
+    #classement-onglets .chip { height: 30px; padding: 0 11px; font-size: 11px; }
+    #classement-regle { margin: 0; font: 500 11.5px/1.4 var(--police); color: rgba(0,0,0,0.55); text-align: center; }
+    #classement-liste { width: 100%; margin: 0; padding: 0; list-style: none; font: 500 13px var(--police); color: var(--noir); }
+    #classement-liste li { display: flex; align-items: baseline; gap: 8px; padding: 6px 4px; border-bottom: 1px solid rgba(0,0,0,0.08); }
+    #classement-liste li.moi { background: rgba(255,207,46,0.35); border-radius: 3px; font-weight: 900; }
+    #classement-liste .rang { width: 22px; flex: 0 0 auto; color: rgba(0,0,0,0.45); font-weight: 900; }
+    #classement-liste .nom { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #classement-liste .nom small { display: block; font: 500 10.5px var(--police); color: rgba(0,0,0,0.45); letter-spacing: 0.06em; }
+    #classement-liste .m { flex: 0 0 auto; font-weight: 900; }
+    #classement-vide { margin: 0; font: 600 13px/1.4 var(--police); color: var(--noir); text-align: center; }
+
+    /* Les messages d'invitation : on en choisit un, il part avec le lien. */
+    #partage-messages { display: flex; flex-direction: column; gap: 5px; width: 100%; margin: 2px 0 0; }
+    .msg-choix { display: block; width: 100%; box-sizing: border-box; padding: 9px 11px; text-align: left; border: 1.5px solid rgba(0,0,0,0.22); border-radius: var(--rayon); background: #fff; font: 500 13px/1.3 var(--police); color: var(--noir); -webkit-tap-highlight-color: transparent; }
+    .msg-choix.actif { border-color: var(--noir); box-shadow: 0 0 0 2px #ffcf2e; font-weight: 700; }
+
     @media (prefers-reduced-motion: reduce) {
       #overlay, #overlay .fade, .btn { transition-duration: 0.01s; }
       .view.active { animation-duration: 0.01s; }
@@ -512,8 +573,14 @@
             <input type="text" id="pseudo-input" placeholder="ton pseudo" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="32" />
           </div>
           <p class="champ-titre beta-off">Pour aller plus loin</p>
-          <div class="champ-row beta-off"><span class="icon">IG</span><input type="text" id="insta-input" placeholder="ton Instagram (facultatif)" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="40" /></div>
+          <div class="champ-row beta-off"><span class="icon">IG</span><input type="text" id="insta-input" placeholder="ton Instagram" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="40" /></div>
           <div class="champ-row beta-off"><span class="icon">⌂</span><input type="text" id="ville-input" placeholder="ton village, ta ville (facultatif)" autocomplete="off" spellcheck="false" maxlength="24" /></div>
+          <details id="plus-contact" class="beta-off">
+            <summary>＋ Email, règlement</summary>
+            <div class="champ-row"><span class="icon">@</span><input type="email" id="email-input" placeholder="ton email (facultatif)" autocomplete="email" autocapitalize="none" spellcheck="false" maxlength="80" /></div>
+            <label id="newsletter-row"><input type="checkbox" id="newsletter-input" /><span>Préviens-moi des sorties de PMC par email</span></label>
+            <p id="pourquoi-contact">Ton Insta sert à te prévenir si ta ligue gagne. Rien n'est publié. <a id="lien-reglement" href="reglement.html" target="_blank" rel="noopener">Règlement</a></p>
+          </details>
           <p id="champs-pourquoi" class="beta-off">Ton <b>village</b> s'écrit sur le panneau quand tu le traverses en course. Ton <b>Insta</b>, c'est pour te prévenir si tu gagnes un lot.</p>
           <p id="beta-note" class="field-note hidden">Bêta-test : tout le monde court la <b>même course</b>. Écris ton pseudo, joue, et laisse-moi ton retour à la fin.</p>
           <button id="step1-next" class="btn btn-primary" type="button" disabled>Continuer</button>
@@ -528,7 +595,8 @@
                le code en gros, Inviter en gros, le peloton avec ses bots. -->
           <div id="ligue-bloc">
             <div id="ligue-sans">
-              <p id="ligue-intro">Plus tes potes jouent, plus tu marques de points. <b>Deviens le meilleur score de ta ligue de potes.</b></p>
+              <p id="ligue-intro">Le score de ta ligue, c'est la somme des meilleurs scores de vous tous. <b>À la clôture, la ligue n°1 gagne un son écrit sur elle par PMC.</b></p>
+              <div class="champ-row" id="ligue-nom-row"><span class="icon">№</span><input type="text" id="ligue-nom" placeholder="nom de ta ligue" autocomplete="off" maxlength="28" /></div>
               <button id="ligue-creer" type="button" class="btn btn-primary">Créer ma ligue</button>
               <p class="lp-sep"><span>ou</span></p>
               <p class="lp-ou">Un pote t'a donné un code&nbsp;?</p>
@@ -550,6 +618,8 @@
               </span></span></button>
               <ul id="ligue-peloton"></ul>
               <p id="ligue-membres"></p>
+              <p id="ligue-arrivees" class="hidden"></p>
+              <p id="ligue-concours" class="hidden"></p>
             </div>
           </div>
           <button id="step2-next" class="btn btn-primary" type="button">Jouer</button>
@@ -585,6 +655,13 @@
             <div id="score-num"><span id="score-val">0</span><small>pts</small></div>
             <p id="end-sub"></p>
             <p id="end-max" class="hidden"></p>
+          </div>
+          <div id="end-concours" class="hidden">
+            <p id="end-concours-titre">Ta ligue a besoin de toi</p>
+            <p id="end-concours-rang"></p>
+            <p id="end-concours-ecart" class="hidden"></p>
+            <p id="end-concours-temps" class="hidden"></p>
+            <button id="end-concours-voir" type="button" class="link-minimal">Voir le classement général →</button>
           </div>
           <div id="end-ligue" class="hidden">
             <p id="end-rang" class="hidden"></p>
@@ -736,12 +813,29 @@
        pas dans le navigateur Instagram ») : les navigateurs intégrés n'ont pas
        de partage natif — copier le lien affiché marche partout, les boutons
        ouvrent directement l'appli. -->
+  <div id="classement-sheet" aria-hidden="true">
+    <div id="classement-veil"></div>
+    <div id="classement-card">
+      <p id="classement-eyebrow">Le concours</p>
+      <p id="classement-title">Classement général</p>
+      <div id="classement-onglets">
+        <button type="button" class="chip actif" data-vue="ligues">Les ligues</button>
+        <button type="button" class="chip" data-vue="joueurs">Top 50 joueurs</button>
+      </div>
+      <p id="classement-regle"></p>
+      <ol id="classement-liste"></ol>
+      <p id="classement-vide" class="hidden">Personne n'a encore joué. Ta ligue peut être première.</p>
+      <button id="classement-fermer" type="button" class="link-minimal">Fermer</button>
+    </div>
+  </div>
+
   <div id="partage-sheet" aria-hidden="true">
     <div id="partage-veil"></div>
     <div id="partage-card">
       <p id="partage-eyebrow">Invite tes potes</p>
       <p id="partage-title">Envoie-leur le lien</p>
       <p id="partage-text">Chaque pote qui joue te rapporte des points en plus.</p>
+      <div id="partage-messages"></div>
       <p id="partage-lien"></p>
       <button id="partage-copier" type="button" class="btn btn-primary">Copier le lien</button>
       <p id="partage-hint" class="hidden"></p>

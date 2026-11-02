@@ -23,7 +23,7 @@ await page.addInitScript(() => {
   if (sessionStorage.getItem("pose")) return;
   sessionStorage.setItem("pose", "1");
   localStorage.clear();
-  localStorage.setItem("jp2Pseudo", "test"); localStorage.setItem("jp2LigueVue", "1"); localStorage.setItem("jp2Parties", "6");
+  localStorage.setItem("jp2Pseudo", "test"); localStorage.setItem("jp2Insta", "test.mp3"); localStorage.setItem("jp2LigueVue", "1"); localStorage.setItem("jp2Parties", "6");
 });
 await page.goto(`http://localhost:${port}/`);
 await page.waitForFunction(() => !document.getElementById("play-button").disabled, null, { timeout: 20000 });

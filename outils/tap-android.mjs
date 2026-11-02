@@ -23,7 +23,7 @@ await page.addInitScript(() => {
   if (sessionStorage.getItem("pose")) return;
   sessionStorage.setItem("pose", "1");
   localStorage.clear();
-  localStorage.setItem("jp2Pseudo", "test"); localStorage.setItem("jp2LigueVue", "1");
+  localStorage.setItem("jp2Pseudo", "test"); localStorage.setItem("jp2Insta", "test.mp3"); localStorage.setItem("jp2LigueVue", "1");
   localStorage.setItem("jp2-appris", '["tap","haut","double"]'); localStorage.setItem("jp2-conseils-vus", '{"lait":1,"alerte":1,"mouette":1}');
   localStorage.setItem("jp2Parties", "6"); localStorage.setItem("jp2MorceauOuvert", "1"); localStorage.setItem("jp2PmcSuivi", "1");
   // Compte ce que le jeu reçoit (avant ses propres écouteurs).

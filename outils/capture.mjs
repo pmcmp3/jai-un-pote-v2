@@ -40,7 +40,7 @@ page.on("console", (m) => { if (m.type() === "error") erreurs.push(m.text()); })
 await page.addInitScript(([parties, neuf, genre, velo]) => {
   if (genre || velo) localStorage.setItem("jp2Skin", JSON.stringify({ genre: genre || "homme", velo: velo || "vtt" }));
   localStorage.setItem("jp2-appris", '["tap","haut","double"]'); // pas de conseil hors des scènes qui le testent
-  localStorage.setItem("jp2Pseudo", "pmc");
+  localStorage.setItem("jp2Pseudo", "pmc"); localStorage.setItem("jp2Insta", "pmc.mp3");
   localStorage.setItem("jp2LigueVue", "1");
   localStorage.setItem("jp2-conseils-vus", '{"lait":1,"alerte":1,"mouette":1}'); // projecteurs : seulement dans la scène qui les teste
   localStorage.setItem("jp2Parties", parties);
