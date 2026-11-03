@@ -55,9 +55,15 @@ export function drawCoin(ctx, R, spin, rouge = false) {
   ctx.beginPath();
   ctx.ellipse(-rx * 0.25, -R * 0.3, rx * 0.35, R * 0.22, 0, 0, Math.PI * 2);
   ctx.fill();
-  // Contour sombre : sans lui, une pièce dorée se perd sur le champ de blé
-  // et dans le ciel.
-  ctx.strokeStyle = "rgba(60,38,4,0.85)";
+  // Double contour, clair PUIS sombre : une pièce dorée se perd sur un champ de
+  // blé et dans un ciel orange. Le filet clair dehors, le trait sombre dedans :
+  // elle se détache sur le jaune comme sur la nuit.
+  ctx.strokeStyle = "rgba(255,251,238,0.92)";
+  ctx.lineWidth = Math.max(1.2, R * 0.13) + Math.max(2, R * 0.2);
+  ctx.beginPath();
+  ctx.ellipse(0, 0, rx, R, 0, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.strokeStyle = "rgba(60,38,4,0.9)";
   ctx.lineWidth = Math.max(1.2, R * 0.13);
   ctx.beginPath();
   ctx.ellipse(0, 0, rx, R, 0, 0, Math.PI * 2);

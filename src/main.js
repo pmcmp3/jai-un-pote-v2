@@ -449,6 +449,23 @@ function conseilVue() {
   return { titre: fini ? "BIEN !" : titre, sous: fini ? null : c.sous, onglet: fini ? "BIEN !" : "À TOI", ok: fini, alpha: conseil.alpha, y: safeTop + 96 };
 }
 
+// Où est, à l'écran, ce que la consigne en cours fait franchir ? Le cercle
+// (hud.renderCible) se pose dessus ; null si on ne le voit pas encore.
+function cibleConseil(tm) {
+  if (conseil.r === null || conseil.phase === "fini") return null;
+  const r = conseil.r, row = rows.rowAt(r);
+  if (!row || row.type === "safe") return null;
+  const K = rows.KINDS[row.kind];
+  let u = 0, v = r;
+  if (row.type === "contresens") { const o = rows.contresensAt(r, row, tm); if (!o) return null; v = o.v; }
+  else if (row.type === "traverse") { const c = rows.crossersAt(r, row, tm)[0]; if (!c) return null; u = c.u; }
+  const bas = rows.basObstacle(row.kind, r), haut = rows.hauteurObstacle(row.kind, r);
+  const p = scene.project(u, v, rows.solAt(v) + (bas + haut) / 2);
+  if (p.x < 0 || p.x > width * 0.97) return null;
+  const grand = Math.max(K.traverse ? K.larg : K.long, haut - bas);
+  return { x: p.x, y: p.y, r: Math.max(38, scene.echelle(u) * 0.5 * grand * 1.3 + 12) };
+}
+
 // --- Projecteur ------------------------------------------------------------------
 // Première brique de lait : une fois par joueur (jp2-conseils-vus), le monde
 // gèle, l'écran s'assombrit sauf autour de l'objet, une indication s'affiche,
@@ -1016,6 +1033,7 @@ function majCiel(now, dt) {
   // La plage de fin rallume un coucher de soleil : la nuit s'y lève tout à fait.
   plageFondu += ((rows.enPlage(Math.round(player.v + 8)) ? 1 : 0) - plageFondu) * Math.min(1, dt * 0.45);
   scene.setPlage(plageFondu);
+  canvas.classList.toggle("plage", plageFondu > 0.3);
   if (nd !== undefined) scene.setNight(Math.max(0, Math.min(1, (now - nd) / 30)) * (1 - plageFondu));
   // Le soleil traverse le ciel sur toute la durée du morceau.
   scene.setHeure(now / Math.max(1, window.CONFIG.dureeMorceau));
@@ -1343,10 +1361,14 @@ function renderAlertes(now, vitesse) {
     const age = tReel - alertesVues.get(r);
     // Grand et qui tremble 0,6 s, puis petit et calme jusqu'à l'arrivée.
     const reduit = Math.max(0, Math.min(1, (age - 0.6) / 0.25));
-    const taille = 32 * (1 - reduit) + 17 * reduit;
+    // 20 % plus petit qu'avant (32 → 25,6 ; 17 → 13,6) : le panneau prévient
+    // sans cacher la route.
+    const taille = 25.6 * (1 - reduit) + 13.6 * reduit;
     const tremble = age < 0.6 ? Math.sin(age * 72) * 5 * (1 - age) : 0;
-    // Posé à hauteur de chaussée SOUS le joueur (sur la colline, la route est montée).
-    const y = scene.project(0, player.v, rows.solAt(player.v) + 1.4).y + (age < 0.6 ? Math.cos(age * 61) * 2 : 0);
+    // Posé à hauteur de la chaussée AU NIVEAU DE LA MER, jamais sur le sol sous
+    // le joueur : ce sol monte et descend (rampe du marché, colline) et le
+    // panneau suivait, comme un avion qui descend. Fixe à l'écran.
+    const y = scene.project(0, player.v, 1.4).y + (age < 0.6 ? Math.cos(age * 61) * 2 : 0);
     // ⚠️ Posé sur sa largeur RÉELLE, 2 × taille, avec une marge franche :
     // compté sur une seule `taille`, son coin droit sortirait de l'écran.
     const x = width - 14 - taille * 2 + tremble;
@@ -1737,6 +1759,10 @@ function messagesSurJoueur(u, v, jy) {
 }
 // HUD, décompte, tuto, doigt qui tape, projecteur, bandeau, écran « terminé ».
 function interfaceDeCourse(now, tAnim) {
+  if (gameStarted && !game.ended && !projo.type && conseil.alpha > 0.01) {
+    const cible = cibleConseil(tMonde());
+    if (cible) hud.renderCible(ctx, width, height, cible, conseil.alpha, tAnim);
+  }
   if (gameStarted && hudAlpha > 0.001) {
     ctx.save();
     ctx.globalAlpha = hudAlpha;

@@ -207,6 +207,20 @@ export function renderCountIn(ctx, width, height, t, beatPeriod, beats, linger, 
   ctx.fillStyle = t < 0 ? BLANC : JAUNE;
   ctx.fillText(texte, 0, 0);
   ctx.restore();
+  // Le rappel de la ligue, à CHAQUE départ (premier lancement comme REJOUER) :
+  // c'est ce qui fait inviter. Texte blanc, ombre portée à 25 %, comme le reste
+  // de l'interface : pas de bandeau sombre.
+  {
+    const lignes = ["Plus tu as de potes dans ta ligue,", "plus tu as de chances de faire un meilleur score."];
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillStyle = BLANC;
+    ctx.shadowColor = "rgba(0,0,0,0.25)"; ctx.shadowOffsetY = 2; ctx.shadowBlur = 0;
+    const y0 = Math.max(height * 0.3, 190) + (avecSon ? 118 : 78);
+    lignes.forEach((l, i) => { fitFont(ctx, "800", 15, l, width - 40, 10); ctx.fillText(l, width / 2, y0 + i * 21); });
+    ctx.restore();
+  }
   // Rappel de jouer avec le son (les klaxons annoncent les voitures). Pas si
   // la carte « Monte le son » de l'explication vient de passer.
   if (!avecSon) return;
@@ -396,6 +410,30 @@ export function renderPastille(ctx, x, y, texte, alpha, jaune = false) {
 
 // Projecteur : tout l'écran assombri sauf un cercle autour de l'objet, le
 // nom de l'objet en jaune, une phrase, et « touche pour continuer ».
+// Le CERCLE sur le danger d'une consigne : pendant qu'on explique un geste, le
+// reste de l'écran s'assombrit en fondu et un anneau se pose sur ce qu'il faut
+// franchir. Contrairement au projecteur (renderProjecteur), le monde n'est pas
+// gelé et rien ne bloque : c'est le tuto contextuel qui garde la main.
+export function renderCible(ctx, width, height, c, alpha, t) {
+  if (alpha <= 0.01) return;
+  const r = c.r * (1 + 0.045 * Math.sin(t * 7));
+  ctx.save();
+  ctx.globalAlpha = Math.min(1, alpha);
+  const voile = ctx.createRadialGradient(c.x, c.y, r * 1.05, c.x, c.y, r * 3);
+  voile.addColorStop(0, "rgba(8,8,12,0)");
+  voile.addColorStop(1, "rgba(8,8,12,0.58)");
+  ctx.fillStyle = voile;
+  ctx.fillRect(0, 0, width, height);
+  // Anneau blanc plein, filet rouge autour : il se lit sur le ciel comme sur la nuit.
+  ctx.lineWidth = 3.5;
+  ctx.strokeStyle = "rgba(255,255,255,0.96)";
+  ctx.beginPath(); ctx.arc(c.x, c.y, r, 0, Math.PI * 2); ctx.stroke();
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = `rgba(225,62,38,${0.55 + 0.35 * Math.sin(t * 7)})`;
+  ctx.beginPath(); ctx.arc(c.x, c.y, r + 6, 0, Math.PI * 2); ctx.stroke();
+  ctx.restore();
+}
+
 export function renderProjecteur(ctx, width, height, p, info, t) {
   const a = Math.min(1, p.age * 5);
   const r = p.r * (1 + 0.06 * Math.sin(t * 6));

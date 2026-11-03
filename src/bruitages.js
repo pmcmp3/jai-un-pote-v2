@@ -403,6 +403,23 @@ SONS.carillon = (ctx, out, t0) => {
   for (const [dt, f] of [[0, n("B5")], [0.42, n("G5")]]) partiels(ctx, out, t0 + dt, [[f, 0.7, 0.5], [f * 2, 0.15, 0.25], [f * 4, 0.06, 0.15]], 0.004);
 };
 
+// ===== Le marché =====
+// Une cagette posée sur un étal : un toc sourd et un bruit de bois.
+SONS.cagette = (ctx, out, t0, o) => {
+  coupSourd(ctx, out, t0, { f0: 150, f1: 68, duree: 0.11, crete: 0.9 });
+  bouffee(ctx, out, t0, { type: "lowpass", f: 800, crete: 0.5, tau: 0.03, alea: o.alea });
+  const f = surGamme(380 + o.alea() * 300);
+  partiels(ctx, out, t0 + 0.012, [[f, 0.25, 0.04], [f * 2.4, 0.08, 0.025]], 0.001);
+};
+// Des pièces qu'on rend dans la main : trois tintements aigus, sur la gamme.
+SONS.pieces = (ctx, out, t0, o) => {
+  const notes = [n("G6"), n("D7"), n("B6")];
+  for (let i = 0; i < 3; i++) {
+    const f = notes[i], t = t0 + i * (0.05 + o.alea() * 0.03), cr = 0.55 - i * 0.1;
+    partiels(ctx, out, t, [[f, cr, 0.1], [f * 2.76, cr * 0.22, 0.045], [f * 5.4, cr * 0.07, 0.025]], 0.001);
+  }
+};
+
 // ===== Le bowling =====
 // La boule qui percute, puis les quilles : des « toc » de bois creux qui
 // s'entrechoquent, serrés d'abord, puis qui retombent.
@@ -565,6 +582,20 @@ export function couche(ctx, out, nom) {
   } else if (nom === "boules") {
     const lp = filtre(ctx, "lowpass", 160, 0.8);
     src.connect(lp); lp.connect(g);
+  } else if (nom === "foule") {
+    // Le brouhaha d'un marché : du bruit dans la bande de la voix, qui gonfle
+    // et retombe par vagues lentes (deux rythmes qui ne se recalent jamais),
+    // avec un second timbre qui se balade, comme des gens qui se parlent.
+    const bp = filtre(ctx, "bandpass", 650, 0.7), lp = filtre(ctx, "lowpass", 2600, 0.6), mod = gain(ctx, 0.7);
+    src.connect(bp); bp.connect(lp); lp.connect(mod); mod.connect(g);
+    for (const [fr, prof] of [[0.23, 0.22], [0.57, 0.14]]) {
+      const l = osc(ctx, "sine", fr), lg = gain(ctx, prof);
+      l.connect(lg); lg.connect(mod.gain); l.start(t); osc2.push(l);
+    }
+    const bp2 = filtre(ctx, "bandpass", 1500, 1.4), g2 = gain(ctx, 0.35);
+    src.connect(bp2); bp2.connect(g2); g2.connect(mod);
+    const lf = osc(ctx, "sine", 0.37), lfg = gain(ctx, 500);
+    lf.connect(lfg); lfg.connect(bp2.frequency); lf.start(t); osc2.push(lf);
   }
   g.connect(out);
   return c;
@@ -629,7 +660,7 @@ export const KINDS_MOTEUR = Object.keys(MOTEURS);
 // Pour le banc d'écoute (outils/bruitages.mjs) : chaque couche, chaque
 // moteur et chaque rafale de grains, 2 s à leur niveau nominal (gain 1).
 for (const kind of KINDS_MOTEUR) SONS[`moteur_${kind}`] = (ctx, out, t0) => { const m = moteur(ctx, out, kind); m.regler(1, 0, 1, t0); m.arreter(t0 + 2); };
-for (const nom of ["roulement", "vent", "blizzard", "vagues", "jet", "grondement", "freins", "boules"]) {
+for (const nom of ["roulement", "vent", "blizzard", "vagues", "jet", "grondement", "freins", "boules", "foule"]) {
   SONS[`couche_${nom}`] = (ctx, out, t0) => { const c = couche(ctx, out, nom); c.gain.setValueAtTime(0, 0); c.gain.setValueAtTime(1, t0); if (c.env) c.env.setValueAtTime(1, t0); c.stop(t0 + 2.5); };
 }
 SONS.roueLibre = (ctx, out, t0) => { for (let i = 0; i < 36; i++) jouerGrain(ctx, out, "tic", t0 + i / 24); };
@@ -661,7 +692,8 @@ export const CIBLES = {
   oiseau: -33, grillon: -35, chouette: -33, mouette: -31, cri_mouette: -27, cloche: -29,
   // Continus, au niveau nominal (ambiance.js les module) : le vélo reste discret.
   couche_roulement: -33, roueLibre: -34, neigeRoule: -34, planches: -32, couche_vent: -36, couche_blizzard: -33, couche_vagues: -31,
-  couche_jet: -26, couche_grondement: -28, couche_freins: -27, couche_boules: -33,
+  couche_jet: -26, couche_grondement: -28, couche_freins: -27, couche_boules: -33, couche_foule: -27,
+  cagette: -26, pieces: -28,
   moteur_contresens: -30, moteur_bus: -29, moteur_tracteur: -29, moteur_chasseneige: -29, moteur_buggy: -30, moteur_skieur: -32,
 };
 export const NIVEAUX = {
@@ -672,7 +704,8 @@ export const NIVEAUX = {
   atterrissage: 0.624, train: 0.26, rail: 0.422, pschit: 0.09, gresille: 0.05, carillon: 0.108, quilles: 0.513, oiseau: 0.037, grillon: 0.066, chouette: 0.039,
   mouette: 0.045, cri_mouette: 0.07, cloche: 0.052,
   couche_roulement: 0.182, roueLibre: 0.193, neigeRoule: 0.153, planches: 0.195, couche_vent: 0.074, couche_blizzard: 0.24, couche_vagues: 0.232,
-  couche_jet: 0.211, couche_grondement: 0.589, couche_freins: 0.061, couche_boules: 0.417,
+  couche_jet: 0.211, couche_grondement: 0.589, couche_freins: 0.061, couche_boules: 0.417, couche_foule: 0.272,
+  cagette: 0.598, pieces: 0.157,
   moteur_contresens: 0.146, moteur_bus: 0.191, moteur_tracteur: 0.412, moteur_chasseneige: 0.197, moteur_buggy: 0.394, moteur_skieur: 0.129,
 };
 // Durée d'un son (budget de voix simultanées).

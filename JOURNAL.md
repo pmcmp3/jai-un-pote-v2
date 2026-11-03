@@ -1064,3 +1064,21 @@ règlement. `cleDeNavigation()` ne garde « ./ » que pour la page du jeu.
 Un joueur ne compte que pour UNE ligue, celle où il a fait son meilleur score (`distinct on`
 dans la vue) : sans ça, cinq potes qui rejoignent les cinq ligues les uns des autres feraient
 monter les cinq d'un coup.
+
+## 3 novembre 2026 — retours de la partie jouée en vrai (v44)
+
+Premier test complet de l'artiste sur la v2 (« je suis arrivé premier de ma ligue, c'est trop
+bien »). Il n'a pas pris un seul obstacle : « ça manque de difficulté ». Retours traités :
+vitesse finale 5,6 → 8,4 (« à la plage, presque deux fois plus vite »), vitesse max 2,9 → 3,2,
+`VERSION_COURSE` 27 ; plafond anti-triche 75 000 → 95 000 (le score parfait max monte de 18 476
+à 23 050). Mesuré : joueur idéal 0 choc sur 1 118 obstacles ; les 24 « paires serrées » du
+rapport sont le bouchon voulu, entré dans la fenêtre de mesure. ⚠️ Risque assumé : ~0,5 s de
+visibilité devant le joueur à la plage ; `vitesseFinale` est LE curseur.
+Aussi : ambiance de marché (il n'y en avait pas : seul le vocal du marchand jouait, bas et
+6 s), cercle + fond assombri sur le danger des consignes, grotte du yéti à la vitesse de la
+route, panneau rouge −20 %, panneau fixe en bas (il « descendait comme un avion »), contraste
+(pièces à double contour, sable plus sourd, filtre plage), hélicoptère de plage, rappel de ligue
+au chargement et au décompte.
+Non traité, dit à l'artiste : 20 cyclistes derrière soi (le peloton est plafonné à 5 par les
+paliers de pièces) ; « les couleurs des arbres au changement de biome » (défaut non identifié) ;
+HUD (barre du haut, bouton pause écrasé, flou : le canvas est rendu à 1,5× sur un écran 3×).

@@ -30,7 +30,7 @@ window.CONFIG = {
   // devant les étals (1 = le fichier tel quel, à −16 LUFS ; le morceau est à
   // ~−14) ; de loin il descend à ~35 % de ça, étouffé. "" = marché muet.
   fichierMarchand: "assets/marchand-courgettes.mp3",
-  marchandVolume: 0.34,
+  marchandVolume: 0.5,
   // SOUND DESIGN : tout est synthétisé (bruitages.js, ambiance.js), chaque son
   // calé sur le morceau. 1 = réglage de référence ; 0,5 ≈ −6 dB ; 0 = coupé.
   bruitagesVolume: 1,       // cris, chocs, klaxons, train, quilles…
@@ -45,10 +45,10 @@ window.CONFIG = {
   // En multiples de V_UNIT (regles.js) : la vitesse double toutes les
   // V_DOUBLING_S secondes depuis vitesseBase jusqu'à vitesseMax.
   vitesseBase: 1.7,
-  vitesseMax: 2.9,
+  vitesseMax: 3.2,
   // DEUXIÈME ACCÉLÉRATION : sur les `accelDernieresS` dernières secondes, la
   // vitesse repart de vitesseMax vers vitesseFinale, atteinte ~15 s avant la fin.
-  vitesseFinale: 5.6,
+  vitesseFinale: 8.4,
   accelDernieresS: 120,          // durée de la 2e accélération (s), comptée depuis la fin du morceau
 
   // === VUE DE PROFIL ===
@@ -62,7 +62,7 @@ window.CONFIG = {
   // Où est le joueur à l'écran (fraction de la largeur) : au départ, puis à
   // vitesse maximale — la caméra prend de l'avance quand ça accélère, pour
   // garder ~1,6 s de lecture devant soi.
-  cameraJoueurX: [0.3, 0.25],
+  cameraJoueurX: [0.3, 0.2],
 
   // === SAUT ===
   // Tap court    → apex ~1,3 (poules, chats, chiens, moutons, bottes)

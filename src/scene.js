@@ -522,8 +522,11 @@ function plaqueNeige(r, k, u) {
   return teintes(k % 2 ? shadeHex(SOIL.montagne, -6) : SOIL.montagne, u).plat;
 }
 export function zoneAt(r) { return zoneForcee(r) || ZONES[Math.floor(Math.max(0, r) / ZONE_ROWS) % ZONES.length]; }
-const SOIL = { ble: "#c9a648", prairie: "#7aa63c", tournesol: "#6f8c2f", foret: "#3f5a2a", vigne: "#8a6a45", village: "#8fa864", villageSud: "#b9a06a", montagne: "#e4e9ee", plage: "#ecd3a0" };
-const HERBE = { ble: "#6f8f34", prairie: "#7aa63c", tournesol: "#66852f", foret: "#4a6a30", vigne: "#6f8f34", village: "#8fa864", villageSud: "#9aa86a", montagne: "#dfe5eb", plage: "#e6c993" };
+// Le blé, le sable et la pierre du Sud sont plus sombres et moins saturés que
+// d'abord : un premier plan tout en jaune clair noyait les pièces et les
+// véhicules, qui sont eux-mêmes jaunes ou dorés.
+const SOIL = { ble: "#b69443", prairie: "#7aa63c", tournesol: "#6f8c2f", foret: "#3f5a2a", vigne: "#8a6a45", village: "#8fa864", villageSud: "#a89264", montagne: "#e4e9ee", plage: "#d2b57e" };
+const HERBE = { ble: "#6f8f34", prairie: "#7aa63c", tournesol: "#66852f", foret: "#4a6a30", vigne: "#6f8f34", village: "#8fa864", villageSud: "#929d63", montagne: "#dfe5eb", plage: "#c9ad78" };
 // La route de la montagne est ENNEIGÉE : neige tassée et deux ornières.
 const NEIGE_ROUTE = "#dde3e9", ORNIERE = "#b9c2cc", BORD_NEIGE = "#cfd7df";
 function routeNeige(r) { return zoneForcee(r) === "montagne"; }
@@ -773,6 +776,38 @@ function soleilCouchant(ctx, a) {
   ctx.restore();
 }
 
+// L'hélicoptère de plage : très haut dans le ciel, hors de portée, il traverse
+// l'écran de droite à gauche toutes les 24 s (puis disparaît le temps de
+// revenir). Une silhouette sombre en rectangles, comme tout le jeu : elle se
+// lit sur le ciel orange. Il ne touche à rien, il est là pour le plaisir.
+const HELICO_PERIODE = 24, HELICO_VOL = 15;
+function helicoptere(ctx) {
+  if (plageAlpha < 0.3) return;
+  const t = decorT, ph = (t % HELICO_PERIODE) / HELICO_VOL;
+  if (ph > 1) return;
+  const L = Math.max(46, K * 3.3);                       // longueur de la cabine à l'écran
+  const x = W + L * 1.4 - ph * (W + L * 3.2);
+  const y = horizonY * (0.3 + 0.03 * Math.sin(t * 0.9)) + Math.sin(t * 2.3) * 2;
+  const k = L / 46;
+  const rect = (dx, dy, w, h, col) => { ctx.fillStyle = col; ctx.fillRect(Math.round(x + dx * k), Math.round(y + dy * k), Math.ceil(w * k), Math.ceil(h * k)); };
+  ctx.save();
+  ctx.globalAlpha = Math.min(1, (plageAlpha - 0.3) / 0.4) * 0.92;
+  const corps = "#2a2438", vitre = "#6a6f99";
+  rect(-23, -7, 30, 14, corps);                          // cabine
+  rect(-23, -3, 9, 6, vitre);                            // verrière, côté nez
+  rect(7, -4, 26, 4, corps);                             // poutre de queue
+  rect(31, -12, 4, 12, corps);                           // dérive
+  rect(-16, 8, 26, 2, corps); rect(-13, 5, 2, 4, corps); rect(5, 5, 2, 4, corps); // patins
+  rect(-3, -11, 3, 4, corps);                            // mât
+  // Le rotor : un trait qui s'allonge et se raccourcit (vu de profil, il tourne).
+  const pale = 62 * (0.55 + 0.45 * Math.abs(Math.cos(t * 38)));
+  rect(-1.5 - pale / 2, -13, pale, 2, "rgba(42,36,56,0.8)");
+  rect(33, -10, 1.5, 7, "rgba(42,36,56,0.55)");          // rotor de queue
+  // Le feu rouge, qui clignote.
+  if (Math.sin(t * 6) > 0.2) { ctx.globalAlpha *= 0.9; rect(-26, -1, 3, 3, "#ff4a3a"); }
+  ctx.restore();
+}
+
 function nuages(ctx) {
   const u = 380, s = echelle(u);
   ctx.save();
@@ -837,6 +872,7 @@ export function renderGround(ctx, boueAt) {
     astre(Math.max(0, heure - 0.55), `rgba(250,244,220,${a})`, K * 0.7, 0);
   }
   nuages(ctx);
+  helicoptere(ctx);
   modeSaison = "sol";
   // Montagnes au loin (les villages du jeu sont en Isère : les Alpes en toile
   // de fond), neige sur les crêtes ; puis collines vertes, dans la brume.
@@ -1977,8 +2013,14 @@ function caverneYeti(ctx, v, hPlateau) {
   const yCrete = project(-ROAD_HALF, v, hPlateau).y, cibleY = yCrete + 0.36 * (H - yCrete);
   let lo = 0, hi = hPlateau;
   for (let i = 0; i < 24; i++) { const m = (lo + hi) / 2; if (sur(m).p.y > cibleY) lo = m; else hi = m; }
-  const { uS, p: c } = sur((lo + hi) / 2), t = decorT;
-  const R = Math.min(1.5 * echelle(uS), 0.2 * (H - yCrete));
+  const { uS, p: pente } = sur((lo + hi) / 2), t = decorT;
+  // Défile À LA VITESSE DE LA ROUTE : le versant est plus près de la caméra que
+  // la chaussée, donc sa parallaxe est plus rapide, et la grotte glissait
+  // doucement par rapport à la route sous le joueur. Seule la hauteur à
+  // l'écran vient du versant ; la position horizontale vient du plan de la route.
+  const c = { x: project(0, v, 0).x, y: pente.y };
+  // Plus grande qu'avant, sans dépasser la moitié de la largeur de l'écran.
+  const R = Math.min(1.9 * echelle(uS), 0.25 * (H - yCrete), 0.22 * W);
   if (c.y - R > H || c.x + 2 * R < 0 || c.x - 2 * R > W) return;
   const rect = (x, y, w, h, col) => { ctx.fillStyle = col; ctx.fillRect(Math.round(c.x + x * R), Math.round(c.y + y * R), Math.ceil(w * R), Math.ceil(h * R)); };
   ctx.save();

@@ -67,6 +67,11 @@
     #game-canvas.game-over-bw { filter: grayscale(1) saturate(0); }
     #game-canvas.danger { animation: canvas-danger 4s ease-in-out infinite; }
     #game-canvas.turbo { filter: saturate(1.95) contrast(1.1); }
+    /* Sur la plage, le ciel, le sable et les pièces sont tous orange ou dorés :
+       on baisse la saturation et on remonte le contraste pour que ce qui compte
+       (pièces, mouettes, véhicules) se détache du fond. */
+    #game-canvas.plage { filter: saturate(0.98) contrast(1.1) brightness(0.97); }
+    #game-canvas.plage.turbo { filter: saturate(1.5) contrast(1.12); }
     @keyframes canvas-danger { 0%, 15%, 100% { filter: grayscale(0); } 7.5% { filter: grayscale(0.8); } }
 
     /* Plus de flou dans les coins (5 octobre 2026 : « tu peux enlever le flou
@@ -181,6 +186,7 @@
     #loading.failed #loading-track { display: none; }
     #loading-track { width: 100%; height: 3px; border-radius: 999px; background: rgba(255,255,255,0.3); overflow: hidden; }
     #loading-fill { width: 0%; height: 100%; background: #fff; transition: width 0.25s linear; }
+    #loading-astuce { margin: 14px 0 0; font: 700 13px/1.4 var(--police); color: #fff; text-align: center; text-shadow: 0 2px 0 rgba(0,0,0,0.25); }
     #loading-label { font: 500 13px var(--police); color: rgba(255,255,255,0.85); font-variant-numeric: tabular-nums; }
 
     /* --- Menu en trois étapes ------------------------------------------- */
@@ -551,6 +557,7 @@
     <div id="loading">
       <div id="loading-track"><div id="loading-fill"></div></div>
       <span id="loading-label">0 %</span>
+      <p id="loading-astuce">Plus tu as de potes dans ta ligue,<br />plus tu as de chances de faire un meilleur score.</p>
     </div>
   </div>
   <div id="app"><canvas id="game-canvas"></canvas></div>

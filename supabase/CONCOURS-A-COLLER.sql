@@ -21,7 +21,7 @@ create table if not exists public.concours (
   id integer primary key default 1,
   debut timestamptz not null default now(),
   fin timestamptz,
-  plafond_score integer not null default 75000,
+  plafond_score integer not null default 95000,
   constraint concours_ligne_unique check (id = 1)
 );
 alter table public.concours enable row level security;
@@ -32,7 +32,7 @@ create policy "Lecture publique du concours" on public.concours for select to an
 -- Ouverture : l'instant où tu colles ce fichier. `do nothing` : relancer le
 -- fichier ne réécrit jamais une date que tu as corrigée après coup.
 insert into public.concours (id, debut, fin, plafond_score)
-values (1, now(), '2026-11-22 12:00:00+01', 75000)
+values (1, now(), '2026-11-22 12:00:00+01', 95000)
 on conflict (id) do nothing;
 
 -- ===========================================================================
@@ -115,7 +115,7 @@ create or replace view public.concours_ligues as
          count(m.pseudo)::int        as joueurs,
          coalesce(sum(m.metres), 0)::bigint as total
   from public.ligues l
-  left join meilleurs m on m.code = l.code
+  join meilleurs m on m.code = l.code
   where l.concours
   group by l.code, l.nom;
 grant select on public.concours_ligues to anon;
@@ -139,10 +139,10 @@ grant select on public.concours_joueurs to anon;
 -- 6. LE GARDE-FOU À L'INSERTION D'UN SCORE.
 --
 -- Plafond : `outils/plafond.mjs` mesure le score parfait le plus haut sur
--- 400 graines (18 476) ; avec le boost de ligue maximal (×3), un humain plafonne
--- à 55 428. Le plafond est posé bien au-dessus, à 75 000 : trop bas, il
+-- 300 graines (23 050) ; avec le boost de ligue maximal (×3), un humain plafonne
+-- à 69 150. Le plafond est posé bien au-dessus, à 95 000 : trop bas, il
 -- refuserait une vraie partie et le joueur perdrait son score sans le savoir.
--- Pour le relever : update public.concours set plafond_score = 90000 where id = 1;
+-- Pour le relever : update public.concours set plafond_score = 120000 where id = 1;
 --
 -- Cadence : une course dure 173 s. Un joueur qui meurt tout de suite et relance
 -- peut en enchaîner quelques-unes ; dix en une minute, c'est un script.
@@ -151,7 +151,7 @@ create or replace function public.score_vraisemblable() returns trigger language
 declare cap integer; recentes integer;
 begin
   select plafond_score into cap from public.concours where id = 1;
-  if cap is null then cap := 75000; end if;
+  if cap is null then cap := 95000; end if;
   if new.metres > cap then
     raise exception 'score impossible : % (plafond %)', new.metres, cap;
   end if;
@@ -211,6 +211,15 @@ create or replace view public.ab_invitation as
   from public.evenements
   where details->>'message' is not null
   group by 1 order by 1;
+
+-- Confidentialité : Supabase donne à la clé publique le droit de lire tout ce qui
+-- se crée dans `public`. Ces vues sont pour TOI seul.
+revoke all on public.contacts from anon, authenticated;
+revoke all on public.ligues_suspectes from anon, authenticated;
+revoke all on public.ab_ecoute from anon, authenticated;
+revoke all on public.ab_invitation from anon, authenticated;
+alter view public.contacts set (security_invoker = true);
+alter view public.ligues_suspectes set (security_invoker = true);
 
 -- ===========================================================================
 -- VÉRIFICATION — ces trois lignes doivent répondre.

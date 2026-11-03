@@ -740,6 +740,15 @@ const SCENES = {
     console.log("PLAGE à partir de la rangée", r0);
     await page.keyboard.press("KeyD");
   },
+  // HÉLICO : la plage, une photo toutes les 1,5 s pendant 24 s (il vole 15 s sur 24).
+  helico: async () => {
+    await page.waitForFunction(() => window.__pote.player.v > 2, null, { timeout: 15000 });
+    await page.keyboard.press("KeyD");
+    const r0 = await course(() => { const p = window.__pote; for (let r = 300; r < 3000; r++) if (p.rows.enPlage(r)) return r; return 0; });
+    await course(([t, v]) => { const p = window.__pote; p.clock.jumpBy(t - p.clock.now()); p.player.v = v; p.player.prevV = v; p.player.jumpY = p.rows.solAt(v); }, [150, r0 + 12]);
+    for (let i = 0; i < 14; i++) { await attendre(1700); await photo(`57-helico-${String(i).padStart(2, "0")}`); }
+    await page.keyboard.press("KeyD");
+  },
   // MOUETTES : la première de la course (projecteur), puis une sur la plage,
   // en vol vers le joueur.
   mouettes: async () => {

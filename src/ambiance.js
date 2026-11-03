@@ -34,7 +34,7 @@ const pistes = new Map();     // piste de bowling → phase de la boule à l'ima
 let prochain = {};            // prochains événements d'ambiance (horloge audio)
 let rafales = {};             // prochain grain de chaque rafale
 let train = null;             // ce que le TER a déjà fait
-const dernier = { klaxon: -9, sonnette: -9, appel: -9, quilles: -9 };
+const dernier = { klaxon: -9, sonnette: -9, appel: -9, quilles: -9, cagette: -9, pieces: -9 };
 const alea = B.rng(Date.now() % 1e9);
 
 const clamp = (x, a = -0.9, b = 0.9) => Math.max(a, Math.min(b, x));
@@ -91,6 +91,7 @@ export function pas(dt, E) {
   betes(E, t);
   gare(E, t);
   bowling(E, t);
+  marche(E, t);
   nature(E, t);
   lampadaires(E, t);
 }
@@ -262,6 +263,29 @@ function bowling(E, t) {
     dernier.quilles = t;
     B.jouer("quilles", { pan: clamp(2 * x - 1), volume: proche });
   }
+}
+
+// --- Le marché : le brouhaha, les cagettes, les pièces ---------------------------------
+// Il monte à l'approche (on l'entend avant de voir les étals), est plein
+// devant les étals, retombe en sortant. Le vocal du marchand (audio.js) vient
+// par-dessus, une fois par course.
+function marche(E, t) {
+  const d = rows.debutHalle("marche");
+  if (d === null) return;
+  const p = E.v, f = d + rows.HALLE_ROWS;
+  if (p < d - 40 || p > f + 18) {
+    if (C.foule) C.foule.gain.setTargetAtTime(0, t, 0.4);
+    return;
+  }
+  if (!C.foule) C.foule = B.couche(ctx, bus, "foule");
+  const dist = p < d ? d - p : p > f ? p - f : 0;
+  const pres = 1 / (1 + (dist / 16) ** 2);
+  C.foule.gain.setTargetAtTime(NIV("couche_foule") * pres * (window.CONFIG.ambianceVolume ?? 1), t, 0.3);
+  if (dist > 0) return;
+  // Dans les étals : un toc de cagette, un tintement de pièces, au hasard.
+  const x = clamp(2 * E.ecranX(p + 4 + alea() * 8) - 1, -0.7, 0.8);
+  if (t - dernier.cagette > 1.1 + alea() * 1.6) { dernier.cagette = t; B.jouer("cagette", { pan: x, volume: 0.6 + 0.4 * alea(), ambiance: true }); }
+  if (t - dernier.pieces > 2.2 + alea() * 2.6) { dernier.pieces = t; B.jouer("pieces", { pan: -x, volume: 0.6 + 0.4 * alea(), ambiance: true }); }
 }
 
 // --- L'ambiance de chaque décor --------------------------------------------------------

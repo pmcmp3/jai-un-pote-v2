@@ -100,8 +100,11 @@ intégré d'Instagram d'abord**, portrait natif.
 ### Pièces, potes, turbo
 - Les pièces **dessinent le geste** (arc au-dessus de chaque obstacle), pièce double au sommet
   d'un double saut. Paliers de potes, rachat et coût des chocs : `config.js`.
-- **Difficulté qui monte** : vitesse max 2,9 puis finale 5,6 (on lit moins longtemps ce qui
-  arrive), le paquet « finale » (presque tout roule) dès le 4e paquet, un choc coûte +1 pote
+- **Difficulté qui monte** : vitesse max 3,2 puis finale 8,4 (≈ 22 rangées/s sur la plage, contre
+  4,4 au départ : on lit moins longtemps ce qui arrive — ~0,5 s de visibilité devant soi à
+  la fin, `cameraJoueurX` finit à 0,2). ⚠️ Plus vite = scores plus hauts : le score parfait
+  maximal est de 23 050 (×3 avec le boost de ligue), le plafond anti-triche de la base est à
+  95 000 (`outils/plafond.mjs`, `supabase/CORRECTIF-PLAFOND.sql`), le paquet « finale » (presque tout roule) dès le 4e paquet, un choc coûte +1 pote
   dès 30 % de la course et +2 dès 65 % (`chocPlusDeuxApres`), racheter un pote coûte 12 puis
   jusqu'à 35 pièces. Mesuré par `outils/difficulte.mjs` (joueur qui rate 5/10/15/20 % des
   obstacles, vraie économie) : à 5 % de ratés il meurt dans 23 % des courses (7 % avant), à
@@ -263,6 +266,23 @@ intégré d'Instagram d'abord**, portrait natif.
 - **Tableau de bord** : `public/tableau-de-bord.html` (en ligne à côté du jeu), lit les vues
   AGRÉGÉES de `supabase/tableau-de-bord.sql` (jamais un pseudo) ; `?exemple` = chiffres
   inventés, signalés.
+- **Ambiance du marché** (`ambiance.js › marche`, couche `foule` + `cagette` + `pieces`, calées à
+  −27 / −26 / −28 LUFS par `outils/bruitages.mjs`) : le brouhaha monte à l'approche, est plein
+  dans les étals, retombe en sortant ; le vocal du marchand (`marchandVolume` 0,5) vient par-dessus.
+- **Cercle sur le danger** (`hud.renderCible`, `main.cibleConseil`) : pendant une consigne de
+  geste (tap / appui / double), le reste de l'écran s'assombrit en fondu et un anneau se pose sur
+  ce qu'il faut franchir. Distinct du projecteur (qui gèle le monde, une fois par joueur).
+- **Rappel de ligue à CHAQUE départ** : « Plus tu as de potes dans ta ligue, plus tu as de chances
+  de faire un meilleur score » sur l'écran de chargement et pendant le décompte 3-2-1 (premier
+  lancement comme REJOUER).
+- **Contraste** : pièces cerclées de blanc PUIS de sombre, sol du blé / sable / Sud plus sourds,
+  classe CSS `plage` (saturation 0,98, contraste 1,1) sur le canvas pendant la plage. Un
+  premier plan tout en jaune clair noyait les pièces, les véhicules et les mouettes.
+- **Hélicoptère de plage** (`scene.helicoptere`) : silhouette en rectangles, traverse le ciel de
+  droite à gauche 15 s toutes les 24 s, hors de portée.
+- **Grotte du yéti** : défile à la vitesse de la route (x pris dans le plan de la route, y sur le
+  versant), un quart plus grande. **Panneau « attention »** 20 % plus petit, et posé à hauteur
+  de chaussée AU NIVEAU DE LA MER (plus à `solAt`, où il suivait la rampe du marché).
 - **Fantôme** du meilleur de la ligue : en sommeil (la trace part avec le score ; le
   chargement `chargerFantome` est à rebrancher quand la base existera).
 - **Porte de conversion** (`niveauPour`) : une demande à la fois — l'album d'abord, puis
