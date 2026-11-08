@@ -499,6 +499,7 @@
     #end-concours-titre { margin: 0; font: 900 12px var(--police); letter-spacing: 0.1em; text-transform: uppercase; color: var(--noir); }
     #end-concours-rang { margin: 0; font: 500 13.5px/1.35 var(--police); color: var(--noir); text-align: center; }
     #end-concours-rang b { font-weight: 900; }
+    #end-concours-detail { margin: 0; font: 500 11.5px/1.35 var(--police); color: rgba(0,0,0,0.65); text-align: center; }
     #end-concours-ecart { margin: 0; font: 600 13px/1.35 var(--police); color: var(--noir); text-align: center; }
     #end-concours-ecart b { font-weight: 900; color: var(--rouge); }
     #end-concours-temps { margin: 0; font: 600 11.5px var(--police); letter-spacing: 0.06em; text-transform: uppercase; color: rgba(0,0,0,0.55); }
@@ -529,6 +530,8 @@
     #classement-liste { width: 100%; margin: 0; padding: 0; list-style: none; font: 500 13px var(--police); color: var(--noir); }
     #classement-liste li { display: flex; align-items: baseline; gap: 8px; padding: 6px 4px; border-bottom: 1px solid rgba(0,0,0,0.08); }
     #classement-liste li.moi { background: rgba(255,207,46,0.35); border-radius: 3px; font-weight: 900; }
+    #classement-liste li.podium .rang { color: var(--rouge); }
+    #classement-liste li.coupure { display: block; padding: 5px 4px 6px; border-bottom: 1.5px dashed rgba(0,0,0,0.35); font: 700 10.5px var(--police); letter-spacing: 0.06em; text-transform: uppercase; color: var(--rouge); text-align: center; }
     #classement-liste .rang { width: 22px; flex: 0 0 auto; color: rgba(0,0,0,0.45); font-weight: 900; }
     #classement-liste .nom { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     #classement-liste .nom small { display: block; font: 500 10.5px var(--police); color: rgba(0,0,0,0.45); letter-spacing: 0.06em; }
@@ -586,7 +589,7 @@
             <summary>＋ Email, règlement</summary>
             <div class="champ-row"><span class="icon">@</span><input type="email" id="email-input" placeholder="ton email (facultatif)" autocomplete="email" autocapitalize="none" spellcheck="false" maxlength="80" /></div>
             <label id="newsletter-row"><input type="checkbox" id="newsletter-input" /><span>Préviens-moi des sorties de PMC par email</span></label>
-            <p id="pourquoi-contact">Ton Insta sert à te prévenir si ta ligue gagne. Rien n'est publié. <a id="lien-reglement" href="reglement.html" target="_blank" rel="noopener">Règlement</a></p>
+            <p id="pourquoi-contact">Ton Insta sert à te prévenir si tu gagnes. Rien n'est publié. <a id="lien-reglement" href="reglement.html" target="_blank" rel="noopener">Règlement</a></p>
           </details>
           <p id="champs-pourquoi" class="beta-off">Ton <b>village</b> s'écrit sur le panneau quand tu le traverses en course. Ton <b>Insta</b>, c'est pour te prévenir si tu gagnes un lot.</p>
           <p id="beta-note" class="field-note hidden">Bêta-test : tout le monde court la <b>même course</b>. Écris ton pseudo, joue, et laisse-moi ton retour à la fin.</p>
@@ -602,7 +605,7 @@
                le code en gros, Inviter en gros, le peloton avec ses bots. -->
           <div id="ligue-bloc">
             <div id="ligue-sans">
-              <p id="ligue-intro">Le score de ta ligue, c'est la somme des meilleurs scores de vous tous. <b>À la clôture, la ligue n°1 gagne un son écrit sur elle par PMC.</b></p>
+              <p id="ligue-intro">Chaque pote qui joue te rapporte des points. <b>À la clôture, tirage au sort entre les 3 premiers du général : le gagnant fait un morceau avec PMC et ses potes.</b></p>
               <div class="champ-row" id="ligue-nom-row"><span class="icon">№</span><input type="text" id="ligue-nom" placeholder="nom de ta ligue" autocomplete="off" maxlength="28" /></div>
               <button id="ligue-creer" type="button" class="btn btn-primary">Créer ma ligue</button>
               <p class="lp-sep"><span>ou</span></p>
@@ -664,11 +667,12 @@
             <p id="end-max" class="hidden"></p>
           </div>
           <div id="end-concours" class="hidden">
-            <p id="end-concours-titre">Ta ligue a besoin de toi</p>
+            <p id="end-concours-titre">Classement général</p>
             <p id="end-concours-rang"></p>
+            <p id="end-concours-detail"></p>
             <p id="end-concours-ecart" class="hidden"></p>
             <p id="end-concours-temps" class="hidden"></p>
-            <button id="end-concours-voir" type="button" class="link-minimal">Voir le classement général →</button>
+            <button id="end-concours-voir" type="button" class="link-minimal">Voir les classements →</button>
           </div>
           <div id="end-ligue" class="hidden">
             <p id="end-rang" class="hidden"></p>
@@ -824,14 +828,15 @@
     <div id="classement-veil"></div>
     <div id="classement-card">
       <p id="classement-eyebrow">Le concours</p>
-      <p id="classement-title">Classement général</p>
+      <p id="classement-title">Les classements</p>
       <div id="classement-onglets">
-        <button type="button" class="chip actif" data-vue="ligues">Les ligues</button>
-        <button type="button" class="chip" data-vue="joueurs">Top 50 joueurs</button>
+        <button type="button" class="chip actif" data-vue="general">Général</button>
+        <button type="button" class="chip" data-vue="ligue">Ma ligue</button>
+        <button type="button" class="chip" data-vue="ligues">Les ligues</button>
       </div>
       <p id="classement-regle"></p>
       <ol id="classement-liste"></ol>
-      <p id="classement-vide" class="hidden">Personne n'a encore joué. Ta ligue peut être première.</p>
+      <p id="classement-vide" class="hidden">Personne n'a encore joué. La première place est libre.</p>
       <button id="classement-fermer" type="button" class="link-minimal">Fermer</button>
     </div>
   </div>

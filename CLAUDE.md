@@ -195,12 +195,22 @@ intégré d'Instagram d'abord**, portrait natif.
   AUCUNE règle de lecture : les contacts sont illisibles avec la clé publique, ils se lisent
   dans le Table editor (vue `contacts`).
 - **Ligues** : 21 membres maximum, complétées par 3 bots ; **boost de ligue** (+10 % par pote
-  qui a joué au moins 30 s, jusqu'à ×3) ; relais de ligue ; sprint du dimanche ; au plus
-  `liguesParVague` nouvelles ligues par semaine. Partage : natif d'abord, tiroir maison si
+  qui a joué au moins 30 s, jusqu'à ×3) ; relais de ligue ; sprint du dimanche ; `liguesParVague` (0 = aucune
+  limite de création, indispensable pendant le concours). Partage : natif d'abord, tiroir maison si
   absent (Instagram sur Android).
-- **LE CONCOURS DE LIGUES** (`supabase/CONCOURS-A-COLLER.sql`). La règle, en une phrase : *le
-  score d'une ligue, c'est la somme des meilleurs scores de ses membres* ; à la clôture, la
-  ligue n°1 gagne un son écrit sur elle. Clôture le **dimanche 22 novembre 2026 à 12 h**.
+- **LE CONCOURS** (`supabase/CONCOURS-A-COLLER.sql` puis `supabase/CLASSEMENT-GENERAL-A-COLLER.sql`).
+  ⚠️ **Règle changée le 8 novembre 2026** : *score au général = ton record + 10 % du record de
+  chaque pote de ta ligue* ; à la clôture, **tirage au sort entre les 3 premiers du général**, le
+  gagnant fait un morceau avec PMC et ses potes. Clôture le **dimanche 22 novembre 2026 à 12 h**.
+  - **Boost et commission sont deux mécaniques séparées** : le boost (+10 % par pote, ×3 max)
+    multiplie les points pendant la course ; la commission s'ajoute dans le classement, sur les
+    records et jamais sur les totaux. Taux : `concours.commission` (la base calcule),
+    `config.commissionParPote` n'est que le repli d'affichage.
+  - **Les joueurs sans ligue sont au général**, sans commission : leur score part sous le code
+    `PMCMP`, inclus dans `concours_joueurs` et exclu de `concours_ligues`.
+  - Un appareil ne rapporte qu'une commission par ligue (`par_appareil`). Le classement des
+    ligues reste affiché pour l'honneur, sans lot. `concours_podium` (top 10 et contacts) n'est
+    lisible que dans le SQL editor. Test : `outils/classement-general.mjs`, base simulée.
   - Tout est additionné par la BASE (vues `concours_ligues` et `concours_joueurs`) : le jeu ne
     voit que son propre score, il ne pourrait rien totaliser. Il lit, il n'écrit pas.
   - ⚠️ Un joueur ne compte que pour **UNE** ligue, celle où il a fait son meilleur score

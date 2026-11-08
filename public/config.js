@@ -137,9 +137,13 @@ window.CONFIG = {
   // (supabase/CONCOURS-A-COLLER.sql) : le jeu la lit au chargement. Celle-ci
   // n'est que le repli quand la base ne répond pas. Les deux doivent coïncider.
   concoursFin: "2026-11-22T12:00:00+01:00",
-  concoursLot: "un son écrit sur votre bande de potes",
+  concoursLot: "un morceau avec PMC et ses potes",
+  // Commission : +10 % du record de chaque pote de ta ligue au classement général.
+  // Le taux qui fait foi est celui de la table `concours` (la base fait le calcul) ;
+  // celui-ci n'est que le repli d'affichage. Les deux doivent coïncider.
+  commissionParPote: 0.10,
   reglementUrl: "reglement.html",
-  liguesParVague: 5,        // 5 ligues jouables en même temps, au-delà : lundi prochain
+  liguesParVague: 0,        // 0 = pas de limite de création de ligues (concours ouvert à tous)
   relaisDistance: 30000,    // mètres cumulés d'une ligue pour gagner le relais
   sprintDureeS: 60,         // le sprint du dimanche : 60 s, même route pour tous
 
@@ -223,7 +227,7 @@ window.CONFIG = {
     { id: "jamais-su", texte: "J'ai jamais su te le dire, alors rejoins ma ligue." },
     { id: "pote-ou-pas", texte: "T'es mon pote ou pas ? On va vérifier." },
     { id: "manque-toi", texte: "On y est déjà, il nous manque plus que toi." },
-    { id: "trente-s", texte: "30 secondes de ton temps et ma ligue monte au classement." },
+    { id: "trente-s", texte: "30 secondes de ton temps et je monte au classement." },
   ],
 
   toucheDebug: "d",

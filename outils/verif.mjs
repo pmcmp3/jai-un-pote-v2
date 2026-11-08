@@ -23,6 +23,7 @@ const TESTS = [
   ["sons", ["outils/sons-course.mjs"], {}, "course entière : sons dans leur décor, aucune erreur"],
   ["perf", ["outils/perf-plage.mjs"], {}, "une image coûte moins de 8,3 ms à CPU ×4"],
   ["hors-ligne", ["outils/hors-ligne.mjs"], {}, "la page s’ouvre sans réseau quel que soit le lien, et ?9 recharge proprement"],
+  ["classement", ["outils/classement-general.mjs"], {}, "classement général, commission, joueur sans ligue (base simulée)"],
   ["build", null, {}, "le build se construit et tourne sans erreur"],
 ];
 const demandes = process.argv.slice(2);

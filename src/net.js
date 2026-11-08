@@ -65,8 +65,11 @@ export function genererCode() {
 }
 
 export async function creerLigue(code, pseudo, skin = null, nom = "") {
-  const n = await liguesCetteSemaine();
-  if (n !== null && n >= (window.CONFIG.liguesParVague || 5)) return { erreur: "vague" };
+  const cap = window.CONFIG.liguesParVague || 0; // 0 = pas de limite
+  if (cap) {
+    const n = await liguesCetteSemaine();
+    if (n !== null && n >= cap) return { erreur: "vague" };
+  }
   // Le nom s'affiche dans le classement du concours : un code à cinq lettres
   // ne se reconnaît pas, « les Bonnets » si.
   const ok = await post("ligues", { code, nom: String(nom || "").trim().slice(0, 28) || `Ligue de ${pseudo}`, createur: pseudo });
@@ -213,11 +216,11 @@ export async function classement(code, graine) {
   return get("ligue_classement", `?code=eq.${encodeURIComponent(code)}&select=pseudo,metres,potes,parties&order=metres.desc&limit=50`);
 }
 
-// --- LE CONCOURS DE LIGUES -----------------------------------------------------
-// La règle : le score d'une ligue, c'est la somme des meilleurs scores de ses
-// membres pendant le concours. Tout est calculé par la base (vues
-// `concours_ligues` et `concours_joueurs`, CONCOURS-A-COLLER.sql) : le jeu ne
-// fait que lire, il ne pourrait pas additionner ce qu'il ne voit pas.
+// --- LE CONCOURS ----------------------------------------------------------------
+// La règle : score au général = ton record + une commission sur le record de
+// chaque pote de ta ligue. À la clôture, tirage au sort entre les 3 premiers.
+// Tout est calculé par la base (vue `concours_joueurs`,
+// CLASSEMENT-GENERAL-A-COLLER.sql) : le jeu ne fait que lire.
 
 // Dates et plafond, lus une fois par chargement. La base fait foi ; sans
 // réseau, repli sur `config.concoursFin` pour que le compte à rebours
@@ -225,7 +228,7 @@ export async function classement(code, graine) {
 let concoursCache;
 export async function concours() {
   if (concoursCache !== undefined) return concoursCache;
-  const rows = await get("concours", "?id=eq.1&select=debut,fin,plafond_score");
+  const rows = await get("concours", "?id=eq.1&select=*");
   const repli = window.CONFIG.concoursFin ? { debut: null, fin: window.CONFIG.concoursFin, plafond_score: null } : null;
   concoursCache = rows && rows.length ? rows[0] : repli;
   return concoursCache;
@@ -237,15 +240,27 @@ export function restantMs(c, maintenant = Date.now()) {
   return Number.isFinite(fin) ? fin - maintenant : null;
 }
 
-// Classement des ligues, la plus forte d'abord. Les ligues de test en sont
+// Classement des ligues (pour l'honneur : le lot se joue au général), la plus
+// forte d'abord. Les ligues de test en sont
 // exclues par la base (colonne `ligues.concours`), jamais par le jeu.
 export async function classementLigues(limite = 100) {
   return get("concours_ligues", `?select=code,nom,joueurs,total&order=total.desc,code.asc&limit=${limite}`);
 }
 
-// Le top 50 individuel (la « super ligue »).
-export async function top50() {
-  return get("concours_joueurs", "?select=pseudo,metres&order=metres.desc&limit=50");
+// Le classement général : tous les joueurs, avec ou sans ligue.
+const CHAMPS_JOUEUR = "pseudo,metres,commission,potes,total,rang,classes,code,nom";
+export async function classementGeneral(limite = 100) {
+  return get("concours_joueurs", `?select=${CHAMPS_JOUEUR}&order=rang.asc&limit=${limite}`);
+}
+// La ligne d'un joueur (son rang, même loin du haut du classement).
+export async function maPlace(pseudo) {
+  if (!pseudo) return null;
+  const rows = await get("concours_joueurs", `?pseudo=eq.${encodeURIComponent(pseudo)}&select=${CHAMPS_JOUEUR}&limit=1`);
+  return rows && rows.length ? rows[0] : null;
+}
+// Les joueurs d'une ligue, dans l'ordre du général.
+export async function joueursDeLigue(code) {
+  return get("concours_joueurs", `?code=eq.${encodeURIComponent(code)}&select=${CHAMPS_JOUEUR}&order=rang.asc&limit=${LIGUE_MAX + 10}`);
 }
 
 // La fiche de contact du joueur : c'est la SEULE chose qui permettra de

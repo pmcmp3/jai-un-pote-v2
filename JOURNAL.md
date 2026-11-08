@@ -1082,3 +1082,19 @@ au chargement et au décompte.
 Non traité, dit à l'artiste : 20 cyclistes derrière soi (le peloton est plafonné à 5 par les
 paliers de pièces) ; « les couleurs des arbres au changement de biome » (défaut non identifié) ;
 HUD (barre du haut, bouton pause écrasé, flou : le canvas est rendu à 1,5× sur un écran 3×).
+
+## 8 novembre 2026 — classement général, commission, tirage au sort (v45)
+
+Demandé par l'artiste : « un classement par ligue et un classement général », « un système de
+commission », « une ligue avec 15 personnes [doit] faire un immense score », « un tirage au sort
+parmi les trois premiers ». La somme de la ligue ne désigne plus le gagnant : elle reste affichée
+pour l'honneur.
+- `concours_joueurs` : record + commission de 10 % par pote (par appareil), rang, nombre de classés ;
+  joueurs sans ligue inclus (score envoyé sous `PMCMP`). `concours_podium` : contrôle et contacts.
+- Écran de fin : place au général, détail, écart avec le top 3. Tiroir : Général / Ma ligue / Les ligues.
+- **`liguesParVague` passe à 0** : il refusait la création d'une 6e ligue dans la semaine, reliquat de
+  la bêta, alors que 5 ligues existaient déjà.
+- SQL vérifié sur un Postgres local (PGlite) ; écran vérifié avec base simulée. Plafond porté à 95 000
+  dans le même fichier (il était resté à 75 000 en base).
+Limites connues : le pseudo n'est pas unique (deux « tom » se confondent) ; chaque ligue a sa route,
+et le score parfait varie de 20 521 à 23 050 selon la graine (12 %).

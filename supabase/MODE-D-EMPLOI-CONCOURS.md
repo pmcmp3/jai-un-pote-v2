@@ -1,5 +1,13 @@
 # Mettre le concours en route — étape par étape
 
+> ⚠️ **Règle changée le 8 novembre 2026.** Score au général = ton record + 10 % du record de chaque
+> pote de ta ligue. À la clôture, tirage au sort entre les 3 premiers. Colle
+> `supabase/CLASSEMENT-GENERAL-A-COLLER.sql` après le fichier de l'étape 1.
+>
+> **À la clôture**, le SQL Editor te donne le podium et les contacts :
+> `select * from public.concours_podium;`
+> Vérifie les 3 premiers (scores, appareils, rejeu en visio au besoin), fais le tirage et publie-le.
+
 Cinq minutes, tout se fait dans le navigateur. Rien à installer.
 
 ---

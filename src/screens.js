@@ -727,7 +727,7 @@ function afficherBoost() {
   const ligne1 = document.createElement("span");
   ligne1.textContent = n ? ` · ${n} pote${n > 1 ? "s" : ""} dans ta ligue` : "";
   const regle = document.createElement("small");
-  regle.textContent = `1 pote qui joue ${C.boostLigueDureeS || 30} s = +${pct} % pour toi · Inviter →`;
+  regle.textContent = `1 pote qui joue ${C.boostLigueDureeS || 30} s = +${pct} % sur tes points + ${commissionPct()} % de son record · Inviter →`;
   el.append(titre, ligne1, regle);
 }
 async function rafraichirBoost() {
@@ -835,13 +835,12 @@ async function rejoindre(code, creer = false) {
 }
 function lienLigue(code) { return `${window.CONFIG.lienJeu || location.origin + location.pathname}?ligue=${code}`; }
 
-// --- LE CONCOURS DE LIGUES -----------------------------------------------------
-// LA RÈGLE, en une phrase : le score d'une ligue, c'est la somme des meilleurs
-// scores de ses membres. À la clôture, la ligue n°1 gagne un son écrit sur elle.
-// Tout est additionné par la base (vue `concours_ligues`) : le jeu ne voit que
-// son propre score, il ne pourrait rien totaliser.
+// --- LE CONCOURS -----------------------------------------------------------------
+// LA RÈGLE : score au général = ton record + une commission sur le record de
+// chaque pote de ta ligue. À la clôture, tirage au sort entre les 3 premiers :
+// le gagnant fait son morceau avec PMC et ses potes. Tout est calculé par la base
+// (vue `concours_joueurs`) : le jeu ne voit que son propre score.
 let concoursInfo = null;      // { debut, fin, plafond_score } — lu une fois
-let concoursLigues = null;    // le classement, gardé pour le tiroir
 
 // « 9 jours », « 6 heures », « 12 min » : l'unité qui reste lisible d'un coup
 // d'œil. Jamais un compte à rebours à la seconde — ça ne se lit pas, et ça
@@ -871,51 +870,61 @@ function majConcoursMenu() {
   el.textContent = "";
   const b = document.createElement("b");
   b.textContent = t;
-  el.append("Vos meilleurs scores s'additionnent. ", b);
+  el.append("Tirage au sort entre les 3 premiers du général. ", b);
   el.classList.remove("hidden");
 }
 
-// Sur l'écran de fin : « Ta ligue a besoin de toi » — son rang parmi TOUTES les
-// ligues, et ce qui manque pour passer celle du dessus. C'est le seul endroit
-// où inviter un pote a une conséquence chiffrée et visible.
-async function afficherConcours(code) {
+function commissionPct() {
+  const t = concoursInfo && concoursInfo.commission != null ? Number(concoursInfo.commission) : window.CONFIG.commissionParPote;
+  return Math.round((t || 0.1) * 100);
+}
+function formaterRang(n) { return n === 1 ? "1er" : `${n}e`; }
+function lignePotes(n) { return `${n} pote${n > 1 ? "s" : ""}`; }
+
+// Sur l'écran de fin : ta place au général, ce qui la compose, et ce qui manque
+// pour entrer dans le top 3. Avec ou sans ligue.
+async function afficherConcours() {
   const bloc = $("end-concours");
   if (!bloc) return;
   bloc.classList.add("hidden");
-  if (!code || demo || !net.estConfigure()) return;
-  const rows = await net.classementLigues();
-  if (!rows || !rows.length) return;
-  concoursLigues = rows;
-  const i = rows.findIndex((r) => r.code === code);
-  if (i < 0) return;
-  const moi = rows[i];
+  if (demo || !net.estConfigure()) return;
+  const moi = await net.maPlace(getPseudo());
+  if (!moi) return;
   const rang = $("end-concours-rang");
   rang.textContent = "";
   const place = document.createElement("b"), total = document.createElement("b");
-  place.textContent = `${i + 1}${i === 0 ? "re" : "e"}`;
+  place.textContent = formaterRang(moi.rang);
   total.textContent = pts(moi.total);
-  rang.append("Ta ligue est ", place, ` sur ${rows.length}, avec `, total);
+  rang.append("Tu es ", place, ` sur ${moi.classes}, avec `, total);
+  const detail = $("end-concours-detail");
+  detail.textContent = moi.commission > 0
+    ? `${pts(moi.metres)} de record + ${pts(moi.commission)} de commission (${lignePotes(moi.potes)})`
+    : `Chaque pote de ta ligue te rapporte ${commissionPct()}\u00a0% de son record.`;
   const ecart = $("end-concours-ecart");
   ecart.textContent = "";
-  if (i > 0) {
-    const devant = rows[i - 1];
-    const manque = Math.max(1, Math.floor(Number(devant.total)) - Math.floor(Number(moi.total)) + 1);
-    const b = document.createElement("b");
-    b.textContent = pts(manque);
-    ecart.append("Il vous manque ", b, " pour passer devant ", devant.nom || devant.code);
-  } else ecart.textContent = rows.length > 1 ? "Vous êtes premiers. Tenez la place jusqu'à la clôture." : "Vous êtes la première ligue en course.";
-  ecart.classList.remove("hidden");
+  if (moi.rang <= 3) ecart.textContent = "Tu es dans le top 3 : le morceau se tire au sort entre vous trois.";
+  else {
+    const haut = await net.classementGeneral(3);
+    const troisieme = haut && haut[2];
+    if (troisieme) {
+      const b = document.createElement("b");
+      b.textContent = pts(Math.max(1, Number(troisieme.total) - Number(moi.total) + 1));
+      ecart.append("Il te manque ", b, " pour entrer dans le top 3");
+    }
+  }
+  ecart.classList.toggle("hidden", !ecart.textContent);
   const temps = $("end-concours-temps"), t = tempsRestant();
   temps.textContent = t || "";
   temps.classList.toggle("hidden", !t);
   bloc.classList.remove("hidden");
 }
 
-// --- Tiroir du classement général ----------------------------------------------
-// Deux vues : les ligues (le concours) et les 50 meilleurs joueurs (la « super
-// ligue », un classement bonus dont on ne parle pas en vidéo).
+// --- Tiroir des classements ------------------------------------------------------
+// Trois vues : le général (celui du lot), les joueurs de ta ligue, les ligues
+// entre elles (pour l'honneur).
 const classementSheet = $("classement-sheet");
-let classementVue = "ligues";
+let classementVue = "general";
+let classementJeton = 0; // un changement d'onglet rapide : seule la dernière réponse s'affiche
 function ouvrirClassement() {
   suivi("classement_vu", { vue: classementVue });
   classementSheet.classList.add("visible");
@@ -926,13 +935,35 @@ function fermerClassement() {
   classementSheet.classList.remove("visible");
   classementSheet.setAttribute("aria-hidden", "true");
 }
+function regleClassement(vue) {
+  const C = window.CONFIG;
+  if (vue === "general") return `Ton record + ${commissionPct()}\u00a0% du record de chaque pote de ta ligue. À la clôture, tirage au sort entre les 3 premiers : le gagnant fait ${C.concoursLot || "le morceau"}. `;
+  if (vue === "ligue") return "Les joueurs de ta ligue, avec leur record et leur commission. ";
+  return "La somme des records de chaque ligue. Pour l'honneur : le morceau se joue au général. ";
+}
+function ligneJoueur(r, position, moiPseudo, sousTitre) {
+  const li = document.createElement("li");
+  if (r.pseudo === moiPseudo) li.classList.add("moi");
+  const rang = document.createElement("span"); rang.className = "rang"; rang.textContent = `${position}`;
+  const nom = document.createElement("span"); nom.className = "nom"; nom.textContent = `@${r.pseudo}`;
+  const sous = document.createElement("small");
+  const calcul = Number(r.commission) > 0 ? `${pts(r.metres)} + ${pts(r.commission)}` : "";
+  sous.textContent = [sousTitre, calcul].filter(Boolean).join(" · ");
+  if (sous.textContent) nom.appendChild(sous);
+  const m = document.createElement("span"); m.className = "m"; m.textContent = pts(r.total);
+  li.append(rang, nom, m);
+  return li;
+}
 async function remplirClassement() {
+  const jeton = ++classementJeton;
   const liste = $("classement-liste"), vide = $("classement-vide"), regle = $("classement-regle");
-  const ligues = classementVue === "ligues";
-  for (const b of $("classement-onglets").children) b.classList.toggle("actif", (b.dataset.vue === "ligues") === ligues);
-  regle.textContent = ligues
-    ? `Le score d'une ligue, c'est la somme des meilleurs scores de ses membres. À la clôture, la ligue n°1 gagne ${window.CONFIG.concoursLot || "le lot"}. `
-    : "Les 50 meilleurs scores individuels, toutes ligues confondues. ";
+  const monCode = ligue && !ligue.enAttente && !demo ? ligue.code : null, monPseudo = getPseudo();
+  const ongletLigue = $("classement-onglets").querySelector('[data-vue="ligue"]');
+  ongletLigue.classList.toggle("hidden", !monCode);
+  if (classementVue === "ligue" && !monCode) classementVue = "general";
+  const vue = classementVue;
+  for (const b of $("classement-onglets").children) b.classList.toggle("actif", b.dataset.vue === vue);
+  regle.textContent = regleClassement(vue);
   if (window.CONFIG.reglementUrl) {
     const a = document.createElement("a");
     a.href = window.CONFIG.reglementUrl; a.target = "_blank"; a.rel = "noopener";
@@ -941,25 +972,40 @@ async function remplirClassement() {
   }
   liste.textContent = "";
   vide.classList.add("hidden");
-  const rows = ligues ? (concoursLigues || await net.classementLigues()) : await net.top50();
-  if (ligues && rows) concoursLigues = rows;
+  const rows = vue === "general" ? await net.classementGeneral(100) : vue === "ligue" ? await net.joueursDeLigue(monCode) : await net.classementLigues();
+  if (jeton !== classementJeton) return; // un autre onglet a été ouvert entre-temps
   if (!rows || !rows.length) { vide.classList.remove("hidden"); return; }
-  const monCode = ligue && !ligue.enAttente ? ligue.code : null, monPseudo = getPseudo();
-  rows.slice(0, 50).forEach((r, i) => {
-    const li = document.createElement("li");
-    if (ligues ? r.code === monCode : r.pseudo === monPseudo) li.className = "moi";
-    const rang = document.createElement("span"); rang.className = "rang"; rang.textContent = `${i + 1}`;
-    const nom = document.createElement("span"); nom.className = "nom";
-    if (ligues) {
-      nom.textContent = r.nom || r.code;
+  if (vue === "ligues") {
+    rows.slice(0, 100).forEach((r, i) => {
+      const li = document.createElement("li");
+      if (r.code === monCode) li.classList.add("moi");
+      const rang = document.createElement("span"); rang.className = "rang"; rang.textContent = `${i + 1}`;
+      const nom = document.createElement("span"); nom.className = "nom"; nom.textContent = r.nom || r.code;
       const sous = document.createElement("small");
       sous.textContent = `${r.joueurs} joueur${r.joueurs > 1 ? "s" : ""}`;
       nom.appendChild(sous);
-    } else nom.textContent = `@${r.pseudo}`;
-    const m = document.createElement("span"); m.className = "m"; m.textContent = pts(ligues ? r.total : r.metres);
-    li.append(rang, nom, m);
+      const m = document.createElement("span"); m.className = "m"; m.textContent = pts(r.total);
+      li.append(rang, nom, m);
+      liste.appendChild(li);
+    });
+    return;
+  }
+  rows.forEach((r, i) => {
+    const li = ligneJoueur(r, vue === "general" ? r.rang : i + 1, monPseudo, vue === "general" ? (r.nom || "Sans ligue") : "");
+    if (vue === "general" && r.rang <= 3) li.classList.add("podium");
     liste.appendChild(li);
+    if (vue === "general" && r.rang === 3 && rows.length > 3) {
+      const sep = document.createElement("li");
+      sep.className = "coupure";
+      sep.textContent = "Tirage au sort entre ces trois-là";
+      liste.appendChild(sep);
+    }
   });
+  // Au-delà du haut du classement : ta ligne quand même, avec ton vrai rang.
+  if (vue === "general" && monPseudo && !rows.some((r) => r.pseudo === monPseudo)) {
+    const moi = await net.maPlace(monPseudo);
+    if (moi && jeton === classementJeton) liste.appendChild(ligneJoueur(moi, moi.rang, monPseudo, moi.nom || "Sans ligue"));
+  }
 }
 function initClassement() {
   const voir = $("end-concours-voir");
@@ -1181,8 +1227,14 @@ export async function finLigue(metres, potes, mode = "course", bilan = {}) {
   endLigue.classList.add("hidden");
   if (mode === "sprint") lsSet(CLE_SPRINT, net.jourSprint());
   const code = ligue ? ligue.code : (window.CONFIG.ligueDemo || "PMCMP");
-  if (!ligue && mode !== "sprint") return;
   if (demo && mode !== "sprint") { afficherClassement(ligue.code, classementDemo(metres, bilan.fin)); return; }
+  // Sans ligue : le score part sous le code de la ligue de démo, pour que le joueur
+  // figure quand même au classement général (la base ne le compte dans aucune ligue).
+  if (!ligue && mode !== "sprint") {
+    await net.envoyerScore(code, getPseudo(), metres, potes, mode, { graine: bilan.graine, trace: null, duree: bilan.duree });
+    await afficherConcours();
+    return;
+  }
   let trace = null;
   if (mode !== "sprint" && bilan.trace) {
     const avant = await net.classement(ligue.code, bilan.graine);
@@ -1216,7 +1268,7 @@ export async function finLigue(metres, potes, mode = "course", bilan = {}) {
   endRelais.classList.remove("hidden");
   endRelais.textContent = `Relais : ${Number(relais.metres).toLocaleString("fr-FR")} / ${objectif.toLocaleString("fr-FR")} pts`;
   afficherClassement(ligue.code, rows);
-  await afficherConcours(ligue.code);
+  await afficherConcours();
 }
 // Classement de la ligue sur l'écran de fin, avec le rang du joueur en tête
 // de carte (« Tu es 1er de ta ligue ! »).
@@ -1373,8 +1425,8 @@ export function showEndScreen({ metres, potesMax, record, fin, sprint, scoreMax 
   const endMax = $("end-max");
   const pct = Math.round((window.CONFIG.boostLigueParPote || 0.1) * 100);
   const ligneBoost = sprint || (!net.estConfigure() && !demo) ? "" : boost.potes.length
-    ? `Tes potes te donnent <b>+${Math.round((boost.mult - 1) * 100)} %</b> · +${pct} % par nouveau pote`
-    : `<b>+${pct} %</b> de points par pote invité qui joue`;
+    ? `Tes potes te donnent <b>+${Math.round((boost.mult - 1) * 100)} %</b> · +${pct} % par nouveau pote, plus ${commissionPct()} % de son record`
+    : `<b>+${pct} %</b> de points par pote invité qui joue, plus ${commissionPct()} % de son record`;
   const meilleur = Math.max(getRecord(), Math.floor(metres));
   const mieux = record ? "" : `Meilleur score : ${pts(meilleur)} · tu peux le battre.`;
   endMax.classList.toggle("hidden", !mieux && !ligneBoost);
