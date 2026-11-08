@@ -12,6 +12,9 @@ import * as friends from "./friends.js";
 import { COULEURS, CHAPEAUX, SKIN_DEFAUT } from "./rider.js";
 
 import { graineLigue } from "./regles.js";
+import { installerTypo } from "./typo.js";
+import { installerA11y, annoncer } from "./a11y.js";
+import { vibrationsActives, setVibrations } from "./vibration.js";
 const pts = (n) => `${Math.floor(Number(n) || 0).toLocaleString("fr-FR")} pts`;
 
 let deps = null;
@@ -161,7 +164,7 @@ function setSkin(cle, val) { getSkin()[cle] = val; lsSet(CLE_SKIN, JSON.stringif
 function majSkinUi() {
   const sk = getSkin();
   document.querySelectorAll("#skin-options .chips").forEach((box) => {
-    for (const b of box.children) b.classList.toggle("actif", sk[box.dataset.cle] === b.dataset.val);
+    for (const b of box.children) { const oui = sk[box.dataset.cle] === b.dataset.val; b.classList.toggle("actif", oui); b.setAttribute("aria-pressed", oui ? "true" : "false"); }
   });
 }
 function construireSkinUi() {
@@ -172,11 +175,14 @@ function construireSkinUi() {
   document.querySelectorAll("#skin-options .chips").forEach((box) => {
     const cle = box.dataset.cle;
     box.textContent = "";
+    box.setAttribute("role", "group");
+    box.setAttribute("aria-label", box.previousElementSibling ? box.previousElementSibling.textContent : cle);
     for (const [label, val] of listes[cle]) {
       const b = document.createElement("button");
       b.type = "button";
       const couleur = cle === "c1" || cle === "short" || cle === "chaussures";
       b.className = `chip${couleur ? " couleur" : ""}${sk[cle] === val ? " actif" : ""}`;
+      b.setAttribute("aria-pressed", sk[cle] === val ? "true" : "false");
       b.dataset.val = val;
       if (couleur) { b.style.background = val; b.title = label; b.setAttribute("aria-label", label); } else b.textContent = label;
       b.addEventListener("click", (e) => {
@@ -471,14 +477,12 @@ function creerDecompte(boite, num, arc) {
 const decompteRevive = creerDecompte(reviveTimer, reviveTimerNum, reviveArc);
 
 let reviveCallbacks = null;
-let reviveMetres = 0;
 
 // `potes` = nombre de potes au maximum de la course : la carte les promet de
 // retour (ressort émotionnel : les potes s'en vont, ouvre l'album pour les
 // rattraper).
 export function openReviveSheet({ metres, potes, onAccept, onDecline, onReplay }) {
   reviveCallbacks = { onAccept, onDecline, onReplay };
-  reviveMetres = metres;
   reviveTitle.textContent = potes > 0 ? "Tes potes t'attendent" : "Ta course n'est pas finie";
   reviveText.textContent = potes > 0
     ? `Reprends à ${pts(metres)}, et ${Math.min(2, potes)} pote${Math.min(2, potes) > 1 ? "s" : ""} te retombe${Math.min(2, potes) > 1 ? "nt" : ""} dessus.`
@@ -855,7 +859,6 @@ function formaterRestant(ms) {
   return `${Math.max(1, Math.round(ms / 60000))} min restantes`;
 }
 function tempsRestant() { return formaterRestant(net.restantMs(concoursInfo)); }
-function concoursOuvert() { const r = net.restantMs(concoursInfo); return r === null || r > 0; }
 
 async function chargerConcours() {
   concoursInfo = await net.concours();
@@ -917,6 +920,7 @@ async function afficherConcours() {
   temps.textContent = t || "";
   temps.classList.toggle("hidden", !t);
   bloc.classList.remove("hidden");
+  annoncer(`Classement général : ${formaterRang(moi.rang)} sur ${moi.classes}, avec ${pts(moi.total)}.`);
 }
 
 // --- Tiroir des classements ------------------------------------------------------
@@ -1419,6 +1423,7 @@ function finSplash() {
 export function showEndScreen({ metres, potesMax, record, fin, sprint, scoreMax }) {
   suivi("fin_vue", { score: Math.floor(metres), potes: potesMax, arrivee: !!fin, sprint: !!sprint, record: !!record, temps: Math.round(deps.tempsCourse ? deps.tempsCourse() : 0) });
   scoreVal.textContent = Math.floor(metres).toLocaleString("fr-FR");
+  annoncer(`Course terminée : ${pts(metres)}.`);
   derniereCourse = { metres: Math.floor(metres), potes: potesMax, fin: !!fin };
   // Ligne d'encouragement (meilleur score à battre) et rappel du boost de
   // ligue — plutôt que le score parfait de la route.
@@ -1651,6 +1656,11 @@ function startGame(opts = {}) {
 }
 
 export function init(d) {
+  installerTypo();
+  installerA11y();
+  const vibrations = $("vibrations-input");
+  vibrations.checked = vibrationsActives();
+  vibrations.addEventListener("change", () => setVibrations(vibrations.checked));
   deps = d;
   [ctaLink, endCta].forEach((lien) => {
     lien.removeAttribute("href"); lien.removeAttribute("target"); lien.setAttribute("role", "button");

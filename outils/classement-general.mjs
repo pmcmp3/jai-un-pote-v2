@@ -90,7 +90,7 @@ console.log("sans ligue :", JSON.stringify(b, null, 1));
 const c = await scenario({ largeur: 320, hauteur: 568, avecLigue: true, nom: "petit" });
 console.log("petit écran avec ligue :", JSON.stringify({ rejouable: c.rejouable, erreurs: c.erreurs, debordement: c.debordement }));
 
-const okA = /37e sur 240/.test(a.fin.rang) && /12\s400 pts de record \+ 4\s300 pts de commission \(6 potes\)/.test(a.fin.detail) && /Il te manque/.test(a.fin.ecart)
+const okA = /37e sur 240/.test(a.fin.rang) && /12\s400\spts de record \+ 4\s300\spts de commission \(6\spotes\)/.test(a.fin.detail) && /Il te manque/.test(a.fin.ecart)
   && a.general.some((l) => /Tirage au sort/i.test(l)) && a.general[a.general.length - 1].includes("@pmc") && a.general[a.general.length - 1].startsWith("37")
   && a.onglets.join() === "general,ligue,ligues" && a.ligue.length === 2 && a.ligues.length === 2
   && a.ecrits.some((e) => e.code === "ESSAI");

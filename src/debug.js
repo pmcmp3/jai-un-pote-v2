@@ -9,7 +9,6 @@ import { clock } from "./clock.js";
 const getSpeed = () => 0; const getDistanceScrolled = () => 0;
 import { isTypingTarget } from "./input.js";
 
-const VISIBLE_BEATS = 8; // nombre de temps affichés à l'avance sur la grille
 
 // Activable au clavier (desktop) OU via ?debug dans l'URL — indispensable sur
 // téléphone, où il n'y a pas de clavier pour appuyer sur CONFIG.toucheDebug et

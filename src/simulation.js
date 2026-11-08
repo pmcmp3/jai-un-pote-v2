@@ -12,18 +12,9 @@
 
 import { Route, CORPS_HAUT, familleDe, montee, solAt, toitGare, armer, delaiArmement } from "./rows.js";
 import { ROWS_AHEAD } from "./scene.js";
-import { V_UNIT, targetSpeed, multiplicateur, dureeCourse } from "./regles.js";
+import { V_UNIT, targetSpeed, multiplicateur, dureeCourse, fenetreApresTurbo } from "./regles.js";
 
 const REGARD = 12; // rangées examinées devant
-
-// Temps de montée jusqu'au sommet, par famille de saut (config.js).
-function montees(C) {
-  const tTenue = C.sautTenueMaxS;
-  const tTap = C.sautVitesse / C.sautGravite;
-  const tHaut = tTenue + (C.sautVitesse - C.sautGraviteTenue * tTenue) / C.sautGravite;
-  const tDouble = C.sautVitesseDouble / C.sautGravite;
-  return { tap: tTap, haut: tHaut, double: tHaut + tDouble * 0.6, tDouble };
-}
 
 // Ce que demande une rangée : null, "tap", "haut" ou "double". Les pièces en
 // l'air DESSINENT l'arc d'un obstacle voisin : le pilote ne les vise pas
@@ -43,7 +34,6 @@ export function scoreParfait(seed, potesMax) {
   const route = new Route(seed);
   const dt = 1 / 120, T = dureeCourse();
   const paliers = C.potesPaliers || [];
-  const M = montees(C);
   let v = 0, prevV = 0, speed = V_UNIT * C.vitesseBase;
   let jumpY = 0, vy = 0, doubled = false, tHaut = 0, plan = null;
   // Le sol n'est pas toujours 0 : les halles portent le vélo en l'air.
@@ -99,8 +89,8 @@ export function scoreParfait(seed, potesMax) {
         if (cible !== null && points >= cible) { cible = null; if (potes < potesMax) potes += 1; }
       } else if (ev.type === "lait") {
         stats.laits += 1; turbo = C.laitDureeS || 5;
-        const r0 = Math.floor(v + 0.5) + ROWS_AHEAD + 1;
-        route.ouvrirFenetreSure(r0, r0 + Math.ceil(speed * (C.laitVitesse || 1.2) * (C.laitDureeS || 5)) + 12);
+        const [de, a] = fenetreApresTurbo(v, speed, Math.floor(v + 0.5) + ROWS_AHEAD + 1);
+        route.ouvrirFenetreSure(de, a);
       } else if (ev.type === "rouge") {
         stats.rouges += 1;
         if (potes < potesMax) potes += 1; else metres += 40 * mult;

@@ -8,6 +8,15 @@ export const V_UNIT = 2.6;          // rangées/s par unité de « vitesse » de
 export const V_DOUBLING_S = 50; // vitesseMax atteinte vers 30 s
 export const LEAD_IN = 3.3;         // décompte avant le GO (ancré sur la grille du morceau)
 
+// Le turbo du lait laisse les obstacles sur la route : il les fait exploser. Seule
+// la sortie du turbo est dégagée, pour ne pas retomber sur un obstacle à la fin.
+// Renvoie [première rangée, dernière rangée] à vider.
+export function fenetreApresTurbo(v, speed, premiereHorsEcran) {
+  const C = window.CONFIG;
+  const sortie = Math.ceil(v + speed * (C.laitVitesse || 1.2) * (C.laitDureeS || 5));
+  return [Math.max(premiereHorsEcran, sortie - 4), sortie + 12];
+}
+
 export function targetSpeed(t) {
   const { vitesseBase, vitesseMax, vitesseFinale, accelDernieresS } = window.CONFIG;
   let v = Math.min(vitesseMax, vitesseBase * Math.pow(2, Math.max(0, t) / V_DOUBLING_S));
@@ -35,7 +44,7 @@ export function dureeCourse() {
 // les règles changent la route — les scores et fantômes d'une ligue sont
 // filtrés sur la graine, une nouvelle version repart donc sur un classement
 // vierge sans rien supprimer en base.
-export const VERSION_COURSE = 27; // entre dans graineLigue() : +1 = nouvelle route partout
+export const VERSION_COURSE = 28; // entre dans graineLigue() : +1 = nouvelle route partout
 export function graineDepuisTexte(txt) {
   let h = 7;
   for (const ch of String(txt)) h = (h * 31 + ch.charCodeAt(0)) % 100000;

@@ -63,7 +63,7 @@ const res = await page.evaluate(() => {
       else ratees.push(`${row.kind}@${r} t=${P.clock.now().toFixed(1)}`);
     }
   }
-  return { vus, touches, invulnerables, pourquoi, ratees: ratees.slice(0, 20), fin: P.clock.now(), vibrationsChoc: window.__vibrations.filter((m) => m === 60).length };
+  return { vus, touches, invulnerables, pourquoi, ratees: ratees.slice(0, 20), fin: P.clock.now(), vibrationsChoc: window.__vibrations.filter((m) => m === 90).length };
 });
 console.log("Rencontrés / percutés (et payés) / percutés pendant une invulnérabilité (turbo, bouclier) :");
 for (const k of Object.keys(res.vus).sort()) console.log(`  ${k.padEnd(12)} ${res.vus[k]} / ${res.touches[k] || 0} / ${res.invulnerables[k] || 0}`);

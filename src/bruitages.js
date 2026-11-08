@@ -364,7 +364,6 @@ SONS.atterrissage = (ctx, out, t0, o) => {
 // Le TER : « pouêêt — pouêêêêt », deux tons d'avertisseur, qui s'installent
 // comme une corne à air.
 SONS.train = (ctx, out, t0, o) => {
-  const d = o.doppler || 1;
   // Ré puis La (une quarte qui descend), doublés d'un souffle de cents pour
   // l'épaisseur. Pas de Doppler : il désaccorderait les deux tons.
   klaxon(ctx, out, t0, { notes: [n("D5"), n("D5") * 1.003, n("D4")], type: "sawtooth", segments: [[0, 0.45]], f: 1100, q: 0.7, grain: 1.6, bend: -0.03, attaque: 0.05, corps: 0.6 });
@@ -410,6 +409,13 @@ SONS.cagette = (ctx, out, t0, o) => {
   bouffee(ctx, out, t0, { type: "lowpass", f: 800, crete: 0.5, tau: 0.03, alea: o.alea });
   const f = surGamme(380 + o.alea() * 300);
   partiels(ctx, out, t0 + 0.012, [[f, 0.25, 0.04], [f * 2.4, 0.08, 0.025]], 0.001);
+};
+// L'explosion du turbo : un gros coup sourd, le souffle, des débris qui crépitent.
+SONS.explosion = (ctx, out, t0, o) => {
+  coupSourd(ctx, out, t0, { f0: 140, f1: 34, duree: 0.42, crete: 1 });
+  bouffee(ctx, out, t0, { type: "lowpass", f: 1500, crete: 0.9, tau: 0.09, alea: o.alea });
+  bouffee(ctx, out, t0 + 0.02, { type: "bandpass", f: 420, q: 0.7, crete: 0.6, tau: 0.16, alea: o.alea });
+  for (let i = 0; i < 5; i++) bouffee(ctx, out, t0 + 0.05 + o.alea() * 0.26, { type: "highpass", f: 2600, crete: 0.2, tau: 0.012, alea: o.alea });
 };
 // Des pièces qu'on rend dans la main : trois tintements aigus, sur la gamme.
 SONS.pieces = (ctx, out, t0, o) => {
@@ -693,7 +699,7 @@ export const CIBLES = {
   // Continus, au niveau nominal (ambiance.js les module) : le vélo reste discret.
   couche_roulement: -33, roueLibre: -34, neigeRoule: -34, planches: -32, couche_vent: -36, couche_blizzard: -33, couche_vagues: -31,
   couche_jet: -26, couche_grondement: -28, couche_freins: -27, couche_boules: -33, couche_foule: -27,
-  cagette: -26, pieces: -28,
+  cagette: -26, pieces: -28, explosion: -19,
   moteur_contresens: -30, moteur_bus: -29, moteur_tracteur: -29, moteur_chasseneige: -29, moteur_buggy: -30, moteur_skieur: -32,
 };
 export const NIVEAUX = {
@@ -705,11 +711,11 @@ export const NIVEAUX = {
   mouette: 0.045, cri_mouette: 0.07, cloche: 0.052,
   couche_roulement: 0.182, roueLibre: 0.193, neigeRoule: 0.153, planches: 0.195, couche_vent: 0.074, couche_blizzard: 0.24, couche_vagues: 0.232,
   couche_jet: 0.211, couche_grondement: 0.589, couche_freins: 0.061, couche_boules: 0.417, couche_foule: 0.272,
-  cagette: 0.598, pieces: 0.157,
+  cagette: 0.598, pieces: 0.157, explosion: 0.33,
   moteur_contresens: 0.146, moteur_bus: 0.191, moteur_tracteur: 0.412, moteur_chasseneige: 0.197, moteur_buggy: 0.394, moteur_skieur: 0.129,
 };
 // Durée d'un son (budget de voix simultanées).
-const DUREES = { vache: 1, meuh: 1.3, cloche: 5.5, train: 1.8, pschit: 1.6, chouette: 1.5, grillon: 2.1, mouette: 1.4, cri_mouette: 1.4, sonnette: 1, carillon: 1.3 };
+const DUREES = { explosion: 1.7, vache: 1, meuh: 1.3, cloche: 5.5, train: 1.8, pschit: 1.6, chouette: 1.5, grillon: 2.1, mouette: 1.4, cri_mouette: 1.4, sonnette: 1, carillon: 1.3 };
 export const NOMS = Object.keys(SONS);
 
 // Rendu sur n'importe quel contexte (le jeu, ou hors ligne pour l'outil).

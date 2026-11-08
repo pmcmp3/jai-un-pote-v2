@@ -8,7 +8,6 @@ const BLANC = "#ffffff";
 const NOIR = "#0d0d10";
 const JAUNE = "#ffcf2e";
 const ROUGE = "#e13e26";
-const PANNEAU = "rgba(13,13,16,0.72)";
 const POLICE = '"Helvetica Neue", Helvetica, Arial, system-ui, sans-serif';
 const POLICE_TITRE = '"Source Serif 2", Georgia, serif';
 const PAD = 16;

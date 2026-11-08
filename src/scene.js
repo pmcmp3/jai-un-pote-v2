@@ -77,6 +77,7 @@ export function setNight(n) { night = Math.max(0, Math.min(1, n)); }
 // Avancement de la journée : le soleil traverse l'écran de gauche à droite
 // jusqu'à la nuit, puis la lune fait pareil — on sent le temps passer.
 export function setHeure(t) { heure = Math.max(0, Math.min(1, t)); }
+function lisse(a) { const x = Math.max(0, Math.min(1, a)); return x * x * (3 - 2 * x); }
 export function getNight() { return night; }
 export function setDecorTime(t) { decorT = t; }
 export function scale() { return K; }
@@ -538,7 +539,6 @@ function bordure(r) { return routeNeige(r) ? BORD_NEIGE : enPlage(r) ? SABLE_BOR
 const DIRT = "#9a7a4e";
 const ROAD = "#55514d";
 const LINE = "#f2ead8";
-const MUD = "#5a3f22";
 let dessinVoiture = null; // (ctx, u, v) → voiture garée, fourni par main.js
 export function setDessinVoiture(f) { dessinVoiture = f; }
 let villeJoueur = null; // nom saisi à l'inscription : le joueur traverse SA ville
@@ -641,8 +641,9 @@ export function setPlage(a) { plageAlpha = Math.max(0, Math.min(1, a)); }
 // vers le rivage, des vagues en traits fins et le reflet du soleil en colonne.
 function mer(ctx, alpha) {
   ctx.save();
-  ctx.globalAlpha = alpha;
   const y0 = horizonY, y1 = H;
+  // La mer MONTE vers nous depuis l'horizon, au lieu d'apparaître en fondu.
+  ctx.beginPath(); ctx.rect(0, y0, W, (y1 - y0) * lisse(alpha)); ctx.clip();
   const g = ctx.createLinearGradient(0, y0, 0, ySol(RIVAGE));
   g.addColorStop(0, rgbA(melange(parseColor("#ffb37a"), HORIZON_NUIT, night * 0.5)));
   g.addColorStop(0.2, rgbA(melange(parseColor("#c4608e"), HORIZON_NUIT, night * 0.5)));
@@ -732,29 +733,24 @@ function raquettesPlage(ctx, u, v, t, k) {
 // moitié basse), énorme, dégradé or → orange → rose, rayé dans le bas comme
 // un coucher de soleil des années 80 — Miami, Vice City. Un grand halo
 // chaud éclaire tout le ciel.
-// En entrant sur la plage, le soleil DESCEND jusqu'à l'horizon et grossit
-// (un seul soleil, qui glisse de sa place dans le ciel à sa place sur la mer).
+// En entrant sur la plage, il MONTE de derrière l'horizon pendant que la lune
+// descend de l'autre côté : un mouvement, jamais un fondu.
 export const SOLEIL_X = 0.64;
 function soleilPlage(a) {
-  const e = a * a * (3 - 2 * a);
-  const R0 = K * 0.9, R1 = K * 2.3;
-  const x0 = W * (0.08 + 0.84 * heure), y0 = horizonY * (1.02 - 0.86 * Math.sin(Math.PI * Math.max(0, Math.min(1, heure))));
-  const x1 = W * SOLEIL_X, y1 = horizonY - R1 * 0.3;
-  return { x: x0 + (x1 - x0) * e, y: y0 + (y1 - y0) * e, R: R0 + (R1 - R0) * e, e };
+  const e = lisse(a);
+  const R = K * 2.3, y1 = horizonY - R * 0.3, y0 = horizonY + R * 1.05;
+  return { x: W * SOLEIL_X, y: y0 + (y1 - y0) * e, R, e };
 }
 function soleilCouchant(ctx, a) {
   const { x, y, R, e } = soleilPlage(a);
   ctx.save();
   const halo = ctx.createRadialGradient(x, y, R * 0.4, x, y, W * (0.75 + 0.3 * e));
-  halo.addColorStop(0, `rgba(255,226,150,${0.85 + 0.1 * e})`);
-  halo.addColorStop(0.18, `rgba(255,160,96,${0.35 + 0.2 * e})`);
+  halo.addColorStop(0, `rgba(255,226,150,${0.95 * e})`);
+  halo.addColorStop(0.18, `rgba(255,160,96,${0.55 * e})`);
   halo.addColorStop(0.45, `rgba(255,96,120,${0.22 * e})`);
   halo.addColorStop(1, "rgba(120,60,160,0)");
   ctx.fillStyle = halo;
   ctx.fillRect(0, 0, W, horizonY + 4);
-  // Le disque uni (le soleil du ciel) s'efface pendant que le disque rayé apparaît.
-  if (e < 1) { ctx.globalAlpha = 1 - e; ctx.fillStyle = "rgba(255,200,130,1)"; ctx.beginPath(); ctx.arc(x, y, R, 0, Math.PI * 2); ctx.fill(); }
-  ctx.globalAlpha = e;
   const disque = ctx.createLinearGradient(0, y - R, 0, y + R);
   disque.addColorStop(0, "#fff1a8");
   disque.addColorStop(0.45, "#ffb347");
@@ -776,22 +772,27 @@ function soleilCouchant(ctx, a) {
   ctx.restore();
 }
 
-// L'hélicoptère de plage : très haut dans le ciel, hors de portée, il traverse
-// l'écran de droite à gauche toutes les 24 s (puis disparaît le temps de
-// revenir). Une silhouette sombre en rectangles, comme tout le jeu : elle se
-// lit sur le ciel orange. Il ne touche à rien, il est là pour le plaisir.
+// L'hélicoptère de plage : il ARRIVE, du coin haut droit, en piqué, nez baissé ;
+// il se redresse, traverse à hauteur de ciel et sort à gauche. Jamais de fondu :
+// il entre et sort par les bords de l'écran. Une silhouette sombre en rectangles,
+// comme tout le jeu. Il ne touche à rien, il est là pour le plaisir.
 const HELICO_PERIODE = 24, HELICO_VOL = 15;
+let helicoDepart = null;
 function helicoptere(ctx) {
-  if (plageAlpha < 0.3) return;
-  const t = decorT, ph = (t % HELICO_PERIODE) / HELICO_VOL;
+  if (plageAlpha < 0.05) { helicoDepart = null; return; }
+  if (plageAlpha < 0.5) return;
+  if (helicoDepart === null || decorT < helicoDepart) helicoDepart = decorT;
+  const t = decorT, ph = ((t - helicoDepart) % HELICO_PERIODE) / HELICO_VOL;
   if (ph > 1) return;
   const L = Math.max(46, K * 3.3);                       // longueur de la cabine à l'écran
   const x = W + L * 1.4 - ph * (W + L * 3.2);
-  const y = horizonY * (0.3 + 0.03 * Math.sin(t * 0.9)) + Math.sin(t * 2.3) * 2;
+  const arrivee = Math.max(0, 1 - ph / 0.4);             // 1 à l'entrée, 0 une fois redressé
+  const croisiere = horizonY * (0.3 + 0.03 * Math.sin(t * 0.9)) + Math.sin(t * 2.3) * 2;
+  const y = croisiere - arrivee * arrivee * (croisiere + L * 1.2);
   const k = L / 46;
   const rect = (dx, dy, w, h, col) => { ctx.fillStyle = col; ctx.fillRect(Math.round(x + dx * k), Math.round(y + dy * k), Math.ceil(w * k), Math.ceil(h * k)); };
   ctx.save();
-  ctx.globalAlpha = Math.min(1, (plageAlpha - 0.3) / 0.4) * 0.92;
+  ctx.translate(x, y); ctx.rotate(-0.32 * arrivee); ctx.translate(-x, -y);
   const corps = "#2a2438", vitre = "#6a6f99";
   rect(-23, -7, 30, 14, corps);                          // cabine
   rect(-23, -3, 9, 6, vitre);                            // verrière, côté nez
@@ -850,8 +851,10 @@ export function renderGround(ctx, boueAt) {
   // Le soleil traverse le ciel pendant la course : il se lève à gauche,
   // passe au plus haut vers la mi-course, se couche à droite ; la lune prend
   // le même chemin la nuit.
-  const astre = (t, couleur, rayon, halo) => {
-    const x = W * (0.08 + 0.84 * t), y = horizonY * (1.02 - 0.86 * Math.sin(Math.PI * Math.max(0, Math.min(1, t))));
+  // `couche` : 0 = sur sa course dans le ciel, 1 = caché sous l'horizon.
+  const astre = (t, couleur, rayon, halo, couche = 0, derive = 0) => {
+    const x = W * (0.08 + 0.84 * t + derive), yCiel = horizonY * (1.02 - 0.86 * Math.sin(Math.PI * Math.max(0, Math.min(1, t))));
+    const y = yCiel + (horizonY + rayon * 1.2 - yCiel) * couche;
     if (halo > 0) {
       const g2 = ctx.createRadialGradient(x, y, 0, x, y, W * 0.75);
       g2.addColorStop(0, `rgba(255,222,160,${0.85 * halo})`);
@@ -863,23 +866,31 @@ export function renderGround(ctx, boueAt) {
     ctx.fillStyle = couleur;
     ctx.beginPath(); ctx.arc(x, y, rayon, 0, Math.PI * 2); ctx.fill();
   };
+  // Un astre ne s'efface jamais : il passe derrière l'horizon. Le soleil se couche
+  // en rougissant quand la nuit tombe, la lune monte ; et à la plage la lune redescend.
   if (plageAlpha > 0.01) soleilCouchant(ctx, plageAlpha);
-  else if (night < 0.98) astre(heure, `rgba(255,236,190,${1 - night})`, K * 0.9, 1 - night);
+  else if (night < 0.995) {
+    const soir = lisse(night);
+    const c = melange([255, 236, 190], [255, 128, 84], soir);
+    astre(heure, rgbA(c), K * 0.9, 1 - soir, soir, soir * 0.14);
+  }
   if (night > 0.3) {
     const a = Math.min(1, (night - 0.3) / 0.5);
     ctx.fillStyle = `rgba(255,255,255,${0.75 * a})`;
     for (let i = 0; i < 40; i++) ctx.fillRect(hash(i * 7.1) * W, hash(i * 3.3) * (horizonY - 30), 2, 2);
-    astre(Math.max(0, heure - 0.55), `rgba(250,244,220,${a})`, K * 0.7, 0);
+    astre(Math.max(0, heure - 0.55), "rgb(250,244,220)", K * 0.7, 0, 1 - lisse((night - 0.3) / 0.7));
   }
   nuages(ctx);
   helicoptere(ctx);
   modeSaison = "sol";
   // Montagnes au loin (les villages du jeu sont en Isère : les Alpes en toile
   // de fond), neige sur les crêtes ; puis collines vertes, dans la brume.
-  // (À la plage, montagnes et collines s'effacent : la mer va jusqu'à l'horizon.)
-  ctx.save(); ctx.globalAlpha = 1 - plageAlpha;
+  // (À la plage, montagnes et collines s'enfoncent sous l'horizon : la mer va
+  // jusqu'au bout.)
+  ctx.save();
+  ctx.translate(0, lisse(plageAlpha) * H * 0.55);
   montagnes(ctx, 320);
-  if (montagneAlpha > 0.01) { ctx.globalAlpha = (1 - plageAlpha) * montagneAlpha; montagnesProches(ctx); ctx.globalAlpha = 1 - plageAlpha; }
+  if (montagneAlpha > 0.01) { ctx.globalAlpha = montagneAlpha; montagnesProches(ctx); ctx.globalAlpha = 1; }
   collines(ctx, 150, 2, 26, teintes("#7c96a8", 14).plat, 1.7);
   collines(ctx, 62, 0.4, 9, teintes("#6d8c45", 12).plat, 4.1);
   ctx.restore();
@@ -1669,7 +1680,7 @@ export function phaseQuilles(t, v) { return ((t * 0.42 + v * 0.37) % 1 + 1) % 1;
 export function clocherA(r) { return ((r % ZONE_ROWS) + ZONE_ROWS) % ZONE_ROWS === 27 && estVillage(zoneAt(r)) && !(masque(r) & SANS_DECOR); }
 
 export function drawHalle(ctx, rDebut, geo, rFrom = -Infinity, rTo = Infinity, couche = "fond") {
-  const { haut, montee, plat, descente, total } = geo;
+  const { haut, montee, plat, total } = geo;
   const type = geo.type || "marche";
   const visible = (v0, v1) => v1 >= rFrom - 2 && v0 <= rTo + 2;
   const uG = -ROAD_HALF - 0.2, uD = ROAD_HALF + 0.2;

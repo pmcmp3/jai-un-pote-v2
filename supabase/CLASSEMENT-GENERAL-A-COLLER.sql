@@ -17,11 +17,11 @@
 
 -- ===========================================================================
 -- 1. LES RÉGLAGES.
--- Le plafond passe aussi à 95 000 : à 75 000, le jeu refuserait des scores
--- possibles depuis l'accélération de fin de course.
+-- Le plafond passe aussi à 110 000 (outils/plafond.mjs) : à 75 000, le jeu
+-- refuserait des scores possibles depuis l'accélération de fin de course.
 -- ===========================================================================
 alter table public.concours add column if not exists commission numeric(4,3) not null default 0.10;
-update public.concours set plafond_score = 95000 where id = 1 and plafond_score < 95000;
+update public.concours set plafond_score = 110000 where id = 1 and plafond_score < 110000;
 
 -- ===========================================================================
 -- 2. LE CLASSEMENT DES JOUEURS.

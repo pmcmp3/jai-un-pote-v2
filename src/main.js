@@ -33,7 +33,8 @@ import { consumeJumpPress, consumeWheelie, isHolding } from "./input.js";
 import { PALETTES, paletteDepuisSkin, couronner } from "./rider.js";
 import { drawRider, drawJetpack, RIDER_HEIGHT, setNuit as phareNuit } from "./voxrider.js";
 import { drawCoin } from "./coin.js";
-import { V_UNIT, LEAD_IN, targetSpeed as targetSpeedRegle, multiplicateur as multRegle, graineLigue, dureeCourse, rangAuTemps } from "./regles.js";
+import { vibrer } from "./vibration.js";
+import { V_UNIT, LEAD_IN, targetSpeed as targetSpeedRegle, multiplicateur as multRegle, graineLigue, dureeCourse, rangAuTemps, fenetreApresTurbo } from "./regles.js";
 import { scoreParfait } from "./simulation.js";
 import * as fantome from "./fantome.js";
 
@@ -75,9 +76,9 @@ if (window.visualViewport) {
   updateBrowserChromeInset();
 }
 
-// Vibrations : Android (Chrome/Firefox) seulement — Safari iOS n'expose pas
-// navigator.vibrate, et aucune API web ne fait vibrer un iPhone. Sans effet là-bas.
-function vibrer(motif) { try { if (navigator.vibrate) navigator.vibrate(motif); } catch (e) { /* rien */ } }
+// Accessibilité : avec « réduire les animations » du téléphone, ni secousse, ni
+// flash, et des explosions plus sobres.
+const MOUVEMENT_REDUIT = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 // --- Horloge ---------------------------------------------------------------
 const perfClock = () => performance.now() / 1000;
@@ -87,13 +88,11 @@ let gameStarted = false;
 let startRequested = false;
 let startRequestedAt = 0;
 let audioDrivesClock = false;
-let audioFallback = false;
 const audioWatch = { lastT: -1, lastReal: 0 };
 
 function useFallbackClock(preserve) {
   clock.setTimeSource(perfClock, preserve);
   audioDrivesClock = false;
-  audioFallback = true;
 }
 
 const COUNT_IN_BEATS = 3;
@@ -353,7 +352,7 @@ function tempsAvant(r, row, tm, vitesse) {
 }
 function momentIdeal(f) { return rows.montee(f) + 0.03; } // le moment du joueur idéal (outils/mesurer.mjs), un poil avant
 function conseilCherche(tm, vitesse) {
-  if (conseil.r !== null || projo.type || game.sprint) return;
+  if (conseil.r !== null || projo.type || game.sprint || game.turbo > 0) return;
   const deja = appris();
   if (deja.size >= 3) return;
   const vus = lireJson(CLE_VUS, {});
@@ -474,12 +473,12 @@ function cibleConseil(tm) {
 const PROJECTEURS = {
   // On dit ce que la brique FAIT (l'invincibilité surtout, c'est ce qui se
   // voit en jeu), pas seulement ce qu'elle est.
-  lait: { titre: "BRIQUE DE LAIT = TURBO", sous: "Attrape-la : pendant 5 s, tu fonces, rien ne peut te toucher et tes points comptent double" },
+  lait: { titre: "BRIQUE DE LAIT = TURBO", sous: "Attrape-la : pendant 5 s, tu exploses tout sur ton passage et tes points comptent double" },
   mouette: { titre: "ATTENTION, LES MOUETTES !", sous: "Elles volent à hauteur de saut : ne saute pas, roule dessous" },
 };
 const projo = { type: null, x: 0, y: 0, r: 40, age: 0 };
 function projoLancer(type, x, y, r) {
-  if (projo.type || game.sprint || game.ended || conseil.r !== null || !gameStarted || clock.now() < 1) return;
+  if (projo.type || game.sprint || game.ended || game.turbo > 0 || conseil.r !== null || !gameStarted || clock.now() < 1) return;
   // Jamais juste avant un tuto : deux explications qui se marchent dessus,
   // et ni l'une ni l'autre ne rentre.
   if ((game.tutos || []).some((r) => r > player.v - 2 && r - player.v < 30)) return;
@@ -612,7 +611,7 @@ function resetRun() {
   player.u = 0; player.prevU = 0; player.v = 0; player.prevV = 0; cameraX = null;
   player.jumpY = 0; player.prevJumpY = 0; player.jumpVy = 0; player.doubled = false; player.flip = 0; player.prevFlip = 0; player.tHaut = 0; player.roue = 0; player.prevRoue = 0;
   game.cibleRachat = null;
-  sparkles.length = 0; ghosts.length = 0;
+  sparkles.length = 0; ghosts.length = 0; eclats.length = 0; boules.length = 0; motBoum = 0;
   speed = V_UNIT * window.CONFIG.vitesseBase; nuitDebut = null;
   friends.reset();
   ambiance.reinitialiser(); alertesVues.clear(); montagneFondu = 0; leveeCam = 0; scene.setLevee(0); plageFondu = 0; scene.setPlage(0);
@@ -631,7 +630,7 @@ function restartGame(opts = {}) {
   audio.restart();
   if (audio.isRunning()) {
     clock.setTimeSource(audio.now);
-    audioDrivesClock = true; audioFallback = false;
+    audioDrivesClock = true;
     audioWatch.lastT = -1; audioWatch.lastReal = perfClock();
   } else {
     useFallbackClock(false);
@@ -719,7 +718,7 @@ function endGame(reason) {
 // ligue ne compare que les courses de la même route) et trace du fantôme.
 function bilanCourse() { return { graine: game.graine, trace: fantome.encoder(), scoreMax: game.scoreMax, duree: Math.max(0, clock.now()), fin: game.endReason === "fin" }; }
 
-function triggerShake(amp, duration) { shake.amp = amp; shake.duration = duration; shake.time = duration; }
+function triggerShake(amp, duration) { if (MOUVEMENT_REDUIT) return; shake.amp = amp; shake.duration = duration; shake.time = duration; }
 
 function arriveePote(pote, direct) {
   if (!pote) return;
@@ -756,13 +755,14 @@ function gagnerLait(u, v) {
   sfx.lait();
   vibrer(40);
   semerSparkles(u, v, 16, "#ffffff");
-  pousserPastille("TURBO · ×2 PENDANT 5 S", 1.8);
+  // Le lait se boit d'un coup : une grande onde de choc part du vélo.
+  boules.push({ v: player.v, h: rows.solAt(player.v) + 1, vit: speed, age: 0, mot: "TURBO !" });
+  triggerShake(7, 0.3);
+  pousserPastille("TU EXPLOSES TOUT · ×2", 1.8);
   canvas.classList.add("turbo");
-  // Pas d'obstacles pendant le turbo : la route devient sûre au-delà de
-  // l'écran (les rangées déjà visibles sont couvertes par l'invulnérabilité).
-  const r0 = Math.floor(player.v + 0.5) + scene.ROWS_AHEAD + 1;
-  const finFenetre = r0 + Math.ceil(speed * (window.CONFIG.laitVitesse || 1.2) * (window.CONFIG.laitDureeS || 5)) + 12;
-  rows.ouvrirFenetreSure(r0, finFenetre);
+  // Les obstacles restent : le turbo les fait exploser. Seule sa sortie est dégagée.
+  const [debutFenetre, finFenetre] = fenetreApresTurbo(player.v, speed, Math.floor(player.v + 0.5) + scene.ROWS_AHEAD + 1);
+  rows.ouvrirFenetreSure(debutFenetre, finFenetre);
   if ((game.tutos || []).length) degagerTutos(finFenetre + 1);
 }
 function gagnerRouge(u, v) {
@@ -781,24 +781,125 @@ function marquerTombe(ev, now) { if (ev.r !== undefined && !KINDS_ROULANTS.has(e
 // turbo du lait, bouclier de reprise — est ÉJECTÉ : il s'envole en tournant
 // et disparaît. Sans ça, traverser un obstacle sous invincibilité ressemble à
 // un bug de collision.
-const ejectes = new Map(); // rangée → { t0 (horloge du monde), v (où il était) }
-const EJECTION_S = 0.9;
+const ejectes = new Map(); // rangée → { t0 (horloge du monde), v (où il était), vit (entraînement) }
+const EJECTION_S = 1.5;
+function poserEjecte(r, now, vit) {
+  const row = rows.rowAt(r), o = row.type === "contresens" ? rows.contresensAt(r, row, now) : null;
+  const v = o ? o.v : r;
+  ejectes.set(r, { t0: now, v, sens: r % 2 ? 1 : -1, vit });
+  if (ejectes.size > 40) ejectes.delete(ejectes.keys().next().value);
+  return v;
+}
 function ejecter(ev, now) {
   if (ev.r === undefined || !KINDS_ROULANTS.has(ev.kind) || ejectes.has(ev.r)) return;
-  const row = rows.rowAt(ev.r), o = row.type === "contresens" ? rows.contresensAt(ev.r, row, now) : null;
-  ejectes.set(ev.r, { t0: now, v: o ? o.v : ev.r, sens: ev.r % 2 ? 1 : -1 });
-  if (ejectes.size > 30) ejectes.delete(ejectes.keys().next().value);
+  poserEjecte(ev.r, now, speed * 0.6);
 }
-// Dessin d'un éjecté : il monte en cloche, part vers le fond en tournant, s'efface.
+// Dessin d'un éjecté : il part en cloche vers le haut en tournant, emporté dans le
+// sens de la course pour rester à l'écran, et rétrécit à la fin de son vol.
 function dessinerEjecte(ej, K, tm, dessin) {
   const a = tm - ej.t0;
   if (a < 0 || a > EJECTION_S) return;
-  const lift = 7 * a - 6 * a * a, du = 2.4 * a, v = ej.v - 0.8 * a;
+  const lift = 11 * a - 3.2 * a * a, du = 2 * a, v = ej.v + (ej.vit || 0) * a;
   const c = scene.project(du, v, lift + K.h / 2);
+  const reste = Math.max(0, Math.min(1, (EJECTION_S - a) / 0.3));
   ctx.save();
-  ctx.globalAlpha *= Math.max(0, Math.min(1, 1 - (a - 0.5) / 0.4));
-  ctx.translate(c.x, c.y); ctx.rotate(ej.sens * 6.5 * a); ctx.translate(-c.x, -c.y);
+  ctx.translate(c.x, c.y); ctx.rotate(ej.sens * 7.5 * a); ctx.scale(reste, reste); ctx.translate(-c.x, -c.y);
   try { scene.avecLift(lift + rows.solAt(v), () => dessin(du, v)); } finally { ctx.restore(); }
+}
+
+// --- LES EXPLOSIONS DU TURBO -------------------------------------------------------
+// Avec le lait, tout ce qui est sur la route explose devant le vélo, même si le
+// joueur saute : l'obstacle part en l'air, une boule de feu, une gerbe de débris.
+const eclats = [], boules = [];
+const COULEURS_ECLATS = ["#fff4c0", "#ffcf2e", "#ff8a2e", "#e13e26", "#f4efe4", "#3a3a40"];
+const MOTS_BOUM = ["BOUM !", "BAM !", "PAF !", "CRAC !", "BADABOUM !"];
+const PORTEE_SOUFFLE = 2.6; // rangées devant le vélo
+let motBoum = 0, nbExplosions = 0;
+function exploser(r, kind, now) {
+  if (r === undefined || ejectes.has(r)) return;
+  nbExplosions += 1;
+  const vit = speed * (window.CONFIG.laitVitesse || 1.2);
+  const v = poserEjecte(r, now, vit * 0.85);
+  const K = rows.KINDS[kind], h = rows.solAt(v) + (K.bas || 0) + (K.h || 1) / 2;
+  const n = MOUVEMENT_REDUIT ? 8 : 26;
+  for (let i = 0; i < n && eclats.length < 170; i++) {
+    eclats.push({
+      u: (Math.random() - 0.5) * 1.4, v, h,
+      vu: (Math.random() - 0.5) * 5, vv: vit * (0.35 + Math.random() * 0.95), vh: 3 + Math.random() * 9,
+      rot: Math.random() * 6, vrot: (Math.random() - 0.5) * 18,
+      taille: 0.07 + Math.random() * 0.17, couleur: COULEURS_ECLATS[i % COULEURS_ECLATS.length], age: 0, vie: 0.7 + Math.random() * 0.5,
+    });
+  }
+  boules.push({ v, h, vit: vit * 0.85, age: 0, mot: MOTS_BOUM[motBoum++ % MOTS_BOUM.length] });
+  bruitages.jouer("explosion", { prioritaire: true, pan: 0.1 });
+  triggerShake(9, 0.35);
+  vibrer(45);
+}
+// Le souffle : tout obstacle qui arrive à portée du vélo pendant le turbo.
+function souffleTurbo(tm) {
+  // Une traînée de feu derrière le vélo, tout le temps du turbo.
+  if (!MOUVEMENT_REDUIT && eclats.length < 170 && Math.random() < 0.25) {
+    const vit = speed * (window.CONFIG.laitVitesse || 1.2);
+    eclats.push({
+      u: (Math.random() - 0.5) * 0.5, v: player.v - 0.6, h: player.jumpY + 0.25 + Math.random() * 0.5,
+      vu: (Math.random() - 0.5) * 1.5, vv: vit * (0.35 + Math.random() * 0.4), vh: 1 + Math.random() * 3,
+      rot: Math.random() * 6, vrot: 9, taille: 0.06 + Math.random() * 0.08,
+      couleur: COULEURS_ECLATS[Math.floor(Math.random() * 4)], age: 0, vie: 0.35 + Math.random() * 0.25,
+    });
+  }
+  const r0 = Math.floor(player.v) - 1;
+  for (let r = r0; r <= r0 + 45; r++) {
+    if (ejectes.has(r) || r === conseil.r) continue;
+    const row = rows.rowAt(r);
+    if (row.type === "statique") { if (r <= player.v + PORTEE_SOUFFLE && r >= player.v - 1) exploser(r, row.kind, tm); continue; }
+    if (row.type === "contresens") {
+      const inst = rows.contresensAt(r, row, tm);
+      if (inst && inst.v <= player.v + PORTEE_SOUFFLE && inst.v >= player.v - 1) exploser(r, row.kind, tm);
+    }
+  }
+}
+function vieillirExplosions(dt) {
+  for (let i = eclats.length - 1; i >= 0; i--) {
+    const e = eclats[i];
+    e.age += dt; e.u += e.vu * dt; e.v += e.vv * dt; e.h += e.vh * dt; e.vh -= 16 * dt; e.rot += e.vrot * dt;
+    if (e.age > e.vie) eclats.splice(i, 1);
+  }
+  for (let i = boules.length - 1; i >= 0; i--) { const b = boules[i]; b.age += dt; b.v += b.vit * dt; if (b.age > 0.75) boules.splice(i, 1); }
+}
+function dessinerExplosions() {
+  const K = scene.scale();
+  for (const b of boules) {
+    const p = scene.project(0, b.v, b.h);
+    // Le mot, gros, sur l'explosion : il claque puis monte.
+    const ageMot = Math.min(1, b.age / 0.1), tailleMot = K * (0.55 + 0.75 * ageMot);
+    ctx.save();
+    ctx.font = `900 ${Math.round(tailleMot)}px "Helvetica Neue", Helvetica, Arial, sans-serif`;
+    ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.lineJoin = "round";
+    ctx.lineWidth = Math.max(3, tailleMot * 0.18); ctx.strokeStyle = "#0d0d10"; ctx.fillStyle = "#ffcf2e";
+    const yMot = p.y - K * (1.1 + b.age * 1.6);
+    ctx.strokeText(b.mot, p.x, yMot); ctx.fillText(b.mot, p.x, yMot);
+    ctx.restore();
+    if (b.age > 0.42) continue;
+    const a = b.age / 0.42, R = K * (0.7 + 2.2 * Math.sqrt(a)), f = 1 - a;
+    const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, R);
+    g.addColorStop(0, `rgba(255,252,225,${f})`);
+    g.addColorStop(0.35, `rgba(255,190,60,${0.9 * f})`);
+    g.addColorStop(0.7, `rgba(235,80,35,${0.55 * f})`);
+    g.addColorStop(1, "rgba(120,30,20,0)");
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(p.x, p.y, R, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = `rgba(255,255,255,${0.85 * f})`;
+    ctx.lineWidth = Math.max(1, K * 0.14 * f);
+    ctx.beginPath(); ctx.arc(p.x, p.y, R * 1.15, 0, Math.PI * 2); ctx.stroke();
+  }
+  for (const e of eclats) {
+    const p = scene.project(e.u, e.v, e.h), c = K * e.taille * Math.min(1, (e.vie - e.age) / 0.2 + 0.25);
+    ctx.save();
+    ctx.translate(p.x, p.y); ctx.rotate(e.rot);
+    ctx.fillStyle = e.couleur;
+    ctx.fillRect(-c, -c, c * 2, c * 2);
+    ctx.restore();
+  }
 }
 // Une bête écrasée s'aplatit en 0,12 s autour de ses pieds, puis reste là.
 function aplati(r, age, dessin) {
@@ -828,6 +929,12 @@ const chocs = []; // debug : les derniers chocs (auto-audit)
 function toucherJoueur(ev) {
   chocs.push({ r: ev.r, kind: ev.kind, conseil: conseil.r, dessus: parDessus(ev) }); if (chocs.length > 20) chocs.shift();
   if (conseil.r !== null && ev.r === conseil.r) { conseil.touche = true; return; } // l'obstacle expliqué ne fait pas mal
+  if (ev.r !== undefined && ejectes.has(ev.r)) return; // déjà parti en l'air
+  if (game.turbo > 0) {
+    exploser(ev.r, ev.kind, tMonde());
+    if (!game.invincibleAnnonce) { game.invincibleAnnonce = true; pousserPopup("TURBO : TU EXPLOSES TOUT !", JAUNE); }
+    return;
+  }
   if (parDessus(ev)) { ecraser(ev); return; }
   // Le cri de ce qu'on a percuté (poule, vache…) ; pour un humain, la voix
   // suit la personne (homme / femme).
@@ -835,13 +942,13 @@ function toucherJoueur(ev) {
   // Invulnérable (turbo lait, bouclier de reprise) : la bête est quand même
   // renversée, avec une gerbe d'étincelles — sinon on croit à un bug de
   // collision.
-  if (clock.now() < reviveShieldUntil || invincible || game.turbo > 0) {
+  if (clock.now() < reviveShieldUntil || invincible) {
     marquerTombe(ev, tMonde());
     ejecter(ev, tMonde());
     semerSparkles(player.u, player.v, 14, "#ffffff");
     triggerShake(3, 0.2);
     // La première fois de la course, on le DIT.
-    if (!game.invincibleAnnonce) { game.invincibleAnnonce = true; pousserPopup(game.turbo > 0 ? "TURBO : INVINCIBLE !" : "INVINCIBLE !", JAUNE); }
+    if (!game.invincibleAnnonce) { game.invincibleAnnonce = true; pousserPopup("INVINCIBLE !", JAUNE); }
     return;
   }
   marquerTombe(ev, tMonde());
@@ -855,7 +962,7 @@ function toucherJoueur(ev) {
     game.sansFaute = false;
     triggerShake(6, 0.45);
     damageFlash = 0.8;
-    vibrer(60);
+    vibrer(90);
     sfx.potePerdu();
     // Juste « −1 POTE » en pop-up au-dessus du joueur, sans autre texte.
     pousserPopup(perdus.length > 1 ? `−${perdus.length} POTES` : "−1 POTE", ROUGE);
@@ -983,6 +1090,7 @@ function vieillirEffets(dt) {
     sp.age += dt; sp.u += sp.vu * dt; sp.v += sp.vv * dt; sp.h += sp.vh * dt; sp.vh -= 9 * dt;
     if (sp.age > 0.6) sparkles.splice(i, 1);
   }
+  vieillirExplosions(dt);
   for (let i = ghosts.length - 1; i >= 0; i--) { ghosts[i].age += dt; if (ghosts[i].age > 0.35) ghosts.splice(i, 1); }
 
   for (let i = popups.length - 1; i >= 0; i--) { popups[i].age += dt; if (popups[i].age >= 1.1) popups.splice(i, 1); }
@@ -1031,7 +1139,9 @@ function majCiel(now, dt) {
   // --- Nuit : tombe à partir de nuitDebutS, 30 s de transition ---
   const nd = nuitDebut !== null ? nuitDebut : window.CONFIG.nuitDebutS;
   // La plage de fin rallume un coucher de soleil : la nuit s'y lève tout à fait.
-  plageFondu += ((rows.enPlage(Math.round(player.v + 8)) ? 1 : 0) - plageFondu) * Math.min(1, dt * 0.45);
+  // Une rampe régulière : scene.js en fait des mouvements (le soleil monte, la lune
+  // descend, les montagnes s'enfoncent), pas un fondu.
+  plageFondu = Math.max(0, Math.min(1, plageFondu + (rows.enPlage(Math.round(player.v + 8)) ? dt : -dt) / PLAGE_TRANSITION_S));
   scene.setPlage(plageFondu);
   canvas.classList.toggle("plage", plageFondu > 0.3);
   if (nd !== undefined) scene.setNight(Math.max(0, Math.min(1, (now - nd) / 30)) * (1 - plageFondu));
@@ -1107,7 +1217,11 @@ function sauter(dt, now, tm, phys) {
 // vitesse du pas (turbo compris).
 function avancer(dt, now, tm, phys, marque) {
   // --- Turbo lait ---
-  if (game.turbo > 0) { game.turbo -= dt; if (game.turbo <= 0) { game.turbo = 0; canvas.classList.remove("turbo"); } }
+  if (game.turbo > 0) {
+    game.turbo -= dt;
+    // À la sortie, une demi-seconde de grâce : on ne retombe pas sur un obstacle.
+    if (game.turbo <= 0) { game.turbo = 0; canvas.classList.remove("turbo"); reviveShieldUntil = Math.max(reviveShieldUntil, clock.now() + 0.5); }
+  }
 
   // --- Avance ---
   speed += (targetSpeed(now) - speed) * Math.min(1, 3 * dt);
@@ -1157,6 +1271,7 @@ function avancer(dt, now, tm, phys, marque) {
 function collisionsEtPieces(now, tm) {
   // --- Collisions et pièces ---
   if (now >= 0) {
+    if (game.turbo > 0) souffleTurbo(tm);
     for (const ev of rows.checkMember("j", player.prevV, player.v, player.jumpY, tm)) {
       if (ev.type === "piece") gagnerPiece(player.u, player.v, ev.double ? 2 : 1);
       else if (ev.type === "lait") gagnerLait(player.u, player.v);
@@ -1334,8 +1449,9 @@ function dessinerJetpackObjet(r, now) {
 const alertesVues = new Map(); // rangée → instant (réel) où son panneau est apparu
 let debugAlertes = null; // harnais : rangée → { alerte, vu } (panneau affiché / véhicule à l'écran)
 let montagneFondu = 0, leveeCam = 0, plageFondu = 0;
+const PLAGE_TRANSITION_S = 8;
 function renderAlertes(now, vitesse) {
-  if (!gameStarted || game.ended || now < 0) return;
+  if (!gameStarted || game.ended || now < 0 || game.turbo > 0) return; // en turbo, plus rien n'est un danger
   const devant = scene.unitesDevant();
   const r0 = Math.floor(player.v) + 1, r1 = Math.floor(player.v + vitesse * ARM_AHEAD_S) + 2;
   for (let r = r0; r <= r1; r++) {
@@ -1593,9 +1709,12 @@ function objetsDeLaRoute(items, from, to, now, tm, tAnim, vc, largeurRoute) {
     if (row.grosse !== undefined && !rows.bonusTaken(r, "grosse") && !cachee(r, row.grosse)) items.push({ d: scene.depth(-0.3, r), draw: () => drawPiece(r, row.grosse, now, "grosse") });
     if (r === jet.r && !jet.pris) items.push({ d: scene.depth(-0.3, r), draw: () => dessinerJetpackObjet(r, now) });
     if (row.type === "statique" && ejectes.has(r)) {
-      // La voiture garée percutée en turbo s'envole aussi.
+      // Tout ce qui est posé sur la route s'envole aussi, voiture garée comme bête.
       const ej = ejectes.get(r), K = rows.KINDS[row.kind];
-      items.push({ d: scene.depth(0, r), draw: () => dessinerEjecte(ej, K, tm, (u, vv) => props.drawVoiture(ctx, K, u, vv, 1, tAnim, row.bouchon !== undefined ? props.COULEURS_BOUCHON[row.bouchon % 3] : null)) });
+      const voiture = row.kind === "voiture" || row.bouchon !== undefined;
+      items.push({ d: scene.depth(0, r), draw: () => dessinerEjecte(ej, K, tm, (u, vv) => (voiture
+        ? props.drawVoiture(ctx, K, u, vv, 1, tAnim, row.bouchon !== undefined ? props.COULEURS_BOUCHON[row.bouchon % 3] : null)
+        : props.drawStatic(ctx, row.kind, u, vv, tAnim, r))) });
     } else if (row.type === "statique") {
       const tombe = tombes.get(r), ecrase = ecrases.get(r);
       items.push({ d: scene.depth(0, r), draw: () => surSol(r, () => (ecrase !== undefined
@@ -1699,6 +1818,7 @@ function peindreObjets(items) {
 // Étincelles, halos des lampadaires, brume, météo, panneaux d'alerte, turbo.
 // Renvoie le niveau de nuit (affiché par le debug).
 function effetsDeScene(from, to, tm, tAnim) {
+  dessinerExplosions();
   for (const sp of sparkles) {
     const g = scene.project(sp.u, sp.v, sp.h);
     ctx.globalAlpha = Math.max(0, 1 - sp.age / 0.6);
@@ -1766,7 +1886,6 @@ function interfaceDeCourse(now, tAnim) {
   if (gameStarted && hudAlpha > 0.001) {
     ctx.save();
     ctx.globalAlpha = hudAlpha;
-    const paliers = window.CONFIG.potesPaliers;
     const plein = friends.count() >= friends.max();
     const gaugeT = plein ? 1 : Math.max(0, Math.min(1, (game.points - palierPrecedent()) / Math.max(1, prochainPalier() - palierPrecedent())));
     hud.renderHud(ctx, width, height, {
@@ -2028,6 +2147,10 @@ if (debugOverlay.isEnabled()) {
     fps: () => perf.fps,
     frameMs: () => perf.frameMs,
     tombes: () => tombes.size,
+    explosions: () => nbExplosions,
+    setInvincible: (oui) => { invincible = !!oui; },
+    lait: () => gagnerLait(player.u, player.v),
+    eclats: () => eclats.length,
     conseil: () => ({ ...conseil, ralenti }),
     chocs: () => chocs.slice(),
     forcerJetpack: () => { jetpackForce = true; poserJetpack(); return jet.r; },

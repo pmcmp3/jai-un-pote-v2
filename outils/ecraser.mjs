@@ -33,7 +33,7 @@ const res = await page.evaluate(() => {
     const v = P.player.v;
     for (let r = Math.floor(v) + 1; r <= v + 3; r++) {
       const row = P.rows.rowAt(r);
-      if (row.type !== "statique" || !PETITES.has(row.kind) || faites.has(r)) continue;
+      if (row.type !== "statique" || !PETITES.has(row.kind) || faites.has(r) || P.game.turbo > 0) continue; // en turbo, elle explose
       const K = P.rows.KINDS[row.kind], bord = r - K.long / 2 - P.rows.VELO_DEMI;
       if (v < bord - 0.35 || v > bord - 0.05) continue;
       faites.add(r);
@@ -44,7 +44,7 @@ const res = await page.evaluate(() => {
       for (let i = 0; i < 40 && P.chocs().length === n0; i++) P.videoPas(1 / 120);
       const c = P.chocs()[P.chocs().length - 1];
       // Survolée sans la toucher (une longue bête, vite) : ni réussite ni échec.
-      if (P.chocs().length === n0) survolees += 1;
+      if (P.chocs().length === n0 || P.game.turbo > 0) survolees += 1;
       else if (c.r === r && c.dessus && P.friends.count() === avant && P.player.jumpVy > 0) ecrasees.push(row.kind);
       else ratees.push(`${row.kind}@${r} ${P.chocs().length > n0 ? `choc dessus=${c.dessus} potes ${avant}→${P.friends.count()}` : "aucun contact"}`);
     }

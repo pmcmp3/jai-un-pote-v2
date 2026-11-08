@@ -22,8 +22,40 @@ const LOGO = [
 ];
 const LOGO_W = 15, LOGO_H = 11;
 
+// Le halo doux derrière la pièce : une seule image préparée, redessinée à l'échelle.
+let lueur = null;
+function imageLueur() {
+  if (lueur) return lueur;
+  lueur = document.createElement("canvas");
+  lueur.width = lueur.height = 96;
+  const g = lueur.getContext("2d"), d = g.createRadialGradient(48, 48, 12, 48, 48, 48);
+  d.addColorStop(0, "rgba(255,240,170,0.75)");
+  d.addColorStop(0.5, "rgba(255,214,90,0.28)");
+  d.addColorStop(1, "rgba(255,200,60,0)");
+  g.fillStyle = d;
+  g.fillRect(0, 0, 96, 96);
+  return lueur;
+}
+
+// L'éclat : une étoile à quatre branches, quand la pièce fait face à la lumière.
+function eclat(ctx, x, y, taille, force) {
+  ctx.save();
+  ctx.globalAlpha = force;
+  ctx.fillStyle = "#fffdf0";
+  ctx.beginPath();
+  for (let i = 0; i < 8; i++) {
+    const a = (i * Math.PI) / 4, r = i % 2 ? taille * 0.14 : taille;
+    if (i) ctx.lineTo(x + Math.cos(a) * r, y + Math.sin(a) * r); else ctx.moveTo(x + r, y);
+  }
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
 export function drawCoin(ctx, R, spin, rouge = false) {
   const c = Math.cos(spin);
+  const G = R * 2.1;
+  ctx.drawImage(imageLueur(), -G, -G, G * 2, G * 2);
   if (rouge) {
     // Pièce « ROUGE » rare = un pote direct. Elle reste DORÉE (en rouge, elle se
     // lit comme un poison) : même pièce, plus grosse, avec un grand halo solaire.
@@ -55,19 +87,15 @@ export function drawCoin(ctx, R, spin, rouge = false) {
   ctx.beginPath();
   ctx.ellipse(-rx * 0.25, -R * 0.3, rx * 0.35, R * 0.22, 0, 0, Math.PI * 2);
   ctx.fill();
-  // Double contour, clair PUIS sombre : une pièce dorée se perd sur un champ de
-  // blé et dans un ciel orange. Le filet clair dehors, le trait sombre dedans :
-  // elle se détache sur le jaune comme sur la nuit.
-  ctx.strokeStyle = "rgba(255,251,238,0.92)";
-  ctx.lineWidth = Math.max(1.2, R * 0.13) + Math.max(2, R * 0.2);
-  ctx.beginPath();
-  ctx.ellipse(0, 0, rx, R, 0, 0, Math.PI * 2);
-  ctx.stroke();
-  ctx.strokeStyle = "rgba(60,38,4,0.9)";
-  ctx.lineWidth = Math.max(1.2, R * 0.13);
-  ctx.beginPath();
-  ctx.ellipse(0, 0, rx, R, 0, 0, Math.PI * 2);
-  ctx.stroke();
+  // La pièce brille quand elle se présente de face : un reflet, puis l'éclat.
+  const face = Math.abs(c) ** 10;
+  if (face > 0.02) {
+    ctx.fillStyle = `rgba(255,255,255,${0.75 * face})`;
+    ctx.beginPath();
+    ctx.ellipse(-rx * 0.28, -R * 0.34, rx * 0.34, R * 0.2, -0.5, 0, Math.PI * 2);
+    ctx.fill();
+    eclat(ctx, R * 0.42, -R * 0.5, R * 0.95, face);
+  }
   // Logo, écrasé horizontalement avec l'angle, masqué de profil.
   if (window.CONFIG.piecesLogo && Math.abs(c) > 0.22) {
     const px = (R * 1.25) / LOGO_H;

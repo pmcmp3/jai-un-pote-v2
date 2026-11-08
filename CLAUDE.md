@@ -316,6 +316,21 @@ chaque choc payé vibre.
 - Avec `?debug` : I invincible, G mourir, F terminer, P/O pote ±1, L lait, N nuit, S saison,
   D affichage de debug.
 
+## Interface et effets (9 novembre 2026)
+
+- **Turbo du lait** : les obstacles RESTENT sur la route et explosent (`exploser`, `souffleTurbo`,
+  main.js) ; seule la sortie du turbo est dégagée (`fenetreApresTurbo`, regles.js, partagée avec la
+  simulation), avec 0,5 s de grâce. Pas de panneau d'alerte ni de tuto pendant le turbo.
+- **Ciel** : aucun astre ne s'efface. Le soleil se couche, la lune monte, et à la plage la lune
+  redescend pendant que le soleil monte de l'horizon. Montagnes qui s'enfoncent, mer qui monte
+  (`PLAGE_TRANSITION_S`, 8 s). L'hélicoptère entre et sort par les bords.
+- **Vibrations** (`src/vibration.js`, coupables dans le panneau ♪) : Android par
+  `navigator.vibrate` ; iPhone par l'interrupteur natif, sans garantie selon la version d'iOS.
+- **Typographie** (`src/typo.js`) : insécables françaises sur tous les textes, même écrits après
+  coup. **Accessibilité** (`src/a11y.js`) : focus, Tab et Échap dans les tiroirs, `annoncer()` pour
+  le lecteur d'écran, « réduire les animations » respecté. Tests : `outils/accessibilite.mjs`
+  (axe-core), `outils/lignes.mjs` (aucun mot seul en fin de texte), `outils/turbo.mjs`.
+
 ## Points ouverts
 
 - **Sous-domaine** (§4).

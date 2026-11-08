@@ -26,14 +26,13 @@ let potes = [];
 let maxCount = 0;
 let largeurEcran = 400; // pour garder les pastilles d'arrivée dans l'écran
 export function setLargeurEcran(w) { largeurEcran = w || largeurEcran; }
-let joins = 0;
 let marques = []; // { id, v, type, ref } — là où le joueur a sauté, et devant quel obstacle
 let markId = 0;
 
 // Le premier de la ligue (screens.getLeader) : couronné dans le peloton.
 let leader = null;
 export function setLeader(nom) { leader = nom || null; }
-export function reset() { potes = []; maxCount = 0; joins = 0; marques = []; tirerSelection(); }
+export function reset() { potes = []; maxCount = 0; marques = []; tirerSelection(); }
 export function alive() { return potes.filter((p) => !p.leave); }
 export function count() { return alive().length; }
 export function maxReached() { return maxCount; }
@@ -119,7 +118,6 @@ export function join(player) {
   const base = PALETTES.potes[idx % PALETTES.potes.length];
   const tenue = membre && membre.skin ? paletteDepuisSkin(membre.skin, base) : base;
   const palette = leader && name === leader ? couronner(tenue) : tenue;
-  joins += 1;
   // Il arrive de derrière et rejoint sa place dans la meute.
   const v = vDuSlot(player.v, slot);
   const pote = {

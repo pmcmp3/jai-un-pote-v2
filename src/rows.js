@@ -331,7 +331,7 @@ function dansHalle(r) { const d = halleA(r); return d !== null && r >= d && r <=
 // suppose un départ au même niveau que lui. Ils se posent sur PLAT tout
 // autour de leur saut (penteAutour). Décor : scene.js, zone « montagne ».
 const MONTAGNE_DEBUT_S = 46, MONTAGNE_AVANT = 24, MONTAGNE_APRES = 22;
-const COLLINE_MONTEE = 28, COLLINE_PLAT = 22, COLLINE_VALLEE = 22, COLLINE_HAUT = 6.5;
+const COLLINE_MONTEE = 28, COLLINE_PLAT = 22, COLLINE_HAUT = 6.5;
 const COLLINE_LONG = 2 * COLLINE_MONTEE + COLLINE_PLAT;
 export const GEO_BOSSE = { long: COLLINE_LONG, haut: COLLINE_HAUT };
 let MONTAGNE = null, BOSSES = null;
@@ -444,11 +444,11 @@ const PAQUETS = [
 // Seuls (~35 s), par deux (~75 s), par trois (~2 min), par quatre sur la
 // plage — la route se remplit à vue d'œil.
 function taillePietons(d) { return d < 3 ? 1 : d < 5 ? 2 : d < 6 ? 3 : 4; }
-// MOUETTES : sur les MOUETTES_DERNIERES_S dernières secondes (dès ~70 s), MOUETTES_PART
+// MOUETTES : sur les MOUETTES_DERNIERES_S dernières secondes (dès ~59 s), MOUETTES_PART
 // des places possibles. Avant et après elle, MOUETTE_GRACE_S de plus que la
 // physique : retomber un peu tard, ou sauter un peu tôt l'obstacle suivant,
 // ne doit pas suffire à la toucher — c'est sauter POUR RIEN qui est puni.
-const MOUETTES_DERNIERES_S = 100, MOUETTES_PART = 0.8, MOUETTE_GRACE_S = 0.4;
+const MOUETTES_DERNIERES_S = 115, MOUETTES_PART = 0.8, MOUETTE_GRACE_S = 0.4;
 function graceMouette(r) { return Math.ceil(MOUETTE_GRACE_S * vitesseAuRang(r)); }
 // Avant la mouette, on compte la retombée d'un saut TENU au moins : un joueur
 // qui garde l'appui sur une petite bête retombe plus loin que le tap prévu,
@@ -515,8 +515,7 @@ export class Route {
     this.fenetreSure = [from, to];
     for (let r = from; r <= to; r++) {
       // ⚠️ Un véhicule DÉJÀ ARMÉ reste : son panneau d'alerte est peut-être
-      // déjà à l'écran, l'effacer laisserait une alerte sans obstacle. Le
-      // turbo rend invulnérable, il passe sans dégât.
+      // déjà à l'écran, l'effacer laisserait une alerte sans obstacle.
       const avant = this.cache.get(r);
       if (avant && (avant.type === "contresens" || avant.type === "traverse") && avant.armed) continue;
       this.cache.set(r, this.rangeeSure(r));

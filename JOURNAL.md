@@ -1098,3 +1098,15 @@ pour l'honneur.
   dans le même fichier (il était resté à 75 000 en base).
 Limites connues : le pseudo n'est pas unique (deux « tom » se confondent) ; chaque ligue a sa route,
 et le score parfait varie de 20 521 à 23 050 selon la graine (12 %).
+
+## 9 novembre 2026 — retours de partie : pièces, mouettes, explosions, ciel, accessibilité (v46)
+
+Pièces sans contour, avec lueur et éclat quand elles font face. Mouettes dès ~59 s au lieu de ~74 s
+(`MOUETTES_DERNIERES_S` 100 → 115, soit 20 % plus tôt). Turbo : tout explose, onde de choc, traînée
+de feu, son `explosion`. Vibrations plus fortes au choc, essai sur iPhone. Ciel et hélicoptère en
+mouvements plutôt qu'en fondus. Nettoyage : 15 variables mortes et 9 règles CSS sans élément retirées.
+Accessibilité : contraste (rouge DOM #d93820, gris relevés), police minimale 11 px, zoom autorisé,
+fenêtres et landmarks, focus visible. Plafond conseillé 110 000 (route changée, score parfait maximal
+25 938, soit 77 814 avec le boost ×3), porté dans CLASSEMENT-GENERAL-A-COLLER.sql.
+Non vérifié sur vrai téléphone : le vibreur d'iPhone (une bibliothèque de référence le dit corrigé
+par Apple à partir d'iOS 26.5). Textes dessinés dans le canvas (tutos, popups) hors du test des lignes.

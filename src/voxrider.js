@@ -107,7 +107,7 @@ function phareAvant(ctx, um, v, h) {
   ctx.restore();
 }
 
-const TIRE = "#151518", RIM = "#8a8d98", FRAME = "#1b1b21", SKIN_SHOE = "#565a66";
+const TIRE = "#151518", RIM = "#8a8d98", FRAME = "#1b1b21";
 
 // Ancré au sol en (u, v) = centre du vélo. `lift` = hauteur de saut.
 // `flip` (0..2π) = angle du salto (double saut) : tout le vélo tourne
@@ -132,7 +132,7 @@ export function drawRider(ctx, u, v, lift, P, pedal, alpha = 1, flip = 0, ombre 
   const W = 0.36;              // largeur (u)
   const L = 1.15;              // longueur (v)
   const x = u - W / 2, y = v - L / 2;
-  const s = Math.sin(pedal), c = Math.cos(pedal);
+  const s = Math.sin(pedal);
   const grandBi = P.velo === "grandbi";
   const roller = P.velo === "roller";
   const enfant = P.velo === "enfant";
