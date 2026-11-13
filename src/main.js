@@ -871,7 +871,11 @@ function dessinerExplosions() {
   for (const b of boules) {
     const p = scene.project(0, b.v, b.h);
     // Le mot, gros, sur l'explosion : il claque puis monte.
-    const ageMot = Math.min(1, b.age / 0.1), tailleMot = K * (0.55 + 0.75 * ageMot);
+    const ageMot = Math.min(1, b.age / 0.1);
+    // 19 px au minimum : en dessous de 18,66 px, WCAG demande 4,5:1 à un texte
+    // gras, et le jaune sur la boule de feu tombait à 4,32:1. Au-dessus, c'est
+    // un GRAND texte, seuil 3:1 — et il est cerné de noir.
+    const tailleMot = Math.max(19, K * (0.55 + 0.75 * ageMot));
     ctx.save();
     ctx.font = `900 ${Math.round(tailleMot)}px "Helvetica Neue", Helvetica, Arial, sans-serif`;
     ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.lineJoin = "round";
@@ -1868,7 +1872,10 @@ function messagesSurJoueur(u, v, jy) {
     for (const pop of popups) {
       const t = pop.age / 1.1;
       ctx.globalAlpha = t < 0.7 ? 1 : 1 - (t - 0.7) / 0.3;
-      ctx.font = `900 18px "Helvetica Neue", Helvetica, Arial, sans-serif`;
+      // 19 px et non 18 : au-dessus de 18,66 px, un texte gras est un GRAND
+      // texte au sens de WCAG (seuil 3:1 au lieu de 4,5:1), et le jaune des
+      // pièces sur un décor clair ne tenait pas les 4,5 (mesuré 3,77:1).
+      ctx.font = `900 19px "Helvetica Neue", Helvetica, Arial, sans-serif`;
       ctx.lineWidth = 4; ctx.strokeStyle = "rgba(0,0,0,0.6)"; ctx.lineJoin = "round";
       ctx.strokeText(pop.texte, g.x, base - t * 46 - pop.decalage);
       ctx.fillStyle = pop.couleur;

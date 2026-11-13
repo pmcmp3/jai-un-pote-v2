@@ -18,6 +18,7 @@ import { chromium } from "playwright-core";
 import { mkdirSync, rmSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { installerPilote } from "./pilote.mjs";
 
 const [nom = "extrait", debutArg = "41", dureeArg = "15", option = ""] = process.argv.slice(2);
 const DEBUT = Number(debutArg), DUREE = Number(dureeArg), FPS = 30;
@@ -53,40 +54,8 @@ await page.keyboard.press("KeyI");                       // invincible : rien ne
 for (let i = 0; i < 5; i++) await page.keyboard.press("KeyP"); // cinq potes
 await page.keyboard.press("KeyD");                       // pas de calque de debug à l'image
 
-// Pilote automatique : la règle du joueur idéal (mesurer.mjs). Au sol, on
-// part quand l'obstacle suivant est à `montée × vitesse` ; on tient l'appui
-// pour un saut haut ; on re-tape au sommet pour un double saut. En jetpack,
-// on monte vers la prochaine pièce.
-await page.evaluate(() => {
-  const st = { plan: null, tenir: false, double: false, appuye: false };
-  const presser = () => { window.dispatchEvent(new KeyboardEvent("keydown", { code: "Space" })); st.appuye = true; };
-  const lacher = () => { if (st.appuye) window.dispatchEvent(new KeyboardEvent("keyup", { code: "Space" })); st.appuye = false; };
-  window.__pilote = () => {
-    const P = window.__pote, pl = P.player, R = P.rows, C = window.CONFIG;
-    if (P.jetpack().reste > 0) {
-      const cible = P.jetPieces().find((c) => c.v > pl.v + 0.5);
-      const corps = pl.jumpY + 0.85;
-      if (cible && cible.h > corps + 0.2) { if (!st.appuye) presser(); } else lacher();
-      st.plan = null;
-      return;
-    }
-    if (st.plan && pl.auSol && pl.jumpVy <= 0 && st.plan.parti) { st.plan = null; lacher(); }
-    if (!st.plan && pl.auSol) {
-      const vit = P.vitesse();
-      for (let r = Math.floor(pl.v) + 1; r <= Math.floor(pl.v) + 14; r++) {
-        const row = R.rowAt(r);
-        if (row.type === "safe") continue;
-        const type = R.familleDe(row.kind);
-        if (r - pl.v <= vit * R.montee(type)) { st.plan = { type, parti: false }; presser(); st.tenir = type !== "tap"; if (!st.tenir) lacher(); st.double = false; }
-        break;
-      }
-    } else if (st.plan) {
-      if (pl.jumpY > R.solAt(pl.v) + 0.05) st.plan.parti = true;
-      if (st.tenir && pl.tHaut >= C.sautTenueMaxS) { lacher(); st.tenir = false; }
-      if (st.plan.type === "double" && !st.double && st.plan.parti && pl.jumpVy <= 0) { lacher(); presser(); lacher(); st.double = true; }
-    }
-  };
-});
+// Pilote automatique : la règle du joueur idéal (outils/pilote.mjs).
+await page.evaluate(installerPilote);
 
 // En place : horloge à la main, puis avance rapide jusqu'au début de l'extrait.
 await page.evaluate(() => window.__pote.videoDemarrer());

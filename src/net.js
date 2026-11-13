@@ -83,9 +83,17 @@ export const LIGUE_MAX = 21; // toi + 20 potes (boost de ligue)
 export function estBeta(code) { return Boolean(window.CONFIG.ligueBeta) && code === window.CONFIG.ligueBeta; }
 export function plafondLigue(code) { return estBeta(code) ? (window.CONFIG.ligueBetaPlafond || 60) : LIGUE_MAX; }
 
-// Adhésion idempotente (doublon ignoré). Renvoie { membres } ou { erreur }
-// ("inexistante", "complete", "reseau").
-export async function rejoindreLigue(code, pseudo, skin = null) {
+// Adhésion idempotente (doublon ignoré). Renvoie { membres }, { membres,
+// homonyme: true } ou { erreur } ("inexistante", "complete", "reseau").
+//
+// `dejaDedans` = ce téléphone se souvient d'être dans cette ligue. Sinon, un
+// pseudo déjà présent est probablement un HOMONYME — et deux « tom » ne font
+// qu'un seul membre (clé unique code+pseudo) et qu'une seule ligne au
+// classement (le record le plus haut gagne) : le second effacerait son propre
+// score sans le voir. On ne BLOQUE pas (ce peut être lui, sur un
+// nouveau téléphone, et le priver de son pseudo lui coûterait son record) :
+// on le prévient, c'est tout.
+export async function rejoindreLigue(code, pseudo, skin = null, dejaDedans = false) {
   // `select=*` (et pas `code`) : la colonne `plafond` n'existe pas avant la
   // migration bêta, et PostgREST refuserait un select la nommant.
   const existe = await get("ligues", `?code=eq.${encodeURIComponent(code)}&select=*`);
@@ -93,11 +101,13 @@ export async function rejoindreLigue(code, pseudo, skin = null) {
   if (!existe.length) return { erreur: "inexistante" };
   const cap = Number(existe[0] && existe[0].plafond) || plafondLigue(code);
   const avant = (await membres(code)) || [];
-  if (!avant.some((m) => m.nom === pseudo) && avant.length >= cap) return { erreur: "complete" };
+  const pris = avant.some((m) => m.nom === pseudo);
+  if (!pris && avant.length >= cap) return { erreur: "complete" };
+  const homonyme = pris && !dejaDedans;
   // Adhésion (doublon ignoré) puis mise à jour du skin si la colonne existe.
   await post("ligue_membres", { code, pseudo, skin: skin ? JSON.stringify(skin) : null }, { Prefer: "return=minimal,resolution=merge-duplicates" }, "?on_conflict=code,pseudo");
   const liste = await membres(code);
-  return liste ? { membres: liste } : { erreur: "reseau" };
+  return liste ? { membres: liste, homonyme } : { erreur: "reseau" };
 }
 
 // Membres = [{ nom, skin }] dans l'ordre d'arrivée.
@@ -135,11 +145,29 @@ export async function envoyerScore(code, pseudo, metres, potes, mode = "course",
 
 // Boost de ligue : les AUTRES membres qui ont fait au moins une course de
 // `boostLigueDureeS` secondes dans cette ligue (null = pas de réseau).
+//
+// ⚠️ UN APPAREIL = UN POTE, jamais un pseudo (13 novembre 2026). Un audit à
+// l'aveugle du concours l'a trouvé : on comptait les pseudos distincts, donc
+// vingt pseudos créés sur un SEUL téléphone — dix minutes en navigation
+// privée, trente et une secondes de jeu chacun — donnaient le boost maximum
+// (×3) à vie. C'était la meilleure stratégie du concours, et elle battait le
+// recrutement de vrais potes. La commission, elle, dédoublonnait déjà par
+// appareil (vue `concours_joueurs`) : le boost était la moitié oubliée de la
+// même règle.
+// Repli sur le pseudo pour les scores d'avant la colonne `appareil`, et on ne
+// se compte jamais soi-même — ni sous son pseudo, ni sous son appareil.
 export async function potesActifs(code, moi) {
   const min = window.CONFIG.boostLigueDureeS || 30;
-  const rows = await get("ligue_scores", `?code=eq.${encodeURIComponent(code)}&duree_s=gte.${min}&select=pseudo&limit=2000`);
+  const rows = await get("ligue_scores", `?code=eq.${encodeURIComponent(code)}&duree_s=gte.${min}&select=pseudo,appareil&limit=2000`);
   if (!rows) return null;
-  return [...new Set(rows.map((r) => r.pseudo))].filter((p) => p !== moi);
+  const mien = joueurId();
+  const vus = new Set();
+  for (const r of rows) {
+    if (r.pseudo === moi) continue;
+    if (mien && r.appareil === mien) continue;
+    vus.add(r.appareil || `pseudo:${r.pseudo}`);
+  }
+  return [...vus];
 }
 
 // Le FANTÔME de la ligue : la meilleure course (avec trace) sur CETTE route.

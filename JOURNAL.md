@@ -1110,3 +1110,87 @@ fenêtres et landmarks, focus visible. Plafond conseillé 110 000 (route changé
 25 938, soit 77 814 avec le boost ×3), porté dans CLASSEMENT-GENERAL-A-COLLER.sql.
 Non vérifié sur vrai téléphone : le vibreur d'iPhone (une bibliothèque de référence le dit corrigé
 par Apple à partir d'iOS 26.5). Textes dessinés dans le canvas (tutos, popups) hors du test des lignes.
+
+## 13 novembre 2026 — la ligue du bureau, et les trois verrous qui manquaient
+
+Demandé : une ligue de test pour le bureau (« Bruno »), et l'assurance que tout est en ligne et
+prêt à lancer. La relecture de la base a trouvé trois choses qui auraient cassé le lancement.
+- ⚠️ **Une ligue n'avait que 6 places.** `ligues.plafond` valait 6 par défaut : le 7e membre était
+  refusé (« Cette ligue est complète (21 max) » — le message mentait) alors que toute la promesse
+  du concours est de monter une ligue de quinze personnes. Défaut porté à 21.
+- ⚠️ **Le plafond de score était resté à 75 000** alors que le maximum humain mesuré est 77 814 :
+  la base aurait refusé une vraie partie, et le joueur aurait perdu sa course sans le savoir.
+  Porté à 110 000.
+- ⚠️ **Le classement général n'avait jamais été collé** : la vue `concours_joueurs` n'avait ni
+  `rang` ni `commission`, donc l'écran de fin et le tiroir ne pouvaient rien afficher.
+- Les contacts (Insta, email, ville) étaient protégés par la seule RLS : le droit de lecture leur
+  est maintenant retiré pour de bon (`revoke select` sur `joueurs`, `evenements`, `retours_beta`).
+  Le jeu n'y écrit qu'en `Prefer: return=minimal`, il n'a jamais besoin de les relire.
+- Tout est réuni dans **`supabase/AVANT-LE-LANCEMENT.sql`** : un seul fichier à coller, relançable,
+  qui ne supprime rien (les ligues de test sortent par `concours = false`).
+- Nouveau filet : **`outils/sql-concours.mjs`** rejoue les trois fichiers SQL sur un vrai Postgres
+  (PGlite, en mémoire) avec les droits par défaut de Supabase, et vérifie 33 points — calcul de la
+  commission, un appareil = une commission, plafonds, 21 places, confidentialité. Ajouté à
+  `npm run verif` (19 tests). C'est ce test qui aurait vu la fuite de `contacts` de début novembre.
+
+## 13 novembre 2026 — le contraste de tout ce qui est écrit, du menu à la plage
+
+Demandé : « refaire des tests d'accessibilité contraste sur la globalité du parcours ». Le test
+d'accessibilité existant passe axe-core sur chaque écran — mais axe ne voit que le DOM, et pour lui
+le canvas n'est qu'une image. **Le score, « TURBO ! », les tutos, les popups, le bandeau : jamais
+mesurés**, alors que ce sont eux qu'on lit en jouant, par-dessus un décor qui change tout le temps.
+- Nouveau `outils/contraste.mjs` : il enveloppe `fillText`/`strokeText`, photographie les pixels
+  DERRIÈRE chaque texte, repère l'encre (les pixels franchement changés) et calcule le rapport
+  WCAG pixel par pixel. Puis il joue la course entière image par image, avec le pilote automatique
+  (`outils/pilote.mjs`, sorti de video.mjs), turbo et jetpack compris, et photographie l'instant
+  exact de chaque texte trop faible. Il finit par axe-core sur l'écran de fin, les classements,
+  l'invitation et **le règlement, jamais testé jusqu'ici**.
+- ⚠️ **Le score tombait à 2,38:1** (seuil 3:1 pour un grand texte) : il est écrit à même le ciel, et
+  le même noir passe de 15:1 sur un ciel clair à 2,4:1 sur une montagne ou un nuage sombre. Aucune
+  couleur fixe ne peut marcher — il n'y a pas de fond moyen, il y a un décor qui défile.
+  Corrigé par un **liseré de la couleur opposée** sur tout le bandeau (`poser`, hud.js), la même
+  grammaire que « BAM ! ». Un texte cerné se lit par le meilleur des deux, sa couleur ou son liseré,
+  et ça se calcule : la paire #0d0d10 / blanc ne descend jamais sous **4,40:1** quel que soit le
+  fond (4,58:1 avec du noir pur), là où le score tombait à 2,38:1. Sur une course entière, le
+  5e percentile mesuré ne passe plus jamais sous 4,5:1.
+- Le blanc sur le rouge de charte (#e13e26) ne tenait pas AA en petit (4,25:1) : la pastille « ×10 »
+  en turbo et l'onglet de tuto passent au rouge DOM (#d93820, 4,63:1). Le rouge PEINT du décor ne
+  bouge pas.
+- Le popup « +2 PIÈCES » passe de 18 à 19 px : au-dessus de 18,66 px un texte gras est un GRAND
+  texte au sens de WCAG, seuil 3:1 au lieu de 4,5:1 (il mesurait 3,77:1).
+- **Règlement** : le rouge de charte y était resté à #e13e26 (le jeu est passé à #d93820 le
+  9 novembre). Lien du pied de page sur fond crème à 3,96:1 → #b82f1b (5,2:1) ; gris du
+  sous-titre et du pied de page relevés à 0,62.
+- Un texte CERNÉ est jugé sur le meilleur des deux, sa couleur ou celle de son liseré : c'est le
+  liseré qui le détache. Un liseré à moitié transparent ne compte pas.
+
+## 13 novembre 2026 — audit à l'aveugle du concours : deux failles bouchées
+
+Idée volée à un dépôt croisé sur Reddit (`apetrovCode/game-design-skills`) : faire auditer un design
+par une session FRAÎCHE, qui ne reçoit que les règles et rien du raisonnement. La partie
+mathématique de ces skills (cycles, stratégies dominées) ne s'applique pas à un runner — leur propre
+exemple Tetris marque l'étape « N/A » — mais l'audit à l'aveugle, si. Consigne donnée : « finis dans
+les 3 premiers sans être le meilleur joueur ». Huit hypothèses sont revenues, vérifiées dans le code.
+- ⚠️ **La ferme de potes.** `potesActifs()` comptait les PSEUDOS distincts. Vingt pseudos créés sur
+  un seul téléphone (navigation privée, 31 s de jeu chacun, dix minutes en tout) donnaient le boost
+  maximum **×3 à vie** — la meilleure stratégie du concours, meilleure que recruter de vrais potes.
+  La commission, elle, dédoublonnait déjà par appareil : le boost était la moitié oubliée de la même
+  règle. Corrigé : **un appareil = un pote**, repli sur le pseudo pour les scores d'avant la colonne
+  `appareil`, et on ne se compte jamais soi-même. Test : `classement-general.mjs` sert sept pseudos
+  sortis de quatre téléphones et exige 3 potes, pas 6.
+- ⚠️ **Le sabotage par pseudo.** Le garde-fou de cadence comptait `where pseudo = new.pseudo`. Les
+  pseudos n'étant ni uniques ni protégés, dix scores bidons envoyés sous le pseudo d'un rival
+  faisaient refuser LE SIEN, en silence. Compté par **appareil** désormais : celui qui inonde se
+  bride lui-même. Test dans `sql-concours.mjs`.
+- **Fausse alerte levée** : l'audit craignait qu'un joueur rattaché ailleurs puisse commissionner
+  plusieurs ligues. La vue joint `par_appareil` sur `rattachement` : seuls les joueurs RATTACHÉS à
+  la ligue comptent, sur leur meilleur score dans cette ligue. C'était déjà fermé.
+- **Assumé, pas corrigé** : le score est calculé par le navigateur et reste forgeable (détection au
+  podium + rejeu en visio, article 8) ; le parcours fixe pendant dix jours se mémorise ; 12 % d'écart
+  de graine entre ligues ; le dépôt est public, donc `simulation.js` permet de calculer la meilleure
+  graine et de choisir son code de ligue.
+- ⚠️ **Conséquence de design à trancher** : comme tous les membres d'une ligue partagent le même
+  `0,1 × T`, la meilleure ligue occupe mécaniquement les premières places du général. Le tirage
+  « entre les 3 premiers » risque donc d'être un tirage **à l'intérieur d'un seul groupe**, qui gagne
+  avec probabilité 1. Ce n'est pas une faille — c'est la règle voulue — mais le tirage n'arbitre
+  alors plus rien.

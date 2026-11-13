@@ -1,5 +1,10 @@
 -- « J'ai un pote v2 » — LE CLASSEMENT GÉNÉRAL ET LA COMMISSION.
 --
+-- ⚠️ 13 novembre 2026 : CE FICHIER EST REPRIS EN ENTIER DANS
+-- `AVANT-LE-LANCEMENT.sql`, qui ajoute les 21 places par ligue, la ligue du
+-- bureau et le verrou sur les contacts. C'est celui-là qu'il faut coller ;
+-- celui-ci reste pour mémoire, et parce qu'il est relançable sans risque.
+--
 -- À coller EN UNE FOIS dans l'éditeur SQL du projet Supabase de la v2
 -- (jamais celui de la v1), après CONCOURS-A-COLLER.sql. Relançable sans risque.
 --

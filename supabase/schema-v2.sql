@@ -52,6 +52,10 @@ create policy "Adhesion publique" on public.ligue_membres for insert to anon wit
 create index if not exists ligue_membres_code_idx on public.ligue_membres (code, created_at);
 
 -- Plafond vérifié côté serveur, lu dans ligues.plafond.
+-- ⚠️ La version QUI FAIT FOI est celle de AVANT-LE-LANCEMENT.sql (13 novembre
+-- 2026) : elle laisse toujours passer un membre déjà inscrit, et verrouille la
+-- ligne de la ligue pour que deux inscriptions simultanées soient comptées
+-- l'une après l'autre.
 create or replace function public.ligue_plafond() returns trigger language plpgsql as $$
 declare cap integer;
 begin

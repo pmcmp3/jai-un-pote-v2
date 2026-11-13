@@ -23,10 +23,12 @@ const TESTS = [
   ["sons", ["outils/sons-course.mjs"], {}, "course entière : sons dans leur décor, aucune erreur"],
   ["perf", ["outils/perf-plage.mjs"], {}, "une image coûte moins de 8,3 ms à CPU ×4"],
   ["hors-ligne", ["outils/hors-ligne.mjs"], {}, "la page s’ouvre sans réseau quel que soit le lien, et ?9 recharge proprement"],
+  ["sql", ["outils/sql-concours.mjs"], {}, "le SQL du concours rejoué sur un vrai Postgres : classement, plafonds, confidentialité"],
   ["classement", ["outils/classement-general.mjs"], {}, "classement général, commission, joueur sans ligue (base simulée)"],
   ["turbo", ["outils/turbo.mjs"], {}, "le lait fait exploser les obstacles, sans perdre de pote"],
   ["accessibilite", ["outils/accessibilite.mjs"], {}, "axe-core sur chaque écran, clavier dans les tiroirs"],
   ["lignes", ["outils/lignes.mjs"], {}, "aucun mot seul en bout de texte, de 320 à 430 px"],
+  ["contraste", ["outils/contraste.mjs"], {}, "le contraste de tout ce qui est écrit, du menu à la plage"],
   ["build", null, {}, "le build se construit et tourne sans erreur"],
 ];
 const demandes = process.argv.slice(2);

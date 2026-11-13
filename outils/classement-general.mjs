@@ -32,7 +32,10 @@ async function scenario({ largeur, hauteur, avecLigue, nom }) {
     let corps = [];
     if (table === "concours") corps = [{ id: 1, debut: "2026-11-02T07:00:00Z", fin: "2026-11-22T11:00:00Z", plafond_score: 95000, commission: 0.1 }];
     else if (table === "concours_joueurs") corps = q.get("pseudo") ? [{ ...MOI, ...(avecLigue ? {} : { code: null, nom: null, commission: 0, potes: 0, total: 12400 }) }] : q.get("code") ? LIGUE : HAUT.slice(0, Number(q.get("limit")) || 100);
-    else if (table === "ligue_scores" && avecLigue) corps = ["pmc", "lola", "sam", "nina", "yanis", "tom", "hugo"].map((pseudo, i) => ({ pseudo, metres: 5000 - i * 500, potes: 1, trace: null }));
+    // Sept pseudos pour QUATRE téléphones : lola, sam, nina et yanis sortent
+    // tous du même (« la ferme de potes »). Le boost doit donc compter 3 potes
+    // et non 6 — c'est la faille trouvée par l'audit à l'aveugle du 13 novembre.
+    else if (table === "ligue_scores" && avecLigue) corps = [["pmc", "tel-pmc"], ["lola", "tel-ferme"], ["sam", "tel-ferme"], ["nina", "tel-ferme"], ["yanis", "tel-ferme"], ["tom", "tel-tom"], ["hugo", "tel-hugo"]].map(([pseudo, appareil], i) => ({ pseudo, appareil, metres: 5000 - i * 500, potes: 1, trace: null }));
     else if (table === "concours_ligues") corps = [{ code: "GROS", nom: "Les quinze", joueurs: 15, total: 170000 }, { code: "ESSAI", nom: "Ligue d'essai", joueurs: 7, total: 20000 }];
     return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(corps) });
   });
@@ -44,6 +47,9 @@ async function scenario({ largeur, hauteur, avecLigue, nom }) {
   }, avecLigue);
   await page.goto(`http://localhost:${port}/?debug&base`);
   await page.waitForFunction(() => !document.getElementById("play-button").disabled, null, { timeout: 20000 });
+  // Le boost se demande directement à net.js : la bannière du menu, elle, ne se
+  // rafraîchit qu'au lancement de la course, trop tard pour être lue ici.
+  const boost = avecLigue ? await page.evaluate(async () => (await import("/src/net.js")).potesActifs("ESSAI", "pmc")) : null;
   await page.click("#play-button");
   await page.waitForFunction(() => window.__pote && window.__pote.estDemarre(), null, { timeout: 30000 });
   await page.waitForTimeout(800);
@@ -79,7 +85,7 @@ async function scenario({ largeur, hauteur, avecLigue, nom }) {
   const rejouable = await page.evaluate(() => { const b = document.getElementById("replay-button"); b.scrollIntoView({ block: "center" }); const r = b.getBoundingClientRect(); return r.top >= 0 && r.bottom <= innerHeight; });
   await page.screenshot({ path: `${sorties}classement-${nom}-rejouer.png` });
   await contexte.close();
-  return { fin, general, onglets, ligue, ligues, ecrits, erreurs, debordement, rejouable };
+  return { fin, boost, general, onglets, ligue, ligues, ecrits, erreurs, debordement, rejouable };
 }
 
 const a = await scenario({ largeur: 375, hauteur: 812, avecLigue: true, nom: "ligue" });
@@ -90,6 +96,11 @@ console.log("sans ligue :", JSON.stringify(b, null, 1));
 const c = await scenario({ largeur: 320, hauteur: 568, avecLigue: true, nom: "petit" });
 console.log("petit écran avec ligue :", JSON.stringify({ rejouable: c.rejouable, erreurs: c.erreurs, debordement: c.debordement }));
 
+// Le boost compte les TÉLÉPHONES, pas les pseudos : sept pseudos sortis de
+// quatre téléphones (dont le mien) valent 3 potes, donc +30 %, et non +60 %.
+const okFerme = Array.isArray(a.boost) && a.boost.length === 3;
+console.log("ferme de potes :", okFerme ? "OK — 7 pseudos sortis de 4 téléphones = 3 potes (+30 %), pas 6 (+60 %)" : `KO — potes comptés : ${JSON.stringify(a.boost)}`);
+
 const okA = /37e sur 240/.test(a.fin.rang) && /12\s400\spts de record \+ 4\s300\spts de commission \(6\spotes\)/.test(a.fin.detail) && /Il te manque/.test(a.fin.ecart)
   && a.general.some((l) => /Tirage au sort/i.test(l)) && a.general[a.general.length - 1].includes("@pmc") && a.general[a.general.length - 1].startsWith("37")
   && a.onglets.join() === "general,ligue,ligues" && a.ligue.length === 2 && a.ligues.length === 2
@@ -97,5 +108,5 @@ const okA = /37e sur 240/.test(a.fin.rang) && /12\s400\spts de record \+ 4\s300\
 const okB = /sur 240/.test(b.fin.rang) && /Chaque pote/.test(b.fin.detail) && b.onglets.join() === "general,ligues"
   && b.ecrits.length === 1 && b.ecrits[0].code === "PMCMP" && b.ecrits[0].mode === "course" && !b.ecrits[0].trace;
 const propre = [a, b, c].every((x) => !x.erreurs.length && !x.debordement && x.rejouable);
-verdict(okA && okB && propre, `avec ligue : ${okA ? "rang, détail, podium, ta ligne, 3 onglets" : "ÉCHEC"} · sans ligue : ${okB ? "score envoyé sous PMCMP, présent au général" : "ÉCHEC"} · REJOUER atteignable sur petit écran : ${c.rejouable ? "oui" : "NON"} · ${a.erreurs.length + b.erreurs.length + c.erreurs.length} erreur(s) JS`);
+verdict(okA && okB && okFerme && propre, `avec ligue : ${okA ? "rang, détail, podium, ta ligne, 3 onglets" : "ÉCHEC"} · ferme de potes : ${okFerme ? "un téléphone = un pote" : "ÉCHEC"} · sans ligue : ${okB ? "score envoyé sous PMCMP, présent au général" : "ÉCHEC"} · REJOUER atteignable sur petit écran : ${c.rejouable ? "oui" : "NON"} · ${a.erreurs.length + b.erreurs.length + c.erreurs.length} erreur(s) JS`);
 await navigateur.close(); await serveur.close();

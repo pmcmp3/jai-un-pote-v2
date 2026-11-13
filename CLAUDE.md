@@ -198,7 +198,8 @@ intégré d'Instagram d'abord**, portrait natif.
   qui a joué au moins 30 s, jusqu'à ×3) ; relais de ligue ; sprint du dimanche ; `liguesParVague` (0 = aucune
   limite de création, indispensable pendant le concours). Partage : natif d'abord, tiroir maison si
   absent (Instagram sur Android).
-- **LE CONCOURS** (`supabase/CONCOURS-A-COLLER.sql` puis `supabase/CLASSEMENT-GENERAL-A-COLLER.sql`).
+- **LE CONCOURS** (`supabase/CONCOURS-A-COLLER.sql` puis `supabase/AVANT-LE-LANCEMENT.sql`, qui
+  reprend `CLASSEMENT-GENERAL-A-COLLER.sql` en entier et le remplace).
   ⚠️ **Règle changée le 8 novembre 2026** : *score au général = ton record + 10 % du record de
   chaque pote de ta ligue* ; à la clôture, **tirage au sort entre les 3 premiers du général**, le
   gagnant fait un morceau avec PMC et ses potes. Clôture le **dimanche 22 novembre 2026 à 12 h**.
@@ -210,7 +211,19 @@ intégré d'Instagram d'abord**, portrait natif.
     `PMCMP`, inclus dans `concours_joueurs` et exclu de `concours_ligues`.
   - Un appareil ne rapporte qu'une commission par ligue (`par_appareil`). Le classement des
     ligues reste affiché pour l'honneur, sans lot. `concours_podium` (top 10 et contacts) n'est
-    lisible que dans le SQL editor. Test : `outils/classement-general.mjs`, base simulée.
+    lisible que dans le SQL editor. Tests : `outils/sql-concours.mjs` rejoue les trois fichiers
+    SQL sur un vrai Postgres (PGlite, en mémoire, avec LES DROITS PAR DÉFAUT DE SUPABASE — sans
+    ça le banc d'essai serait plus fermé que la vraie base et ne verrait pas une fuite de
+    contacts) ; `outils/classement-general.mjs` vérifie l'écran, base simulée.
+  - ⚠️ **Une ligue a 21 places depuis le 13 novembre 2026** : la colonne `ligues.plafond` valait
+    **6** par défaut et le jeu refusait le 7e membre (« Cette ligue est complète (21 max) »,
+    message qui mentait) alors que la commission se gagne jusqu'à 20 potes. Corrigé par un
+    `alter column plafond set default 21` dans `AVANT-LE-LANCEMENT.sql` ; la ligue de démo
+    (PMCMP) reste à 6 pour que personne ne s'invite dans le peloton de démonstration, la bêta
+    garde ses 60.
+  - **Les ligues de test ne sont jamais supprimées, elles sortent par `concours = false`**
+    (ESSAI et ses 5 faux scores, les essais de septembre). Un `update … set concours = true` les
+    fait revenir. La ligue du bureau est `BRUNO` (`?ligue=BRUNO`, 21 places, en concours).
   - Tout est additionné par la BASE (vues `concours_ligues` et `concours_joueurs`) : le jeu ne
     voit que son propre score, il ne pourrait rien totaliser. Il lit, il n'écrit pas.
   - ⚠️ Un joueur ne compte que pour **UNE** ligue, celle où il a fait son meilleur score
@@ -220,6 +233,14 @@ intégré d'Instagram d'abord**, portrait natif.
     `config.concoursFin` n'est que le repli hors réseau. Les deux doivent coïncider.
   - Les ligues de test sortent du classement par la colonne `ligues.concours`, jamais par le
     jeu. La ligue de démo reste en base : c'est le peloton de ceux qui jouent sans ligue.
+  - ⚠️ **UN APPAREIL = UN POTE** (13 novembre 2026, trouvé par un audit à l'aveugle du règlement) :
+    `net.potesActifs()` comptait les PSEUDOS, donc vingt pseudos créés sur un seul téléphone
+    donnaient le boost ×3 en dix minutes — mieux que recruter de vrais potes. La commission
+    dédoublonnait déjà par appareil ; le boost était la moitié oubliée de la même règle. Ne pas
+    revenir à un comptage par pseudo.
+  - ⚠️ **La cadence se compte par APPAREIL, jamais par pseudo** : les pseudos ne sont pas uniques
+    et rien ne les protège, donc dix scores bidons sous le pseudo d'un rival faisaient refuser le
+    sien (sabotage gratuit et intraçable). Corrigé dans `AVANT-LE-LANCEMENT.sql`.
   - **Anti-triche** : plafond de vraisemblance et cadence vérifiés par un trigger Postgres
     (`score_vraisemblable`) ; identifiant d'appareil à côté de chaque score, vue
     `ligues_suspectes` (vingt pseudos, un appareil). Détection, pas prévention — c'est l'artiste
@@ -235,8 +256,9 @@ intégré d'Instagram d'abord**, portrait natif.
   - **« @x a rejoint ta ligue »** sous le peloton : mémorisé par ligue (`jp2LigueVus`), et la
     première fois qu'on regarde une ligue on ne crie pas que tout le monde vient d'arriver.
   - **Règlement** : `public/reglement.html`, lié depuis l'inscription et le classement.
-    ⚠️ Il reste des `[À COMPLÉTER]` surlignés : identité de l'organisateur, SIRET, adresse,
-    email de contact.
+    ⚠️ Il reste des trous surlignés en jaune, et ce sont les DERNIERS obstacles au lancement :
+    identité de l'organisateur, statut, SIRET, adresse, email de contact (deux fois), et le
+    nombre maximum de personnes dans le groupe qui gagne le morceau.
 - **A/B TEST** (`config.abTests`, `net.variante`) : la variante d'un joueur est **tirée de son
   identifiant anonyme**, pas au hasard à chaque fois — sinon il verrait une version différente à
   chaque visite et la mesure ne voudrait rien dire. Elle part dans `details.ab` de chaque
@@ -330,13 +352,32 @@ chaque choc payé vibre.
   coup. **Accessibilité** (`src/a11y.js`) : focus, Tab et Échap dans les tiroirs, `annoncer()` pour
   le lecteur d'écran, « réduire les animations » respecté. Tests : `outils/accessibilite.mjs`
   (axe-core), `outils/lignes.mjs` (aucun mot seul en fin de texte), `outils/turbo.mjs`.
+- ⚠️ **LE CONTRASTE DU CANVAS A SON PROPRE TEST** (`outils/contraste.mjs`, 13 novembre 2026) :
+  axe-core ne voit que le DOM, et le canvas n'est pour lui qu'une image. Le score, les popups,
+  les tutos, « TURBO ! » n'étaient donc mesurés par rien. Le test enveloppe `fillText`/
+  `strokeText`, photographie les pixels DERRIÈRE chaque texte et calcule le rapport WCAG pixel
+  par pixel, sur la course entière (pilote automatique, turbo, jetpack, tous les biomes), puis
+  passe axe-core sur l'écran de fin, les classements, l'invitation et le règlement.
+  `--dom` pour ne faire que le DOM, `--detail` pour tout lister.
+  - ⚠️ **Le bandeau est écrit À MÊME LE CIEL** : le score noir mesurait 2,38:1 au-dessus d'une
+    montagne (seuil 3:1). Aucune couleur fixe ne peut marcher. Tous les textes du bandeau
+    passent donc par `poser()` (hud.js), qui les cerne de la couleur OPPOSÉE. Un texte cerné se
+    lit par le meilleur des deux, sa couleur ou son liseré, et ça se calcule : la paire
+    #0d0d10 / blanc ne descend jamais sous **4,40:1**, quel que soit le fond (4,58:1 avec du
+    noir pur). Sur une course entière, le 5e percentile mesuré ne passe jamais sous 4,5.
+    Ne pas retirer ce liseré « pour faire plus propre ».
+  - **#d93820 porte du blanc, #e13e26 non** (4,63:1 contre 4,25:1) : `ROUGE_TXT` est réservé aux
+    pastilles écrites (×N en turbo, onglet de tuto) ; le rouge peint du décor reste #e13e26.
+  - Un texte **cerné** se juge sur le meilleur des deux, sa couleur ou son liseré. Un liseré
+    translucide ne compte pas.
 
 ## Points ouverts
 
 - **Sous-domaine** (§4).
-- **Le règlement attend ses mentions** : identité de l'organisateur, SIRET, adresse, email de
-  contact (`public/reglement.html`, surlignés en jaune). Sans elles, le concours tourne mais le
-  règlement n'est pas opposable.
+- **Le règlement attend ses mentions** : identité de l'organisateur, statut, SIRET, adresse,
+  email de contact, et le nombre maximum de personnes dans le groupe qui gagne le morceau
+  (`public/reglement.html`, surlignés en jaune). Sans elles, le concours tourne mais le
+  règlement n'est pas opposable. C'est le DERNIER obstacle au lancement.
 - **Le lien Deezer est un lien court** (`link.deezer.com/s/…`) : une redirection de plus avant
   l'app, à remplacer par le `deezer.com/track/…`. TIDAL et YouTube Music n'ont pas de lien du
   titre : ils ne sont plus proposés.
@@ -349,7 +390,7 @@ chaque choc payé vibre.
 
 ## Le filet et les outils
 
-- **`npm run verif`** (≈ 3 min) : 14 tests du vrai jeu, chacun conclut par ✅ OK ou ❌ ÉCHEC
+- **`npm run verif`** (≈ 6 min) : 19 tests du vrai jeu, chacun conclut par ✅ OK ou ❌ ÉCHEC
   (`outils/verdict.mjs`) ; un test qui échoue est relancé une fois et signalé « instable » s'il
   passe au second essai. `npm run verif -- collisions clavier` pour n'en lancer que certains.
   Ce qu'il garantit : joueur idéal sans choc et joueur immobile qui touche tout (`regles`),

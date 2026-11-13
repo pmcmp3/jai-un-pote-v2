@@ -825,15 +825,22 @@ async function rejoindre(code, creer = false) {
   }
   ligueMessage("…");
   const invitation = !!(ligue && ligue.enAttente);
+  // Ce téléphone se souvient-il d'être DÉJÀ dans cette ligue ? Si oui, un
+  // pseudo déjà présent, c'est le sien ; sinon c'est peut-être un homonyme.
+  const dejaDedans = !!(ligue && ligue.code === code && !ligue.enAttente);
   const nomEl = $("ligue-nom");
-  const r = creer ? await net.creerLigue(code, pseudo, getSkin(), nomEl ? nomEl.value : "") : await net.rejoindreLigue(code, pseudo, getSkin());
+  const r = creer ? await net.creerLigue(code, pseudo, getSkin(), nomEl ? nomEl.value : "") : await net.rejoindreLigue(code, pseudo, getSkin(), dejaDedans);
   if (r.erreur) {
     ligueMessage(r.erreur === "complete" ? `Cette ligue est complète (${net.LIGUE_MAX} max).` : r.erreur === "inexistante" ? "Cette ligue n'existe pas." : r.erreur === "vague" ? `${window.CONFIG.liguesParVague || 5} ligues sont déjà en course cette semaine. La tienne démarre lundi : réessaie à ce moment-là.` : "Pas de réseau, réessaie.");
     if (ligue && ligue.enAttente) { ligue = null; memoriserLigue(); afficherLigue(); }
     return false;
   }
   ligue = { code, membres: r.membres };
-  memoriserLigue(); appliquerNomsLigue(); afficherLigue(); appliquerModeBeta(); ligueMessage(creer ? MSG_CREEE : ""); rafraichirBoost();
+  memoriserLigue(); appliquerNomsLigue(); afficherLigue(); appliquerModeBeta();
+  // Un « tom » était déjà là : si ce n'est pas lui, leurs deux scores vont se
+  // confondre en un seul (une ligne par pseudo au classement). On le dit.
+  ligueMessage(r.homonyme ? `Un « ${pseudo} » est déjà dans cette ligue. Si ce n'est pas toi, prends un autre pseudo : sinon vos deux scores n'en feront qu'un.` : creer ? MSG_CREEE : "");
+  rafraichirBoost();
   if (invitation) net.evenement("invitation_acceptee", { pseudo, ligue: code, source: getSource() });
   return true;
 }

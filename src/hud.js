@@ -8,6 +8,9 @@ const BLANC = "#ffffff";
 const NOIR = "#0d0d10";
 const JAUNE = "#ffcf2e";
 const ROUGE = "#e13e26";
+// Le même rouge, juste assez foncé pour porter du texte BLANC en AA (4,63:1 au
+// lieu de 4,25:1) : réservé aux pastilles écrites, jamais au décor peint.
+const ROUGE_TXT = "#d93820";
 const POLICE = '"Helvetica Neue", Helvetica, Arial, system-ui, sans-serif';
 const POLICE_TITRE = '"Source Serif 2", Georgia, serif';
 const PAD = 16;
@@ -43,6 +46,31 @@ function fitFont(ctx, weight, size, text, maxW, min = 9) {
 //   droite : « ×1,5  2 POTES » en gros, puis « PROCHAINE ÉTAPE » et
 //            « 6 PIÈCES ». Ni cases ni jauge, aucun texte flouté.
 // Texte blanc la nuit ET sur la plage : le noir ne se lit pas sur le ciel violet.
+//
+// ⚠️ LE BANDEAU EST ÉCRIT À MÊME LE CIEL, et le ciel change tout le temps.
+// Mesuré par outils/contraste.mjs sur une course entière : le même score noir
+// passait de 15:1 au-dessus d'un ciel clair à 2,38:1 au-dessus d'un nuage
+// sombre ou d'une montagne (seuil WCAG AA d'un grand texte : 3:1). Choisir une
+// couleur « qui va bien en moyenne » ne peut pas marcher : il n'y a pas de
+// moyenne, il y a un décor qui défile.
+// D'où le LISERÉ DE LA COULEUR OPPOSÉE (`poser` ci-dessous), la même grammaire
+// que « BAM ! ». Un texte cerné se lit par le meilleur des deux — sa couleur OU
+// son liseré — et ça se calcule : pour un fond de luminance L, la paire offre
+// max((L+0,05)/(Ln+0,05) ; 1,05/(L+0,05)), dont le minimum vaut **4,40:1** avec
+// notre encre #0d0d10, et 4,58:1 avec du noir pur. Autrement dit : au-dessus de
+// N'IMPORTE QUEL fond, et il y en a de toutes les couleurs dans ce jeu, le
+// bandeau ne descend pas sous 4,4:1 — là où il tombait à 2,38:1.
+// (Mesuré sur une course entière, le 5e percentile ne passe jamais sous 4,5.)
+function poser(ctx, texte, x, y, liseret, taille) {
+  ctx.save();
+  ctx.strokeStyle = liseret;
+  ctx.lineWidth = Math.max(2, taille * 0.115);
+  ctx.lineJoin = "round";
+  ctx.miterLimit = 2;
+  ctx.strokeText(texte, x, y);
+  ctx.restore();
+  ctx.fillText(texte, x, y);
+}
 export function renderHud(ctx, width, height, hud) {
   ctx.save();
   const top = hud.safeTop || 0;
@@ -51,6 +79,7 @@ export function renderHud(ctx, width, height, hud) {
   const clair = hud.nuit > 0.5 || (hud.plage || 0) > 0.35;
   const TXT = clair ? BLANC : NOIR, TXT_VIDE = clair ? "rgba(255,255,255,0.28)" : "rgba(13,13,16,0.22)";
   const TXT_DOUX = clair ? "rgba(255,255,255,0.8)" : "rgba(13,13,16,0.72)";
+  const LISERE = clair ? NOIR : BLANC;
 
   // --- Droite : « ×1,5  2 POTES », puis la prochaine étape -----------------
   const total = hud.potesMax;
@@ -60,14 +89,14 @@ export function renderHud(ctx, width, height, hud) {
   ctx.font = `900 16px ${POLICE}`;
   const wLib = ctx.measureText(libelle).width;
   ctx.fillStyle = TXT;
-  ctx.fillText(libelle, xD, y1 + 2);
+  poser(ctx, libelle, xD, y1 + 2, LISERE, 16);
   let gaucheDroite = xD - wLib;
   if (hud.mult > 1.001) {
     const txt = `×${String(hud.mult).replace(".", ",")}`;
     ctx.font = `900 15px ${POLICE}`;
     const w = ctx.measureText(txt).width + 14;
     const xP = xD - wLib - 8 - w;
-    ctx.fillStyle = hud.turbo ? ROUGE : JAUNE;
+    ctx.fillStyle = hud.turbo ? ROUGE_TXT : JAUNE;
     roundRect(ctx, xP, y1 - 2, w, 24, 4);
     ctx.fill();
     ctx.fillStyle = hud.turbo ? BLANC : "#4a3305";
@@ -79,10 +108,10 @@ export function renderHud(ctx, width, height, hud) {
     ctx.textAlign = "right";
     ctx.font = `800 10.5px ${POLICE}`;
     ctx.fillStyle = TXT_DOUX;
-    ctx.fillText("PROCHAINE ÉTAPE", xD, y1 + 29);
+    poser(ctx, "PROCHAINE ÉTAPE", xD, y1 + 29, LISERE, 10.5);
     ctx.font = `900 16px ${POLICE}`;
     ctx.fillStyle = TXT;
-    ctx.fillText(`${hud.restant} PIÈCE${hud.restant > 1 ? "S" : ""}`, xD, y1 + 43);
+    poser(ctx, `${hud.restant} PIÈCE${hud.restant > 1 ? "S" : ""}`, xD, y1 + 43, LISERE, 16);
   }
 
   // --- Centre : les points, au MILIEU DE L'ÉCRAN (pas entre les deux blocs :
@@ -102,9 +131,9 @@ export function renderHud(ctx, width, height, hud) {
   ctx.fillStyle = TXT;
   ctx.textAlign = "left";
   ctx.font = `900 ${taille}px ${POLICE_TITRE}`;
-  ctx.fillText(num, x0, top + PAD - 2);
+  poser(ctx, num, x0, top + PAD - 2, LISERE, taille);
   ctx.font = `700 14px ${POLICE}`;
-  ctx.fillText(" pts", x0 + wNum, top + PAD + taille * 0.5);
+  poser(ctx, " pts", x0 + wNum, top + PAD + taille * 0.5, LISERE, 14);
 
   // --- Tout en haut : la barre du MORCEAU, comme les barres des stories ----
   // (Instagram) : elle se remplit jusqu'au drapeau d'arrivée, rouge dans les
@@ -207,8 +236,10 @@ export function renderCountIn(ctx, width, height, t, beatPeriod, beats, linger, 
   ctx.fillText(texte, 0, 0);
   ctx.restore();
   // Le rappel de la ligue, à CHAQUE départ (premier lancement comme REJOUER) :
-  // c'est ce qui fait inviter. Texte blanc, ombre portée à 25 %, comme le reste
-  // de l'interface : pas de bandeau sombre.
+  // c'est ce qui fait inviter. ⚠️ Il était en blanc avec une simple ombre à
+  // 25 % : mesuré à 1,13:1 au-dessus du ciel du petit matin (outils/
+  // contraste.mjs), c'est-à-dire illisible. Liseré noir, comme le décompte
+  // juste au-dessus — toujours pas de bandeau sombre.
   {
     const lignes = ["Plus tu as de potes dans ta ligue,", "plus tu as de chances de faire un meilleur score."];
     ctx.save();
@@ -217,7 +248,7 @@ export function renderCountIn(ctx, width, height, t, beatPeriod, beats, linger, 
     ctx.fillStyle = BLANC;
     ctx.shadowColor = "rgba(0,0,0,0.25)"; ctx.shadowOffsetY = 2; ctx.shadowBlur = 0;
     const y0 = Math.max(height * 0.3, 190) + (avecSon ? 118 : 78);
-    lignes.forEach((l, i) => { fitFont(ctx, "800", 15, l, width - 40, 10); ctx.fillText(l, width / 2, y0 + i * 21); });
+    lignes.forEach((l, i) => { const t = fitFont(ctx, "800", 15, l, width - 40, 10); poser(ctx, l, width / 2, y0 + i * 21, "#000000", t || 15); });
     ctx.restore();
   }
   // Rappel de jouer avec le son (les klaxons annoncent les voitures). Pas si
@@ -326,7 +357,7 @@ export function renderTuto(ctx, width, height, tuto) {
   ctx.save();
   ctx.translate(x + 16 + 50, y);
   ctx.rotate(-0.035);
-  ctx.fillStyle = tuto.ok ? JAUNE : ROUGE;
+  ctx.fillStyle = tuto.ok ? JAUNE : ROUGE_TXT;   // porte du blanc en 11 px : AA
   ctx.fillRect(-50, -10, 100, 20);
   ctx.strokeStyle = NOIR; ctx.lineWidth = 1.2;
   ctx.strokeRect(-50, -10, 100, 20);
