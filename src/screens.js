@@ -848,8 +848,8 @@ function lienLigue(code) { return `${window.CONFIG.lienJeu || location.origin + 
 
 // --- LE CONCOURS -----------------------------------------------------------------
 // LA RÈGLE : score au général = ton record + une commission sur le record de
-// chaque pote de ta ligue. À la clôture, tirage au sort entre les 3 premiers :
-// le gagnant fait son morceau avec PMC et ses potes. Tout est calculé par la base
+// chaque pote de ta ligue. À la clôture, le PREMIER du général l'emporte :
+// il fait son morceau avec PMC et ses potes. Tout est calculé par la base
 // (vue `concours_joueurs`) : le jeu ne voit que son propre score.
 let concoursInfo = null;      // { debut, fin, plafond_score } — lu une fois
 
@@ -880,7 +880,7 @@ function majConcoursMenu() {
   el.textContent = "";
   const b = document.createElement("b");
   b.textContent = t;
-  el.append("Tirage au sort entre les 3 premiers du général. ", b);
+  el.append("Le premier du général gagne. ", b);
   el.classList.remove("hidden");
 }
 
@@ -892,7 +892,7 @@ function formaterRang(n) { return n === 1 ? "1er" : `${n}e`; }
 function lignePotes(n) { return `${n} pote${n > 1 ? "s" : ""}`; }
 
 // Sur l'écran de fin : ta place au général, ce qui la compose, et ce qui manque
-// pour entrer dans le top 3. Avec ou sans ligue.
+// pour passer premier. Avec ou sans ligue.
 async function afficherConcours() {
   const bloc = $("end-concours");
   if (!bloc) return;
@@ -912,14 +912,14 @@ async function afficherConcours() {
     : `Chaque pote de ta ligue te rapporte ${commissionPct()}\u00a0% de son record.`;
   const ecart = $("end-concours-ecart");
   ecart.textContent = "";
-  if (moi.rang <= 3) ecart.textContent = "Tu es dans le top 3 : le morceau se tire au sort entre vous trois.";
+  if (moi.rang === 1) ecart.textContent = "Tu es premier : le morceau est pour toi si tu tiens jusqu’à la clôture.";
   else {
-    const haut = await net.classementGeneral(3);
-    const troisieme = haut && haut[2];
-    if (troisieme) {
+    const haut = await net.classementGeneral(1);
+    const premier = haut && haut[0];
+    if (premier) {
       const b = document.createElement("b");
-      b.textContent = pts(Math.max(1, Number(troisieme.total) - Number(moi.total) + 1));
-      ecart.append("Il te manque ", b, " pour entrer dans le top 3");
+      b.textContent = pts(Math.max(1, Number(premier.total) - Number(moi.total) + 1));
+      ecart.append("Il te manque ", b, " pour passer premier");
     }
   }
   ecart.classList.toggle("hidden", !ecart.textContent);
@@ -948,7 +948,7 @@ function fermerClassement() {
 }
 function regleClassement(vue) {
   const C = window.CONFIG;
-  if (vue === "general") return `Ton record + ${commissionPct()}\u00a0% du record de chaque pote de ta ligue. À la clôture, tirage au sort entre les 3 premiers : le gagnant fait ${C.concoursLot || "le morceau"}. `;
+  if (vue === "general") return `Ton record + ${commissionPct()}\u00a0% du record de chaque pote de ta ligue. À la clôture, le premier fait ${C.concoursLot || "le morceau"}. `;
   if (vue === "ligue") return "Les joueurs de ta ligue, avec leur record et leur commission. ";
   return "La somme des records de chaque ligue. Pour l'honneur : le morceau se joue au général. ";
 }
@@ -1003,12 +1003,12 @@ async function remplirClassement() {
   }
   rows.forEach((r, i) => {
     const li = ligneJoueur(r, vue === "general" ? r.rang : i + 1, monPseudo, vue === "general" ? (r.nom || "Sans ligue") : "");
-    if (vue === "general" && r.rang <= 3) li.classList.add("podium");
+    if (vue === "general" && r.rang === 1) li.classList.add("podium");
     liste.appendChild(li);
-    if (vue === "general" && r.rang === 3 && rows.length > 3) {
+    if (vue === "general" && r.rang === 1 && rows.length > 1) {
       const sep = document.createElement("li");
       sep.className = "coupure";
-      sep.textContent = "Tirage au sort entre ces trois-là";
+      sep.textContent = "Le premier gagne le morceau";
       liste.appendChild(sep);
     }
   });

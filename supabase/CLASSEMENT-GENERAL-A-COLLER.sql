@@ -10,7 +10,7 @@
 --
 -- LA RÈGLE :
 --   score au général = ton record + 10 % du record de chaque pote de ta ligue.
---   À la clôture, tirage au sort entre les 3 premiers du général.
+--   À la clôture, le premier du général gagne.
 --
 -- Deux mécaniques séparées :
 --   - le BOOST (déjà en place) multiplie tes points pendant la course ;

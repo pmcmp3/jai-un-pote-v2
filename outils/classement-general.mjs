@@ -1,6 +1,6 @@
 // classement-general.mjs — Le classement général et la commission (8 novembre
 // 2026) : sur l'écran de fin, ta place au général et ce qui la compose ; dans le
-// tiroir, les onglets Général / Ma ligue / Les ligues, le podium du tirage et ta
+// tiroir, les onglets Général / Ma ligue / Les ligues, le podium et ta
 // ligne quand tu es loin ; un joueur sans ligue envoie son score et apparaît aussi.
 // ⚠️ TOUTE la base est simulée : aucune requête ne sort vers Supabase.
 //   node outils/classement-general.mjs
@@ -102,7 +102,7 @@ const okFerme = Array.isArray(a.boost) && a.boost.length === 3;
 console.log("ferme de potes :", okFerme ? "OK — 7 pseudos sortis de 4 téléphones = 3 potes (+30 %), pas 6 (+60 %)" : `KO — potes comptés : ${JSON.stringify(a.boost)}`);
 
 const okA = /37e sur 240/.test(a.fin.rang) && /12\s400\spts de record \+ 4\s300\spts de commission \(6\spotes\)/.test(a.fin.detail) && /Il te manque/.test(a.fin.ecart)
-  && a.general.some((l) => /Tirage au sort/i.test(l)) && a.general[a.general.length - 1].includes("@pmc") && a.general[a.general.length - 1].startsWith("37")
+  && a.general.some((l) => /Le premier gagne le morceau/i.test(l)) && a.general[a.general.length - 1].includes("@pmc") && a.general[a.general.length - 1].startsWith("37")
   && a.onglets.join() === "general,ligue,ligues" && a.ligue.length === 2 && a.ligues.length === 2
   && a.ecrits.some((e) => e.code === "ESSAI");
 const okB = /sur 240/.test(b.fin.rang) && /Chaque pote/.test(b.fin.detail) && b.onglets.join() === "general,ligues"

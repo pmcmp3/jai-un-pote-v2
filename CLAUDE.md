@@ -201,8 +201,10 @@ intégré d'Instagram d'abord**, portrait natif.
 - **LE CONCOURS** (`supabase/CONCOURS-A-COLLER.sql` puis `supabase/AVANT-LE-LANCEMENT.sql`, qui
   reprend `CLASSEMENT-GENERAL-A-COLLER.sql` en entier et le remplace).
   ⚠️ **Règle changée le 8 novembre 2026** : *score au général = ton record + 10 % du record de
-  chaque pote de ta ligue* ; à la clôture, **tirage au sort entre les 3 premiers du général**, le
-  gagnant fait un morceau avec PMC et ses potes. Clôture le **dimanche 22 novembre 2026 à 12 h**.
+  chaque pote de ta ligue* ; à la clôture, **le premier du classement général gagne** et fait un
+  morceau avec PMC et ses potes. ⚠️ Le tirage au sort entre les 3 premiers a été **abandonné le
+  13 novembre 2026** (« on prendra le premier du classement général ») : une ligue soudée occupait
+  mécaniquement tout le podium, le tirage n'arbitrait donc rien. Clôture le **dimanche 22 novembre 2026 à 12 h**.
   - **Boost et commission sont deux mécaniques séparées** : le boost (+10 % par pote, ×3 max)
     multiplie les points pendant la course ; la commission s'ajoute dans le classement, sur les
     records et jamais sur les totaux. Taux : `concours.commission` (la base calcule),

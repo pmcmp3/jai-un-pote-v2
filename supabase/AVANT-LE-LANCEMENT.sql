@@ -29,7 +29,7 @@ update public.concours set plafond_score = 110000 where id = 1 and plafond_score
 -- 2. LE CLASSEMENT DES JOUEURS.
 --
 -- LA RÈGLE : score au général = ton record + 10 % du record de chaque pote de
--- ta ligue. À la clôture, tirage au sort entre les 3 premiers.
+-- ta ligue. À la clôture, le premier du général gagne.
 -- La commission se calcule sur les RECORDS, jamais sur les totaux : pas
 -- d'effet boule de neige entre membres d'une ligue.
 --

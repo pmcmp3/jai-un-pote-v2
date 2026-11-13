@@ -246,7 +246,7 @@ export async function classement(code, graine) {
 
 // --- LE CONCOURS ----------------------------------------------------------------
 // La règle : score au général = ton record + une commission sur le record de
-// chaque pote de ta ligue. À la clôture, tirage au sort entre les 3 premiers.
+// chaque pote de ta ligue. À la clôture, le premier du général l'emporte.
 // Tout est calculé par la base (vue `concours_joueurs`,
 // CLASSEMENT-GENERAL-A-COLLER.sql) : le jeu ne fait que lire.
 

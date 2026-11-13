@@ -1,14 +1,16 @@
 # Mettre le concours en route — étape par étape
 
 > ⚠️ **Règle changée le 8 novembre 2026.** Score au général = ton record + 10 % du record de chaque
-> pote de ta ligue. À la clôture, tirage au sort entre les 3 premiers. Colle
+> pote de ta ligue. À la clôture, le premier du général gagne (tirage abandonné le
+> 13 novembre 2026). Colle
 > `supabase/AVANT-LE-LANCEMENT.sql` après le fichier de l'étape 1 : il contient le classement
 > général, le plafond de score à 110 000, les 21 places par ligue (sans ça le jeu refuse le 7e
 > membre), la ligue du bureau `BRUNO` et le verrou de lecture sur les contacts.
 >
 > **À la clôture**, le SQL Editor te donne le podium et les contacts :
 > `select * from public.concours_podium;`
-> Vérifie les 3 premiers (scores, appareils, rejeu en visio au besoin), fais le tirage et publie-le.
+> Vérifie le premier (score, appareil, rejeu en visio au besoin) et publie-le. S'il est écarté,
+> c'est le suivant au classement.
 
 ## Où on en est, au 13 novembre 2026
 

@@ -1194,3 +1194,41 @@ les 3 premiers sans être le meilleur joueur ». Huit hypothèses sont revenues,
   « entre les 3 premiers » risque donc d'être un tirage **à l'intérieur d'un seul groupe**, qui gagne
   avec probabilité 1. Ce n'est pas une faille — c'est la règle voulue — mais le tirage n'arbitre
   alors plus rien.
+
+## 13 novembre 2026 — le tirage au sort est abandonné : le premier gagne (v47)
+
+« le reglement on s'en fout mdr pour l'instant / on prendra le premier du classement général
+haha ». Deux décisions dans une phrase.
+
+**Le tirage entre les 3 premiers disparaît.** C'était la question laissée ouverte par l'audit du
+13 novembre : comme `total_i = 0,9 × S_i + 0,1 × T`, tous les membres d'une même ligue partagent
+le même `0,1 × T`, donc une ligue soudée occupe mécaniquement le haut du général — le tirage
+avait une chance proche de 1 de se jouer *à l'intérieur d'un seul groupe*, et n'arbitrait donc
+rien. Plutôt que de tirer entre les 3 premiers **de ligues différentes** (l'autre sortie
+proposée), l'artiste tranche pour le plus simple : **le premier du classement général gagne.**
+
+⚠️ **Aucun SQL à recoller.** La vue `concours_joueurs` donnait déjà le rang ; c'est la règle
+affichée qui changeait, pas le calcul. Seuls des textes et un marqueur visuel ont bougé :
+
+- `index.html` : « À la clôture, le premier du classement général fait un morceau avec PMC et
+  ses potes. »
+- `src/screens.js` : le rappel sous le peloton (« Le premier du général gagne. » + temps
+  restant), la règle des trois onglets, et surtout **la coupure du classement** — la ligne
+  pointillée et la pastille `podium` passent du rang 3 au **rang 1** (« Le premier gagne le
+  morceau »). Sur l'écran de fin, l'écart affiché n'est plus « il te manque X pour entrer dans
+  le top 3 » mais « **pour passer premier** », mesuré sur le 1er et non sur le 3e
+  (`net.classementGeneral(1)`).
+- `public/reglement.html` : l'article 6 ne tire plus au sort, il désigne le premier ; en cas de
+  non-réponse sous quinze jours le lot va au **suivant au classement** (plus de « nouveau
+  tirage entre les autres participants du podium »).
+- `outils/classement-general.mjs` cherche désormais « Le premier gagne le morceau » dans le
+  tiroir, là où il cherchait « Tirage au sort ».
+
+**Le règlement reste incomplet, sciemment** : ni identité de l'organisateur, ni SIRET, ni
+adresse, ni nombre maximum de personnes dans le groupe qui gagne. Assumé pour la ligue du
+bureau ; à remplir avant d'ouvrir plus large.
+
+⚠️ **Un faux échec de `perf` dans le filet de cette passe** : 10,1 ms pour l'image la plus chère
+(seuil 8,3). Aucun des changements ne touche au rendu — trois relances de `perf-plage.mjs` ont
+donné 7,2 / 7,3 / 7,4 ms. C'était la machine (deux filets complets enchaînés), pas le jeu. Si ce
+test échoue seul, le relancer avant de chercher une cause.
