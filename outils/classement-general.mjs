@@ -56,6 +56,9 @@ async function scenario({ largeur, hauteur, avecLigue, nom }) {
   await page.keyboard.press("KeyF");
   await page.waitForSelector("#end-concours:not(.hidden)", { timeout: 15000 });
   await page.waitForTimeout(600);
+  // Le score part en tâche de fond : l'attendre vraiment, plutôt que d'espérer
+  // qu'il soit arrivé au moment où on lit `ecrits`.
+  for (let i = 0; i < 100 && !ecrits.length; i++) await page.waitForTimeout(50);
   const texte = (id) => page.evaluate((id) => document.getElementById(id).textContent.trim(), id);
   const fin = { rang: await texte("end-concours-rang"), detail: await texte("end-concours-detail"), ecart: await texte("end-concours-ecart") };
   await page.screenshot({ path: `${sorties}classement-${nom}-fin.png` });
@@ -63,7 +66,11 @@ async function scenario({ largeur, hauteur, avecLigue, nom }) {
   await page.click("#end-concours-voir");
   await page.waitForSelector("#classement-sheet.visible");
   await page.waitForFunction(() => document.querySelectorAll("#classement-liste li").length > 0);
-  await page.waitForTimeout(450);
+  // Ma ligne est AJOUTÉE après coup (un second appel, `net.maPlace`), donc
+  // attendre « la liste n'est plus vide » ne suffit pas : sur une machine
+  // chargée, les 450 ms d'avant laissaient lire une liste encore sans moi.
+  // On attend la chose elle-même.
+  await page.waitForFunction(() => [...document.querySelectorAll("#classement-liste li")].some((l) => l.textContent.includes("@pmc")), null, { timeout: 10000 });
   const lignes = () => page.evaluate(() => [...document.querySelectorAll("#classement-liste li")].map((l) => l.textContent.replace(/\s+/g, " ").trim()));
   const general = await lignes();
   await page.screenshot({ path: `${sorties}classement-${nom}-general.png` });
@@ -101,12 +108,35 @@ console.log("petit écran avec ligue :", JSON.stringify({ rejouable: c.rejouable
 const okFerme = Array.isArray(a.boost) && a.boost.length === 3;
 console.log("ferme de potes :", okFerme ? "OK — 7 pseudos sortis de 4 téléphones = 3 potes (+30 %), pas 6 (+60 %)" : `KO — potes comptés : ${JSON.stringify(a.boost)}`);
 
-const okA = /37e sur 240/.test(a.fin.rang) && /12\s400\spts de record \+ 4\s300\spts de commission \(6\spotes\)/.test(a.fin.detail) && /Il te manque/.test(a.fin.ecart)
-  && a.general.some((l) => /Le premier gagne le morceau/i.test(l)) && a.general[a.general.length - 1].includes("@pmc") && a.general[a.general.length - 1].startsWith("37")
-  && a.onglets.join() === "general,ligue,ligues" && a.ligue.length === 2 && a.ligues.length === 2
-  && a.ecrits.some((e) => e.code === "ESSAI");
-const okB = /sur 240/.test(b.fin.rang) && /Chaque pote/.test(b.fin.detail) && b.onglets.join() === "general,ligues"
-  && b.ecrits.length === 1 && b.ecrits[0].code === "PMCMP" && b.ecrits[0].mode === "course" && !b.ecrits[0].trace;
+// Chaque vérification porte son nom : un échec doit dire LAQUELLE a lâché.
+// Sans ça, un « ÉCHEC » muet coûte un filet complet (7 min) à chaque fois,
+// et on ne sait même pas s'il faut chercher un bug ou relancer (vécu le
+// 13 novembre 2026, sur une machine chargée).
+function juger(titre, essais) {
+  const rates = Object.entries(essais).filter(([, v]) => !v).map(([k]) => k);
+  if (rates.length) console.log(`${titre} — ont lâché : ${rates.join(", ")}`);
+  return rates.length === 0;
+}
+const okA = juger("avec ligue", {
+  "rang (37e sur 240)": /37e sur 240/.test(a.fin.rang),
+  "détail (record + commission)": /12\s400\spts de record \+ 4\s300\spts de commission \(6\spotes\)/.test(a.fin.detail),
+  "écart affiché": /Il te manque/.test(a.fin.ecart),
+  "coupure du premier": a.general.some((l) => /Le premier gagne le morceau/i.test(l)),
+  "ma ligne en bas du général": a.general[a.general.length - 1].includes("@pmc") && a.general[a.general.length - 1].startsWith("37"),
+  "3 onglets": a.onglets.join() === "general,ligue,ligues",
+  "onglet ma ligue": a.ligue.length === 2,
+  "onglet les ligues": a.ligues.length === 2,
+  "score envoyé sous ESSAI": a.ecrits.some((e) => e.code === "ESSAI"),
+});
+const okB = juger("sans ligue", {
+  "rang (sur 240)": /sur 240/.test(b.fin.rang),
+  "détail (chaque pote)": /Chaque pote/.test(b.fin.detail),
+  "2 onglets": b.onglets.join() === "general,ligues",
+  "un seul score envoyé": b.ecrits.length === 1,
+  "envoyé sous PMCMP": b.ecrits.length === 1 && b.ecrits[0].code === "PMCMP",
+  "mode course": b.ecrits.length === 1 && b.ecrits[0].mode === "course",
+  "pas de trace de fantôme": b.ecrits.length === 1 && !b.ecrits[0].trace,
+});
 const propre = [a, b, c].every((x) => !x.erreurs.length && !x.debordement && x.rejouable);
 verdict(okA && okB && okFerme && propre, `avec ligue : ${okA ? "rang, détail, podium, ta ligne, 3 onglets" : "ÉCHEC"} · ferme de potes : ${okFerme ? "un téléphone = un pote" : "ÉCHEC"} · sans ligue : ${okB ? "score envoyé sous PMCMP, présent au général" : "ÉCHEC"} · REJOUER atteignable sur petit écran : ${c.rejouable ? "oui" : "NON"} · ${a.erreurs.length + b.erreurs.length + c.erreurs.length} erreur(s) JS`);
 await navigateur.close(); await serveur.close();

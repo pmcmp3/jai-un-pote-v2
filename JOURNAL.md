@@ -1232,3 +1232,18 @@ bureau ; à remplir avant d'ouvrir plus large.
 (seuil 8,3). Aucun des changements ne touche au rendu — trois relances de `perf-plage.mjs` ont
 donné 7,2 / 7,3 / 7,4 ms. C'était la machine (deux filets complets enchaînés), pas le jeu. Si ce
 test échoue seul, le relancer avant de chercher une cause.
+
+### Le même jour — un test qui échoue doit dire *quoi* (v48)
+
+Le filet relancé sur une machine chargée a sorti un `classement … ÉCHEC` muet : « avec ligue :
+ÉCHEC », sans un mot sur laquelle des neuf vérifications avait lâché. Sept minutes de filet pour
+une information inutilisable, et rien pour trancher entre « un bug » et « relance-le ».
+
+- **`juger(titre, essais)`** remplace la chaîne de `&&` : chaque vérification porte son nom, et
+  un échec imprime « ont lâché : écart affiché, score envoyé sous ESSAI ».
+- **Deux attentes en dur remplacées par la condition elle-même.** Ma ligne, en bas du classement
+  général, est AJOUTÉE après coup par un second appel (`net.maPlace`) : attendre « la liste n'est
+  plus vide » puis 450 ms laissait lire, sous charge, une liste encore sans moi. On attend
+  maintenant qu'une ligne contienne `@pmc`. De même, le score part en tâche de fond : on attend
+  qu'il soit arrivé (jusqu'à 5 s) au lieu d'espérer qu'il le soit.
+- Vérifié : trois passages de suite, machine saturée par trois `yes > /dev/null`, trois fois vert.
