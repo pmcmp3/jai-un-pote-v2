@@ -1247,3 +1247,60 @@ une information inutilisable, et rien pour trancher entre « un bug » et « rel
   maintenant qu'une ligne contienne `@pmc`. De même, le score part en tâche de fond : on attend
   qu'il soit arrivé (jusqu'à 5 s) au lieu d'espérer qu'il le soit.
 - Vérifié : trois passages de suite, machine saturée par trois `yes > /dev/null`, trois fois vert.
+
+## 15 novembre 2026 — retours de test sur iPhone 16 : alléger, espacer, rendre lisible (v49)
+
+Une partie complète testée sur iPhone 16, puis une liste de retours. Tout a été fait sauf ce qui
+est noté en bas. `VERSION_COURSE` 28 → 29 (lait, espacement et tailles changent la route).
+
+**Retiré, demandé** : « Plus tu as de potes dans ta ligue… » (chargement et décompte),
+l'encart jaune « TES POINTS +0 % » de l'écran du cycliste (« juste, les gens font leur
+cycliste »), le chapeau « aucun » (« les gens doivent nécessairement choisir un chapeau », trois
+puces = une ligne nette ; un « aucun » déjà enregistré devient une casquette), le sprint du
+dimanche (« il faut absolument que tu enlèves le truc » — `config.sprintDimanche: false`, le
+code reste), « L'album est sorti » sur le menu, les cartes « 1 tap = 1 saut » et « Arrivée »
+(« c'est logique »), tout texte au départ (« tu mets juste 3, 2, 1, c'est parti »), les
+onomatopées des explosions (« on veut juste l'animation »), et sur l'écran de fin « Meilleur
+score · N potes maximum » et « Tes potes te donnent +60 % ». « Ligue CODE · copier » passe sous
+le classement (« c'est trop bizarre que ça soit là »).
+
+**« Joue avec tes potes » refaite** : « je fais jouer des gens, ils n'ont pas compris. Ils
+pensent que plus il y a de gens en vélo dans leur partie, plus ça fait de points. » L'ancienne
+carte montrait justement des cyclistes qui arrivent… La nouvelle montre le vrai mécanisme : un
+score de 1 000, « Invitation envoyée à @lea », « @lea a rejoint ta ligue · +10 % », le score
+MONTE (il ne saute pas), puis quatre autres en accéléré jusqu'à 1 500, +50 %.
+
+**Contours → ombres.** « L'accessibilité est beaucoup trop augmentée, c'est pas beau du tout. Je
+préfère que tu mettes une ombre à la place, mais pas de contour autour du texte. » Les liserés
+du 13 novembre sont partis, partout. À leur place : un halo doux de la couleur opposée (doublé
+sous 20 px par une passe d'ombre seule), une ombre portée sous le décompte, une ombre doublée
+sous les popups. ⚠️ Le test `contraste` ne savait pas juger une ombre — il la prenait pour de
+l'encre et jugeait la lettre contre un fond qu'elle ne voit pas. Il dessine maintenant l'ombre
+seule, puis la lettre seule, et mesure chaque pixel d'encre contre le fond ombré. Résultat : 0
+texte illisible, 0 juste, sans un contour. Moins garanti qu'un liseré, assumé.
+
+**Le turbo se comprend** : bulle blanche autour du cycliste + anneau qui se vide en 5 s, rien
+d'écrit. Explosions à la taille de l'objet (la boule montait à 2,9 unités de rayon, elle
+s'arrête à ~1,2), moitié moins d'éclats. Le lait bu fait une onde blanche, plus une explosion.
+**Lait deux fois moins présent** (tous les 96 rangs : 420 → 220 briques sur 20 graines).
+
+**Lisibilité de la route** : obstacles espacés (+3 rangées partout, mou minimal 3 : 1 833 → 1 584
+chocs pour le joueur immobile, −14 %) ; chat, chien, botte ×1,3, poule ×1,15, tous toujours au
+tap ; **le fond s'efface** derrière un voile atmosphérique, la route et ce qui y roule restent
+nets (« beaucoup trop d'éléments au même plan, il n'y a pas de contraste ») ; jetpack ×1,5 avec
+un anneau qui bat, et une main qui reste appuyée après la prise (« j'ai pris le jetpack, j'avais
+même pas compris ») ; les phares d'un bus éjecté ne balaient plus l'écran pendant son salto.
+
+**Pause** : « VIBRATIONS » ne tenait pas dans sa colonne de 62 px, la coche s'écrivait dessus
+(iPhone 16) — colonne à 92 px.
+
+⚠️ **Découvert en route — le test `perf` était trompeur.** Il mesure l'image à 30 s ; avec le
+lait tous les 48 rangs, il tombait en plein turbo, où les explosions vident la route. Avec deux
+fois moins de lait, il mesure une image NORMALE — et la version en ligne y coûtait déjà
+8,0–8,3 ms (seuil 8,3), vérifié sur une copie de la version en ligne. Profileur : les étals du
+marché, à 35 % de l'image (un cube par fruit, deux étages). Simplifiés (un tas par cagette,
+quelques fruits dessus) : 6,6 ms. C'est aussi ce qui était demandé pour les décors de fond.
+
+**Pas fait, à dire** : les gros animaux (cochon, vache, mouton) n'ont pas été agrandis — ils
+passeraient à un autre geste ; les décors du fond sont voilés et le marché simplifié, mais les
+autres biomes n'ont pas été redessinés pièce par pièce.

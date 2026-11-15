@@ -186,7 +186,6 @@
     #loading.failed #loading-track { display: none; }
     #loading-track { width: 100%; height: 3px; border-radius: 999px; background: rgba(255,255,255,0.3); overflow: hidden; }
     #loading-fill { width: 0%; height: 100%; background: #fff; transition: width 0.25s linear; }
-    #loading-astuce { margin: 14px 0 0; font: 700 13px/1.4 var(--police); color: #fff; text-align: center; text-shadow: 0 2px 0 rgba(0,0,0,0.25); }
     #loading-label { font: 500 13px var(--police); color: rgba(255,255,255,0.85); font-variant-numeric: tabular-nums; }
 
     /* --- Menu en trois étapes ------------------------------------------- */
@@ -227,23 +226,29 @@
     .expl-etape.on { display: block; animation: expl-in 0.3s ease-out both; }
     .expl-titre { margin: 4px 0 12px; font: 900 27px/1.05 var(--titre); color: var(--noir); }
     .expl-texte { margin: 0 0 12px; font: 500 13.5px/1.45 var(--police); color: var(--noir); }
-    #expl-main { position: relative; width: 96px; height: 96px; margin: 0 auto 10px; }
     /* Main et haut-parleur DESSINÉS (4 octobre 2026, nuit) : les emojis 👆 🔊
        changeaient de tête selon le téléphone (Samsung ≠ iPhone). */
-    #expl-main .doigt { position: absolute; left: 26px; top: 18px; width: 44px; height: 44px; animation: expl-tape 0.9s ease-in-out infinite; }
-    #expl-main .onde { position: absolute; left: 30px; top: 6px; width: 36px; height: 36px; border: 3px solid var(--rouge); border-radius: 50%; animation: expl-onde 0.9s ease-out infinite; }
-    @keyframes expl-tape { 0%, 100% { transform: translateY(14px); } 45% { transform: translateY(0); } 55% { transform: translateY(0) scale(0.92); } }
-    @keyframes expl-onde { 0%, 45% { transform: scale(0.2); opacity: 0; } 55% { opacity: 1; } 100% { transform: scale(1.6); opacity: 0; } }
-    #expl-arrivee { height: 64px; margin: 0 auto 12px; width: 220px; background: repeating-conic-gradient(#0d0d10 0 25%, #f4efe4 0 50%) 0 0 / 16px 16px; border: 1.5px solid var(--noir); display: flex; align-items: center; justify-content: center; }
-    #expl-arrivee span { padding: 5px 12px; background: var(--rouge); color: #fff; font: 900 16px var(--police); letter-spacing: 0.14em; }
-    #expl-peloton { display: block; width: 260px; max-width: 100%; height: 124px; margin: 0 auto; }
     #expl-son { position: relative; width: 120px; height: 90px; margin: 0 auto 10px; }
     #expl-son .hp { position: absolute; left: 10px; top: 20px; width: 48px; height: 48px; }
     #expl-son .onde { position: absolute; left: 50px; top: 20px; width: 44px; height: 44px; border: 3px solid var(--rouge); border-left-color: transparent; border-bottom-color: transparent; border-radius: 50%; transform: rotate(45deg); opacity: 0; animation: expl-son 1.2s ease-out infinite; }
     #expl-son .o2 { animation-delay: 0.25s; } #expl-son .o3 { animation-delay: 0.5s; }
     @keyframes expl-son { 0% { opacity: 0; transform: rotate(45deg) scale(0.5); } 30% { opacity: 1; } 100% { opacity: 0; transform: rotate(45deg) scale(1.5); } }
-    #expl-mult { margin: 10px 0 8px; font: 900 44px/1 var(--titre); color: var(--rouge); }
-    #expl-mult.pop { animation: expl-pop 0.25s ease-out; }
+    /* La carte « Joue avec tes potes » : un score, et le fil des invitations. */
+    #expl-invit { width: 252px; max-width: 100%; margin: 0 auto 12px; }
+    #expl-score { position: relative; display: flex; align-items: baseline; justify-content: center; gap: 4px; margin: 0 0 10px; }
+    #expl-score b { font: 900 46px/1 var(--titre); color: var(--noir); font-variant-numeric: tabular-nums; }
+    #expl-score small { font: 700 14px var(--police); color: var(--noir); }
+    #expl-score.pop b { animation: expl-pop 0.3s ease-out; }
+    #expl-gain { position: absolute; right: -2px; top: -6px; padding: 3px 7px; background: var(--rouge); color: #fff; font: 900 13px var(--police); border-radius: 3px; transform: rotate(4deg); opacity: 0; }
+    #expl-gain.on { opacity: 1; animation: expl-pop 0.3s ease-out; }
+    #expl-fil { list-style: none; margin: 0; padding: 2px 0; height: 124px; overflow: hidden; display: flex; flex-direction: column; gap: 6px; }
+    #expl-carte .step-eyebrow { white-space: nowrap; }
+    #expl-fil li { display: flex; align-items: center; gap: 8px; padding: 6px 9px; border: 1.5px solid var(--noir); border-radius: var(--rayon); background: #fff; font: 600 12.5px var(--police); color: var(--noir); text-align: left; animation: expl-fil-in 0.28s ease-out both; }
+    #expl-fil li .ico { flex: none; width: 18px; height: 18px; }
+    #expl-fil li .txt { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #expl-fil li .plus { flex: none; font-weight: 900; color: var(--rouge); }
+    #expl-fil li.rejoint { background: #ffcf2e; }
+    @keyframes expl-fil-in { from { transform: translateY(-8px); opacity: 0; } to { transform: none; opacity: 1; } }
     #expl-barre { height: 4px; background: rgba(0,0,0,0.12); overflow: hidden; }
     #expl-barre i { display: block; height: 100%; width: 0; background: var(--rouge); }
     #explication { flex-direction: column; }
@@ -457,9 +462,12 @@
     /* Deux curseurs (4 octobre 2026, nuit : « un réglage pour la musique et un
        réglage pour les effets sonores ») ; le bouton ♪ du menu ouvre le même
        panneau, sans Reprendre ni Recommencer (classe .reglages). */
-    #pause-volume { display: flex; flex-direction: column; gap: 14px; width: 250px; margin: 4px 0 24px; }
+    #pause-volume { display: flex; flex-direction: column; gap: 14px; width: 270px; max-width: 100%; margin: 4px 0 24px; }
     .volume-row { display: flex; align-items: center; gap: 12px; }
-    .volume-row .skin-label { width: 62px; }
+    /* 62 px ne tenaient pas « VIBRATIONS » en capitales espacées : la coche
+       s'écrivait sur le mot (iPhone 16, 15 novembre 2026). Une colonne assez
+       large pour le plus long des trois, et le reste s'aligne dessus. */
+    .volume-row .skin-label { width: 92px; white-space: nowrap; }
     #son-fermer { display: none; }
     #pause-screen.reglages #resume-button, #pause-screen.reglages #pause-replay-button { display: none; }
     #pause-screen.reglages #son-fermer { display: block; }
@@ -559,7 +567,6 @@
     <div id="loading">
       <div id="loading-track"><div id="loading-fill"></div></div>
       <span id="loading-label">0 %</span>
-      <p id="loading-astuce">Plus tu as de potes dans ta ligue,<br />plus tu as de chances de faire un meilleur score.</p>
     </div>
   </div>
   <div id="app" role="region" aria-label="La course"><canvas id="game-canvas" role="img" aria-label="Le cycliste et ses potes sur la route"></canvas></div>
@@ -677,8 +684,10 @@
           <div id="end-ligue" class="hidden">
             <p id="end-rang" class="hidden"></p>
             <p id="end-ecart" class="hidden"></p>
-            <button id="end-ligue-titre" type="button">Ligue <b id="end-ligue-code">—</b> <small id="end-ligue-copier">· copier</small></button>
             <ol id="end-ligue-liste"></ol>
+            <!-- Sous la liste depuis le 15 novembre 2026 (« c'est trop bizarre
+                 que ça soit là », entre l'écart et le classement). -->
+            <button id="end-ligue-titre" type="button">Ligue <b id="end-ligue-code">—</b> <small id="end-ligue-copier">· copier</small></button>
             <p id="end-relais" class="hidden"></p>
           </div>
           <div id="end-actions">
@@ -715,7 +724,7 @@
        concept, et après bam, lancement de partie »). -->
   <div id="explication" class="hidden" aria-live="polite">
     <div id="expl-carte">
-      <div class="panel-header"><p class="step-eyebrow" id="expl-eyebrow">Comment jouer · 1/4</p></div>
+      <div class="panel-header"><p class="step-eyebrow" id="expl-eyebrow">Comment jouer · 1/2</p></div>
       <!-- Ordre du 5 octobre 2026 : « Monte le son » EN PREMIER (« je le mettrais
            en tout premier, et après 2, 3, 4 »). -->
       <div class="expl-etape" data-e="son">
@@ -723,23 +732,20 @@
         <div id="expl-son"><svg class="hp" viewBox="0 0 48 48" width="48" height="48" aria-hidden="true"><path d="M6 18h10l13-10v32L16 30H6z" fill="#0d0d10" stroke="#0d0d10" stroke-width="2" stroke-linejoin="round"/></svg><span class="onde o1"></span><span class="onde o2"></span><span class="onde o3"></span></div>
         <p class="expl-texte"><b>Les klaxons t'annoncent les voitures.</b> Écoute-les, ils arrivent avant elles.</p>
       </div>
-      <div class="expl-etape" data-e="tap">
-        <p class="expl-titre">1 tap = 1 saut</p>
-        <div id="expl-main"><span class="onde"></span><svg class="doigt" viewBox="0 0 48 48" width="44" height="44" aria-hidden="true"><g fill="#fff" stroke="#0d0d10" stroke-width="2.4" stroke-linejoin="round"><rect x="8" y="25" width="9" height="14" rx="4.5" transform="rotate(-28 12.5 32)"/><rect x="14" y="23" width="27" height="19" rx="7"/><rect x="25" y="18" width="8" height="12" rx="4"/><rect x="31" y="20" width="7" height="11" rx="3.5"/><rect x="17" y="3" width="9" height="27" rx="4.5"/><rect x="17" y="40" width="21" height="6" rx="1.5" fill="#e13e26"/></g></svg></div>
-        <p class="expl-texte">Tape n'importe où sur l'écran, <b>pas besoin de glisser.</b> Re-tape en l'air = double saut.</p>
-      </div>
-      <div class="expl-etape" data-e="arrivee">
-        <div id="expl-arrivee"><span>ARRIVÉE</span></div>
-        <p class="expl-texte">La course dure le temps de la musique. <b>Tiens jusqu'à la ligne d'arrivée.</b></p>
-      </div>
+      <!-- « 1 tap = 1 saut » et « Arrivée » retirées le 15 novembre 2026 (« c'est
+           logique, tu peux l'enlever ») : il reste le son, et les potes. -->
       <div class="expl-etape" data-e="potes">
         <p class="expl-titre">Joue avec tes potes</p>
-        <!-- Des CYCLISTES, dessinés par le moteur du jeu, plus des carrés de
-             couleur (« incompréhensible avec les tags de couleur ») : un pote
-             de plus dans ta ligue = un cycliste de plus derrière toi, +10 %. -->
-        <canvas id="expl-peloton" aria-hidden="true"></canvas>
-        <p id="expl-mult">+0 %</p>
-        <p class="expl-texte">Plus tu as de potes dans ta ligue qui jouent au jeu, <b>plus tu as de chances de faire le meilleur score.</b></p>
+        <!-- Refaite le 15 novembre 2026 : des joueurs pensaient que plus il y a
+             de cyclistes DANS la course, plus on marque. Le vrai principe, c'est
+             l'INVITATION : un vrai pote rejoint ta ligue → +10 % sur ton score.
+             Donc on le montre tel quel : un score, une invitation, un pote qui
+             arrive, le score qui monte — puis la même chose en accéléré. -->
+        <div id="expl-invit" aria-hidden="true">
+          <div id="expl-score"><b id="expl-score-val">1 000</b><small>pts</small><span id="expl-gain"></span></div>
+          <ul id="expl-fil"></ul>
+        </div>
+        <p class="expl-texte">Chaque pote qui rejoint ta ligue et joue&nbsp;: <b>+10&nbsp;% sur tous tes points.</b></p>
       </div>
       <div id="expl-barre"><i></i></div>
     </div>

@@ -145,6 +145,9 @@ window.CONFIG = {
   reglementUrl: "reglement.html",
   liguesParVague: 0,        // 0 = pas de limite de création de ligues (concours ouvert à tous)
   relaisDistance: 30000,    // mètres cumulés d'une ligue pour gagner le relais
+  // Sprint du dimanche : COUPÉ le 15 novembre 2026 (« il faut absolument que
+  // tu enlèves le truc »). Le code reste, `true` le rallume.
+  sprintDimanche: false,
   sprintDureeS: 60,         // le sprint du dimanche : 60 s, même route pour tous
 
   piecesLogo: false,        // false = pièces jaunes unies, sans dessin

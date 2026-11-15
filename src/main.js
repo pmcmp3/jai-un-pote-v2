@@ -188,11 +188,11 @@ const targetSpeed = targetSpeedRegle;
 // Hors du générateur de rangées : la route (et le score parfait des ligues)
 // reste la même avec ou sans jetpack.
 const HAUT_HUD_PX = 112;   // sous le score et le chrono
-const jet = { r: null, pris: false, reste: 0, pieces: [], trace: [], flamme: false, enregistre: false };
+const jet = { r: null, pris: false, reste: 0, pieces: [], trace: [], flamme: false, enregistre: false, appuiVu: false };
 let jetpackForce = new URLSearchParams(location.search).has("jetpack");
 function partieJetpack() { const C = window.CONFIG; return jetpackForce || (!game.sprint && screens.getParties() % (C.jetpackUneSur || 5) === (C.jetpackPartie ?? 3)); }
 function poserJetpack() {
-  jet.r = null; jet.pris = false; jet.reste = 0; jet.pieces = []; jet.trace = []; jet.flamme = false; jet.enregistre = false;
+  jet.r = null; jet.pris = false; jet.reste = 0; jet.pieces = []; jet.trace = []; jet.flamme = false; jet.enregistre = false; jet.appuiVu = false;
   if (!partieJetpack()) return;
   const cible = Math.round(rangAuTemps(window.CONFIG.jetpackTempsS || 70));
   for (let d = 0; d < 60; d++) for (const r of [cible + d, cible - d]) {
@@ -229,6 +229,7 @@ function voler(dt) {
   jet.reste -= dt;
   const pousse = isHolding();
   jet.flamme = pousse;
+  if (pousse) jet.appuiVu = true;
   player.jumpVy += (pousse ? (C.jetpackPoussee || 30) : -(C.jetpackGravite || 15)) * dt;
   player.jumpVy = Math.max(-7, Math.min(9, player.jumpVy));
   player.jumpY += player.jumpVy * dt;
@@ -615,7 +616,7 @@ function resetRun() {
   speed = V_UNIT * window.CONFIG.vitesseBase; nuitDebut = null;
   friends.reset();
   ambiance.reinitialiser(); alertesVues.clear(); montagneFondu = 0; leveeCam = 0; scene.setLevee(0); plageFondu = 0; scene.setPlage(0);
-  jet.r = null; jet.pris = false; jet.reste = 0; jet.pieces = []; jet.trace = []; jet.flamme = false; jet.enregistre = false;
+  jet.r = null; jet.pris = false; jet.reste = 0; jet.pieces = []; jet.trace = []; jet.flamme = false; jet.enregistre = false; jet.appuiVu = false;
   popups.length = 0; pastilles.length = 0; banner = null; damageFlash = 0; shake.time = 0; hudAlpha = 0; hintTimer = 6;
   canvas.classList.remove("game-over-bw", "danger", "turbo");
   scene.setNight(0);
@@ -756,7 +757,7 @@ function gagnerLait(u, v) {
   vibrer(40);
   semerSparkles(u, v, 16, "#ffffff");
   // Le lait se boit d'un coup : une grande onde de choc part du vélo.
-  boules.push({ v: player.v, h: rows.solAt(player.v) + 1, vit: speed, age: 0, mot: "TURBO !" });
+  boules.push({ v: player.v, h: rows.solAt(player.v) + 1, vit: speed, age: 0, onde: true });
   triggerShake(7, 0.3);
   pousserPastille("TU EXPLOSES TOUT · ×2", 1.8);
   canvas.classList.add("turbo");
@@ -804,7 +805,8 @@ function dessinerEjecte(ej, K, tm, dessin) {
   const reste = Math.max(0, Math.min(1, (EJECTION_S - a) / 0.3));
   ctx.save();
   ctx.translate(c.x, c.y); ctx.rotate(ej.sens * 7.5 * a); ctx.scale(reste, reste); ctx.translate(-c.x, -c.y);
-  try { scene.avecLift(lift + rows.solAt(v), () => dessin(du, v)); } finally { ctx.restore(); }
+  props.couperFaisceaux(true);
+  try { scene.avecLift(lift + rows.solAt(v), () => dessin(du, v)); } finally { props.couperFaisceaux(false); ctx.restore(); }
 }
 
 // --- LES EXPLOSIONS DU TURBO -------------------------------------------------------
@@ -812,7 +814,8 @@ function dessinerEjecte(ej, K, tm, dessin) {
 // joueur saute : l'obstacle part en l'air, une boule de feu, une gerbe de débris.
 const eclats = [], boules = [];
 const COULEURS_ECLATS = ["#fff4c0", "#ffcf2e", "#ff8a2e", "#e13e26", "#f4efe4", "#3a3a40"];
-const MOTS_BOUM = ["BOUM !", "BAM !", "PAF !", "CRAC !", "BADABOUM !"];
+// Plus d'onomatopées écrites (« BOUM ! », « PAF ! », « TURBO ! ») depuis le
+// 15 novembre 2026 : « on veut juste l'animation, pas le texte ».
 const PORTEE_SOUFFLE = 2.6; // rangées devant le vélo
 let motBoum = 0, nbExplosions = 0;
 function exploser(r, kind, now) {
@@ -821,18 +824,18 @@ function exploser(r, kind, now) {
   const vit = speed * (window.CONFIG.laitVitesse || 1.2);
   const v = poserEjecte(r, now, vit * 0.85);
   const K = rows.KINDS[kind], h = rows.solAt(v) + (K.bas || 0) + (K.h || 1) / 2;
-  const n = MOUVEMENT_REDUIT ? 8 : 26;
+  const n = MOUVEMENT_REDUIT ? 6 : 14;
   for (let i = 0; i < n && eclats.length < 170; i++) {
     eclats.push({
-      u: (Math.random() - 0.5) * 1.4, v, h,
-      vu: (Math.random() - 0.5) * 5, vv: vit * (0.35 + Math.random() * 0.95), vh: 3 + Math.random() * 9,
+      u: (Math.random() - 0.5) * 0.9, v, h,
+      vu: (Math.random() - 0.5) * 3, vv: vit * (0.35 + Math.random() * 0.7), vh: 2 + Math.random() * 5,
       rot: Math.random() * 6, vrot: (Math.random() - 0.5) * 18,
-      taille: 0.07 + Math.random() * 0.17, couleur: COULEURS_ECLATS[i % COULEURS_ECLATS.length], age: 0, vie: 0.7 + Math.random() * 0.5,
+      taille: 0.05 + Math.random() * 0.09, couleur: COULEURS_ECLATS[i % COULEURS_ECLATS.length], age: 0, vie: 0.5 + Math.random() * 0.35,
     });
   }
-  boules.push({ v, h, vit: vit * 0.85, age: 0, mot: MOTS_BOUM[motBoum++ % MOTS_BOUM.length] });
+  boules.push({ v, h, vit: vit * 0.85, age: 0 });
   bruitages.jouer("explosion", { prioritaire: true, pan: 0.1 });
-  triggerShake(9, 0.35);
+  triggerShake(5, 0.25);
   vibrer(45);
 }
 // Le souffle : tout obstacle qui arrive à portée du vélo pendant le turbo.
@@ -870,21 +873,20 @@ function dessinerExplosions() {
   const K = scene.scale();
   for (const b of boules) {
     const p = scene.project(0, b.v, b.h);
-    // Le mot, gros, sur l'explosion : il claque puis monte.
-    const ageMot = Math.min(1, b.age / 0.1);
-    // 19 px au minimum : en dessous de 18,66 px, WCAG demande 4,5:1 à un texte
-    // gras, et le jaune sur la boule de feu tombait à 4,32:1. Au-dessus, c'est
-    // un GRAND texte, seuil 3:1 — et il est cerné de noir.
-    const tailleMot = Math.max(19, K * (0.55 + 0.75 * ageMot));
-    ctx.save();
-    ctx.font = `900 ${Math.round(tailleMot)}px "Helvetica Neue", Helvetica, Arial, sans-serif`;
-    ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.lineJoin = "round";
-    ctx.lineWidth = Math.max(3, tailleMot * 0.18); ctx.strokeStyle = "#0d0d10"; ctx.fillStyle = "#ffcf2e";
-    const yMot = p.y - K * (1.1 + b.age * 1.6);
-    ctx.strokeText(b.mot, p.x, yMot); ctx.fillText(b.mot, p.x, yMot);
-    ctx.restore();
-    if (b.age > 0.42) continue;
-    const a = b.age / 0.42, R = K * (0.7 + 2.2 * Math.sqrt(a)), f = 1 - a;
+    // ⚠️ Taille revue le 15 novembre 2026 (« l'animation est beaucoup trop
+    // grosse par rapport aux éléments ») : la boule montait à 2,9 unités de
+    // rayon — trois obstacles de large. Elle reste maintenant à l'échelle de
+    // ce qui explose (≈ 1,2 unité au plus).
+    if (b.age > 0.36) continue;
+    const a = b.age / 0.36, f = 1 - a;
+    const R = K * (b.onde ? 0.5 + 1.1 * Math.sqrt(a) : 0.3 + 0.9 * Math.sqrt(a));
+    if (b.onde) {
+      // Le lait bu : une onde BLANCHE, pas une explosion (rien n'explose).
+      ctx.strokeStyle = `rgba(255,255,255,${0.9 * f})`;
+      ctx.lineWidth = Math.max(1.5, K * 0.16 * f);
+      ctx.beginPath(); ctx.arc(p.x, p.y, R, 0, Math.PI * 2); ctx.stroke();
+      continue;
+    }
     const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, R);
     g.addColorStop(0, `rgba(255,252,225,${f})`);
     g.addColorStop(0.35, `rgba(255,190,60,${0.9 * f})`);
@@ -892,8 +894,8 @@ function dessinerExplosions() {
     g.addColorStop(1, "rgba(120,30,20,0)");
     ctx.fillStyle = g;
     ctx.beginPath(); ctx.arc(p.x, p.y, R, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = `rgba(255,255,255,${0.85 * f})`;
-    ctx.lineWidth = Math.max(1, K * 0.14 * f);
+    ctx.strokeStyle = `rgba(255,255,255,${0.7 * f})`;
+    ctx.lineWidth = Math.max(1, K * 0.08 * f);
     ctx.beginPath(); ctx.arc(p.x, p.y, R * 1.15, 0, Math.PI * 2); ctx.stroke();
   }
   for (const e of eclats) {
@@ -1425,26 +1427,39 @@ function halo(r, h, now, coeur, bord) {
   ctx.restore();
 }
 // Le jetpack posé sur la route : il flotte, tourne, brille, et s'annonce.
+// ⚠️ Plus gros et plus voyant depuis le 15 novembre 2026 (« j'ai pris le
+// jetpack, j'avais même pas compris, je suis tombé dessus sans faire exprès ») :
+// ×1,5, halo plus fort, et un anneau qui bat pour dire « attrape-moi ».
+const JET_ECHELLE = 1.5;
 function dessinerJetpackObjet(r, now) {
-  const bas = rows.solAt(r) + 0.35 + Math.sin(now * 3) * 0.08, spin = now * 2.2;
-  const p = scene.project(0, r, bas + 0.8);
-  const R = scene.scale() * 1.6;
+  const J = JET_ECHELLE;
+  const bas = rows.solAt(r) + 0.25 + Math.sin(now * 3) * 0.08, spin = now * 2.2;
+  const p = scene.project(0, r, bas + 0.8 * J);
+  const R = scene.scale() * 2.1;
+  {
+    const k = (now * 1.4) % 1;
+    ctx.save();
+    ctx.strokeStyle = `rgba(255,214,90,${0.9 * (1 - k)})`;
+    ctx.lineWidth = Math.max(2, scene.scale() * 0.12);
+    ctx.beginPath(); ctx.arc(p.x, p.y, scene.scale() * (0.8 + 1.1 * k), 0, Math.PI * 2); ctx.stroke();
+    ctx.restore();
+  }
   ctx.save();
   const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, R);
   g.addColorStop(0, `rgba(255,214,90,${0.55 + 0.15 * Math.sin(now * 6)})`); g.addColorStop(1, "rgba(255,214,90,0)");
   ctx.fillStyle = g; ctx.fillRect(p.x - R, p.y - R, R * 2, R * 2);
   ctx.restore();
-  for (const dx of [-0.17, 0.17]) {
-    scene.drawBoxR(ctx, Math.cos(spin) * dx, r + Math.sin(spin) * dx, 0.26, 0.26, 0.95, "#cfd4dc", bas, spin);
-    scene.drawBoxR(ctx, Math.cos(spin) * dx, r + Math.sin(spin) * dx, 0.24, 0.24, 0.12, "#e13e26", bas + 0.95, spin);
+  for (const dx of [-0.17 * J, 0.17 * J]) {
+    scene.drawBoxR(ctx, Math.cos(spin) * dx, r + Math.sin(spin) * dx, 0.26 * J, 0.26 * J, 0.95 * J, "#cfd4dc", bas, spin);
+    scene.drawBoxR(ctx, Math.cos(spin) * dx, r + Math.sin(spin) * dx, 0.24 * J, 0.24 * J, 0.12 * J, "#e13e26", bas + 0.95 * J, spin);
   }
-  scene.drawBoxR(ctx, 0, r, 0.62, 0.14, 0.1, "#e13e26", bas + 0.6, spin);
-  const t = scene.project(0, r, bas + 1.55);
+  scene.drawBoxR(ctx, 0, r, 0.62 * J, 0.14 * J, 0.1 * J, "#e13e26", bas + 0.6 * J, spin);
+  const t = scene.project(0, r, bas + 1.55 * J);
   ctx.save();
-  ctx.font = `800 ${Math.round(scene.scale() * 0.42)}px "Helvetica Neue", Helvetica, Arial, sans-serif`;
+  ctx.font = `900 ${Math.max(14, Math.round(scene.scale() * 0.5))}px "Helvetica Neue", Helvetica, Arial, sans-serif`;
   ctx.textAlign = "center"; ctx.textBaseline = "bottom";
-  ctx.lineWidth = 3; ctx.strokeStyle = "rgba(0,0,0,0.6)"; ctx.lineJoin = "round";
-  ctx.strokeText("JETPACK", t.x, t.y); ctx.fillStyle = "#ffcf2e"; ctx.fillText("JETPACK", t.x, t.y);
+  ctx.shadowColor = "rgba(0,0,0,0.88)"; ctx.shadowBlur = 5; ctx.shadowOffsetY = 1;
+  ctx.fillStyle = "#ffcf2e"; ctx.fillText("JETPACK", t.x, t.y);
   ctx.restore();
 }
 
@@ -1810,14 +1825,40 @@ function objetsCyclistes(items, alpha, u, v, jy, pedal, flip, now, tm, tAnim, vc
     }
   } });
 }
+// LE FOND S'EFFACE DERRIÈRE LE JEU (15 novembre 2026 : « il y a beaucoup trop
+// d'éléments au même plan visuellement, il n'y a pas de contraste, on comprend
+// même pas »). Maisons, arbres, montagnes et ciel étaient peints avec la même
+// netteté que les obstacles. Une PERSPECTIVE ATMOSPHÉRIQUE les recule : une
+// fois tout le décor du fond peint, un voile de brume passe dessus — clair le
+// jour, bleu nuit la nuit — et seulement ENSUITE viennent la route, ce qui y
+// roule et le joueur, eux à pleine netteté. Un seul aplat par image.
+// ⚠️ Le seuil laisse passer le fond des halles (rampe, plancher : on roule
+// dessus) — il est à ROAD_HALF + 0,5, en deçà de la limite.
+const VOILE_U = scene.ROAD_HALF + 1.0;
+const VOILE_JOUR = [238, 234, 226], VOILE_NUIT = [18, 22, 44];
+function voilerLeFond() {
+  const n = scene.getNight();
+  const c = VOILE_JOUR.map((x, i) => Math.round(x + (VOILE_NUIT[i] - x) * n));
+  const a = 0.42 - 0.1 * n;
+  const y = scene.project(VOILE_U, scene.getVCentre(), 0).y;
+  // Un aplat simple (un dégradé plein écran coûtait ~0,3 ms à CPU ×4).
+  ctx.save();
+  ctx.fillStyle = `rgba(${c[0]},${c[1]},${c[2]},${a})`;
+  ctx.fillRect(0, 0, width, y);
+  ctx.restore();
+}
 function peindreObjets(items) {
   items.sort((a, b) => b.d - a.d);
+  const dVoile = scene.depth(VOILE_U, scene.getVCentre());
+  let voile = !gameStarted; // le menu garde son décor tel quel
   for (const it of items) {
+    if (!voile && it.d < dVoile) { voile = true; voilerLeFond(); }
     // Un objet qui plante ne doit emporter ni l'image ni l'état du canvas.
     // Tout ce qui n'est pas décor reste ÉCLAIRÉ la nuit : un obstacle invisible
     // dans le noir tue sans prévenir.
     try { if (it.decor) it.draw(); else scene.eclaire(it.draw); } catch (e) { if (!rendusRates.has(String(e))) { rendusRates.add(String(e)); console.error("rendu d'objet :", e); } ctx.setTransform(dprCourant, 0, 0, dprCourant, 0, 0); ctx.globalAlpha = 1; }
   }
+  if (!voile) voilerLeFond();
 }
 // Étincelles, halos des lampadaires, brume, météo, panneaux d'alerte, turbo.
 // Renvoie le niveau de nuit (affiché par le debug).
@@ -1853,6 +1894,7 @@ function effetsDeScene(from, to, tm, tAnim) {
 }
 // Flash de choc, pastilles et popups au-dessus du joueur.
 function messagesSurJoueur(u, v, jy) {
+  bulleTurbo(u, v, jy);
   if (damageFlash > 0) {
     ctx.fillStyle = `rgba(225, 62, 38, ${0.35 * damageFlash})`;
     ctx.fillRect(0, 0, width, height);
@@ -1876,13 +1918,48 @@ function messagesSurJoueur(u, v, jy) {
       // texte au sens de WCAG (seuil 3:1 au lieu de 4,5:1), et le jaune des
       // pièces sur un décor clair ne tenait pas les 4,5 (mesuré 3,77:1).
       ctx.font = `900 19px "Helvetica Neue", Helvetica, Arial, sans-serif`;
-      ctx.lineWidth = 4; ctx.strokeStyle = "rgba(0,0,0,0.6)"; ctx.lineJoin = "round";
-      ctx.strokeText(pop.texte, g.x, base - t * 46 - pop.decalage);
+      // Ombre douce, plus de contour (15 novembre 2026, même règle que le HUD).
+      ctx.shadowColor = "rgba(0,0,0,0.9)"; ctx.shadowBlur = 4; ctx.shadowOffsetY = 1;
       ctx.fillStyle = pop.couleur;
+      // Ombre doublée (hud.ombreSeule) : une seule ombre floue laissait le
+      // bord des lettres jaunes sur un ciel clair.
+      hud.ombreSeule(ctx, pop.texte, g.x, base - t * 46 - pop.decalage);
       ctx.fillText(pop.texte, g.x, base - t * 46 - pop.decalage);
     }
     ctx.restore();
   }
+}
+// LE TURBO SE VOIT (15 novembre 2026 : « on comprend pas très bien le mode
+// Turbo, il faudra une animation qui permette de comprendre qu'il est
+// activé »). Le lait bu enveloppe le cycliste d'une BULLE blanche qui
+// pulse — l'image de l'invincibilité dans tous les runners — et un anneau
+// autour d'elle se vide en 5 s : on voit qu'on est protégé, et combien de
+// temps il reste. Rien d'écrit.
+function bulleTurbo(u, v, jy) {
+  if (!(game.turbo > 0) || game.ended) return;
+  const duree = window.CONFIG.laitDureeS || 5, reste = Math.max(0, Math.min(1, game.turbo / duree));
+  const K = scene.scale(), c = scene.project(u, v, jy + RIDER_HEIGHT * 0.5);
+  const t = game.turbo; // le temps du jeu, pas l'horloge murale : même rendu au pas à pas
+  const pulse = MOUVEMENT_REDUIT ? 0 : Math.sin(t * 10) * 0.04;
+  const R = K * (1.15 + pulse);
+  // Elle clignote dans la dernière seconde : le turbo va finir.
+  const fin = game.turbo < 1 && !MOUVEMENT_REDUIT ? 0.55 + 0.45 * Math.abs(Math.sin(t * 12)) : 1;
+  ctx.save();
+  ctx.globalAlpha = fin;
+  const g = ctx.createRadialGradient(c.x, c.y, R * 0.55, c.x, c.y, R);
+  g.addColorStop(0, "rgba(255,255,255,0)");
+  g.addColorStop(0.75, "rgba(255,255,255,0.18)");
+  g.addColorStop(1, "rgba(255,255,255,0.5)");
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.arc(c.x, c.y, R, 0, Math.PI * 2); ctx.fill();
+  // L'anneau du temps qui reste : la piste sombre, puis le blanc qui se vide.
+  const ep = Math.max(3, K * 0.11);
+  ctx.lineCap = "round";
+  ctx.strokeStyle = "rgba(13,13,16,0.35)"; ctx.lineWidth = ep;
+  ctx.beginPath(); ctx.arc(c.x, c.y, R + ep, 0, Math.PI * 2); ctx.stroke();
+  ctx.strokeStyle = "#ffffff";
+  ctx.beginPath(); ctx.arc(c.x, c.y, R + ep, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * reste); ctx.stroke();
+  ctx.restore();
 }
 // HUD, décompte, tuto, doigt qui tape, projecteur, bandeau, écran « terminé ».
 function interfaceDeCourse(now, tAnim) {
@@ -1904,13 +1981,19 @@ function interfaceDeCourse(now, tAnim) {
     ctx.restore();
   }
   if (gameStarted && !game.ended) {
-    if (now < COUNT_IN_GO_LINGER_S) hud.renderCountIn(ctx, width, height, now, clock.beatPeriod, COUNT_IN_BEATS, COUNT_IN_GO_LINGER_S, !game.sonAnnonce);
+    if (now < COUNT_IN_GO_LINGER_S) hud.renderCountIn(ctx, width, height, now, clock.beatPeriod, COUNT_IN_BEATS, COUNT_IN_GO_LINGER_S);
     hud.renderTuto(ctx, width, height, conseilVue());
   }
   // Le doigt qui tape : 3 premières parties, jusqu'au premier saut.
   // Après le GO seulement, et jamais par-dessus une consigne ou un projecteur :
   // une seule indication à la fois.
   if (gameStarted && !game.ended && game.tapHint && now > COUNT_IN_GO_LINGER_S && !conseilVue() && !projo.type) hud.renderTapHint(ctx, width, height, tAnim, Math.min(1, (now - COUNT_IN_GO_LINGER_S) * 2));
+  // Jetpack pris : une main qui RESTE appuyée montre le geste, jusqu'à ce que
+  // le joueur appuie (ou 4 s). Le texte de la pastille ne suffisait pas.
+  if (gameStarted && !game.ended && jet.reste > 0 && !jet.appuiVu) {
+    const ecoule = (window.CONFIG.jetpackDureeS || 10) - jet.reste;
+    if (ecoule < 4) hud.renderHoldHint(ctx, width, height, tAnim, Math.min(1, ecoule * 4, (4 - ecoule) * 2));
+  }
   if (projo.type) hud.renderProjecteur(ctx, width, height, projo, PROJECTEURS[projo.type], tAnim);
   if (gameStarted && hudAlpha > 0.001 && banner) {
     ctx.save();

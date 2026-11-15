@@ -1568,7 +1568,14 @@ function pasteque(ctx, u, v, h) {
   for (const dv of [0.08, 0.22, 0.36]) drawBox(ctx, u - 0.005, v + dv, 0.41, 0.05, 0.345, "#1c4a1c", h);
   drawBox(ctx, u + 0.05, v + 0.06, 0.3, 0.38, 0.06, "#3f8a3a", h + 0.34);
 }
-// Le contenu d'une cagette (dessus visible d'en haut), en petits cubes.
+// Le contenu d'une cagette (dessus visible d'en haut).
+// ⚠️ SIMPLIFIÉ le 15 novembre 2026 (« simplifier les décors en arrière-plan ») :
+// un cube par fruit, sur deux étages, faisait des centaines de boîtes par
+// étal — mesuré au profileur, les étals du marché prenaient 35 % d'une image
+// à 30 s, et passaient le budget de 8,3 ms à CPU ×4 dès que le turbo ne
+// vidait pas la route. Désormais : un TAS de la couleur du produit, et
+// quelques fruits dessus pour qu'on le reconnaisse. Lu de loin, sous le voile
+// du fond, c'est la même chose.
 function produit(ctx, sorte, u, v, du, dv, h, graine) {
   const g = (k) => hash(graine * 13 + k * 7);
   if (sorte === "pasteque") { pasteque(ctx, u, v + dv * 0.1, h - 0.1); return; }
@@ -1577,12 +1584,11 @@ function produit(ctx, sorte, u, v, du, dv, h, graine) {
     drawBox(ctx, u, v + 0.05, du, dv - 0.1, 0.12, "#2f6a2a", h);
     drawBox(ctx, u + 0.03, v + 0.08, du - 0.06, dv - 0.16, 0.04, "#f2f0d8", h + 0.12);
     drawBox(ctx, u + 0.05, v + 0.1, du - 0.1, dv - 0.2, 0.04, "#e8364a", h + 0.15);
-    for (let k = 0; k < 6; k++) drawBox(ctx, u + 0.08 + g(k) * (du - 0.2), v + 0.14 + g(k + 9) * (dv - 0.3), 0.03, 0.04, 0.01, "#1a1a1e", h + 0.19);
     return;
   }
   if (sorte === "courgette" || sorte === "poireau" || sorte === "banane") {
     // Des légumes longs, couchés en travers de la cagette.
-    const n = sorte === "banane" ? 4 : 5;
+    const n = 2;
     for (let k = 0; k < n; k++) {
       const vv = v + (k + 0.15) * (dv / n);
       if (sorte === "poireau") { drawBox(ctx, u, vv, du * 0.55, dv / n * 0.7, 0.09, "#f2efe0", h); drawBox(ctx, u + du * 0.55, vv, du * 0.45, dv / n * 0.7, 0.1, "#3f8a3a", h); }
@@ -1597,9 +1603,8 @@ function produit(ctx, sorte, u, v, du, dv, h, graine) {
   // Des fruits ronds en tas : un cube par fruit, deux étages.
   const COUL = { tomate: ["#e13e26", "#c8301c"], orange: ["#f28a1c", "#e8781a"], pomme: ["#d8352a", "#b82a22"], pommeVerte: ["#8ac43a", "#76b02e"], fraise: ["#e8283a", "#c81e2e"], salade: ["#8ac43a", "#a8d85a"], aubergine: ["#5a2a6a", "#4a1f5a"] }[sorte] || ["#e13e26", "#c8301c"];
   const t = sorte === "salade" ? 0.26 : sorte === "aubergine" ? 0.16 : sorte === "fraise" ? 0.1 : 0.14;
-  const nu = Math.max(1, Math.floor(du / (t + 0.02))), nv = Math.max(1, Math.floor(dv / (t + 0.02)));
-  for (let a = 0; a < nu; a++) for (let b = 0; b < nv; b++) drawBox(ctx, u + a * (du / nu), v + b * (dv / nv), t, sorte === "aubergine" ? t * 1.6 : t, t, COUL[(a + b) % 2], h);
-  for (let a = 0; a < nu - 1; a++) for (let b = 0; b < nv - 1; b++) if (g(a * 5 + b) < 0.6) drawBox(ctx, u + (a + 0.5) * (du / nu), v + (b + 0.5) * (dv / nv), t, t, t * 0.9, COUL[(a + b + 1) % 2], h + t * 0.9);
+  drawBox(ctx, u, v, du, dv, t, COUL[0], h);
+  for (let k = 0; k < 3; k++) drawBox(ctx, u + g(k) * (du - t), v + (k + 0.2) * (dv / 3), t, t, t * 0.8, COUL[1], h + t);
 }
 
 // --- Les HALLES DE MARCHÉ ----------------------------------------------------------

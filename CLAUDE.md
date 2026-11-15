@@ -114,14 +114,26 @@ intégré d'Instagram d'abord**, portrait natif.
   dessous de deux ; ×2 en plus au turbo. Jamais de demi-multiplication à l'écran (le boost de
   ligue, lui, reste en pourcentage). Un choc coûte des potes ; seul le joueur meurt.
 - **Brique de lait** : turbo 5 s, invincible, points doublés ; ce qu'on percute est éjecté.
-  Plus grande qu'une pièce, avec un halo qui pulse au rythme du morceau.
+  Plus grande qu'une pièce, avec un halo qui pulse au rythme du morceau. ⚠️ **Une tous les 96
+  rangs** depuis le 15 novembre 2026 (48 avant : « je suis tout le temps invincible »). Le
+  turbo se VOIT : une **bulle blanche** autour du cycliste et un **anneau qui se vide** en 5 s
+  (`bulleTurbo`, main.js). Explosions à la taille de l'objet, **sans onomatopée écrite** (plus
+  de « BOUM ! », « PAF ! », « TURBO ! »). Un véhicule éjecté n'éclaire plus la route
+  (`props.couperFaisceaux`) : ses phares balayaient l'écran pendant le salto.
+- **Espacement** : `ESPACE_EN_PLUS` (3 rangées) s'ajoute partout à l'écart physique, et le mou
+  aléatoire ne descend plus sous 3 (15 novembre 2026, « espace beaucoup plus les éléments »).
+- **Petites bêtes et bottes de foin agrandies** (15 novembre 2026) : chat, chien, botte ×1,3,
+  poule ×1,15. Toutes restent au TAP (`node outils/familles.mjs`) — au-delà, la poule passait à
+  l'appui maintenu.
 - ⚠️ **Aucun conflit entre objets et récompenses** : aucune pièce ni brique de lait dans un
   obstacle, ni sur le passage d'un véhicule venu d'en face pendant qu'il est à l'écran
   (`balayageVisible`, rows.js), et **aucune pièce à moins de 3 rangées d'une brique de lait**
   (`LAIT_ISOLE` : on cherche une place loin des arcs, sinon les pièces voisines s'effacent — le
-  quota de 15 briques reste le même pour toutes les graines). Gardé par le test `conflits`.
+  quota de briques reste le même pour toutes les graines). Gardé par le test `conflits`.
 - **Jetpack** une partie sur cinq, posé hors du générateur (une course à jetpack peut dépasser
-  le score parfait).
+  le score parfait). ×1,5 et un anneau qui bat depuis le 15 novembre 2026 (« je suis tombé
+  dessus sans faire exprès ») ; après la prise, une **main qui reste appuyée**
+  (`hud.renderHoldHint`) jusqu'au premier appui.
 
 ### Le temps
 - ⚠️ **Deux horloges** : `clock.now()` = le morceau (chrono, nuit, soleil, fin) ; `tMonde()` =
@@ -187,7 +199,8 @@ intégré d'Instagram d'abord**, portrait natif.
 ### Menus, ligues, conversion (`screens.js`, `net.js`)
 - Premier passage : pseudo + **Insta OBLIGATOIRE** (c'est par là qu'on prévient la ligue
   gagnante), email et village facultatifs, case newsletter séparée, lien vers le règlement →
-  mon cycliste (homme/femme, VTT / Grand Bi / vélo enfant, maillot, chapeau) → ma ligue (créer
+  mon cycliste (homme/femme, VTT / Grand Bi / vélo enfant, maillot, chapeau — casquette, bob ou
+  paille, **plus de « aucun »** depuis le 15 novembre 2026) → ma ligue (créer
   avec un nom libre, rejoindre, ou jouer sans). Ensuite le cycliste est l'accueil. Un habitué
   sans Insta repasse UNE fois par l'étape 1.
 - **Fiche de contact** (`net.enregistrerJoueur`, table `joueurs`) : elle ne part que quand elle
@@ -195,7 +208,8 @@ intégré d'Instagram d'abord**, portrait natif.
   AUCUNE règle de lecture : les contacts sont illisibles avec la clé publique, ils se lisent
   dans le Table editor (vue `contacts`).
 - **Ligues** : 21 membres maximum, complétées par 3 bots ; **boost de ligue** (+10 % par pote
-  qui a joué au moins 30 s, jusqu'à ×3) ; relais de ligue ; sprint du dimanche ; `liguesParVague` (0 = aucune
+  qui a joué au moins 30 s, jusqu'à ×3) ; relais de ligue ; sprint du dimanche **coupé**
+  (`config.sprintDimanche: false`, 15 novembre 2026) ; `liguesParVague` (0 = aucune
   limite de création, indispensable pendant le concours). Partage : natif d'abord, tiroir maison si
   absent (Instagram sur Android).
 - **LE CONCOURS** (`supabase/CONCOURS-A-COLLER.sql` puis `supabase/AVANT-LE-LANCEMENT.sql`, qui
@@ -306,9 +320,22 @@ intégré d'Instagram d'abord**, portrait natif.
 - **Cercle sur le danger** (`hud.renderCible`, `main.cibleConseil`) : pendant une consigne de
   geste (tap / appui / double), le reste de l'écran s'assombrit en fondu et un anneau se pose sur
   ce qu'il faut franchir. Distinct du projecteur (qui gèle le monde, une fois par joueur).
-- **Rappel de ligue à CHAQUE départ** : « Plus tu as de potes dans ta ligue, plus tu as de chances
-  de faire un meilleur score » sur l'écran de chargement et pendant le décompte 3-2-1 (premier
-  lancement comme REJOUER).
+- ⚠️ **ALLÈGEMENT DU 15 NOVEMBRE 2026** (retours de test sur iPhone 16) — retirés, ne pas les
+  remettre sans redemander : le rappel « Plus tu as de potes… » (chargement ET décompte), le
+  bandeau « Monte le son » du décompte, le texte sous le doigt du départ, l'encart jaune « TES
+  POINTS +N % » de l'écran du cycliste, le bouton « L'album est sorti » du menu, le sprint du
+  dimanche, et sur l'écran de fin la ligne « Meilleur score · N potes maximum » et le rappel du
+  boost. Le décompte dit **« 3, 2, 1, C'EST PARTI ! »** et rien d'autre. « Comment jouer » n'a
+  plus que **deux cartes** : « Monte le son », puis « Joue avec tes potes », refaite en
+  animation : un score de 1 000, une invitation part, un vrai pote rejoint la ligue, +10 %,
+  puis la même chose en accéléré jusqu'à +50 % — des joueurs croyaient que les cyclistes DE LA
+  COURSE faisaient les points. Sur l'écran de fin, « Ligue CODE · copier » passe **sous** le
+  classement.
+- **Le fond s'efface derrière le jeu** (`voilerLeFond`, main.js) : une fois le décor du fond
+  peint (au-delà de `ROAD_HALF + 1`), un voile clair le jour, bleu nuit la nuit, passe dessus ;
+  la route, ce qui y roule et le joueur viennent APRÈS, nets. Le fond des halles (rampe,
+  plancher) reste en deçà du seuil : on roule dessus. Les **étals du marché** sont simplifiés
+  (un tas par cagette au lieu d'un cube par fruit) : ils prenaient 35 % d'une image.
 - **Contraste** : pièces cerclées de blanc PUIS de sombre, sol du blé / sable / Sud plus sourds,
   classe CSS `plage` (saturation 0,98, contraste 1,1) sur le canvas pendant la plage. Un
   premier plan tout en jaune clair noyait les pièces, les véhicules et les mouettes.
@@ -362,16 +389,23 @@ chaque choc payé vibre.
   passe axe-core sur l'écran de fin, les classements, l'invitation et le règlement.
   `--dom` pour ne faire que le DOM, `--detail` pour tout lister.
   - ⚠️ **Le bandeau est écrit À MÊME LE CIEL** : le score noir mesurait 2,38:1 au-dessus d'une
-    montagne (seuil 3:1). Aucune couleur fixe ne peut marcher. Tous les textes du bandeau
-    passent donc par `poser()` (hud.js), qui les cerne de la couleur OPPOSÉE. Un texte cerné se
-    lit par le meilleur des deux, sa couleur ou son liseré, et ça se calcule : la paire
-    #0d0d10 / blanc ne descend jamais sous **4,40:1**, quel que soit le fond (4,58:1 avec du
-    noir pur). Sur une course entière, le 5e percentile mesuré ne passe jamais sous 4,5.
-    Ne pas retirer ce liseré « pour faire plus propre ».
-  - **#d93820 porte du blanc, #e13e26 non** (4,63:1 contre 4,25:1) : `ROUGE_TXT` est réservé aux
-    pastilles écrites (×N en turbo, onglet de tuto) ; le rouge peint du décor reste #e13e26.
-  - Un texte **cerné** se juge sur le meilleur des deux, sa couleur ou son liseré. Un liseré
-    translucide ne compte pas.
+    montagne (seuil 3:1). Aucune couleur fixe ne peut marcher. Le 13 novembre, un LISERÉ de la
+    couleur opposée réglait ça. ⚠️ **Retiré le 15 novembre 2026, demandé par l'artiste** :
+    « l'accessibilité est beaucoup trop augmentée, c'est pas beau du tout. Je préfère une ombre
+    à la place, mais pas de contour autour du texte. » **Plus aucun `strokeText` sur du texte.**
+    `poser()` (hud.js) pose un HALO DOUX de la couleur opposée, doublé sous 20 px par
+    `ombreSeule()` (l'ombre seule, la lettre envoyée hors de l'écran) ; le décompte a une
+    ombre portée sous le mot ; les popups, une ombre doublée. Mesuré : 0 texte illisible sur
+    la course entière — mais c'est moins GARANTI qu'un liseré (une ombre floue s'efface au
+    bord des lettres). Si un texte repasse sous le seuil, densifier son ombre, jamais
+    remettre un contour.
+  - Le test sait juger une ombre : il dessine l'ombre seule, puis la lettre seule, et mesure
+    chaque pixel d'encre contre le fond TEL QUE L'OMBRE LE LAISSE.
+  - **`ROUGE_TXT` = #c9341d** (5,2:1 sous du blanc ; #d93820 tombait à 4,35:1 dans un onglet en
+    fondu) : réservé aux pastilles écrites ; le rouge peint du décor reste #e13e26.
+  - ⚠️ **Le test `perf` mesurait une image de TURBO** (scène allégée par les explosions) : avec
+    deux fois moins de lait, il tombe sur une image normale à 30 s — et la version en ligne y
+    coûtait déjà 8,0–8,3 ms, au ras du seuil. Ramenée à ~6,7 ms en simplifiant les étals.
 
 ## Points ouverts
 

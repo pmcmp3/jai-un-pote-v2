@@ -22,6 +22,16 @@ const WHITE = "#f4efe4", BLACK = "#1a1a1e", PINK = "#f0a0b0", ORANGE = "#e08a2a"
 // `a` court le long du corps (0 = arrière, 1 = tête, vers −v donc vers la
 // gauche de l'écran), `b` en travers, `h` en hauteur. Tout modèle décrit ainsi
 // grandit tout seul quand on change K.long / K.larg / K.h.
+// Les FAISCEAUX des phares sont des aplats posés au sol devant le véhicule.
+// Quand le turbo l'éjecte et le fait tourner en l'air, l'aplat tournait avec
+// lui et balayait l'écran comme un trait de lumière (15 novembre 2026 : « il
+// faudrait que, quand ils font un triple salto, il n'y ait pas le trait des
+// phares qui suit »). Un véhicule en vol n'éclaire plus la route : main.js
+// coupe les faisceaux le temps de dessiner un éjecté.
+let faisceauxCoupes = false;
+export function couperFaisceaux(oui) { faisceauxCoupes = !!oui; }
+function faisceau(ctx, ...args) { if (!faisceauxCoupes) drawFlat(ctx, ...args); }
+
 function corps(ctx, uC, r, K) {
   return (a, b, da, db, h, col, lift = 0) =>
     drawBox(ctx, uC - K.larg / 2 + b * K.larg, r + K.long / 2 - (a + da) * K.long, db * K.larg, da * K.long, h * K.h, col, lift * K.h);
@@ -55,7 +65,7 @@ function drawTracteur(ctx, K, u, v, dir, t) {
     const a = 0.4 * Math.min(1, (getNight() - 0.2) / 0.4);
     ctx.save(); ctx.globalAlpha *= a;
     const fx = dir > 0 ? u + L / 2 : u - L / 2 - 3.2;
-    drawFlat(ctx, fx, v - 1.0, 3.2, 2.0, "#fff2b0", true);
+    faisceau(ctx, fx, v - 1.0, 3.2, 2.0, "#fff2b0", true);
     ctx.restore();
   }
   // Grandes roues arrière (1,6 m de diamètre), petites roues avant.
@@ -115,7 +125,7 @@ export function drawTracteurRoute(ctx, K, uC, v, t, sens = -1) {
     bloc(0.8, 0.05, 0.48, 0.1, 0.36, 0.64, "#3a3a40");       // pot d'échappement
     const nuit = getNight() > 0.2;
     for (const b of [0.18, 0.7]) bloc(0.97, 0.03, b, 0.12, 0.08, 0.6, nuit ? "#fff6c8" : "#e8e2c8"); // phares
-    if (nuit) { ctx.save(); ctx.globalAlpha *= 0.45; drawFlat(ctx, x - 0.1, sens > 0 ? v + L / 2 : v - L / 2 - 3.6, W + 0.2, 3.6, "#fff2b0", true); ctx.restore(); }
+    if (nuit) { ctx.save(); ctx.globalAlpha *= 0.45; faisceau(ctx, x - 0.1, sens > 0 ? v + L / 2 : v - L / 2 - 3.6, W + 0.2, 3.6, "#fff2b0", true); ctx.restore(); }
   });
 }
 
@@ -189,7 +199,7 @@ export function drawBus(ctx, K, uC, v, t) {
     const nuit = getNight() > 0.2;
     for (const b of [0.08, 0.76]) bloc(-0.02, 0.03, b, 0.16, 0.08, 0.3, nuit ? "#fff6c8" : "#f4eed6");
     ctx.save(); ctx.globalAlpha *= nuit ? 0.55 : 0.22;
-    drawFlat(ctx, x - 0.1, av - 4.2, W + 0.2, 4.2, "#fff2b0", true);
+    faisceau(ctx, x - 0.1, av - 4.2, W + 0.2, 4.2, "#fff2b0", true);
     ctx.restore();
   });
 }
@@ -232,7 +242,7 @@ export function drawChasseNeige(ctx, K, uC, v, t) {
     const nuit = getNight() > 0.2;
     for (const b of [0.1, 0.74]) bloc(0.07, 0.03, b, 0.16, 0.07, 0.42, nuit ? "#fff6c8" : "#f4eed6");
     ctx.save(); ctx.globalAlpha *= nuit ? 0.55 : 0.2;
-    drawFlat(ctx, x - 0.1, av - 4.2, W + 0.2, 4.2, "#fff2b0", true);
+    faisceau(ctx, x - 0.1, av - 4.2, W + 0.2, 4.2, "#fff2b0", true);
     ctx.restore();
   });
 }
@@ -432,7 +442,7 @@ function voitureNue(ctx, K, uCenter, v, sens, t, couleur = null) {
   }
   if (sens < 0) {
     ctx.save(); ctx.globalAlpha *= nuit ? 0.55 : 0.22;
-    drawFlat(ctx, x - 0.1, v - L / 2 - 4.2, Wd + 0.2, 4.2, "#fff2b0", true);
+    faisceau(ctx, x - 0.1, v - L / 2 - 4.2, Wd + 0.2, 4.2, "#fff2b0", true);
     ctx.restore();
   }
 }
@@ -776,7 +786,7 @@ export function drawPouleJetee(ctx, u, v, t) {
 }
 // Poule en cubes, centrée en (u, v), posée à `lift`, tête du côté `sens`.
 function poule(ctx, u, v, lift, t, sens) {
-  const S = 1.4; // même agrandissement que la poule posée (rows.KINDS)
+  const S = 1.61; // même agrandissement que la poule posée (rows.KINDS, ×1,15 le 15 novembre 2026)
   const flap = Math.abs(Math.sin(t * 20)) * 0.14 * S;
   const x = u - 0.3 * S, y = v - 0.32 * S;
   const tete = sens < 0 ? y - 0.02 * S : y + 0.42 * S;

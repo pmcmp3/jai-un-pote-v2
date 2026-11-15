@@ -155,7 +155,7 @@ export function getSource() { return lsGet(CLE_SOURCE) || null; }
 // Skin du joueur (personnalisation, étape 3 du menu).
 let skin = null;
 export function getSkin() {
-  if (!skin) { try { skin = { ...SKIN_DEFAUT, ...(JSON.parse(lsGet(CLE_SKIN) || "{}")) }; } catch (e) { skin = { ...SKIN_DEFAUT }; } if (skin.velo === "roller") skin.velo = "enfant"; }
+  if (!skin) { try { skin = { ...SKIN_DEFAUT, ...(JSON.parse(lsGet(CLE_SKIN) || "{}")) }; } catch (e) { skin = { ...SKIN_DEFAUT }; } if (skin.velo === "roller") skin.velo = "enfant"; if (!CHAPEAUX.includes(skin.chapeau)) skin.chapeau = SKIN_DEFAUT.chapeau; }
   return skin;
 }
 function setSkin(cle, val) { getSkin()[cle] = val; lsSet(CLE_SKIN, JSON.stringify(skin)); majSkinUi(); }
@@ -223,7 +223,7 @@ function majBoutonJouer() {
   playButton.disabled = getPseudo().length === 0 || (!premier && !loadingDone);
   const b = $("boost-ligue"), liens = $("step3-links");
   if (liens) liens.classList.toggle("hidden", premier);
-  if (b && premier) b.classList.add("hidden"); else afficherBoost();
+  if (b) b.classList.add("hidden");
 }
 export function stepCourante() { return Number(onboarding.dataset.step) || 1; }
 function enregistrerProfil() {
@@ -436,7 +436,7 @@ function setView(view) {
   onboardingEl.classList.toggle("active", view === "onboarding");
   endScreenEl.classList.toggle("active", view === "end");
   overlay.classList.toggle("end-view", view === "end");
-  ctaLink.style.display = view === "onboarding" ? "" : "none";
+  ctaLink.style.display = "none"; // « L'album est sorti » retiré du menu le 15 novembre 2026
   requestAnimationFrame(centrerMenu);
 }
 
@@ -720,7 +720,11 @@ function afficherBoost() {
   if (!el) return;
   // Sans base Supabase, pas de ligue : le boost ne peut compter personne
   // (sauf en ligue démo).
-  el.classList.toggle("hidden", (!net.estConfigure() && !demo) || enBeta());
+  // ⚠️ Retiré de l'écran du cycliste le 15 novembre 2026 (« juste, les gens
+  // font leur cycliste ») : la règle s'explique sur la carte « Joue avec tes
+  // potes » au lancement. Le calcul du boost, lui, ne change pas.
+  el.classList.add("hidden");
+  return;
   const C = window.CONFIG, pct = Math.round((C.boostLigueParPote || 0.1) * 100);
   const n = ligue && !ligue.enAttente ? ligue.membres.filter((m) => m.nom !== getPseudo()).length : 0;
   // Explication en deux lignes, la plus simple possible : le chiffre, puis la règle.
@@ -1379,7 +1383,7 @@ function initLigue() {
 // --- Sprint du dimanche --------------------------------------------------------
 const sprintButton = $("sprint-button"), sprintNote = $("sprint-note");
 function majSprint() {
-  if (enBeta() || !net.estConfigure() || !net.sprintOuvert()) { sprintButton.classList.add("hidden"); sprintNote.classList.add("hidden"); return; }
+  if (!window.CONFIG.sprintDimanche || enBeta() || !net.estConfigure() || !net.sprintOuvert()) { sprintButton.classList.add("hidden"); sprintNote.classList.add("hidden"); return; }
   const fait = lsGet(CLE_SPRINT) === net.jourSprint();
   sprintButton.classList.toggle("hidden", fait);
   sprintNote.classList.remove("hidden");
@@ -1441,17 +1445,21 @@ export function showEndScreen({ metres, potesMax, record, fin, sprint, scoreMax 
     : `<b>+${pct} %</b> de points par pote invité qui joue, plus ${commissionPct()} % de son record`;
   const meilleur = Math.max(getRecord(), Math.floor(metres));
   const mieux = record ? "" : `Meilleur score : ${pts(meilleur)} · tu peux le battre.`;
-  endMax.classList.toggle("hidden", !mieux && !ligneBoost);
-  endMax.innerHTML = [mieux, ligneBoost].filter(Boolean).join("<br>");
+  // ⚠️ Retirées le 15 novembre 2026 (« il faut simplifier beaucoup de
+  // choses ») : ni rappel du boost ni meilleur score sous le chiffre. Le rang
+  // dans la ligue et ce qui manque pour passer devant suffisent.
+  void mieux; void ligneBoost;
+  endMax.classList.add("hidden");
   // Le but : arriver au bout du morceau avec un max de potes.
   const potesTxt = potesMax === 0 ? "0 pote" : `${potesMax} pote${potesMax > 1 ? "s" : ""}`;
   // Sous-titre sobre : record éventuel + nombre maximum de potes. Pas de
   // sticker « record » à part (doublon avec cette ligne, et la place manque
   // sur les iPhone récents).
-  endSub.textContent = record ? `Meilleur score · ${potesTxt} maximum` : fin ? `${potesTxt} maximum` : `Tombé avant la fin · ${potesTxt}`;
+  endSub.textContent = "";
+  endSub.classList.add("hidden");
   endBest.classList.add("hidden");
   $("end-eyebrow").textContent = sprint ? "Sprint du dimanche" : "Ta course";
-  if (sprint) endSub.textContent = `Sprint · ${potesTxt}`;
+  void potesTxt;
   setTimeout(() => { setView("end"); showOverlay(); }, fin ? 1500 : 600);
 }
 
@@ -1575,46 +1583,72 @@ function lireVolume(cle) {
 function ecrireVolume(cle, v) { try { localStorage.setItem(cle, String(v)); } catch (e) { /* stockage indisponible */ } }
 
 // --- Démarrage ---------------------------------------------------------------
-// Explication au lancement, en QUATRE cartes : 1) monte le son ; 2) tape
-// l'écran, pas besoin de glisser ; 3) une partie = un morceau, jusqu'à la
-// ligne d'arrivée ; 4) joue avec tes potes, +10 % par pote. Elle vise ce qui
-// bloque un joueur neuf : glisser au lieu de taper, ne pas savoir que la
-// partie dure le morceau. Un tap passe à l'étape suivante ; après la
-// dernière, la course part toute seule. Le contexte audio est débloqué AVANT,
-// dans le geste du JOUER. 3 premières parties + toujours en ligue démo.
+// Explication au lancement, en DEUX cartes depuis le 15 novembre 2026 :
+// 1) monte le son ; 2) joue avec tes potes. « 1 tap = 1 saut » et « Arrivée »
+// sont parties (« c'est logique, tu peux l'enlever »). Un tap passe à l'étape
+// suivante ; après la dernière, la course part toute seule. Le contexte audio
+// est débloqué AVANT, dans le geste du JOUER. 3 premières parties + toujours
+// en ligue démo.
 // ⚠️ Les cartes se reconnaissent à leur NOM (data-e), pas à leur rang.
 // Durées par carte :
-const EXPL_DUREES = { son: 5.0, tap: 4.2, arrivee: 3.8, potes: 6.4 };
+const EXPL_DUREES = { son: 5.0, potes: 7.6 };
 // « Monte le son » reste ~5 s avant le départ : deux bruitages pour régler le
-// volume. Le décompte ne le répète pas.
+// volume.
 let annonceSon = false;
 export function consommerAnnonceSon() { const a = annonceSon; annonceSon = false; return a; }
 function montrerExplication(ensuite) {
   const box = $("explication");
   if (!box || (!demo && getParties() >= 3) || enBeta()) { ensuite(); return; }
   const etapes = [...box.querySelectorAll(".expl-etape")];
-  const mult = $("expl-mult"), barre = box.querySelector("#expl-barre i"), eyebrow = $("expl-eyebrow");
+  const barre = box.querySelector("#expl-barre i"), eyebrow = $("expl-eyebrow");
   let minuteurs = [], idx = -1, fini = false, rafPeloton = 0;
   const vider = () => { minuteurs.forEach(clearTimeout); minuteurs = []; cancelAnimationFrame(rafPeloton); };
   const finir = () => { if (fini) return; fini = true; vider(); box.classList.add("hidden"); overlay.classList.remove("estompe"); ensuite(); };
-  // Le peloton : un pote de plus toutes les 0,7 s, « +10 % » au-dessus de lui.
-  const animerPeloton = () => {
-    const cv = $("expl-peloton"), t0 = performance.now(), arrivees = [];
-    mult.textContent = "+0 %";
-    const boucle = () => {
-      if (fini) return;
-      const t = (performance.now() - t0) / 1000;
-      const voulu = t < 0.5 ? 0 : Math.min(5, 1 + Math.floor((t - 0.5) / 0.7));
-      while (arrivees.length < voulu) {
-        arrivees.push(t);
-        mult.textContent = `+${arrivees.length * 10} %`;
-        mult.classList.remove("pop"); void mult.offsetWidth; mult.classList.add("pop");
+  // « Joue avec tes potes » : un score de 1 000, une invitation part, un vrai
+  // pote rejoint la ligue, le score prend +10 %. Puis la même chose en
+  // accéléré, jusqu'à +50 %. C'est l'INVITATION qui rapporte — pas les
+  // cyclistes de la course, que des joueurs prenaient pour la règle.
+  const ICO_ENV = '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5.5" width="18" height="13" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M3.5 6.5 12 13l8.5-6.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>';
+  const ICO_OK = '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="#0d0d10"/><path d="M7 12.5l3.2 3.2L17 9" fill="none" stroke="#ffcf2e" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  const animerInvitations = () => {
+    const fil = $("expl-fil"), val = $("expl-score-val"), score = $("expl-score"), gain = $("expl-gain");
+    if (!fil || !val) return;
+    fil.textContent = ""; gain.classList.remove("on"); gain.textContent = "";
+    const BASE = 1000, fmt = (n) => Math.round(n).toLocaleString("fr-FR");
+    val.textContent = fmt(BASE);
+    // [pseudo, invitation envoyée à (s), arrivée après (s)] : de plus en plus vite.
+    const potes = [["lea", 0.5, 1.2], ["marius", 2.9, 0.55], ["ines", 3.8, 0.42], ["hugo", 4.5, 0.32], ["nita", 5.05, 0.26]];
+    let affiche = BASE, cible = BASE, t0 = performance.now(), dernier = t0;
+    potes.forEach(([nom, envoi, delai], k) => {
+      minuteurs.push(setTimeout(() => {
+        if (fini) return;
+        const li = document.createElement("li");
+        li.innerHTML = `${ICO_ENV}<span class="txt">Invitation envoyée à @${nom}</span>`;
+        fil.prepend(li);
+        while (fil.children.length > 3) fil.lastChild.remove();
+      }, envoi * 1000));
+      minuteurs.push(setTimeout(() => {
+        if (fini) return;
+        const li = [...fil.children].find((l) => l.textContent.includes(`@${nom}`)) || fil.firstChild;
+        if (li) { li.className = "rejoint"; li.innerHTML = `${ICO_OK}<span class="txt">@${nom} a rejoint ta ligue</span><span class="plus">+10 %</span>`; }
+        cible = BASE * (1 + 0.1 * (k + 1));
+        gain.textContent = `+${(k + 1) * 10} %`;
+        gain.classList.remove("on"); void gain.offsetWidth; gain.classList.add("on");
+        score.classList.remove("pop"); void score.offsetWidth; score.classList.add("pop");
         try { sfx.piece(); } catch (e) { /* pas de son, tant pis */ }
-      }
-      if (cv && deps.dessinerPeloton) deps.dessinerPeloton(cv, t, arrivees);
+      }, (envoi + delai) * 1000));
+    });
+    // Le score MONTE (il ne saute pas) : c'est ce qu'on doit voir.
+    const boucle = (now) => {
+      if (fini) return;
+      const dt = Math.min(0.05, (now - dernier) / 1000); dernier = now;
+      affiche += (cible - affiche) * Math.min(1, dt * 9);
+      if (Math.abs(cible - affiche) < 0.5) affiche = cible;
+      val.textContent = fmt(affiche);
       rafPeloton = requestAnimationFrame(boucle);
     };
-    boucle();
+    void t0;
+    rafPeloton = requestAnimationFrame(boucle);
   };
   const etape = (i) => {
     vider();
@@ -1626,7 +1660,7 @@ function montrerExplication(ensuite) {
     $("expl-passer").textContent = i < etapes.length - 1 ? "Touche pour continuer" : "Touche pour jouer";
     barre.style.transition = "none"; barre.style.width = "0";
     requestAnimationFrame(() => requestAnimationFrame(() => { barre.style.transition = `width ${duree}s linear`; barre.style.width = "100%"; }));
-    if (nom === "potes") animerPeloton();
+    if (nom === "potes") animerInvitations();
     // « Monte le son » : un klaxon puis la sonnette du vélo, les vrais bruitages
     // du jeu (bruitages.js), un peu plus fort qu'en course.
     if (nom === "son") { annonceSon = true; [[300, "klaxon_contresens"], [1300, "sonnette"]].forEach(([ms, son]) => minuteurs.push(setTimeout(() => { try { bruitages.jouer(son, { volume: 1.6, prioritaire: true }); } catch (e) { /* pas de son */ } }, ms))); }

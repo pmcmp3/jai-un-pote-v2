@@ -72,15 +72,20 @@ export const KINDS = {
   // quand le joueur approche, il jette la poule, qui court sur la route vers
   // lui. Mécanique d'une voiture en face (type « contresens »), en tout petit :
   // un tap.
-  poulejetee:  { contresens: true, cout: 1, vitesse: 4.5, lanceur: 3.5, long: 0.9, larg: 0.84, h: 0.9, nom: "une poule jetée" },
+  poulejetee:  { contresens: true, cout: 1, vitesse: 4.5, lanceur: 3.5, long: 1.04, larg: 0.97, h: 1.04, nom: "une poule jetée" },
   // Posés sur la route.
   // Poules grosses pour être bien vues, et rousses pour trancher sur la neige.
-  poule:   { cout: 1, long: 0.9, larg: 0.84, h: 0.9, nom: "une poule" },
-  chat:    { cout: 1, long: 0.80, larg: 0.60, h: 0.74, nom: "un chat" },
-  chien:   { cout: 1, long: 0.80, larg: 0.55, h: 0.70, nom: "un chien" },
+  // ⚠️ Agrandis le 15 novembre 2026 (« les chats, les animaux, les bottes de
+  // foin sont beaucoup trop petits ») : chat, chien et botte ×1,3, poule ×1,15
+  // (déjà grossie). Le dessin suit (props.corps). Vérifié avec
+  // outils/familles.mjs : tous restent au TAP — au-delà, la poule passait à
+  // l'appui maintenu.
+  poule:   { cout: 1, long: 1.04, larg: 0.97, h: 1.04, nom: "une poule" },
+  chat:    { cout: 1, long: 1.04, larg: 0.78, h: 0.96, nom: "un chat" },
+  chien:   { cout: 1, long: 1.04, larg: 0.72, h: 0.91, nom: "un chien" },
   // Un énorme mouton laineux : appui long.
   mouton:  { cout: 1, long: 1.5, larg: 1.3, h: 1.35, nom: "un mouton" },
-  botte:   { cout: 1, long: 0.85, larg: 0.85, h: 0.75, nom: "une botte de foin" },
+  botte:   { cout: 1, long: 1.10, larg: 1.10, h: 0.98, nom: "une botte de foin" },
   cochon:  { cout: 2, long: 1.30, larg: 0.85, h: 0.92, nom: "un cochon" },
   vache:   { cout: 2, long: 1.60, larg: 1.00, h: 1.22, nom: "une vache" },
   // L'homme en COSTARD, planté au milieu de la route avec sa valise, qui
@@ -261,7 +266,12 @@ export const GRACE_ROWS = 40;    // ~9 s sans rien au départ
 const RAMP_ROWS = 380;   // le mou entre obstacles fond en ~40 s
 // Marge ALÉATOIRE ajoutée à l'écart minimal, en rangées : large au début, plus
 // serrée à la fin.
-const MOU_DEBUT = 5, MOU_FIN = 0;
+const MOU_DEBUT = 6, MOU_FIN = 3;
+// ⚠️ Écart FIXE ajouté à l'écart physique, partout (15 novembre 2026 :
+// « espace beaucoup plus les éléments pour que ça soit logique ») : au plus
+// serré, deux obstacles s'enchaînaient à l'écart minimal du saut — jouable,
+// mais illisible. Trois rangées de plus, et le mou ne descend plus sous 3.
+const ESPACE_EN_PLUS = 3;
 export const BLOC = 24;
 // UN SEUL espacement dans tout le jeu, sur l'arc comme au sol : une pièce
 // tous les ESPACEMENT rangs, régulière. Une seule taille de pièce aussi
@@ -271,7 +281,10 @@ export const BLOC = 24;
 export const ESPACEMENT = 3;
 const TRAINEE_MIN = 8;           // rangées libres d'affilée avant de poser une traînée au sol
 const TRAINEE_LONGUEUR = 2;      // pièces d'une traînée
-const LAIT_EVERY = 48;
+// Une brique de lait tous les 96 rangs (48 avant le 15 novembre 2026 : « je
+// suis tout le temps invincible, il n'y a aucune difficulté » — deux fois
+// moins présente, demandé).
+const LAIT_EVERY = 96;
 const LAIT_ISOLE = 3; // aucune pièce à moins de 3 rangées d'une brique de lait
 let FIN_LAIT = null;
 function rangFinLait() { if (FIN_LAIT === null) FIN_LAIT = Math.round(rangAuTemps(dureeCourse() - 55)); return FIN_LAIT; }
@@ -593,7 +606,7 @@ export class Route {
       const jeu = Math.floor(this.hash(i * 37 + 11) * (mou + 1));
       const placer = (k, plancher) => {
         const base = this.chaine.kind ? ecartMin(this.chaine.kind, k, Math.min(vMaxRangees(), vitesseAuRang(this.chaine.r + 20) * 1.08)) : 6;
-        let r = Math.max(plancher, this.chaine.r + base + jeu);
+        let r = Math.max(plancher, this.chaine.r + base + jeu + (this.chaine.kind ? ESPACE_EN_PLUS : 0));
         let garde = 0;
         // Le bouchon : les TROIS voitures sur une route libre et plate (sinon
         // leurs toits ne sont plus à la même hauteur : on s'y cogne).

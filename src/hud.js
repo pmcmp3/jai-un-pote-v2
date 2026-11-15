@@ -10,7 +10,7 @@ const JAUNE = "#ffcf2e";
 const ROUGE = "#e13e26";
 // Le même rouge, juste assez foncé pour porter du texte BLANC en AA (4,63:1 au
 // lieu de 4,25:1) : réservé aux pastilles écrites, jamais au décor peint.
-const ROUGE_TXT = "#d93820";
+const ROUGE_TXT = "#c9341d"; // 5,2:1 sous du blanc (#d93820 tombait à 4,35:1 en fondu)
 const POLICE = '"Helvetica Neue", Helvetica, Arial, system-ui, sans-serif';
 const POLICE_TITRE = '"Source Serif 2", Georgia, serif';
 const PAD = 16;
@@ -47,29 +47,38 @@ function fitFont(ctx, weight, size, text, maxW, min = 9) {
 //            « 6 PIÈCES ». Ni cases ni jauge, aucun texte flouté.
 // Texte blanc la nuit ET sur la plage : le noir ne se lit pas sur le ciel violet.
 //
-// ⚠️ LE BANDEAU EST ÉCRIT À MÊME LE CIEL, et le ciel change tout le temps.
-// Mesuré par outils/contraste.mjs sur une course entière : le même score noir
-// passait de 15:1 au-dessus d'un ciel clair à 2,38:1 au-dessus d'un nuage
-// sombre ou d'une montagne (seuil WCAG AA d'un grand texte : 3:1). Choisir une
-// couleur « qui va bien en moyenne » ne peut pas marcher : il n'y a pas de
-// moyenne, il y a un décor qui défile.
-// D'où le LISERÉ DE LA COULEUR OPPOSÉE (`poser` ci-dessous), la même grammaire
-// que « BAM ! ». Un texte cerné se lit par le meilleur des deux — sa couleur OU
-// son liseré — et ça se calcule : pour un fond de luminance L, la paire offre
-// max((L+0,05)/(Ln+0,05) ; 1,05/(L+0,05)), dont le minimum vaut **4,40:1** avec
-// notre encre #0d0d10, et 4,58:1 avec du noir pur. Autrement dit : au-dessus de
-// N'IMPORTE QUEL fond, et il y en a de toutes les couleurs dans ce jeu, le
-// bandeau ne descend pas sous 4,4:1 — là où il tombait à 2,38:1.
-// (Mesuré sur une course entière, le 5e percentile ne passe jamais sous 4,5.)
-function poser(ctx, texte, x, y, liseret, taille) {
+// ⚠️ LE BANDEAU EST ÉCRIT À MÊME LE CIEL, et le ciel change tout le temps :
+// le même score noir passait de 15:1 au-dessus d'un ciel clair à 2,38:1
+// au-dessus d'un nuage sombre (outils/contraste.mjs, course entière).
+// Le 13 novembre, un LISERÉ de la couleur opposée réglait ça (≥ 4,4:1 partout).
+// ⚠️ Retiré le 15 novembre 2026, demandé : « l'accessibilité est beaucoup trop
+// augmentée, c'est pas beau du tout. Je préfère une ombre à la place, mais pas
+// de contour autour du texte. » D'où un HALO DOUX de la couleur opposée
+// (ombre floue, sans décalage latéral) : il éclaircit ou fonce le fond juste
+// derrière les lettres, sans trait visible. Moins garanti qu'un liseré —
+// assumé, c'est l'arbitrage de l'artiste.
+// L'OMBRE SEULE, sans la lettre : le texte part hors de l'écran, son ombre
+// est ramenée à sa place. Deux ombres l'une sur l'autre (celle-ci, puis celle
+// du vrai texte) épaississent le halo au BORD des lettres — là où une seule
+// ombre floue s'efface — sans jamais dessiner de contour.
+export function ombreSeule(ctx, texte, x, y) {
+  const L = 10000, T = ctx.getTransform();
   ctx.save();
-  ctx.strokeStyle = liseret;
-  ctx.lineWidth = Math.max(2, taille * 0.115);
-  ctx.lineJoin = "round";
-  ctx.miterLimit = 2;
-  ctx.strokeText(texte, x, y);
+  ctx.shadowOffsetX += L * T.a;
+  ctx.fillText(texte, x - L, y);
   ctx.restore();
+}
+function poser(ctx, texte, x, y, halo, taille) {
+  ctx.save();
+  ctx.shadowColor = halo === NOIR || halo === "#000000" ? "rgba(0,0,0,0.72)" : "rgba(255,255,255,0.85)";
+  // Le flou coûte en proportion de son rayon : plafonné à 8 px (le score de
+  // 40 px n'en a pas besoin de plus), et doublé seulement sous 20 px.
+  ctx.shadowBlur = Math.max(4, Math.min(8, taille * 0.3));
+  ctx.shadowOffsetX = 0;
+  ctx.shadowOffsetY = Math.max(1, taille * 0.04);
+  if (taille < 20) ombreSeule(ctx, texte, x, y);
   ctx.fillText(texte, x, y);
+  ctx.restore();
 }
 export function renderHud(ctx, width, height, hud) {
   ctx.save();
@@ -188,18 +197,39 @@ export function renderTapHint(ctx, width, height, t, alpha) {
   }
   const dy = ph < 0.45 ? 14 * (1 - ph / 0.45) : 0;
   dessinerMain(ctx, x - 18, y - 6 + dy, 44 / 48);
-  ctx.textAlign = "center";
-  const msg = "TAPE L'ÉCRAN POUR SAUTER · PAS BESOIN DE GLISSER";
-  fitFont(ctx, "800", 11, msg, width - 50, 8);
-  const w = ctx.measureText(msg).width + 20;
-  ctx.fillStyle = NOIR; ctx.fillRect(x - w / 2, y + 56, w, 24);
-  ctx.fillStyle = BLANC; ctx.textBaseline = "middle";
-  ctx.fillText(msg, x, y + 69);
+  // Plus de bandeau écrit sous le doigt (15 novembre 2026, « enlève le texte
+  // au début ») : le geste animé suffit.
   ctx.restore();
 }
 
-// Décompte « 3, 2, 1, GO » calé sur les temps (voir main.js).
-export function renderCountIn(ctx, width, height, t, beatPeriod, beats, linger, avecSon = true) {
+// Le jetpack : un doigt qui APPUIE et RESTE appuyé, l'anneau se remplit
+// pendant qu'il tient. Dit « reste appuyé pour voler » sans un mot.
+export function renderHoldHint(ctx, width, height, t, alpha) {
+  if (alpha <= 0.01) return;
+  const cyc = 1.6, ph = (t % cyc) / cyc;
+  const x = width / 2, y = height * 0.62;
+  const appuye = ph > 0.18 && ph < 0.88;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.lineCap = "round";
+  ctx.strokeStyle = "rgba(255,255,255,0.35)"; ctx.lineWidth = 5;
+  ctx.beginPath(); ctx.arc(x, y, 34, 0, Math.PI * 2); ctx.stroke();
+  if (appuye) {
+    const k = (ph - 0.18) / 0.7;
+    ctx.strokeStyle = JAUNE;
+    ctx.beginPath(); ctx.arc(x, y, 34, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * k); ctx.stroke();
+  }
+  const dy = ph < 0.18 ? 14 * (1 - ph / 0.18) : ph > 0.88 ? 14 * ((ph - 0.88) / 0.12) : 0;
+  dessinerMain(ctx, x - 18, y - 6 + dy, 44 / 48);
+  ctx.restore();
+}
+
+// Décompte « 3, 2, 1, C'EST PARTI ! » calé sur les temps (voir main.js).
+// ⚠️ Plus AUCUN texte dessous depuis le 15 novembre 2026 (« enlève le texte
+// au début, tu mets juste 3, 2, 1, c'est parti ») : ni le rappel de la
+// ligue, ni « monte le son » — la carte « Monte le son » le dit avant.
+// Ombre douce, pas de contour (même demande que le bandeau du haut).
+export function renderCountIn(ctx, width, height, t, beatPeriod, beats, linger) {
   let texte, age;
   if (t < 0) {
     const restant = -t / beatPeriod;
@@ -209,7 +239,7 @@ export function renderCountIn(ctx, width, height, t, beatPeriod, beats, linger, 
     age = (n - restant) * beatPeriod;
   } else {
     if (t >= linger) return;
-    texte = "GO !";
+    texte = "C'EST PARTI !";
     age = t;
   }
   const tPop = Math.min(1, age / 0.22);
@@ -218,51 +248,34 @@ export function renderCountIn(ctx, width, height, t, beatPeriod, beats, linger, 
   ctx.save();
   ctx.globalAlpha = alpha;
   ctx.translate(width / 2, Math.max(height * 0.3, 190));
-  ctx.scale(scale, scale);
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.font = `900 ${t < 0 ? 84 : 66}px ${POLICE_TITRE}`;
-  // Contour noir net sous le remplissage : un simple flou se perd sur le ciel
-  // clair.
-  ctx.shadowColor = "transparent";
-  ctx.shadowBlur = 10;
-  ctx.shadowOffsetY = 2;
-  ctx.lineWidth = 3;
-  ctx.strokeStyle = NOIR;
-  ctx.lineJoin = "round";
-  ctx.strokeText(texte, 0, 0);
-  ctx.shadowColor = "transparent";
-  ctx.fillStyle = t < 0 ? BLANC : JAUNE;
-  ctx.fillText(texte, 0, 0);
-  ctx.restore();
-  // Le rappel de la ligue, à CHAQUE départ (premier lancement comme REJOUER) :
-  // c'est ce qui fait inviter. ⚠️ Il était en blanc avec une simple ombre à
-  // 25 % : mesuré à 1,13:1 au-dessus du ciel du petit matin (outils/
-  // contraste.mjs), c'est-à-dire illisible. Liseré noir, comme le décompte
-  // juste au-dessus — toujours pas de bandeau sombre.
+  let taille = t < 0 ? 84 : 54;
+  ctx.font = `900 ${taille}px ${POLICE_TITRE}`;
+  // « C'EST PARTI ! » à 1,45× au premier instant ne doit pas sortir de l'écran.
+  while (ctx.measureText(texte).width * 1.45 > width - 32 && taille > 24) { taille -= 2; ctx.font = `900 ${taille}px ${POLICE_TITRE}`; }
+  ctx.scale(scale, scale);
+  // Une OMBRE PORTÉE large sous le mot (une tache sombre, floue, pas un
+  // contour) : c'est elle qui détache le jaune et le blanc d'un ciel clair.
   {
-    const lignes = ["Plus tu as de potes dans ta ligue,", "plus tu as de chances de faire un meilleur score."];
+    const w = ctx.measureText(texte).width, h = taille;
     ctx.save();
-    ctx.globalAlpha = alpha;
-    ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    ctx.fillStyle = BLANC;
-    ctx.shadowColor = "rgba(0,0,0,0.25)"; ctx.shadowOffsetY = 2; ctx.shadowBlur = 0;
-    const y0 = Math.max(height * 0.3, 190) + (avecSon ? 118 : 78);
-    lignes.forEach((l, i) => { const t = fitFont(ctx, "800", 15, l, width - 40, 10); poser(ctx, l, width / 2, y0 + i * 21, "#000000", t || 15); });
+    ctx.scale(1, 0.55);
+    const g = ctx.createRadialGradient(0, 0, 0, 0, 0, w * 0.62 + h * 0.4);
+    g.addColorStop(0, "rgba(0,0,0,0.42)");
+    g.addColorStop(0.6, "rgba(0,0,0,0.26)");
+    g.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = g;
+    ctx.fillRect(-(w * 0.62 + h * 0.4), -(w * 0.62 + h * 0.4), 2 * (w * 0.62 + h * 0.4), 2 * (w * 0.62 + h * 0.4));
     ctx.restore();
   }
-  // Rappel de jouer avec le son (les klaxons annoncent les voitures). Pas si
-  // la carte « Monte le son » de l'explication vient de passer.
-  if (!avecSon) return;
-  const msg = "MONTE LE SON : LES KLAXONS T'ANNONCENT LES VOITURES";
-  ctx.save();
-  ctx.globalAlpha = alpha;
-  fitFont(ctx, "800", 11, msg, width - 60, 8);
-  const w = ctx.measureText(msg).width + 20, y = Math.max(height * 0.3, 190) + 72;
-  ctx.translate(width / 2, y); ctx.rotate(-0.02);
-  ctx.fillStyle = NOIR; ctx.fillRect(-w / 2, -12, w, 24);
-  ctx.fillStyle = BLANC; ctx.textAlign = "center"; ctx.textBaseline = "middle";
-  ctx.fillText(msg, 0, 1);
+  // Dense et serrée : une ombre large et pâle (14 px à 50 %) laissait le jaune
+  // à 1,45:1 sur le ciel clair du village (outils/contraste.mjs).
+  ctx.shadowColor = "rgba(0,0,0,0.78)";
+  ctx.shadowBlur = 9;
+  ctx.shadowOffsetY = 2;
+  ctx.fillStyle = t < 0 ? BLANC : JAUNE;
+  ctx.fillText(texte, 0, 0);
   ctx.restore();
 }
 

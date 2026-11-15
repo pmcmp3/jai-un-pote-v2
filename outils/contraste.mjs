@@ -22,6 +22,8 @@
 // SEUILS (WCAG 2.1, 1.4.3 AA) : 4,5:1 pour un texte normal, 3:1 pour un grand
 // texte (≥ 24 px, ou ≥ 18,66 px en gras). Un texte CERNÉ (un `strokeText` sous
 // le même texte) est jugé sur son contour : c'est lui qui le détache du décor.
+// Un texte À OMBRE (shadowBlur) est jugé contre le fond tel que son ombre le
+// laisse : voir `mesurer`, plus bas.
 //
 // LIMITES ASSUMÉES, écrites noir sur blanc :
 //   - les textes mesurés à mi-fondu ne comptent pas (`globalAlpha` < 0,92) :
@@ -125,11 +127,49 @@ await page.addInitScript(() => {
     const bh = Math.min(ctx.canvas.height - by, Math.ceil(Math.max(...pts.map((p) => p[1])) + marge) - by);
     if (bw < 3 || bh < 3) return false;
 
-    let avant;
-    try { avant = ctx.getImageData(bx, by, bw, bh).data; } catch (e) { return false; }
-    vrai[type].apply(ctx, args);
+    let avantImg;
+    try { avantImg = ctx.getImageData(bx, by, bw, bh); } catch (e) { return false; }
+    let avant = avantImg.data;
+    // UN TEXTE À OMBRE (15 novembre 2026 : l'artiste a remplacé les liserés
+    // par des ombres douces). Un seul fillText peint l'ombre ET les lettres :
+    // comparer « avant/après » prendrait l'ombre pour de l'encre, et la lettre
+    // serait jugée contre un fond qu'elle ne voit pas. On sépare donc :
+    //   1. l'ombre SEULE (la lettre envoyée hors de l'écran, son ombre
+    //      ramenée à sa place) → le fond tel que l'œil le voit autour d'elle ;
+    //   2. la lettre SEULE, sans ombre → le masque de l'encre ;
+    //   3. le vrai dessin, pour que l'image reste exacte.
+    // Chaque pixel d'encre est jugé contre le fond ASSOMBRI (ou éclairci) par
+    // l'ombre. Le 5e percentile tombe sur les bords des lettres, là où l'ombre
+    // est la plus faible : c'est volontairement le cas défavorable.
+    const T0 = ctx.getTransform();
+    const ombre = type === "fill" && ctx.shadowBlur > 0 && (versRgb(ctx.shadowColor) || [0, 0, 0, 0])[3] > 0.05 && T0.b === 0 && T0.c === 0;
     let apres;
-    try { apres = ctx.getImageData(bx, by, bw, bh).data; } catch (e) { return true; }
+    if (ombre) {
+      const LOIN = 10000, ox = ctx.shadowOffsetX;
+      ctx.shadowOffsetX = ox + LOIN * T0.a;
+      vrai.fill.call(ctx, t, x - LOIN, y);
+      ctx.shadowOffsetX = ox;
+      let fondOmbre;
+      try { fondOmbre = ctx.getImageData(bx, by, bw, bh).data; } catch (e) { return true; }
+      ctx.putImageData(avantImg, bx, by);
+      const sc = ctx.shadowColor; ctx.shadowColor = "transparent";
+      vrai.fill.call(ctx, t, x, y);
+      ctx.shadowColor = sc;
+      try { apres = ctx.getImageData(bx, by, bw, bh).data; } catch (e) { return true; }
+      ctx.putImageData(avantImg, bx, by);
+      vrai[type].apply(ctx, args);
+      // L'encre se lit contre l'avant ; le contraste, contre le fond ombré.
+      const masque = new Uint8Array(avant.length / 4);
+      for (let i = 0, k = 0; i < avant.length; i += 4, k++) {
+        masque[k] = Math.max(Math.abs(apres[i] - avant[i]), Math.abs(apres[i + 1] - avant[i + 1]), Math.abs(apres[i + 2] - avant[i + 2])) >= 48 ? 1 : 0;
+      }
+      avant = fondOmbre;
+      apres = new Uint8ClampedArray(avant.length);
+      for (let k = 0; k < masque.length; k++) if (!masque[k]) { apres[k * 4] = avant[k * 4]; apres[k * 4 + 1] = avant[k * 4 + 1]; apres[k * 4 + 2] = avant[k * 4 + 2]; } else { apres[k * 4] = (avant[k * 4] + 128) % 256; apres[k * 4 + 1] = (avant[k * 4 + 1] + 128) % 256; apres[k * 4 + 2] = (avant[k * 4 + 2] + 128) % 256; }
+    } else {
+      vrai[type].apply(ctx, args);
+      try { apres = ctx.getImageData(bx, by, bw, bh).data; } catch (e) { return true; }
+    }
 
     // L'encre : les pixels franchement changés. Le reste est de l'anticrénelage.
     // Un texte CERNÉ se juge sur le meilleur des deux : sa couleur ou celle de

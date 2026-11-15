@@ -26,7 +26,10 @@ export const COULEURS = [
   ["blanc", "#f2ede2"], ["rouge", "#e13e26"], ["jaune", "#ffcf2e"],
   ["vert", "#2f7a46"], ["bleu", "#3f63b4"], ["noir", "#0d0d10"],
 ];
-export const CHAPEAUX = ["casquette", "bob", "paille", "aucun"];
+// « aucun » n'est plus proposé au joueur (15 novembre 2026 : « les gens doivent
+// nécessairement choisir un chapeau », trois puces = une ligne nette) ; le
+// rendu le gère toujours, un bot de la ligue démo s'en sert.
+export const CHAPEAUX = ["casquette", "bob", "paille"];
 export const SKIN_DEFAUT = { genre: "homme", motif: "raye", c1: "#2f7a46", c2: "#f2ede2", short: "#3a3e4e", chapeau: "casquette", chaussures: "#565a66", velo: "vtt" };
 
 // Le premier de la ligue porte une COURONNE dorée à la place de son chapeau.
