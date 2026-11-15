@@ -25,6 +25,7 @@ const TESTS = [
   ["hors-ligne", ["outils/hors-ligne.mjs"], {}, "la page s’ouvre sans réseau quel que soit le lien, et ?9 recharge proprement"],
   ["sql", ["outils/sql-concours.mjs"], {}, "le SQL du concours rejoué sur un vrai Postgres : classement, plafonds, confidentialité"],
   ["classement", ["outils/classement-general.mjs"], {}, "classement général, commission, joueur sans ligue (base simulée)"],
+  ["ligue-nom", ["outils/ligue-nom.mjs"], {}, "nom de ligue choisi → lien ?ligue=…, WhatsApp/SMS/Snap, nom pris, pote qui rejoint (base simulée)"],
   ["turbo", ["outils/turbo.mjs"], {}, "le lait fait exploser les obstacles, sans perdre de pote"],
   ["accessibilite", ["outils/accessibilite.mjs"], {}, "axe-core sur chaque écran, clavier dans les tiroirs"],
   ["lignes", ["outils/lignes.mjs"], {}, "aucun mot seul en bout de texte, de 320 à 430 px"],

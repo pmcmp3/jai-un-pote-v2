@@ -54,7 +54,14 @@ export function variante(test) {
 }
 
 export function estConfigure() { return configured(); }
-export function normaliserCode(c) { return String(c || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6); }
+// Un code de ligue = lettres et chiffres, 16 max. Depuis le 15 novembre 2026
+// il peut venir du NOM choisi par le créateur (« Les Gamers » → LESGAMERS) :
+// les accents tombent (é → E) au lieu de disparaître avec la lettre.
+export const CODE_MAX = 20;
+export function normaliserCode(c) {
+  return String(c || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, CODE_MAX);
+}
+export function codeDepuisNom(nom) { return normaliserCode(nom); }
 
 // Code à 5 lettres sans ambiguïté (pas de O/0, I/1).
 export function genererCode() {
@@ -70,6 +77,11 @@ export async function creerLigue(code, pseudo, skin = null, nom = "") {
     const n = await liguesCetteSemaine();
     if (n !== null && n >= cap) return { erreur: "vague" };
   }
+  // Le code est le nom choisi : il peut déjà être pris. On le dit AVANT
+  // d'écrire (sinon l'insert échoue en conflit et on afficherait « pas de réseau »).
+  const deja = await get("ligues", `?code=eq.${encodeURIComponent(code)}&select=code`);
+  if (!deja) return { erreur: "reseau" };
+  if (deja.length) return { erreur: "pris" };
   // Le nom s'affiche dans le classement du concours : un code à cinq lettres
   // ne se reconnaît pas, « les Bonnets » si.
   const ok = await post("ligues", { code, nom: String(nom || "").trim().slice(0, 28) || `Ligue de ${pseudo}`, createur: pseudo });
@@ -107,7 +119,7 @@ export async function rejoindreLigue(code, pseudo, skin = null, dejaDedans = fal
   // Adhésion (doublon ignoré) puis mise à jour du skin si la colonne existe.
   await post("ligue_membres", { code, pseudo, skin: skin ? JSON.stringify(skin) : null }, { Prefer: "return=minimal,resolution=merge-duplicates" }, "?on_conflict=code,pseudo");
   const liste = await membres(code);
-  return liste ? { membres: liste, homonyme } : { erreur: "reseau" };
+  return liste ? { membres: liste, homonyme, nom: (existe[0] && existe[0].nom) || null } : { erreur: "reseau" };
 }
 
 // Membres = [{ nom, skin }] dans l'ordre d'arrivée.

@@ -240,6 +240,14 @@ intégré d'Instagram d'abord**, portrait natif.
   - **Les ligues de test ne sont jamais supprimées, elles sortent par `concours = false`**
     (ESSAI et ses 5 faux scores, les essais de septembre). Un `update … set concours = true` les
     fait revenir. La ligue du bureau est `BRUNO` (`?ligue=BRUNO`, 21 places, en concours).
+  - ⚠️ **Le NOM choisi devient le code et le lien** (15 novembre 2026, demandé : « mon ami
+    Thomas aimerait avoir son propre nom de ligue et l'envoyer à ses copains ») : « Les Gamers »
+    → code `LESGAMERS` → `…/?ligue=lesgamers` (minuscules dans le lien, capitales en base ;
+    accents retirés, 20 caractères max, 3 minimum — `net.codeDepuisNom`). Aperçu du lien en
+    direct sous le champ. Nom déjà pris → « déjà pris », vérifié AVANT l'insert. Champ vide →
+    code au hasard de 5 lettres comme avant. Le message WhatsApp/SMS porte « Ligue « nom » : ».
+    Les anciens codes (BRUNO, PMCMP…) marchent toujours. Aucune modération des noms (assumé).
+    Test : `outils/ligue-nom.mjs` (base simulée), dans `npm run verif`.
   - Tout est additionné par la BASE (vues `concours_ligues` et `concours_joueurs`) : le jeu ne
     voit que son propre score, il ne pourrait rien totaliser. Il lit, il n'écrit pas.
   - ⚠️ Un joueur ne compte que pour **UNE** ligue, celle où il a fait son meilleur score

@@ -1304,3 +1304,12 @@ quelques fruits dessus) : 6,6 ms. C'est aussi ce qui était demandé pour les d�
 **Pas fait, à dire** : les gros animaux (cochon, vache, mouton) n'ont pas été agrandis — ils
 passeraient à un autre geste ; les décors du fond sont voilés et le marché simplifié, mais les
 autres biomes n'ont pas été redessinés pièce par pièce.
+
+## 15 novembre 2026 (soir) — le nom de la ligue devient le lien
+
+Demandé : « il faut que les gens puissent rentrer le nom de la ligue s'ils veulent, et après tu
+crées l'URL et toutes les liaisons avec WhatsApp ». Le champ « nom de ta ligue » existait, mais
+ne servait qu'à l'affichage du classement : le lien restait un code de 5 lettres au hasard.
+Désormais le nom EST le code (« Les Gamers » → `?ligue=lesgamers`), vérifié libre avant
+création, affiché en direct sous le champ, repris dans le message envoyé. Pas de SQL : la
+colonne `code` n'a aucune contrainte de longueur. Nouveau test `ligue-nom` (16 vérifications).

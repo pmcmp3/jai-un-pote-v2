@@ -782,13 +782,14 @@ function afficherLigue() {
   suivant.classList.toggle("btn-petit", !ligue);
   if (!ligue) {
     pelotonAffiche = new Set(); statutLigue = "";
-    const nom = $("ligue-nom");
-    if (nom && !nom.value && getPseudo()) nom.placeholder = `Ligue de ${getPseudo()}`;
     majConcoursMenu();
     return;
   }
   ligueCodeEl.textContent = ligue.code;
-  $("ligue-titre").textContent = ligue.enAttente ? "Tu rejoins la ligue" : "Ma ligue";
+  ligueCodeEl.style.fontSize = ligue.code.length > 11 ? "18px" : ligue.code.length > 7 ? "24px" : "";
+  $("ligue-titre").textContent = ligue.enAttente ? "Tu rejoins la ligue" : ligue.nom || "Ma ligue";
+  const lienEl = $("ligue-lien");
+  if (lienEl) { lienEl.textContent = lienCourt(ligue.code); lienEl.classList.toggle("hidden", !!ligue.enAttente || !!ligue.demo); }
   liguePartager.classList.toggle("hidden", !!ligue.enAttente);
   const ul = $("ligue-peloton");
   ul.textContent = "";
@@ -820,7 +821,7 @@ async function rejoindre(code, creer = false) {
   const pseudo = getPseudo();
   if (!pseudo) { ligueMessage("Écris ton pseudo d'abord."); pseudoInput.focus(); return false; }
   code = net.normaliserCode(code);
-  if (code.length < 4) { ligueMessage("Code de ligue : 5 lettres."); return false; }
+  if (code.length < 3) { ligueMessage(creer ? "Nom de ligue trop court : 3 lettres minimum." : "Écris le code ou le nom de la ligue."); return false; }
   if (demo) {
     // Démo : créer = une ligue où l'on est seul ; rejoindre = la ligue démo pleine.
     ligue = { code, membres: creer ? [{ nom: pseudo, skin: null }] : DEMO.noms.map((nom) => ({ nom, skin: null })), demo: true };
@@ -835,11 +836,12 @@ async function rejoindre(code, creer = false) {
   const nomEl = $("ligue-nom");
   const r = creer ? await net.creerLigue(code, pseudo, getSkin(), nomEl ? nomEl.value : "") : await net.rejoindreLigue(code, pseudo, getSkin(), dejaDedans);
   if (r.erreur) {
-    ligueMessage(r.erreur === "complete" ? `Cette ligue est complète (${net.LIGUE_MAX} max).` : r.erreur === "inexistante" ? "Cette ligue n'existe pas." : r.erreur === "vague" ? `${window.CONFIG.liguesParVague || 5} ligues sont déjà en course cette semaine. La tienne démarre lundi : réessaie à ce moment-là.` : "Pas de réseau, réessaie.");
+    ligueMessage(r.erreur === "pris" ? `Le nom « ${(nomEl && nomEl.value.trim()) || code.toLowerCase()} » est déjà pris. Change-le ou ajoute un chiffre.` : r.erreur === "complete" ? `Cette ligue est complète (${net.LIGUE_MAX} max).` : r.erreur === "inexistante" ? "Cette ligue n'existe pas." : r.erreur === "vague" ? `${window.CONFIG.liguesParVague || 5} ligues sont déjà en course cette semaine. La tienne démarre lundi : réessaie à ce moment-là.` : "Pas de réseau, réessaie.");
     if (ligue && ligue.enAttente) { ligue = null; memoriserLigue(); afficherLigue(); }
     return false;
   }
-  ligue = { code, membres: r.membres };
+  ligue = { code, membres: r.membres, nom: r.nom || (creer && nomEl ? nomEl.value.trim() : null) || null };
+  if (creer && nomEl) { nomEl.value = ""; majApercuNom(); }
   memoriserLigue(); appliquerNomsLigue(); afficherLigue(); appliquerModeBeta();
   // Un « tom » était déjà là : si ce n'est pas lui, leurs deux scores vont se
   // confondre en un seul (une ligne par pseudo au classement). On le dit.
@@ -848,7 +850,27 @@ async function rejoindre(code, creer = false) {
   if (invitation) net.evenement("invitation_acceptee", { pseudo, ligue: code, source: getSource() });
   return true;
 }
-function lienLigue(code) { return `${window.CONFIG.lienJeu || location.origin + location.pathname}?ligue=${code}`; }
+// Le lien d'invitation porte le code en minuscules (?ligue=lesgamers) : c'est
+// lui qui s'affiche dans WhatsApp, et le jeu le remet en capitales à l'arrivée.
+function lienLigue(code) { return `${window.CONFIG.lienJeu || location.origin + location.pathname}?ligue=${String(code).toLowerCase()}`; }
+function lienCourt(code) { return lienLigue(code).replace(/^https?:\/\//, ""); }
+// Nom de ligue → code. Rien de tapé : un code au hasard, comme avant.
+function codeACreer() {
+  const nomEl = $("ligue-nom");
+  const brut = nomEl ? nomEl.value.trim() : "";
+  return brut ? net.codeDepuisNom(brut) : net.genererCode();
+}
+// Sous le champ du nom : le lien que ce nom donnera, en direct.
+function majApercuNom() {
+  const el = $("ligue-nom-apercu"), nomEl = $("ligue-nom");
+  if (!el || !nomEl) return;
+  const code = net.codeDepuisNom(nomEl.value);
+  el.textContent = "";
+  if (!nomEl.value.trim()) { el.textContent = "Choisis un nom : il devient le lien à envoyer à tes potes."; return; }
+  if (code.length < 3) { el.textContent = "3 lettres minimum."; return; }
+  const b = document.createElement("b"); b.textContent = lienCourt(code);
+  el.append("Ton lien : ", b);
+}
 
 // --- LE CONCOURS -----------------------------------------------------------------
 // LA RÈGLE : score au général = ton record + une commission sur le record de
@@ -1126,12 +1148,17 @@ function construireMessages(avecLigue) {
       messageChoisi = m.id;
       lsSet(CLE_MSG, m.id);
       construireMessages(true);
-      if (partageEtat) { partageEtat.texte = m.texte; appliquerPartage(); }
+      if (partageEtat) { partageEtat.texte = avecNomLigue(m.texte); appliquerPartage(); }
     });
     box.appendChild(b);
   });
 }
 
+// « …rejoins ma ligue. Ligue « les gamers » : https://…?ligue=lesgamers »
+function avecNomLigue(t) {
+  if (!ligue || ligue.enAttente || demo || !ligue.code) return t;
+  return `${t} Ligue « ${ligue.nom || ligue.code.toLowerCase()} » :`;
+}
 const partageSheet = $("partage-sheet"), partageHint = $("partage-hint"), partageCopier = $("partage-copier");
 let partageEtat = null;
 // Le lien et les trois applis se recalculent dès que le message change.
@@ -1200,7 +1227,7 @@ async function partagerLigue(texte, texteSansLigue = "Viens jouer à « J'ai un 
   const url = vraie ? lienLigue(code) : (window.CONFIG.lienJeu || location.origin + location.pathname);
   messageChoisi = vraie ? messageDefaut() : null;
   const perso = vraie ? texteMessage() : null;
-  const msg = vraie ? (perso || texte) : texteSansLigue;
+  const msg = vraie ? avecNomLigue(perso || texte) : texteSansLigue;
   construireMessages(vraie);
   $("partage-text").textContent = vraie || demo ? "Chaque pote qui joue te rapporte des points en plus." : "Envoie-leur le jeu : qui fera le meilleur score ?";
   net.evenement("invitation_ouverte", { pseudo: getPseudo(), ligue: code || null, source: getSource(), details: { integre: NAVIGATEUR_INTEGRE } });
@@ -1360,7 +1387,14 @@ function initLigue() {
   } catch (e) { /* rien */ }
   afficherLigue(); appliquerNomsLigue();
   ligueRejoindre.addEventListener("click", () => rejoindre(ligueInput.value));
-  ligueCreer.addEventListener("click", () => rejoindre(net.genererCode(), true));
+  ligueCreer.addEventListener("click", () => rejoindre(codeACreer(), true));
+  const nomEl = $("ligue-nom");
+  if (nomEl) {
+    nomEl.addEventListener("input", () => { majApercuNom(); ligueMessage(""); });
+    nomEl.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); rejoindre(codeACreer(), true); } });
+    ["pointerdown", "touchstart", "touchmove", "mousedown"].forEach((t) => nomEl.addEventListener(t, (e) => e.stopPropagation()));
+    majApercuNom();
+  }
   ligueQuitter.addEventListener("click", () => { stopperArrivees(); ligue = null; memoriserLigue(); appliquerNomsLigue(); afficherLigue(); appliquerModeBeta(); });
   const copierCode = async () => {
     if (!ligue) return;
