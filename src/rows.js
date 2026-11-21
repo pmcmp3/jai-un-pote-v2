@@ -109,7 +109,7 @@ export const KINDS = {
   // Elle VOLE vers le joueur (vitesse > voiture en face), annoncée par le
   // panneau « attention ».
   // Deux hauteurs de vol (envolMouette) : basse, ou un demi-mètre plus haut.
-  mouette: { aerien: true, sansAlerte: true, contresens: true, cout: 1, vitesse: 3.2, arme: 5.5, long: 1.0, larg: 0.9, bas: 2.4, h: 3.1, nom: "une mouette" },
+  mouette: { aerien: true, sansAlerte: true, contresens: true, cout: 1, vitesse: 3.2, arme: 5.5, long: 1.0, larg: 0.9, bas: 2.75, h: 3.45, nom: "une mouette" },
 };
 
 // ⚠️ Les hauteurs `h` sont mesurées sur les DESSINS (capture.mjs hitbox, qui
@@ -138,7 +138,7 @@ const HUMAINS = new Set(["pieton", "costard", "fermier", "baigneur", "skieur"]);
 export function hauteurObstacle(kind, r) { return HUMAINS.has(kind) ? KINDS[kind].h * tailleObstacle(r) + MARGE_H : hauteurAFranchir(kind) + (kind === "mouette" ? envolMouette(r) : 0); }
 // La mouette de la rangée r vole à sa hauteur de base, ou un demi-mètre plus
 // haut (une sur deux, au hasard de la rangée) : pas toujours exactement pareil.
-export function envolMouette(r) { const x = Math.sin(Math.round(r) * 12.9898) * 43758.5453; return x - Math.floor(x) < 0.5 ? 0 : 0.5; }
+export function envolMouette(r) { const x = Math.sin(Math.round(r) * 12.9898) * 43758.5453; return x - Math.floor(x) < 0.5 ? 0 : 0.15; } // 0,5 avant le 21 novembre 2026 : relevées de 35 cm, elles restent toutes à portée d'un saut (outils/mesurer.mjs)
 // Bas d'un obstacle qui VOLE (sous lui, on passe en roulant).
 export function basObstacle(kind, r) { return (KINDS[kind].bas || 0) + (kind === "mouette" ? envolMouette(r) : 0); }
 // Demi-longueur d'un obstacle LE LONG DE LA ROUTE (un traversant barre la

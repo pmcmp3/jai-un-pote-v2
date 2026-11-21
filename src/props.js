@@ -314,7 +314,9 @@ export function drawPieton(ctx, K, uC, v, t, r, plage = false) {
   const M = humain(r, { enfants: false });
   const ri = Math.abs(Math.round(r));
   const objet = plage ? OBJETS_PLAGE[ri % 3] : M.age === "vieux" && ri % 2 === 0 ? "canne" : OBJETS_VILLE[ri % 4];
-  const haut = HAUTS[(ri * 7 + 3) % HAUTS.length], bas = BAS[(ri * 5 + 1) % BAS.length];
+  // En ROUGE ou en BLANC, toujours (21 novembre 2026 : « une couleur vive, pour
+  // qu'on les remarque bien ») : un piéton en gris se fondait dans la route.
+  const haut = ri % 2 ? "#e13e26" : "#f6f3ea", bas = BAS[(ri * 5 + 1) % BAS.length];
   const maillot = MAILLOTS[(ri * 3) % MAILLOTS.length];
   const jupe = !plage && M.femme && objet !== "joggeur" && ri % 5 < 2;
   const sy = (K.h * M.taille) / 1.7;          // le modèle est dessiné pour 1,70 m

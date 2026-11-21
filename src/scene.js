@@ -48,7 +48,10 @@ export function setViewport(width, height) {
   W = width; H = height;
   // Largeur fixe en unités (même temps de réaction pour tout le monde),
   // plafonnée par la hauteur sur un écran couché (ordinateur).
-  K = Math.min(W / cfg("unitesVisibles", 14.5), H / 11);
+  // ⚠️ Écran COUCHÉ (ordinateur, téléphone tourné) : 15 unités de haut au lieu
+  // de 11 depuis le 21 novembre 2026 — « je suis très zoomé, je vois pas le haut
+  // du marché ». On voit plus haut ET plus loin devant.
+  K = Math.min(W / cfg("unitesVisibles", 14.5), H / (W > H ? 15 : 11));
   camD = cfg("cameraDistance", 11);
   camH0 = cfg("cameraHauteur", 3.6);
   horizonY0 = H * cfg("solEcran", 0.64) - camH0 * K;
@@ -777,7 +780,7 @@ function soleilCouchant(ctx, a) {
 // et derrière il traîne une banderole "Ceci n'est pas GTA" »). Il traverse le
 // ciel de droite à gauche, LENTEMENT : la banderole reste lisible 5 s au moins.
 // Banderole blanche à bord noir, lettres rouges : la plaque de tout le jeu.
-const AVION_PERIODE = 34, AVION_VOL = 18, BANDEROLE = "CECI N'EST PAS GTA";
+const AVION_PERIODE = 34, AVION_VOL = 18, BANDEROLE = "CE JEU N'EST PAS GTA 6";
 let avionDepart = null;
 function helicoptere(ctx) {
   if (plageAlpha < 0.05) { avionDepart = null; return; }

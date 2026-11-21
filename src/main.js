@@ -479,10 +479,17 @@ const PROJECTEURS = {
 };
 const projo = { type: null, x: 0, y: 0, r: 40, age: 0 };
 function projoLancer(type, x, y, r) {
-  if (projo.type || game.sprint || game.ended || game.turbo > 0 || conseil.r !== null || !gameStarted || clock.now() < 1) return;
-  // Jamais juste avant un tuto : deux explications qui se marchent dessus,
-  // et ni l'une ni l'autre ne rentre.
-  if ((game.tutos || []).some((r) => r > player.v - 2 && r - player.v < 30)) return;
+  if (!gameStarted || game.sprint || game.ended || clock.now() < 1 || projo.type) return;
+  // Jamais pendant un turbo ou une consigne, ni juste avant un tuto : deux
+  // explications qui se marchent dessus, et ni l'une ni l'autre ne rentre.
+  // ⚠️ Mais la chose a été VUE : on le note, pour ne pas l'expliquer plus tard
+  // comme une nouveauté (« tu m'as mis "attention, les mouettes" alors que
+  // j'en avais déjà croisé », 21 novembre 2026).
+  if (game.turbo > 0 || conseil.r !== null || (game.tutos || []).some((r) => r > player.v - 2 && r - player.v < 30)) {
+    const deja = lireJson(CLE_VUS, {});
+    if (!deja[type]) { deja[type] = 1; ecrireJson(CLE_VUS, deja); }
+    return;
+  }
   const vus = lireJson(CLE_VUS, {});
   if ((vus[type] || 0) >= 1) return;
   vus[type] = 1; ecrireJson(CLE_VUS, vus);

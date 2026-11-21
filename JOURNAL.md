@@ -1373,3 +1373,20 @@ qu'est-ce que c'est que ça […] fais un design system ». Fait :
   (`plateformesTitre`) ; les libellés disent maintenant « Écouter le morceau ».
 - **Paysage** : rien à activer, le jeu et les menus s'adaptent quand on tourne le téléphone
   (vérifié en 844 × 390 par `outils/audit-ecrans.mjs`).
+
+### Même jour, quatrième passe — invitation, animation des potes, vue ordinateur
+
+- **Créer sa ligue** : plus de « Ton lien : … » sous le champ.
+- **Tiroir d'invitation** refait : un menu déroulant pour la phrase d'accroche (la première :
+  « Joue avec moi dans le jeu « J'ai un pote ». », `config.messagesInvitation`), COPIER LE LIEN,
+  cinq icônes sur une ligne (WhatsApp, Messages, Snapchat, Instagram, TikTok). Instagram et
+  TikTok copient le message (ni l'un ni l'autre n'a de lien de partage de texte).
+  ⚠️ L'A/B des phrases d'invitation est arrêté (`variantes.invitation` = une seule valeur).
+- **« Joue avec tes potes »** (carte d'avant-course) : deux invitations au lieu de cinq, lentes —
+  l'enveloppe, puis le vélo « @ines a rejoint ta ligue », puis le score qui monte. 9,6 s.
+- **Écran couché** (ordinateur, téléphone tourné) : 15 unités de haut au lieu de 11 (`scene.setViewport`).
+- **Mouettes** 35 cm plus haut (bas 2,75 ; à 2,8 + 0,5 un saut n’en touchait plus qu’une sur deux, `mesurer.mjs`). Leur projecteur n'arrive plus après coup : une mouette
+  croisée pendant un turbo ou une consigne compte comme vue.
+- **Piétons** en rouge ou en blanc. Banderole : « CE JEU N'EST PAS GTA 6 ».
+- Non traités, faute de cas précis : la « fausse semi-3D » des poules et objets, des pièces
+  « dans des objets » (le test `conflits` n'en trouve aucune), le bug Android sur la plage.

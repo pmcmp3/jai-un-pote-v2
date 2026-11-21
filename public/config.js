@@ -221,12 +221,13 @@ window.CONFIG = {
     // Quel message d'invitation s'ouvre par défaut (les identifiants de
     // `messagesInvitation`). Le joueur peut toujours en choisir un autre : ce
     // qui est mesuré, c'est le message réellement envoyé.
-    invitation: ["jamais-su", "pote-ou-pas", "manque-toi", "trente-s"],
+    invitation: ["joue-avec-moi"], // 21 novembre 2026 : une seule phrase d'ouverture, demandée ; les autres se choisissent dans le menu
   },
   // Messages d'invitation proposés au joueur. Le PREMIER est celui qui s'ouvre
   // par défaut ; le joueur peut en choisir un autre, et son choix part dans
   // l'événement (vue `ab_invitation`) — c'est ça qu'on mesure.
   messagesInvitation: [
+    { id: "joue-avec-moi", texte: "Joue avec moi dans le jeu « J'ai un pote »." },
     { id: "jamais-su", texte: "J'ai jamais su te le dire, alors rejoins ma ligue." },
     { id: "pote-ou-pas", texte: "T'es mon pote ou pas ? On va vérifier." },
     { id: "manque-toi", texte: "On y est déjà, il nous manque plus que toi." },

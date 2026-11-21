@@ -868,8 +868,9 @@ function majApercuNom() {
   el.textContent = "";
   if (!nomEl.value.trim()) { el.textContent = ""; return; }
   if (code.length < 3) { el.textContent = "3 lettres minimum."; return; }
-  const b = document.createElement("b"); b.textContent = lienCourt(code);
-  el.append("Ton lien : ", b);
+  // Plus de lien affiché sous le champ (21 novembre 2026, « pas très beau ») :
+  // on crée la ligue, puis on invite. Le lien reste lisible par les tests.
+  el.dataset.lien = lienCourt(code);
 }
 
 // --- LE CONCOURS -----------------------------------------------------------------
@@ -1156,25 +1157,23 @@ function texteMessage() {
   return m ? m.texte : null;
 }
 function construireMessages(avecLigue) {
-  const box = $("partage-messages");
-  if (!box) return;
+  const sel = $("partage-select");
+  if (!sel) return;
   const liste = avecLigue ? messagesInvitation() : [];
-  box.textContent = "";
-  box.classList.toggle("hidden", !liste.length);
-  if (!liste.length) return;
+  sel.textContent = "";
+  sel.classList.toggle("hidden", !liste.length);
   liste.forEach((m) => {
-    const b = document.createElement("button");
-    b.type = "button";
-    b.className = `msg-choix${m.id === messageChoisi ? " actif" : ""}`;
-    b.textContent = m.texte;
-    b.addEventListener("click", () => {
-      messageChoisi = m.id;
-      lsSet(CLE_MSG, m.id);
-      construireMessages(true);
-      if (partageEtat) { partageEtat.texte = avecNomLigue(m.texte); appliquerPartage(); }
-    });
-    box.appendChild(b);
+    const o = document.createElement("option");
+    o.value = m.id; o.textContent = m.texte; o.selected = m.id === messageChoisi;
+    sel.appendChild(o);
   });
+  sel.onchange = () => {
+    const m = liste.find((x) => x.id === sel.value);
+    if (!m) return;
+    messageChoisi = m.id;
+    lsSet(CLE_MSG, m.id);
+    if (partageEtat) { partageEtat.texte = avecNomLigue(m.texte); appliquerPartage(); }
+  };
 }
 
 // « …rejoins ma ligue. Ligue « les gamers » : https://…?ligue=lesgamers »
@@ -1200,6 +1199,7 @@ function ouvrirPartage(texte, url) {
   appliquerPartage();
   $("partage-plus").classList.toggle("hidden", !navigator.share);
   partageHint.classList.add("hidden");
+  $("partage-lien").classList.add("hidden");
   partageCopier.textContent = "Copier le lien";
   partageCopier.classList.remove("fait");
   partageSheet.classList.add("visible");
@@ -1220,8 +1220,11 @@ function copierLienPartage(via) {
     partageHint.classList.remove("hidden");
     partageHint.classList.toggle("echec", !ok);
     partageHint.textContent = ok
-      ? (via === "insta" ? "Lien copié ! Reviens sur Insta et colle-le dans une conversation." : "Lien copié ! Colle-le dans une conversation avec tes potes.")
-      : "Ton navigateur bloque la copie : appuie longuement sur le lien ci-dessus, puis Copier.";
+      ? (via === "insta" ? "Copié. Colle-le dans Instagram." : via === "tiktok" ? "Copié. Colle-le dans TikTok." : "Copié.")
+      : "Copie bloquée : appuie longuement sur le lien, puis Copier.";
+    $("partage-lien").classList.toggle("hidden", ok);
+    const ico = via === "insta" || via === "tiktok" ? $(`partage-${via}`) : null;
+    if (ok && ico) { ico.classList.add("fait"); setTimeout(() => ico.classList.remove("fait"), 1600); }
     if (ok) { partageCopier.textContent = "Lien copié ✓"; partageCopier.classList.add("fait"); }
     partageFait(via);
   });
@@ -1229,6 +1232,7 @@ function copierLienPartage(via) {
 function initPartage() {
   partageCopier.addEventListener("click", () => copierLienPartage("copie"));
   $("partage-insta").addEventListener("click", () => copierLienPartage("insta"));
+  $("partage-tiktok").addEventListener("click", () => copierLienPartage("tiktok"));
   $("partage-whatsapp").addEventListener("click", () => partageFait("whatsapp"));
   $("partage-sms").addEventListener("click", () => partageFait("sms"));
   $("partage-snap").addEventListener("click", () => partageFait("snapchat"));
@@ -1252,7 +1256,6 @@ async function partagerLigue(texte, texteSansLigue = "Viens jouer à « J'ai un 
   const perso = vraie ? texteMessage() : null;
   const msg = vraie ? avecNomLigue(perso || texte) : texteSansLigue;
   construireMessages(vraie);
-  $("partage-text").textContent = vraie || demo ? "Chaque pote qui joue te rapporte des points en plus." : "Envoie-leur le jeu : qui fera le meilleur score ?";
   net.evenement("invitation_ouverte", { pseudo: getPseudo(), ligue: code || null, source: getSource(), details: { integre: NAVIGATEUR_INTEGRE } });
   // Le partage natif du téléphone d'abord, partout où il existe — y compris
   // dans Instagram sur iPhone. Le tiroir maison ne sert que s'il manque
@@ -1648,7 +1651,7 @@ function ecrireVolume(cle, v) { try { localStorage.setItem(cle, String(v)); } ca
 // en ligue démo.
 // ⚠️ Les cartes se reconnaissent à leur NOM (data-e), pas à leur rang.
 // Durées par carte :
-const EXPL_DUREES = { son: 5.0, potes: 7.6 };
+const EXPL_DUREES = { son: 5.0, potes: 9.6 };
 // « Monte le son » reste ~5 s avant le départ : deux bruitages pour régler le
 // volume.
 let annonceSon = false;
@@ -1674,20 +1677,23 @@ function montrerExplication(ensuite) {
     const BASE = 1000, fmt = (n) => Math.round(n).toLocaleString("fr-FR");
     val.textContent = fmt(BASE);
     // [pseudo, invitation envoyée à (s), arrivée après (s)] : de plus en plus vite.
-    const potes = [["lea", 0.5, 1.2], ["marius", 2.9, 0.55], ["ines", 3.8, 0.42], ["hugo", 4.5, 0.32], ["nita", 5.05, 0.26]];
+    // Deux potes seulement, et le TEMPS de voir chaque étape (21 novembre 2026 :
+    // « prends le temps de faire l'animation »).
+    const ICO_VELO = '<svg class="ico" viewBox="0 0 30 30" aria-hidden="true"><circle cx="7" cy="20" r="5" fill="none" stroke="#0d0d10" stroke-width="2"/><circle cx="23" cy="20" r="5" fill="none" stroke="#0d0d10" stroke-width="2"/><path d="M7 20l5-9h7l4 9M12 11l5 9M10 8h4M19 11l-1-4h3" fill="none" stroke="#0d0d10" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    const potes = [["ines", 0.5, 1.9], ["marius", 5.0, 1.6]];
     let affiche = BASE, cible = BASE, t0 = performance.now(), dernier = t0;
     potes.forEach(([nom, envoi, delai], k) => {
       minuteurs.push(setTimeout(() => {
         if (fini) return;
         const li = document.createElement("li");
-        li.innerHTML = `${ICO_ENV}<span class="txt">Invitation envoyée à @${nom}</span>`;
-        fil.prepend(li);
-        while (fil.children.length > 3) fil.lastChild.remove();
+        li.className = "envoi";
+        li.innerHTML = `${ICO_ENV}<span class="txt">Tu invites @${nom}</span>`;
+        fil.textContent = ""; fil.appendChild(li);
       }, envoi * 1000));
       minuteurs.push(setTimeout(() => {
         if (fini) return;
         const li = [...fil.children].find((l) => l.textContent.includes(`@${nom}`)) || fil.firstChild;
-        if (li) { li.className = "rejoint"; li.innerHTML = `${ICO_OK}<span class="txt">@${nom} a rejoint ta ligue</span><span class="plus">+10 %</span>`; }
+        if (li) { li.className = "rejoint"; li.innerHTML = `${ICO_VELO}<span class="txt">@${nom} a rejoint ta ligue</span>`; }
         cible = BASE * (1 + 0.1 * (k + 1));
         gain.textContent = `+${(k + 1) * 10} %`;
         gain.classList.remove("on"); void gain.offsetWidth; gain.classList.add("on");
@@ -1699,7 +1705,7 @@ function montrerExplication(ensuite) {
     const boucle = (now) => {
       if (fini) return;
       const dt = Math.min(0.05, (now - dernier) / 1000); dernier = now;
-      affiche += (cible - affiche) * Math.min(1, dt * 9);
+      affiche += (cible - affiche) * Math.min(1, dt * 2.6);
       if (Math.abs(cible - affiche) < 0.5) affiche = cible;
       val.textContent = fmt(affiche);
       rafPeloton = requestAnimationFrame(boucle);

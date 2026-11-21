@@ -76,10 +76,10 @@ if (!(await visible(t.page, "ligue-nom"))) {
 }
 await t.page.waitForSelector("#ligue-nom", { state: "visible", timeout: 10000 });
 await ecrire(t.page, "#ligue-nom", "Les Gamers");
-const apercu = await texte(t.page, "ligue-nom-apercu");
+const apercu = await t.page.evaluate(() => document.getElementById("ligue-nom-apercu").dataset.lien || "");
 juger("aperçu du lien pendant la saisie", /\?ligue=lesgamers$/.test(apercu), apercu);
 await ecrire(t.page, "#ligue-nom", "Les Écureuils d'Été");
-juger("accents et apostrophes nettoyés", /\?ligue=lesecureuilsdete$/.test(await texte(t.page, "ligue-nom-apercu")), await texte(t.page, "ligue-nom-apercu"));
+juger("accents et apostrophes nettoyés", /\?ligue=lesecureuilsdete$/.test(await t.page.evaluate(() => document.getElementById("ligue-nom-apercu").dataset.lien || "")), "data-lien");
 // Nom déjà pris : rien n'est créé.
 await ecrire(t.page, "#ligue-nom", "Bêta");
 const avantPris = ecrits.length;
@@ -110,8 +110,8 @@ juger("SMS : lien", /\?ligue=lesgamers/.test(partage.sms));
 juger("Snap : lien", /\?ligue=lesgamers/.test(partage.snap));
 await t.page.screenshot({ path: `${sorties}ligue-nom-partage.png` });
 // Un autre message choisi garde le nom de la ligue.
-const autre = await t.page.$("#partage-messages .msg-choix:not(.actif)");
-if (autre) { await autre.click(); juger("autre message : nom gardé", (decodeURIComponent(await t.page.evaluate(() => document.getElementById("partage-whatsapp").href))).includes("« Les Gamers »")); }
+const autre = await t.page.$("#partage-select option:not(:checked)");
+if (autre) { await t.page.selectOption("#partage-select", { index: 1 }); juger("autre message : nom gardé", (decodeURIComponent(await t.page.evaluate(() => document.getElementById("partage-whatsapp").href))).includes("« Les Gamers »")); }
 
 // 2. Un pote ouvre le lien.
 const p = await telephone("lea");
