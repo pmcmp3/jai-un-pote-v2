@@ -772,40 +772,46 @@ function soleilCouchant(ctx, a) {
   ctx.restore();
 }
 
-// L'hélicoptère de plage : il ARRIVE, du coin haut droit, en piqué, nez baissé ;
-// il se redresse, traverse à hauteur de ciel et sort à gauche. Jamais de fondu :
-// il entre et sort par les bords de l'écran. Une silhouette sombre en rectangles,
-// comme tout le jeu. Il ne touche à rien, il est là pour le plaisir.
-const HELICO_PERIODE = 24, HELICO_VOL = 15;
-let helicoDepart = null;
+// L'AVION DE PLAGE (21 novembre 2026, à la place de l'hélicoptère : « ça marche
+// pas du tout […] un coucou qui passe, comme les avions de plage dans le sud,
+// et derrière il traîne une banderole "Ceci n'est pas GTA" »). Il traverse le
+// ciel de droite à gauche, LENTEMENT : la banderole reste lisible 5 s au moins.
+// Banderole blanche à bord noir, lettres rouges : la plaque de tout le jeu.
+const AVION_PERIODE = 34, AVION_VOL = 18, BANDEROLE = "CECI N'EST PAS GTA";
+let avionDepart = null;
 function helicoptere(ctx) {
-  if (plageAlpha < 0.05) { helicoDepart = null; return; }
+  if (plageAlpha < 0.05) { avionDepart = null; return; }
   if (plageAlpha < 0.5) return;
-  if (helicoDepart === null || decorT < helicoDepart) helicoDepart = decorT;
-  const t = decorT, ph = ((t - helicoDepart) % HELICO_PERIODE) / HELICO_VOL;
-  if (ph > 1) return;
-  const L = Math.max(46, K * 3.3);                       // longueur de la cabine à l'écran
-  const x = W + L * 1.4 - ph * (W + L * 3.2);
-  const arrivee = Math.max(0, 1 - ph / 0.4);             // 1 à l'entrée, 0 une fois redressé
-  const croisiere = horizonY * (0.3 + 0.03 * Math.sin(t * 0.9)) + Math.sin(t * 2.3) * 2;
-  const y = croisiere - arrivee * arrivee * (croisiere + L * 1.2);
-  const k = L / 46;
-  const rect = (dx, dy, w, h, col) => { ctx.fillStyle = col; ctx.fillRect(Math.round(x + dx * k), Math.round(y + dy * k), Math.ceil(w * k), Math.ceil(h * k)); };
+  if (avionDepart === null || decorT < avionDepart - 3) avionDepart = decorT + 2; // (le temps recule : course relancée)
+  const t = decorT, ph = ((t - avionDepart) % AVION_PERIODE) / AVION_VOL;
+  if (t < avionDepart || ph > 1) return;
+  const k = Math.max(1, K / 22);
+  const corps = 12 * k;                                  // taille des lettres
   ctx.save();
-  ctx.translate(x, y); ctx.rotate(-0.32 * arrivee); ctx.translate(-x, -y);
-  const corps = "#2a2438", vitre = "#6a6f99";
-  rect(-23, -7, 30, 14, corps);                          // cabine
-  rect(-23, -3, 9, 6, vitre);                            // verrière, côté nez
-  rect(7, -4, 26, 4, corps);                             // poutre de queue
-  rect(31, -12, 4, 12, corps);                           // dérive
-  rect(-16, 8, 26, 2, corps); rect(-13, 5, 2, 4, corps); rect(5, 5, 2, 4, corps); // patins
-  rect(-3, -11, 3, 4, corps);                            // mât
-  // Le rotor : un trait qui s'allonge et se raccourcit (vu de profil, il tourne).
-  const pale = 62 * (0.55 + 0.45 * Math.abs(Math.cos(t * 38)));
-  rect(-1.5 - pale / 2, -13, pale, 2, "rgba(42,36,56,0.8)");
-  rect(33, -10, 1.5, 7, "rgba(42,36,56,0.55)");          // rotor de queue
-  // Le feu rouge, qui clignote.
-  if (Math.sin(t * 6) > 0.2) { ctx.globalAlpha *= 0.9; rect(-26, -1, 3, 3, "#ff4a3a"); }
+  ctx.font = `900 ${corps}px "Helvetica Neue", Helvetica, Arial, sans-serif`;
+  const wTxt = ctx.measureText(BANDEROLE).width, wB = wTxt + 20 * k, hB = corps + 10 * k;
+  const corde = 26 * k, total = 46 * k + corde + wB;
+  const x = W + 30 * k - ph * (W + total + 60 * k);       // le nez de l'avion
+  const y = horizonY * 0.3 + Math.sin(t * 1.3) * 3 * k;
+  const rect = (dx, dy, w, h, col) => { ctx.fillStyle = col; ctx.fillRect(Math.round(x + dx * k), Math.round(y + dy * k), Math.ceil(w * k), Math.ceil(h * k)); };
+  // Le coucou : fuselage rouge, aile haute, dérive, hélice qui tourne.
+  rect(2, -5, 36, 10, "#e13e26");                        // fuselage
+  rect(38, -3, 8, 6, "#e13e26");                         // queue
+  rect(41, -12, 5, 10, "#b92e1a");                       // dérive
+  rect(8, -4, 9, 5, "#cfe6ef");                          // verrière
+  rect(6, -9, 22, 3, "#f4efe4");                         // aile haute
+  rect(12, -6, 2, 2, "#2a2438"); rect(22, -6, 2, 2, "#2a2438"); // haubans
+  rect(10, 5, 2, 4, "#2a2438"); rect(8, 8, 6, 3, "#2a2438");    // train
+  const pale = 14 * (0.3 + 0.7 * Math.abs(Math.cos(t * 40)));
+  rect(0, -pale / 2, 2, pale, "rgba(42,36,56,0.75)");    // hélice
+  // La corde, puis la banderole qui ondule à peine.
+  const xb = x + (46 + 26) * k, yb = y + Math.sin(t * 2.2) * 1.5 * k;
+  ctx.strokeStyle = "#2a2438"; ctx.lineWidth = Math.max(1, k);
+  ctx.beginPath(); ctx.moveTo(x + 46 * k, y); ctx.lineTo(xb, yb - hB * 0.3); ctx.moveTo(x + 46 * k, y); ctx.lineTo(xb, yb + hB * 0.3); ctx.stroke();
+  ctx.fillStyle = "#ffffff"; ctx.fillRect(Math.round(xb), Math.round(yb - hB / 2), Math.ceil(wB), Math.ceil(hB));
+  ctx.strokeStyle = "#0d0d10"; ctx.lineWidth = 1.5; ctx.strokeRect(Math.round(xb) + 0.5, Math.round(yb - hB / 2) + 0.5, Math.ceil(wB) - 1, Math.ceil(hB) - 1);
+  ctx.fillStyle = "#c9341d"; ctx.textAlign = "left"; ctx.textBaseline = "middle";
+  ctx.fillText(BANDEROLE, xb + 10 * k, yb + corps * 0.06);
   ctx.restore();
 }
 

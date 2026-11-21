@@ -946,7 +946,9 @@ let bonusRetour = null;
 function ouvrirBonus(r, moi) {
   bonusRetour = document.activeElement;
   $("bonus-titre").textContent = `Bonus +${pts(r.commission)}`;
-  $("bonus-texte").textContent = `${moi ? "Tu as" : `@${r.pseudo} a`} ${lignePotes(r.potes)} dans ${moi ? "ta" : "sa"} ligue : +${commissionPct()}\u00a0% du record de chacun.`;
+  $("bonus-texte").textContent = moi
+    ? `Bonus de points : tu as ${lignePotes(r.potes)} dans ta ligue. Plus tu en invites, plus il monte.`
+    : `Bonus de points : @${r.pseudo} a invité ${lignePotes(r.potes)} dans sa ligue. Invite les tiens, tu auras le même.`;
   $("bonus-pop").classList.remove("hidden");
   $("bonus-fermer").focus();
 }

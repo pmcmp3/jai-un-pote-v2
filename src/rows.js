@@ -53,7 +53,7 @@ export const KINDS = {
   chasseneige: { contresens: true, cout: 3, vitesse: 1.4, arme: 5.5, long: 3.6, larg: 1.9, h: 2.0, plancher: "double", montable: true, nom: "un chasse-neige" },
   // Le SKIEUR DE FOND, dans le biome neige uniquement : il vient en face,
   // lentement, skis compris dans la longueur.
-  skieur:      { contresens: true, cout: 2, vitesse: 1.5, arme: 5.5, long: 1.9, larg: 0.7, h: 1.8, nom: "un skieur" },
+  skieur:      { contresens: true, cout: 2, vitesse: 1.5, arme: 5.5, long: 1.9, larg: 0.7, h: 1.8, sansAlerte: true, nom: "un skieur" },
   // Le BUGGY remplace le tracteur sur la plage, même rôle : il vient en face,
   // on peut rouler dessus.
   buggy:       { contresens: true, cout: 3, vitesse: 1.4, arme: 5.5, long: 2.4, larg: 1.5, h: 1.5, plancher: "double", montable: true, nom: "un buggy de plage" },
@@ -61,7 +61,7 @@ export const KINDS = {
   // plus en plus grands (taillePietons) : une rafale de sauts tenus, au plus
   // serré que permet la physique. La difficulté monte à vue d'œil. Lents :
   // pas de panneau d'alerte (on les voit venir).
-  pieton:      { contresens: true, cout: 1, vitesse: 0.9, arme: 5.5, long: 0.6, larg: 0.6, h: 1.75, sansAlerte: true, nom: "un piéton" },
+  pieton:      { contresens: true, cout: 1, vitesse: 0.9, arme: 5.5, long: 0.75, larg: 0.75, h: 1.75, sansAlerte: true, nom: "un piéton" },
   // La VOITURE EN FACE roule sur la route, vers le joueur ; sa vitesse
   // s'ajoute à la sienne. ⚠️ Lente (2,0 rangées/s) et armée tôt pour laisser
   // le temps de sauter : plus rapide, elle traverse l'écran en une seconde.
@@ -109,7 +109,7 @@ export const KINDS = {
   // Elle VOLE vers le joueur (vitesse > voiture en face), annoncée par le
   // panneau « attention ».
   // Deux hauteurs de vol (envolMouette) : basse, ou un demi-mètre plus haut.
-  mouette: { aerien: true, contresens: true, cout: 1, vitesse: 3.2, arme: 5.5, long: 1.0, larg: 0.9, bas: 2.4, h: 3.1, nom: "une mouette" },
+  mouette: { aerien: true, sansAlerte: true, contresens: true, cout: 1, vitesse: 3.2, arme: 5.5, long: 1.0, larg: 0.9, bas: 2.4, h: 3.1, nom: "une mouette" },
 };
 
 // ⚠️ Les hauteurs `h` sont mesurées sur les DESSINS (capture.mjs hitbox, qui
@@ -284,7 +284,8 @@ const TRAINEE_LONGUEUR = 2;      // pièces d'une traînée
 // Une brique de lait tous les 96 rangs (48 avant le 15 novembre 2026 : « je
 // suis tout le temps invincible, il n'y a aucune difficulté » — deux fois
 // moins présente, demandé).
-const LAIT_EVERY = 96;
+// ⚠️ 192 depuis le 21 novembre 2026 (« beaucoup trop de briques de lait »).
+const LAIT_EVERY = 192;
 const LAIT_ISOLE = 3; // aucune pièce à moins de 3 rangées d'une brique de lait
 let FIN_LAIT = null;
 function rangFinLait() { if (FIN_LAIT === null) FIN_LAIT = Math.round(rangAuTemps(dureeCourse() - 55)); return FIN_LAIT; }

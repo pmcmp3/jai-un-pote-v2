@@ -52,7 +52,10 @@ export function humain(graine, { enfants = true } = {}) {
   const t = g(4);
   const taille = age === "enfant" ? 0.56 + 0.12 * t : age === "vieux" ? 0.9 + 0.06 * t : t < 0.3 ? 0.88 : t < 0.72 ? 0.95 : 1;
   const c = g(5);
-  const corpulence = age === "enfant" ? 1.05 : c < 0.25 ? 1.05 : c < 0.7 ? 1.12 : 1.38;
+  // Sur la ROUTE (enfants: false), tout le monde est 25 % plus épais : un piéton
+  // fin comme un trait ne se voyait pas venir (21 novembre 2026).
+  const gros = enfants ? 1 : 1.25;
+  const corpulence = (age === "enfant" ? 1.05 : c < 0.25 ? 1.05 : c < 0.7 ? 1.12 : 1.38) * gros;
   const h = g(6);
   const cheveux = age === "vieux" ? choisir(GRIS, h)
     : fonce ? choisir(h < 0.75 ? NOIRS : BRUNS, (h * 4) % 1)

@@ -78,15 +78,20 @@ export function renderHud(ctx, width, height, hud) {
   ctx.font = `900 14px ${POLICE}`;
   const wLib = ctx.measureText(libelle).width;
   const etape = total > 0 && !hud.plein;
-  const ligne2 = etape ? `${hud.restant} PIÈCE${hud.restant > 1 ? "S" : ""}` : "";
-  ctx.font = `800 11px ${POLICE}`;
-  const wEtape = etape ? ctx.measureText("PROCHAINE ÉTAPE").width : 0;
-  ctx.font = `900 14px ${POLICE}`;
-  const wL2 = etape ? ctx.measureText(ligne2).width : 0;
+  // LA PROCHAINE ÉTAPE SE DESSINE (21 novembre 2026 : « au lieu d'écrire "une
+  // pièce", tu mets des pièces […] dès que tu en récoltes une, ça passe à 2 ») :
+  // autant de pièces qu'il en reste à ramasser avant le prochain pote. Au-delà
+  // de 6, une pièce et « ×12 », comme le compteur d'un Mario Kart.
+  const nPieces = etape ? Math.max(1, Math.ceil(hud.restant)) : 0;
+  const R_P = 6.5, PAS_P = 16, enRang = nPieces <= 6;
+  ctx.font = `900 13px ${POLICE}`;
+  const wCompte = etape && !enRang ? ctx.measureText(`×${nPieces}`).width + 4 : 0;
+  const wEtape = 0;
+  const wL2 = etape ? (enRang ? (nPieces - 1) * PAS_P + 2 * R_P : 2 * R_P + wCompte) : 0;
   let txtMult = "", wMult = 0;
   if (hud.mult > 1.001) { txtMult = `×${String(hud.mult).replace(".", ",")}`; ctx.font = `900 13px ${POLICE}`; wMult = ctx.measureText(txtMult).width + 12; }
   const wD = Math.max(wLib + (wMult ? wMult + 7 : 0), wEtape, wL2) + 20;
-  const hD = etape ? H1 + 34 : H1;
+  const hD = etape ? H1 + 24 : H1;
   const xG = xD - wD;
   plaque(ctx, xG, y1, wD, hD);
   ctx.textBaseline = "middle";
@@ -106,13 +111,18 @@ export function renderHud(ctx, width, height, hud) {
   if (etape) {
     ctx.fillStyle = "rgba(13,13,16,0.14)";
     ctx.fillRect(xG + 10, y1 + H1 - 1, wD - 20, 1);
-    ctx.textAlign = "right";
-    ctx.font = `800 11px ${POLICE}`;
-    ctx.fillStyle = "rgba(13,13,16,0.72)";
-    ctx.fillText("PROCHAINE ÉTAPE", xD - 10, y1 + H1 + 9);
-    ctx.font = `900 14px ${POLICE}`;
-    ctx.fillStyle = NOIR;
-    ctx.fillText(ligne2, xD - 10, y1 + H1 + 23);
+    const yP = y1 + H1 + 11;
+    const piece = (cxp) => {
+      ctx.fillStyle = JAUNE; ctx.strokeStyle = NOIR; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(cxp, yP, R_P, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = "#c98a00"; ctx.fillRect(cxp - 1, yP - 3, 2, 6);
+    };
+    if (enRang) for (let i = 0; i < nPieces; i++) piece(xD - 10 - R_P - i * PAS_P);
+    else {
+      ctx.textAlign = "right"; ctx.font = `900 13px ${POLICE}`; ctx.fillStyle = NOIR;
+      ctx.fillText(`×${nPieces}`, xD - 10, yP + 1);
+      piece(xD - 10 - wCompte - R_P);
+    }
   }
 
   // --- Centre : les points, au MILIEU DE L'ÉCRAN, sur leur plaque. Ils

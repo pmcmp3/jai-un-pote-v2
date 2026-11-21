@@ -783,7 +783,7 @@ function marquerTombe(ev, now) { if (ev.r !== undefined && !KINDS_ROULANTS.has(e
 // et disparaît. Sans ça, traverser un obstacle sous invincibilité ressemble à
 // un bug de collision.
 const ejectes = new Map(); // rangée → { t0 (horloge du monde), v (où il était), vit (entraînement) }
-const EJECTION_S = 1.5;
+const EJECTION_S = 0.8; // un saut, un tour sur lui-même, il disparaît (1,5 s et 1,8 tour avant)
 function poserEjecte(r, now, vit) {
   const row = rows.rowAt(r), o = row.type === "contresens" ? rows.contresensAt(r, row, now) : null;
   const v = o ? o.v : r;
@@ -804,7 +804,7 @@ function dessinerEjecte(ej, K, tm, dessin) {
   const c = scene.project(du, v, lift + K.h / 2);
   const reste = Math.max(0, Math.min(1, (EJECTION_S - a) / 0.3));
   ctx.save();
-  ctx.translate(c.x, c.y); ctx.rotate(ej.sens * 7.5 * a); ctx.scale(reste, reste); ctx.translate(-c.x, -c.y);
+  ctx.translate(c.x, c.y); ctx.rotate(ej.sens * Math.PI * 2 * Math.min(1, a / EJECTION_S)); ctx.scale(reste, reste); ctx.translate(-c.x, -c.y);
   props.couperFaisceaux(true);
   try { scene.avecLift(lift + rows.solAt(v), () => dessin(du, v)); } finally { props.couperFaisceaux(false); ctx.restore(); }
 }
@@ -850,16 +850,10 @@ function souffleTurbo(tm) {
       couleur: COULEURS_ECLATS[Math.floor(Math.random() * 4)], age: 0, vie: 0.35 + Math.random() * 0.25,
     });
   }
-  const r0 = Math.floor(player.v) - 1;
-  for (let r = r0; r <= r0 + 45; r++) {
-    if (ejectes.has(r) || r === conseil.r) continue;
-    const row = rows.rowAt(r);
-    if (row.type === "statique") { if (r <= player.v + PORTEE_SOUFFLE && r >= player.v - 1) exploser(r, row.kind, tm); continue; }
-    if (row.type === "contresens") {
-      const inst = rows.contresensAt(r, row, tm);
-      if (inst && inst.v <= player.v + PORTEE_SOUFFLE && inst.v >= player.v - 1) exploser(r, row.kind, tm);
-    }
-  }
+  // ⚠️ Plus de SOUFFLE devant le vélo (21 novembre 2026) : tout sautait à 2,6
+  // rangées, avant d'être touché, et même ce qu'on évitait (la mouette sous
+  // laquelle on passe, la voiture qu'on saute). N'explose que ce que la boîte
+  // de collision touche pour de bon : toucherJoueur().
 }
 function vieillirExplosions(dt) {
   for (let i = eclats.length - 1; i >= 0; i--) {
@@ -1927,13 +1921,8 @@ function bulleTurbo(u, v, jy) {
   g.addColorStop(1, "rgba(255,255,255,0.5)");
   ctx.fillStyle = g;
   ctx.beginPath(); ctx.arc(c.x, c.y, R, 0, Math.PI * 2); ctx.fill();
-  // L'anneau du temps qui reste : la piste sombre, puis le blanc qui se vide.
-  const ep = Math.max(3, K * 0.11);
-  ctx.lineCap = "round";
-  ctx.strokeStyle = "rgba(13,13,16,0.35)"; ctx.lineWidth = ep;
-  ctx.beginPath(); ctx.arc(c.x, c.y, R + ep, 0, Math.PI * 2); ctx.stroke();
-  ctx.strokeStyle = "#ffffff";
-  ctx.beginPath(); ctx.arc(c.x, c.y, R + ep, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * reste); ctx.stroke();
+  // Plus d'anneau du temps autour (21 novembre 2026, « j'aime pas trop ») :
+  // la bulle clignote dans la dernière seconde, ça suffit.
   ctx.restore();
 }
 // HUD, décompte, tuto, doigt qui tape, projecteur, bandeau, écran « terminé ».
@@ -1996,7 +1985,10 @@ function renderApercu(pedal) {
 // Un cycliste qui pédale, centré dans un petit canvas : l'aperçu du menu, et
 // l'écran de chargement, où la route défile sous lui.
 function dessinerCycliste(cv, c2, cw, ch, ped, route) {
-  const P = paletteDuJoueur();
+  // Le chapeau CHOISI, jamais la couronne du premier de la ligue : elle
+  // remplaçait le chapeau dans l'aperçu, et les puces « casquette / bob /
+  // paille » semblaient ne rien faire (21 novembre 2026). Elle reste en course.
+  const P = paletteDepuisSkin(screens.getSkin());
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   if (cv.width !== cw * dpr) { cv.width = cw * dpr; cv.height = ch * dpr; }
   c2.setTransform(dpr, 0, 0, dpr, 0, 0);

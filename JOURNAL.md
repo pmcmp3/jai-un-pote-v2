@@ -1354,3 +1354,22 @@ qu'est-ce que c'est que ça […] fais un design system ». Fait :
   lien, de phrase sur les bots, de clôture.
 - **Créer / rejoindre** : une ligne, deux champs encadrés identiques. **Inscription** : trois
   champs encadrés, plus de pictos ni de « Pour aller plus loin ».
+
+### Même jour, troisième passe — retours de jeu sur ordinateur
+
+- **Chapeau** : l'aperçu du menu montrait la couronne du premier de la ligue à la place du
+  chapeau choisi (les puces semblaient cassées). L'aperçu montre le chapeau ; la couronne reste
+  en course.
+- **Bandeau** : « PROCHAINE ÉTAPE / 1 PIÈCE » remplacé par les pièces dessinées (une par pièce
+  à ramasser ; au-delà de 6, une pièce et « ×12 »).
+- **Turbo** : plus d'anneau du temps ; plus de SOUFFLE à 2,6 rangées (tout explosait avant le
+  contact, même ce qu'on évitait) — n'explose que ce que la boîte de collision touche ;
+  l'éjecté fait un saut, un tour, et disparaît (0,8 s au lieu de 1,5 s).
+- **Lait** : une brique tous les 192 rangs (96 avant).
+- **Panneau « attention »** : véhicules seulement (skieur et mouette n'en ont plus).
+- **Piétons** : 25 % plus épais sur la route, boîte de collision alignée (0,75).
+- **Plage** : l'hélicoptère est remplacé par un avion qui traîne « CECI N'EST PAS GTA » (18 s de vol).
+- **Bonus** (éclair) : texte réécrit. Liens d'écoute : déjà sur le titre « J'ai un pote »
+  (`plateformesTitre`) ; les libellés disent maintenant « Écouter le morceau ».
+- **Paysage** : rien à activer, le jeu et les menus s'adaptent quand on tourne le téléphone
+  (vérifié en 844 × 390 par `outils/audit-ecrans.mjs`).
