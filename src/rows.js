@@ -279,7 +279,10 @@ export const BLOC = 24;
 // tout le bloc, il ferait perdre à un arc tantôt sa première, tantôt sa
 // deuxième pièce.
 export const ESPACEMENT = 3;
-const TRAINEE_MIN = 8;           // rangées libres d'affilée avant de poser une traînée au sol
+// ⚠️ 12 rangées libres, et la traînée AU MILIEU (21 novembre 2026 : « des pièces
+// que je ne peux pas récupérer, trop proches d'une voiture arrêtée »). À 8 et
+// posée dès la 2e rangée, elle tombait là où l'on retombe encore du saut.
+const TRAINEE_MIN = 12;
 const TRAINEE_LONGUEUR = 2;      // pièces d'une traînée
 // Une brique de lait tous les 96 rangs (48 avant le 15 novembre 2026 : « je
 // suis tout le temps invincible, il n'y a aucune difficulté » — deux fois
@@ -761,7 +764,7 @@ export class Route {
       if (!vide) { libre = 0; continue; }
       libre += 1;
       if (libre === TRAINEE_MIN) {
-        const depart = p - TRAINEE_MIN + 2;
+        const depart = p - TRAINEE_MIN + 5;
         for (let i = 0; i < TRAINEE_LONGUEUR; i++) pose(r0 + depart + i * ESPACEMENT, solAt(r0 + depart + i * ESPACEMENT) + PIECE_SOL, false);
         libre = 0;
       }

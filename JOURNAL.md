@@ -1390,3 +1390,18 @@ qu'est-ce que c'est que ça […] fais un design system ». Fait :
 - **Piétons** en rouge ou en blanc. Banderole : « CE JEU N'EST PAS GTA 6 ».
 - Non traités, faute de cas précis : la « fausse semi-3D » des poules et objets, des pièces
   « dans des objets » (le test `conflits` n'en trouve aucune), le bug Android sur la plage.
+
+### Même jour, cinquième passe
+
+- **`VERSION_COURSE` 29 → 30** : le parcours a changé dans la journée (lait tous les 192 rangs,
+  mouettes relevées, piétons épaissis) et change encore ici (traînées de pièces).
+- **Pièces au sol** : une traînée demande 12 rangées libres (8 avant) et se pose au MILIEU ;
+  elle tombait à 2 rangées d'un obstacle, là où l'on retombe encore du saut. Score parfait
+  moyen 21 400 → 19 800 (moins de pièces, toutes prenables).
+- **Projecteur** : le tap qui le ferme coupe aussi les taps des 0,6 s suivantes (un double tap
+  sautait dans la mouette). Brique de lait : « Tu es invincible pendant 5 secondes. »
+- **Grand écran** : jamais plus de 2,6 Mpx à peindre (le plein écran d'un ordinateur en faisait 5,2).
+- **Plage** : voile du fond épaissi (+0,22) pour détacher ce qui roule sur la route.
+- Skieur du décor dans le sens de la course ; avion 20 % plus petit ; phrase de la carte
+  « Joue avec tes potes » : « Plus tu invites de potes, plus tu as de chances de faire un
+  meilleur score. »

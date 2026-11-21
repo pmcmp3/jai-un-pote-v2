@@ -788,7 +788,7 @@ function helicoptere(ctx) {
   if (avionDepart === null || decorT < avionDepart - 3) avionDepart = decorT + 2; // (le temps recule : course relancée)
   const t = decorT, ph = ((t - avionDepart) % AVION_PERIODE) / AVION_VOL;
   if (t < avionDepart || ph > 1) return;
-  const k = Math.max(1, K / 22);
+  const k = Math.max(0.85, K / 27); // « un tout petit peu plus petit » (21 novembre 2026)
   const corps = 12 * k;                                  // taille des lettres
   ctx.save();
   ctx.font = `900 ${corps}px "Helvetica Neue", Helvetica, Arial, sans-serif`;
@@ -1095,7 +1095,8 @@ export function rowDecor(ctx, r, clear) {
     // ALLURE : il traverse l'écran en ~1,3 s pendant qu'on avance de 14 rangs.
     if (zone === "montagne" && r % 97 === 50) {
       const f = (vCentre - (r - 8)) / 14;
-      if (f > 0 && f < 1) { const u = ROAD_HALF + 2.9, v = vCentre + 11 - 24 * f; push(u, v, () => skieurFonce(ctx, u, v, decorT)); }
+      // Dans NOTRE sens (21 novembre 2026) : en face, on croyait qu'il nous fonçait dessus.
+      if (f > 0 && f < 1) { const u = ROAD_HALF + 2.9, v = vCentre - 13 + 24 * f; push(u, v, () => skieurFonce(ctx, u, v, decorT)); }
     }
     // Pas de bottes de foin sur le bas-côté : de profil, elles se confondent
     // avec la botte-obstacle posée sur la route. Des buissons bas, ronds et
@@ -1200,16 +1201,17 @@ function batailleNeige(ctx, u, v, t, k) {
 // Le SKIEUR qui file au fond, en position de recherche de vitesse : skis,
 // genoux fléchis, buste couché, bâtons sous les bras, gerbe de neige derrière.
 function skieurFonce(ctx, u, v, t) {
-  drawBox(ctx, u, v - 0.8, 0.08, 1.7, 0.04, "#1f5fb8");                         // skis
-  drawBox(ctx, u + 0.18, v - 0.8, 0.08, 1.7, 0.04, "#1f5fb8");
-  drawBox(ctx, u, v - 0.1, 0.26, 0.3, 0.5, "#23252e", 0.04);                    // jambes fléchies
-  drawBox(ctx, u - 0.02, v - 0.45, 0.3, 0.7, 0.3, "#d8352a", 0.54);             // buste couché
-  drawBox(ctx, u + 0.02, v - 0.68, 0.24, 0.24, 0.24, "#f2c21c", 0.66);          // casque
-  drawBox(ctx, u + 0.1, v - 0.2, 0.04, 1.2, 0.04, "#9aa0a8", 0.62);             // bâtons
+  // Tourné vers l'avant de la course (v croissant) : la tête devant, la neige derrière.
+  drawBox(ctx, u, v - 0.9, 0.08, 1.7, 0.04, "#1f5fb8");                         // skis
+  drawBox(ctx, u + 0.18, v - 0.9, 0.08, 1.7, 0.04, "#1f5fb8");
+  drawBox(ctx, u, v - 0.2, 0.26, 0.3, 0.5, "#23252e", 0.04);                    // jambes fléchies
+  drawBox(ctx, u - 0.02, v - 0.25, 0.3, 0.7, 0.3, "#d8352a", 0.54);             // buste couché
+  drawBox(ctx, u + 0.02, v + 0.44, 0.24, 0.24, 0.24, "#f2c21c", 0.66);          // casque
+  drawBox(ctx, u + 0.1, v - 1.0, 0.04, 1.2, 0.04, "#9aa0a8", 0.62);             // bâtons
   for (let i = 0; i < 5; i++) {
     const a = ((t * 6 + i / 5) % 1);
     ctx.save(); ctx.globalAlpha *= 0.8 * (1 - a);
-    drawBox(ctx, u + 0.05 - a * 0.3, v + 0.9 + a * 1.6, 0.18 + a * 0.2, 0.18 + a * 0.2, 0.18 + a * 0.2, "#ffffff", a * 0.5);
+    drawBox(ctx, u + 0.05 - a * 0.3, v - 1.08 - a * 1.8, 0.18 + a * 0.2, 0.18 + a * 0.2, 0.18 + a * 0.2, "#ffffff", a * 0.5);
     ctx.restore();
   }
 }

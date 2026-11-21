@@ -50,9 +50,14 @@ function resize() {
   // baisse de 44 %.
   const mobile = Math.min(window.innerWidth, window.innerHeight) < 600;
   // `?dpr=3` : plafond levé pour filmer en 1080 px de large (outils/video.mjs).
-  const dpr = Math.min(window.devicePixelRatio || 1, Number(new URLSearchParams(location.search).get("dpr")) || (mobile ? 1.5 : 2));
+  const dprForce = Number(new URLSearchParams(location.search).get("dpr"));
+  let dpr = Math.min(window.devicePixelRatio || 1, dprForce || (mobile ? 1.5 : 2));
   width = window.innerWidth;
   height = window.innerHeight;
+  // Grand écran : jamais plus de 2,6 millions de pixels à peindre (21 novembre
+  // 2026, « ça bugue » en plein écran sur ordinateur — 1440 × 900 en DPR 2
+  // faisait 5,2 Mpx, sept fois un téléphone, filtre CSS compris).
+  if (!dprForce) dpr = Math.max(1, Math.min(dpr, Math.sqrt(2.6e6 / Math.max(1, width * height))));
   canvas.width = Math.round(width * dpr);
   canvas.height = Math.round(height * dpr);
   dprCourant = dpr;
@@ -379,8 +384,13 @@ function conseilCherche(tm, vitesse) {
   }
 }
 // Filtre du tap pendant un conseil (projecteur, approche, double saut).
+let tapMuetJusqua = 0;
 function conseilTap(tap, tm, vitesse) {
-  if (projo.type) { if (tap && projo.age > 0.5) projoFin(); return false; }
+  // Le tap qui FERME un projecteur n'est jamais un saut — ni celui qui le suit
+  // de près (double tap, appui nerveux) : fermer « ne saute pas, roule dessous »
+  // envoyait droit dans la mouette (21 novembre 2026).
+  if (projo.type) { if (tap && projo.age > 0.5) { projoFin(); tapMuetJusqua = perfClock() + 0.6; } return false; }
+  if (tap && perfClock() < tapMuetJusqua) return false;
   if (conseil.r === null) return tap;
   if (conseil.phase === "approche") {
     const t = tempsAvant(conseil.r, rows.rowAt(conseil.r), tm, vitesse);
@@ -474,7 +484,7 @@ function cibleConseil(tm) {
 const PROJECTEURS = {
   // On dit ce que la brique FAIT (l'invincibilité surtout, c'est ce qui se
   // voit en jeu), pas seulement ce qu'elle est.
-  lait: { titre: "BRIQUE DE LAIT = TURBO", sous: "Attrape-la : pendant 5 s, tu exploses tout sur ton passage et tes points comptent double" },
+  lait: { titre: "BRIQUE DE LAIT = TURBO", sous: "Tu es invincible pendant 5 secondes." },
   mouette: { titre: "ATTENTION, LES MOUETTES !", sous: "Elles volent à hauteur de saut : ne saute pas, roule dessous" },
 };
 const projo = { type: null, x: 0, y: 0, r: 40, age: 0 };
@@ -1827,7 +1837,11 @@ const VOILE_JOUR = [238, 234, 226], VOILE_NUIT = [18, 22, 44];
 function voilerLeFond() {
   const n = scene.getNight();
   const c = VOILE_JOUR.map((x, i) => Math.round(x + (VOILE_NUIT[i] - x) * n));
-  const a = 0.42 - 0.1 * n;
+  // Sur la PLAGE le voile s'épaissit (21 novembre 2026 : « un vrai sujet de
+  // contraste […] difficile de comprendre ce qui se passe entre les voitures
+  // et les gens ») : sable, ciel et baigneurs du fond pâlissent, ce qui roule
+  // sur la route garde toute sa couleur.
+  const a = 0.42 - 0.1 * n + 0.22 * plageFondu * (1 - n);
   const y = scene.project(VOILE_U, scene.getVCentre(), 0).y;
   // Un aplat simple (un dégradé plein écran coûtait ~0,3 ms à CPU ×4).
   ctx.save();
