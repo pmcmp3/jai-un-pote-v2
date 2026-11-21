@@ -1313,3 +1313,44 @@ ne servait qu'à l'affichage du classement : le lien restait un code de 5 lettre
 Désormais le nom EST le code (« Les Gamers » → `?ligue=lesgamers`), vérifié libre avant
 création, affiché en direct sous le champ, repris dans le message envoyé. Pas de SQL : la
 colonne `code` n'a aucune contrainte de longueur. Nouveau test `ligue-nom` (16 vérifications).
+
+## 21 novembre 2026 — audit des écrans : plus d'ombre, cibles de 44 px, moins de texte
+
+Demandé : « fais toi-même un audit […] optimisé pour tous les téléphones, les bonnes tailles
+de boutons, un gros sujet d'ombre très moche, je veux pas d'ombre derrière les textes », puis,
+en voyant les captures : « ça fait beaucoup trop de texte par écran ».
+
+- **Nouvel outil `outils/audit-ecrans.mjs`** (dans `npm run verif` sous le nom `ecrans`) : chaque
+  écran sur 9 tailles (320×568 → 430×932, paysage, iPad, ordinateur). Mesure la zone SENSIBLE de
+  tout ce qui se touche (≥ 44 px, `::after` et `<label>` compris), le texte coupé ou hors écran,
+  les corps < 11 px. Premier passage : 371 défauts sur téléphone (puces à 26 px, liens à 16 px,
+  champs à 30 px, cases à 16 px). Après : 0.
+- **Plus aucune ombre ni contour sous un texte du canvas** (`shadowBlur`, `strokeText`) : le score
+  et le bloc potes sont sur des PLAQUES blanches à bord noir (`hud.plaque`), le décompte 3-2-1 sur
+  le sticker rouge de travers, les « +2 PIÈCES » / « −1 POTE » / JETPACK / fantôme en pastilles.
+  Troisième réponse au même problème (liseré le 13, halo le 15, plaques le 21) : ne pas revenir
+  aux deux premières.
+- **Cibles** : les puces et les liens gardent leur taille, c'est leur zone sensible qui déborde
+  (`::after`) ; champs, boutons « petits », curseurs et cases grandissent pour de bon.
+- **Texte coupé partout** : paragraphe « ton village s'écrit… » supprimé, intro de la ligue en une
+  phrase, « ou rejoins un pote », plus de lien répété sous le code, bots en une ligne, bloc
+  concours de fin raccourci, une seule information sous chaque pseudo du classement.
+- Fin de course : le NOM de la ligue (plus le code espacé qui passait à la ligne) et « copier le
+  lien » ; la carte ne monte plus sous le bouton ♪ sur 320 px ; les milliers s'écrivent avec une
+  vraie espace (« 113 000 », l'espace fine disparaissait en gras).
+
+### Même jour, deuxième passe — le système (DESIGN.md) et trois écrans refaits
+
+Retour sur les captures : « trop d'informations […] c'est de l'AI slop […] les tailles de typo,
+qu'est-ce que c'est que ça […] fais un design system ». Fait :
+- **`DESIGN.md`** + jetons CSS (`--t-xs/s/m/saisie/titre`, `--ls-*`, `--e1…5`) ; 91 déclarations
+  de police ramenées dessus par script.
+- **Fin de course** : score, puis LE classement (3 premiers du général + ma ligne encadrée à mon
+  rang), un **éclair + nombre de potes** à côté des totaux bonifiés (on le touche : carte
+  « Bonus »), « Classement → », Rejouer, Inviter. Supprimés : l'encadré « Classement général »,
+  le détail record + commission, la phrase de clôture, le temps restant, le nom de ligue à
+  copier, le relais, le classement de ligue (il est dans le tiroir).
+- **Ma ligue** : le nom en titre serif, Inviter, le peloton, Jouer. Plus de code à copier, de
+  lien, de phrase sur les bots, de clôture.
+- **Créer / rejoindre** : une ligne, deux champs encadrés identiques. **Inscription** : trois
+  champs encadrés, plus de pictos ni de « Pour aller plus loin ».

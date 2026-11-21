@@ -30,6 +30,7 @@ const TESTS = [
   ["accessibilite", ["outils/accessibilite.mjs"], {}, "axe-core sur chaque écran, clavier dans les tiroirs"],
   ["lignes", ["outils/lignes.mjs"], {}, "aucun mot seul en bout de texte, de 320 à 430 px"],
   ["contraste", ["outils/contraste.mjs"], {}, "le contraste de tout ce qui est écrit, du menu à la plage"],
+  ["ecrans", ["outils/audit-ecrans.mjs", "320x568", "393x852", "430x932"], {}, "cibles tactiles ≥ 44 px, rien de coupé ni hors écran, du plus petit au plus grand téléphone"],
   ["build", null, {}, "le build se construit et tourne sans erreur"],
 ];
 const demandes = process.argv.slice(2);

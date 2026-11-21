@@ -60,7 +60,7 @@ async function scenario({ largeur, hauteur, avecLigue, nom }) {
   // qu'il soit arrivé au moment où on lit `ecrits`.
   for (let i = 0; i < 100 && !ecrits.length; i++) await page.waitForTimeout(50);
   const texte = (id) => page.evaluate((id) => document.getElementById(id).textContent.trim(), id);
-  const fin = { rang: await texte("end-concours-rang"), detail: await texte("end-concours-detail"), ecart: await texte("end-concours-ecart") };
+  const fin = { top: (await texte("end-top")).replace(/\s+/g, " "), moi: await page.evaluate(() => { const l = document.querySelector("#end-top li.moi"); return l ? l.textContent.replace(/\s+/g, " ") : ""; }), eclair: await page.evaluate(() => { const e = document.querySelector("#end-top li.moi .eclair"); return e ? e.textContent.trim() : ""; }) };
   await page.screenshot({ path: `${sorties}classement-${nom}-fin.png` });
   await page.evaluate(() => document.getElementById("end-concours-voir").scrollIntoView({ block: "center" }));
   await page.click("#end-concours-voir");
@@ -118,9 +118,8 @@ function juger(titre, essais) {
   return rates.length === 0;
 }
 const okA = juger("avec ligue", {
-  "rang (37e sur 240)": /37e sur 240/.test(a.fin.rang),
-  "détail (record + commission)": /12\s400\spts de record \+ 4\s300\spts de commission \(6\spotes\)/.test(a.fin.detail),
-  "écart affiché": /Il te manque/.test(a.fin.ecart),
+  "ma ligne encadrée, à mon rang (37)": /^37\s?@pmc/.test(a.fin.moi),
+  "éclair du bonus (6 potes)": a.fin.eclair === "6",
   "coupure du premier": a.general.some((l) => /Le premier gagne le morceau/i.test(l)),
   "ma ligne en bas du général": a.general[a.general.length - 1].includes("@pmc") && a.general[a.general.length - 1].startsWith("37"),
   "3 onglets": a.onglets.join() === "general,ligue,ligues",
@@ -129,8 +128,8 @@ const okA = juger("avec ligue", {
   "score envoyé sous ESSAI": a.ecrits.some((e) => e.code === "ESSAI"),
 });
 const okB = juger("sans ligue", {
-  "rang (sur 240)": /sur 240/.test(b.fin.rang),
-  "détail (chaque pote)": /Chaque pote/.test(b.fin.detail),
+  "ma ligne encadrée": /@pmc/.test(b.fin.moi),
+  "pas d'éclair sans pote": b.fin.eclair === "",
   "2 onglets": b.onglets.join() === "general,ligues",
   "un seul score envoyé": b.ecrits.length === 1,
   "envoyé sous PMCMP": b.ecrits.length === 1 && b.ecrits[0].code === "PMCMP",

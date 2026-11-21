@@ -735,7 +735,7 @@ function afficherBoost() {
   const ligne1 = document.createElement("span");
   ligne1.textContent = n ? ` · ${n} pote${n > 1 ? "s" : ""} dans ta ligue` : "";
   const regle = document.createElement("small");
-  regle.textContent = `1 pote qui joue ${C.boostLigueDureeS || 30} s = +${pct} % sur tes points + ${commissionPct()} % de son record · Inviter →`;
+  regle.textContent = `+${pct} % par pote qui joue · Inviter →`;
   el.append(titre, ligne1, regle);
 }
 async function rafraichirBoost() {
@@ -787,9 +787,11 @@ function afficherLigue() {
   }
   ligueCodeEl.textContent = ligue.code;
   ligueCodeEl.style.fontSize = ligue.code.length > 11 ? "18px" : ligue.code.length > 7 ? "24px" : "";
-  $("ligue-titre").textContent = ligue.enAttente ? "Tu rejoins la ligue" : ligue.nom || "Ma ligue";
+  $("ligue-titre").textContent = ligue.demo ? "Ma ligue" : ligue.nom || ligue.code.toLowerCase();
   const lienEl = $("ligue-lien");
-  if (lienEl) { lienEl.textContent = lienCourt(ligue.code); lienEl.classList.toggle("hidden", !!ligue.enAttente || !!ligue.demo); }
+  // Le lien reste dans la page (lecteurs d'écran, tests) mais ne s'affiche plus :
+  // le code en gros et « Inviter tes potes » suffisent (21 novembre 2026, « trop de texte »).
+  if (lienEl) { lienEl.textContent = lienCourt(ligue.code); lienEl.classList.add("hidden"); }
   liguePartager.classList.toggle("hidden", !!ligue.enAttente);
   const ul = $("ligue-peloton");
   ul.textContent = "";
@@ -803,10 +805,8 @@ function afficherLigue() {
     ul.appendChild(li); vus.add(sl.nom);
   });
   pelotonAffiche = vus;
-  if (ligue.enAttente) ligueMembresEl.textContent = "Tu en fais partie ! Appuie sur Jouer.";
-  else ligueMembresEl.textContent = autres.length >= BOTS_LIGUE
-    ? `${autres.length} pote${autres.length > 1 ? "s" : ""} dans ta ligue : ils pédalent derrière toi.`
-    : "En attendant tes vrais potes, des bots jouent avec toi. Quand tes potes auront fait une partie, ils remplaceront les bots.";
+  ligueMembresEl.textContent = ligue.enAttente ? "Tu en fais partie." : "";
+  ligueMembresEl.classList.toggle("hidden", !ligueMembresEl.textContent);
   majStatut();
   majArrivees();
   majConcoursMenu();
@@ -866,7 +866,7 @@ function majApercuNom() {
   if (!el || !nomEl) return;
   const code = net.codeDepuisNom(nomEl.value);
   el.textContent = "";
-  if (!nomEl.value.trim()) { el.textContent = "Choisis un nom : il devient le lien à envoyer à tes potes."; return; }
+  if (!nomEl.value.trim()) { el.textContent = ""; return; }
   if (code.length < 3) { el.textContent = "3 lettres minimum."; return; }
   const b = document.createElement("b"); b.textContent = lienCourt(code);
   el.append("Ton lien : ", b);
@@ -906,7 +906,7 @@ function majConcoursMenu() {
   el.textContent = "";
   const b = document.createElement("b");
   b.textContent = t;
-  el.append("Le premier du général gagne. ", b);
+  el.append("Clôture : ", b);
   el.classList.remove("hidden");
 }
 
@@ -917,8 +917,44 @@ function commissionPct() {
 function formaterRang(n) { return n === 1 ? "1er" : `${n}e`; }
 function lignePotes(n) { return `${n} pote${n > 1 ? "s" : ""}`; }
 
-// Sur l'écran de fin : ta place au général, ce qui la compose, et ce qui manque
-// pour passer premier. Avec ou sans ligue.
+// Sur l'écran de fin : LE classement, rien d'autre (21 novembre 2026 : « trop
+// d'informations […] tu mets le classement et tu encadres toi »). Les trois
+// premiers du général, puis ta ligne à ton vrai rang si tu es plus loin. Un
+// ÉCLAIR à côté d'un total dit « bonus de potes » ; on le touche pour le détail.
+const ECLAIR_SVG = '<svg viewBox="0 0 10 13" aria-hidden="true"><path d="M6.2.6 1 7.4h3.2L3.6 12.4 9 5.4H5.6z" fill="#ffcf2e" stroke="#0d0d10" stroke-width="1" stroke-linejoin="round"/></svg>';
+function ligneRang(r, moiPseudo) {
+  const li = document.createElement("li");
+  if (r.pseudo === moiPseudo) li.className = "moi";
+  const rang = document.createElement("span"); rang.className = "rang";
+  if (Number(r.rang) === 1) rang.innerHTML = COURONNE_SVG; else rang.textContent = `${r.rang}`;
+  const nom = document.createElement("span"); nom.className = "nom"; nom.textContent = `@${r.pseudo}`;
+  li.append(rang, nom);
+  if (Number(r.commission) > 0 && Number(r.potes) > 0) {
+    const e = document.createElement("button");
+    e.type = "button"; e.className = "eclair";
+    e.setAttribute("aria-label", `Bonus : ${lignePotes(r.potes)}`);
+    e.innerHTML = ECLAIR_SVG;
+    e.append(`${r.potes}`);
+    e.addEventListener("click", () => ouvrirBonus(r, r.pseudo === moiPseudo));
+    li.append(e);
+  }
+  const m = document.createElement("span"); m.className = "m"; m.textContent = pts(r.total);
+  li.append(m);
+  return li;
+}
+let bonusRetour = null;
+function ouvrirBonus(r, moi) {
+  bonusRetour = document.activeElement;
+  $("bonus-titre").textContent = `Bonus +${pts(r.commission)}`;
+  $("bonus-texte").textContent = `${moi ? "Tu as" : `@${r.pseudo} a`} ${lignePotes(r.potes)} dans ${moi ? "ta" : "sa"} ligue : +${commissionPct()}\u00a0% du record de chacun.`;
+  $("bonus-pop").classList.remove("hidden");
+  $("bonus-fermer").focus();
+}
+function fermerBonus() {
+  if ($("bonus-pop").classList.contains("hidden")) return;
+  $("bonus-pop").classList.add("hidden");
+  if (bonusRetour && bonusRetour.focus) bonusRetour.focus();
+}
 async function afficherConcours() {
   const bloc = $("end-concours");
   if (!bloc) return;
@@ -926,32 +962,14 @@ async function afficherConcours() {
   if (demo || !net.estConfigure()) return;
   const moi = await net.maPlace(getPseudo());
   if (!moi) return;
-  const rang = $("end-concours-rang");
-  rang.textContent = "";
-  const place = document.createElement("b"), total = document.createElement("b");
-  place.textContent = formaterRang(moi.rang);
-  total.textContent = pts(moi.total);
-  rang.append("Tu es ", place, ` sur ${moi.classes}, avec `, total);
-  const detail = $("end-concours-detail");
-  detail.textContent = moi.commission > 0
-    ? `${pts(moi.metres)} de record + ${pts(moi.commission)} de commission (${lignePotes(moi.potes)})`
-    : `Chaque pote de ta ligue te rapporte ${commissionPct()}\u00a0% de son record.`;
-  const ecart = $("end-concours-ecart");
-  ecart.textContent = "";
-  if (moi.rang === 1) ecart.textContent = "Tu es premier : le morceau est pour toi si tu tiens jusqu’à la clôture.";
-  else {
-    const haut = await net.classementGeneral(1);
-    const premier = haut && haut[0];
-    if (premier) {
-      const b = document.createElement("b");
-      b.textContent = pts(Math.max(1, Number(premier.total) - Number(moi.total) + 1));
-      ecart.append("Il te manque ", b, " pour passer premier");
-    }
+  const haut = (await net.classementGeneral(3)) || [];
+  const liste = $("end-top");
+  liste.textContent = "";
+  for (const r of haut) liste.appendChild(ligneRang(r, moi.pseudo));
+  if (!haut.some((r) => r.pseudo === moi.pseudo)) {
+    if (Number(moi.rang) > haut.length + 1) { const t = document.createElement("li"); t.className = "ecart"; t.setAttribute("aria-hidden", "true"); liste.appendChild(t); }
+    liste.appendChild(ligneRang(moi, moi.pseudo));
   }
-  ecart.classList.toggle("hidden", !ecart.textContent);
-  const temps = $("end-concours-temps"), t = tempsRestant();
-  temps.textContent = t || "";
-  temps.classList.toggle("hidden", !t);
   bloc.classList.remove("hidden");
   annoncer(`Classement général : ${formaterRang(moi.rang)} sur ${moi.classes}, avec ${pts(moi.total)}.`);
 }
@@ -974,9 +992,9 @@ function fermerClassement() {
 }
 function regleClassement(vue) {
   const C = window.CONFIG;
-  if (vue === "general") return `Ton record + ${commissionPct()}\u00a0% du record de chaque pote de ta ligue. À la clôture, le premier fait ${C.concoursLot || "le morceau"}. `;
-  if (vue === "ligue") return "Les joueurs de ta ligue, avec leur record et leur commission. ";
-  return "La somme des records de chaque ligue. Pour l'honneur : le morceau se joue au général. ";
+  if (vue === "general") return `Ton record + ${commissionPct()}\u00a0% de celui de chaque pote. Le premier gagne ${C.concoursLot || "le morceau"}. `;
+  if (vue === "ligue") return "";
+  return "Pour l'honneur : le morceau se joue au général. ";
 }
 function ligneJoueur(r, position, moiPseudo, sousTitre) {
   const li = document.createElement("li");
@@ -985,7 +1003,7 @@ function ligneJoueur(r, position, moiPseudo, sousTitre) {
   const nom = document.createElement("span"); nom.className = "nom"; nom.textContent = `@${r.pseudo}`;
   const sous = document.createElement("small");
   const calcul = Number(r.commission) > 0 ? `${pts(r.metres)} + ${pts(r.commission)}` : "";
-  sous.textContent = [sousTitre, calcul].filter(Boolean).join(" · ");
+  sous.textContent = sousTitre || calcul; // une seule information sous le pseudo
   if (sous.textContent) nom.appendChild(sous);
   const m = document.createElement("span"); m.className = "m"; m.textContent = pts(r.total);
   li.append(rang, nom, m);
@@ -1051,6 +1069,9 @@ function initClassement() {
     b.addEventListener("click", () => { classementVue = b.dataset.vue; suivi("classement_vu", { vue: classementVue }); remplirClassement(); });
   }
   $("classement-fermer").addEventListener("click", fermerClassement);
+  $("bonus-fermer").addEventListener("click", fermerBonus);
+  $("bonus-pop").addEventListener("click", (e) => { if (e.target.id === "bonus-pop") fermerBonus(); });
+  window.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("bonus-pop").classList.contains("hidden")) { e.stopImmediatePropagation(); fermerBonus(); } }, true);
   $("classement-veil").addEventListener("click", fermerClassement);
 }
 
@@ -1332,7 +1353,7 @@ async function rafraichirLeader() {
 }
 const COURONNE_SVG = '<svg class="couronne" viewBox="0 0 16 12" aria-hidden="true"><path d="M1.5 10.5h13l1-8-4.2 3.2L8 1 4.7 5.7.5 2.5z" fill="#ffcf2e" stroke="#0d0d10" stroke-width="1.2" stroke-linejoin="round"/></svg>';
 function afficherClassement(code, rows, titre = null) {
-  endLigueCode.textContent = titre || code;
+  endLigueCode.textContent = titre || (ligue && code === ligue.code && ligue.nom) || code;
   if (!titre && ligue && code === ligue.code && rows.length) retenirLeader(code, rows[0].pseudo);
   endLigueListe.textContent = "";
   const moi = getPseudo() || "toi";
@@ -1404,9 +1425,9 @@ function initLigue() {
   };
   $("ligue-code-btn").addEventListener("click", copierCode);
   $("end-ligue-titre").addEventListener("click", async () => {
-    const code = ligue ? ligue.code : endLigueCode.textContent;
-    const ok = await copierTexte(code);
-    const c = $("end-ligue-copier"); if (c && ok) { c.textContent = "· copié !"; setTimeout(() => { c.textContent = "· copier"; }, 1600); }
+    if (!ligue || ligue.demo || !ligue.code) return;
+    const ok = await copierTexte(lienLigue(ligue.code));
+    const c = $("end-ligue-copier"); if (c && ok) { c.textContent = "lien copié !"; setTimeout(() => { c.textContent = "copier le lien"; }, 1600); }
   });
   liguePartager.addEventListener("click", () => partagerLigue(`Tu es dans ma ligue « J'ai un pote » (code ${ligue ? ligue.code : ""}) : tu pédales derrière moi, viens battre mon score`));
   endLiguePartager.addEventListener("click", () => partagerLigue(`J'ai fait ${scoreVal.textContent} pts dans notre ligue « J'ai un pote » (code ${ligue ? ligue.code : ""}), même course pour tout le monde. Viens me battre`, `J'ai fait ${scoreVal.textContent} pts à « J'ai un pote », le jeu de PMC. Viens me battre`));

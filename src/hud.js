@@ -47,38 +47,21 @@ function fitFont(ctx, weight, size, text, maxW, min = 9) {
 //            « 6 PIÈCES ». Ni cases ni jauge, aucun texte flouté.
 // Texte blanc la nuit ET sur la plage : le noir ne se lit pas sur le ciel violet.
 //
-// ⚠️ LE BANDEAU EST ÉCRIT À MÊME LE CIEL, et le ciel change tout le temps :
-// le même score noir passait de 15:1 au-dessus d'un ciel clair à 2,38:1
-// au-dessus d'un nuage sombre (outils/contraste.mjs, course entière).
-// Le 13 novembre, un LISERÉ de la couleur opposée réglait ça (≥ 4,4:1 partout).
-// ⚠️ Retiré le 15 novembre 2026, demandé : « l'accessibilité est beaucoup trop
-// augmentée, c'est pas beau du tout. Je préfère une ombre à la place, mais pas
-// de contour autour du texte. » D'où un HALO DOUX de la couleur opposée
-// (ombre floue, sans décalage latéral) : il éclaircit ou fonce le fond juste
-// derrière les lettres, sans trait visible. Moins garanti qu'un liseré —
-// assumé, c'est l'arbitrage de l'artiste.
-// L'OMBRE SEULE, sans la lettre : le texte part hors de l'écran, son ombre
-// est ramenée à sa place. Deux ombres l'une sur l'autre (celle-ci, puis celle
-// du vrai texte) épaississent le halo au BORD des lettres — là où une seule
-// ombre floue s'efface — sans jamais dessiner de contour.
-export function ombreSeule(ctx, texte, x, y) {
-  const L = 10000, T = ctx.getTransform();
-  ctx.save();
-  ctx.shadowOffsetX += L * T.a;
-  ctx.fillText(texte, x - L, y);
-  ctx.restore();
-}
-function poser(ctx, texte, x, y, halo, taille) {
-  ctx.save();
-  ctx.shadowColor = halo === NOIR || halo === "#000000" ? "rgba(0,0,0,0.72)" : "rgba(255,255,255,0.85)";
-  // Le flou coûte en proportion de son rayon : plafonné à 8 px (le score de
-  // 40 px n'en a pas besoin de plus), et doublé seulement sous 20 px.
-  ctx.shadowBlur = Math.max(4, Math.min(8, taille * 0.3));
-  ctx.shadowOffsetX = 0;
-  ctx.shadowOffsetY = Math.max(1, taille * 0.04);
-  if (taille < 20) ombreSeule(ctx, texte, x, y);
-  ctx.fillText(texte, x, y);
-  ctx.restore();
+// ⚠️ LE BANDEAU N'EST PLUS ÉCRIT À MÊME LE CIEL (21 novembre 2026). Le ciel
+// change tout le temps : le même score noir passait de 15:1 sur un ciel clair
+// à 2,38:1 sur un nuage sombre. Trois réponses ont été essayées :
+//   13 nov. : un LISERÉ de la couleur opposée — refusé (« pas de contour ») ;
+//   15 nov. : un HALO flou sous les lettres — refusé le 21 (« un gros sujet
+//             d'ombre, très moche, je veux pas d'ombre derrière les textes ») ;
+//   21 nov. : des PLAQUES à plat — blanc, bord noir 1,5 px, rayon 4 px : la
+//             carte du menu, le bouton pause, les pastilles « LOLA EST LÀ ».
+// Plus aucun shadowBlur ni strokeText sur du texte dans tout le jeu : un texte
+// peint dans le canvas est soit sur une plaque, soit sur un voile sombre plein.
+export function plaque(ctx, x, y, w, h, fond = BLANC) {
+  ctx.fillStyle = fond;
+  roundRect(ctx, x, y, w, h, 4); ctx.fill();
+  ctx.strokeStyle = NOIR; ctx.lineWidth = 1.5;
+  roundRect(ctx, x, y, w, h, 4); ctx.stroke();
 }
 export function renderHud(ctx, width, height, hud) {
   ctx.save();
@@ -87,62 +70,74 @@ export function renderHud(ctx, width, height, hud) {
   ctx.shadowColor = "transparent"; ctx.shadowBlur = 0;
   const clair = hud.nuit > 0.5 || (hud.plage || 0) > 0.35;
   const TXT = clair ? BLANC : NOIR, TXT_VIDE = clair ? "rgba(255,255,255,0.28)" : "rgba(13,13,16,0.22)";
-  const TXT_DOUX = clair ? "rgba(255,255,255,0.8)" : "rgba(13,13,16,0.72)";
-  const LISERE = clair ? NOIR : BLANC;
 
-  // --- Droite : « ×1,5  2 POTES », puis la prochaine étape -----------------
+  // --- Droite : une plaque « ×1,5  2 POTES », et dessous la prochaine étape.
   const total = hud.potesMax;
-  const xD = width - PAD, y1 = top + PAD + 6;
+  const xD = width - 14, y1 = top + 16, H1 = 30;
   const libelle = total === 0 ? "INVITE TES POTES" : hud.potes === 0 ? "TOUT SEUL" : hud.potes === 1 ? "1 POTE" : `${hud.potes} POTES`;
-  ctx.textAlign = "right";
-  ctx.font = `900 16px ${POLICE}`;
+  ctx.font = `900 14px ${POLICE}`;
   const wLib = ctx.measureText(libelle).width;
-  ctx.fillStyle = TXT;
-  poser(ctx, libelle, xD, y1 + 2, LISERE, 16);
-  let gaucheDroite = xD - wLib;
-  if (hud.mult > 1.001) {
-    const txt = `×${String(hud.mult).replace(".", ",")}`;
-    ctx.font = `900 15px ${POLICE}`;
-    const w = ctx.measureText(txt).width + 14;
-    const xP = xD - wLib - 8 - w;
+  const etape = total > 0 && !hud.plein;
+  const ligne2 = etape ? `${hud.restant} PIÈCE${hud.restant > 1 ? "S" : ""}` : "";
+  ctx.font = `800 11px ${POLICE}`;
+  const wEtape = etape ? ctx.measureText("PROCHAINE ÉTAPE").width : 0;
+  ctx.font = `900 14px ${POLICE}`;
+  const wL2 = etape ? ctx.measureText(ligne2).width : 0;
+  let txtMult = "", wMult = 0;
+  if (hud.mult > 1.001) { txtMult = `×${String(hud.mult).replace(".", ",")}`; ctx.font = `900 13px ${POLICE}`; wMult = ctx.measureText(txtMult).width + 12; }
+  const wD = Math.max(wLib + (wMult ? wMult + 7 : 0), wEtape, wL2) + 20;
+  const hD = etape ? H1 + 34 : H1;
+  const xG = xD - wD;
+  plaque(ctx, xG, y1, wD, hD);
+  ctx.textBaseline = "middle";
+  ctx.textAlign = "right";
+  ctx.font = `900 14px ${POLICE}`;
+  ctx.fillStyle = NOIR;
+  ctx.fillText(libelle, xD - 10, y1 + H1 / 2 + 1);
+  if (wMult) {
+    const xP = xD - 10 - wLib - 7 - wMult;
     ctx.fillStyle = hud.turbo ? ROUGE_TXT : JAUNE;
-    roundRect(ctx, xP, y1 - 2, w, 24, 4);
-    ctx.fill();
+    roundRect(ctx, xP, y1 + 5, wMult, H1 - 10, 3); ctx.fill();
     ctx.fillStyle = hud.turbo ? BLANC : "#4a3305";
     ctx.textAlign = "center";
-    ctx.fillText(txt, xP + w / 2, y1 + 3);
-    gaucheDroite = Math.min(gaucheDroite, xP);
+    ctx.font = `900 13px ${POLICE}`;
+    ctx.fillText(txtMult, xP + wMult / 2, y1 + H1 / 2 + 1);
   }
-  if (total > 0 && !hud.plein) {
+  if (etape) {
+    ctx.fillStyle = "rgba(13,13,16,0.14)";
+    ctx.fillRect(xG + 10, y1 + H1 - 1, wD - 20, 1);
     ctx.textAlign = "right";
-    ctx.font = `800 10.5px ${POLICE}`;
-    ctx.fillStyle = TXT_DOUX;
-    poser(ctx, "PROCHAINE ÉTAPE", xD, y1 + 29, LISERE, 10.5);
-    ctx.font = `900 16px ${POLICE}`;
-    ctx.fillStyle = TXT;
-    poser(ctx, `${hud.restant} PIÈCE${hud.restant > 1 ? "S" : ""}`, xD, y1 + 43, LISERE, 16);
+    ctx.font = `800 11px ${POLICE}`;
+    ctx.fillStyle = "rgba(13,13,16,0.72)";
+    ctx.fillText("PROCHAINE ÉTAPE", xD - 10, y1 + H1 + 9);
+    ctx.font = `900 14px ${POLICE}`;
+    ctx.fillStyle = NOIR;
+    ctx.fillText(ligne2, xD - 10, y1 + H1 + 23);
   }
 
-  // --- Centre : les points, au MILIEU DE L'ÉCRAN (pas entre les deux blocs :
-  // avec « ×5 5 POTES » à droite, ils partaient vers la gauche). Ils
-  // rapetissent plutôt que de toucher le bouton pause ou le bloc de droite.
-  const leftEnd = 14 + 46 + 10, rightStart = gaucheDroite - 10;
-  const cx = width / 2;
+  // --- Centre : les points, au MILIEU DE L'ÉCRAN, sur leur plaque. Ils
+  // rapetissent plutôt que de toucher le bouton pause ou le bloc de droite ;
+  // sur un écran étroit où le milieu est pris, ils se rangent entre les deux.
+  const leftEnd = 14 + 46 + 8, rightStart = xG - 8;
+  let cx = width / 2;
+  if (2 * Math.min(cx - leftEnd, rightStart - cx) < 96) cx = (leftEnd + rightStart) / 2;
   const centerW = 2 * Math.min(cx - leftEnd, rightStart - cx);
   const num = formatMetres(hud.metres);
-  let taille = 40;
-  ctx.font = `900 ${taille}px ${POLICE_TITRE}`;
-  while (ctx.measureText(num).width + 26 > centerW && taille > 22) { taille -= 2; ctx.font = `900 ${taille}px ${POLICE_TITRE}`; }
-  const wNum = ctx.measureText(num).width;
-  ctx.font = `700 14px ${POLICE}`;
+  let taille = 30;
+  ctx.font = `700 12px ${POLICE}`;
   const wUnit = ctx.measureText(" pts").width;
-  const x0 = cx - (wNum + wUnit) / 2;
-  ctx.fillStyle = TXT;
-  ctx.textAlign = "left";
   ctx.font = `900 ${taille}px ${POLICE_TITRE}`;
-  poser(ctx, num, x0, top + PAD - 2, LISERE, taille);
-  ctx.font = `700 14px ${POLICE}`;
-  poser(ctx, " pts", x0 + wNum, top + PAD + taille * 0.5, LISERE, 14);
+  while (ctx.measureText(num).width + wUnit + 24 > centerW && taille > 16) { taille -= 1; ctx.font = `900 ${taille}px ${POLICE_TITRE}`; }
+  const wNum = ctx.measureText(num).width;
+  const wS = wNum + wUnit + 24, hS = 46;
+  plaque(ctx, cx - wS / 2, y1, wS, hS);
+  const x0 = cx - (wNum + wUnit) / 2, yS = y1 + hS / 2;
+  ctx.fillStyle = NOIR;
+  ctx.textAlign = "left";
+  ctx.textBaseline = "alphabetic";
+  ctx.fillText(num, x0, yS + taille * 0.34);
+  ctx.font = `700 12px ${POLICE}`;
+  ctx.fillText(" pts", x0 + wNum, yS + taille * 0.34);
 
   // --- Tout en haut : la barre du MORCEAU, comme les barres des stories ----
   // (Instagram) : elle se remplit jusqu'au drapeau d'arrivée, rouge dans les
@@ -228,7 +223,6 @@ export function renderHoldHint(ctx, width, height, t, alpha) {
 // ⚠️ Plus AUCUN texte dessous depuis le 15 novembre 2026 (« enlève le texte
 // au début, tu mets juste 3, 2, 1, c'est parti ») : ni le rappel de la
 // ligue, ni « monte le son » — la carte « Monte le son » le dit avant.
-// Ombre douce, pas de contour (même demande que le bandeau du haut).
 export function renderCountIn(ctx, width, height, t, beatPeriod, beats, linger) {
   let texte, age;
   if (t < 0) {
@@ -250,32 +244,21 @@ export function renderCountIn(ctx, width, height, t, beatPeriod, beats, linger) 
   ctx.translate(width / 2, Math.max(height * 0.3, 190));
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  let taille = t < 0 ? 84 : 54;
+  let taille = t < 0 ? 72 : 40;
   ctx.font = `900 ${taille}px ${POLICE_TITRE}`;
   // « C'EST PARTI ! » à 1,45× au premier instant ne doit pas sortir de l'écran.
-  while (ctx.measureText(texte).width * 1.45 > width - 32 && taille > 24) { taille -= 2; ctx.font = `900 ${taille}px ${POLICE_TITRE}`; }
+  while ((ctx.measureText(texte).width + taille * 0.7) * 1.45 > width - 24 && taille > 20) { taille -= 2; ctx.font = `900 ${taille}px ${POLICE_TITRE}`; }
   ctx.scale(scale, scale);
-  // Une OMBRE PORTÉE large sous le mot (une tache sombre, floue, pas un
-  // contour) : c'est elle qui détache le jaune et le blanc d'un ciel clair.
-  {
-    const w = ctx.measureText(texte).width, h = taille;
-    ctx.save();
-    ctx.scale(1, 0.55);
-    const g = ctx.createRadialGradient(0, 0, 0, 0, 0, w * 0.62 + h * 0.4);
-    g.addColorStop(0, "rgba(0,0,0,0.42)");
-    g.addColorStop(0.6, "rgba(0,0,0,0.26)");
-    g.addColorStop(1, "rgba(0,0,0,0)");
-    ctx.fillStyle = g;
-    ctx.fillRect(-(w * 0.62 + h * 0.4), -(w * 0.62 + h * 0.4), 2 * (w * 0.62 + h * 0.4), 2 * (w * 0.62 + h * 0.4));
-    ctx.restore();
-  }
-  // Dense et serrée : une ombre large et pâle (14 px à 50 %) laissait le jaune
-  // à 1,45:1 sur le ciel clair du village (outils/contraste.mjs).
-  ctx.shadowColor = "rgba(0,0,0,0.78)";
-  ctx.shadowBlur = 9;
-  ctx.shadowOffsetY = 2;
-  ctx.fillStyle = t < 0 ? BLANC : JAUNE;
-  ctx.fillText(texte, 0, 0);
+  // LE STICKER ROUGE DE TRAVERS de toute la DA (onglets des cartes, « TERMINÉ »)
+  // porte le chiffre : à plat, sans ombre, lisible sur n'importe quel ciel.
+  ctx.rotate(-0.045);
+  const w = Math.max(ctx.measureText(texte).width + taille * 0.7, taille * 1.25), h = taille * 1.25;
+  ctx.fillStyle = ROUGE_TXT;
+  ctx.fillRect(-w / 2, -h / 2, w, h);
+  ctx.strokeStyle = NOIR; ctx.lineWidth = 2;
+  ctx.strokeRect(-w / 2, -h / 2, w, h);
+  ctx.fillStyle = BLANC;
+  ctx.fillText(texte, 0, taille * 0.04);
   ctx.restore();
 }
 
@@ -411,8 +394,6 @@ export function renderFin(ctx, width, height, age, sous = "Tu es allé au bout d
   const taille = Math.min(34, width * 0.085);
   ctx.font = `900 ${taille}px ${POLICE}`;
   const w = ctx.measureText(txt).width + 44, h = taille + 30;
-  ctx.fillStyle = "rgba(0,0,0,0.3)";
-  ctx.fillRect(-w / 2 + 4, -h / 2 + 6, w, h);
   ctx.fillStyle = ROUGE;
   ctx.fillRect(-w / 2, -h / 2, w, h);
   ctx.strokeStyle = NOIR; ctx.lineWidth = 2;
@@ -426,11 +407,12 @@ export function renderFin(ctx, width, height, age, sous = "Tu es allé au bout d
   if (a2 > 0) {
     ctx.save();
     ctx.globalAlpha = a2;
-    ctx.textAlign = "center"; ctx.textBaseline = "top";
-    ctx.font = `700 15px ${POLICE}`;
-    ctx.shadowColor = "transparent"; ctx.shadowBlur = 6; ctx.shadowOffsetY = 2;
-    ctx.fillStyle = BLANC;
-    ctx.fillText(sous, width / 2, cy + 44 + (1 - a2) * 8);
+    ctx.font = `700 14px ${POLICE}`;
+    const ws = Math.min(width - 24, ctx.measureText(sous).width + 28), ys = cy + 46 + (1 - a2) * 8;
+    plaque(ctx, width / 2 - ws / 2, ys, ws, 30);
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillStyle = NOIR;
+    ctx.fillText(sous, width / 2, ys + 16, ws - 16);
     ctx.restore();
   }
 }
@@ -444,9 +426,11 @@ export function renderPastille(ctx, x, y, texte, alpha, jaune = false) {
   ctx.font = `900 11px ${POLICE}`;
   const w = ctx.measureText(texte).width + 16, h = 20;
   x = Math.max(8 + w / 2, Math.min(ctx.canvas.clientWidth - 8 - w / 2, x)); // jamais coupée au bord
-  ctx.fillStyle = jaune ? JAUNE : BLANC; ctx.strokeStyle = NOIR; ctx.lineWidth = 1.5;
+  // `jaune` : true (jaune), false (blanc) ou une couleur ; le rouge porte du blanc.
+  const fond = jaune === true ? JAUNE : !jaune ? BLANC : jaune === ROUGE ? ROUGE_TXT : jaune;
+  ctx.fillStyle = fond; ctx.strokeStyle = NOIR; ctx.lineWidth = 1.5;
   ctx.beginPath(); ctx.rect(Math.round(x - w / 2) + 0.5, Math.round(y - h) + 0.5, Math.round(w), h); ctx.fill(); ctx.stroke();
-  ctx.fillStyle = NOIR; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.fillStyle = fond === ROUGE_TXT ? BLANC : NOIR; ctx.textAlign = "center"; ctx.textBaseline = "middle";
   ctx.fillText(texte, x, y - h / 2 + 0.5);
   ctx.restore();
 }

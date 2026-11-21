@@ -39,7 +39,7 @@
     /* Même DA que « La ville est belle » depuis le 4 septembre 2026 : l'e-card
        de l'EP. Blanc, rouge de charte, serif noire condensée, stickers rouges
        posés de travers, boutons rectangulaires à capitales espacées. */
-    @font-face { font-family: "Source Serif 2"; src: url("fonts/SourceSerif2-Black.woff2") format("woff2"); font-weight: 900; font-style: normal; font-display: block; }
+    @font-face { font-family: "Source Serif 2"; src: url("fonts/SourceSerif2-Black.woff2") format("woff2"); font-weight: 700; font-style: normal; font-display: block; }
 
     :root {
       --rouge: #d93820;
@@ -48,6 +48,17 @@
       --panneau-fond: #ffffff;
       --panneau-bord: #0d0d10;
       --rayon: 4px;
+      /* --- LE SYSTÈME (21 novembre 2026) : tout texte de l'interface prend
+         l'une de ces valeurs, jamais une taille écrite à la main. Voir DESIGN.md.
+         Tailles : xs étiquette · s note · m corps et boutons · saisie (16 px :
+         en dessous, iOS zoome dans le champ) · titre (serif) · score (serif).
+         Graisses : 500 texte, 700 ce qui compte ; 900 réservé à la serif.
+         Interlettrage : --ls-l pour les capitales, 0 pour tout le reste. */
+      --t-xs: 11px; --t-s: 12px; --t-m: 13px; --t-saisie: 16px; --t-titre: 22px;
+      --ls-s: 0.04em; --ls-l: 0.12em;
+      --gris: rgba(13,13,16,0.68); --jaune: #ffcf2e; --filet: rgba(13,13,16,0.12);
+      --e1: 4px; --e2: 8px; --e3: 12px; --e4: 16px; --e5: 24px;
+
       --police: "Helvetica Neue", Helvetica, Arial, system-ui, sans-serif; /* 8 septembre 2026 : « après, Helvetica, simple, efficace » */
       --titre: "Source Serif 2", Georgia, "Times New Roman", serif;
       --safe-top: env(safe-area-inset-top, 0px);
@@ -138,13 +149,13 @@
       padding: 7px 14px; background: var(--rouge); border-radius: 2px; white-space: nowrap; text-align: center;
     }
     .panel-body { padding: 30px 22px 24px; display: flex; flex-direction: column; align-items: center; }
-    .step-eyebrow { margin: 0; font: 700 11.5px var(--police); letter-spacing: 0.14em; text-transform: uppercase; color: var(--blanc); }
+    .step-eyebrow { margin: 0; font: 700 var(--t-xs) var(--police); letter-spacing: var(--ls-l); text-transform: uppercase; color: var(--blanc); }
 
     /* --- Boutons -------------------------------------------------------- */
     .btn {
       display: block; width: 228px; min-height: 46px; margin: 0; padding: 11px 18px;
       border-radius: var(--rayon); border: 1.5px solid transparent;
-      font: 700 13px var(--police); letter-spacing: 0.12em; text-transform: uppercase; text-align: center;
+      font: 700 var(--t-m) var(--police); letter-spacing: var(--ls-l); text-transform: uppercase; text-align: center;
       touch-action: manipulation; -webkit-tap-highlight-color: transparent;
       transition: transform 0.08s ease, filter 0.08s ease, background 0.2s ease, opacity 0.2s ease;
     }
@@ -157,7 +168,7 @@
     .btn-primary:disabled { background: #cccccc; border-color: #bbbbbb; color: var(--blanc); cursor: not-allowed; transform: none; filter: none; }
     .link-minimal {
       display: inline-block; padding: 0; border: none; background: none;
-      color: rgba(0,0,0,0.68); font: 500 13px var(--police); text-decoration: underline; text-underline-offset: 4px;
+      color: rgba(0,0,0,0.68); font: 500 var(--t-m) var(--police); text-decoration: underline; text-underline-offset: 4px;
       touch-action: manipulation; -webkit-tap-highlight-color: transparent;
     }
     .locked { opacity: 0.45; }
@@ -165,17 +176,17 @@
 
     /* --- Menu ----------------------------------------------------------- */
     #pseudo-row { display: flex; align-items: center; gap: 10px; width: 240px; margin-top: 6px; }
-    #pseudo-row .icon { font: 500 14px var(--police); color: rgba(0,0,0,0.68); }
+    #pseudo-row .icon { font: 500 var(--t-m) var(--police); color: rgba(0,0,0,0.68); }
     #pseudo-input {
       flex: 1; min-width: 0; background: transparent; border: none; border-bottom: 1.5px solid rgba(0,0,0,0.4);
-      color: var(--noir); font: 500 16px var(--police); padding: 5px 2px; -webkit-appearance: none;
+      color: var(--noir); font: 500 var(--t-saisie) var(--police); padding: 5px 2px; -webkit-appearance: none;
     }
     #pseudo-input::placeholder { color: rgba(0,0,0,0.68); }
     #pseudo-input:focus { outline: none; border-bottom-color: var(--rouge); }
-    .field-note { width: 240px; margin: 12px 0 18px; font: 500 13px/1.4 var(--police); color: var(--noir); text-align: center; text-wrap: balance; }
-    .regle { width: 240px; margin: 0 0 18px; padding: 0; list-style: none; font: 500 12.5px/1.5 var(--police); color: rgba(0,0,0,0.7); }
+    .field-note { width: 240px; margin: 12px 0 18px; font: 500 var(--t-m)/1.4 var(--police); color: var(--noir); text-align: center; text-wrap: balance; }
+    .regle { width: 240px; margin: 0 0 18px; padding: 0; list-style: none; font: 500 var(--t-s)/1.5 var(--police); color: rgba(0,0,0,0.7); }
     .regle li { display: flex; gap: 8px; }
-    .regle b { font-weight: 900; color: var(--noir); min-width: 62px; }
+    .regle b { font-weight: 700; color: var(--noir); min-width: 62px; }
     #splash { position: fixed; inset: 0; z-index: 200; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; background: var(--rouge); transition: opacity 0.45s ease, visibility 0s linear 0.45s; }
     #splash.fini { opacity: 0; visibility: hidden; pointer-events: none; }
     /* Logo FIXE (4 octobre 2026 : « vu qu'il y a le petit bonhomme qui fait du
@@ -186,17 +197,17 @@
     #loading.failed #loading-track { display: none; }
     #loading-track { width: 100%; height: 3px; border-radius: 999px; background: rgba(255,255,255,0.3); overflow: hidden; }
     #loading-fill { width: 0%; height: 100%; background: #fff; transition: width 0.25s linear; }
-    #loading-label { font: 500 13px var(--police); color: rgba(255,255,255,0.85); font-variant-numeric: tabular-nums; }
+    #loading-label { font: 500 var(--t-m) var(--police); color: rgba(255,255,255,0.85); font-variant-numeric: tabular-nums; }
 
     /* --- Menu en trois étapes ------------------------------------------- */
     #onboarding .step { display: none; }
     #onboarding[data-step="1"] .step[data-step="1"], #onboarding[data-step="2"] .step[data-step="2"], #onboarding[data-step="3"] .step[data-step="3"] { display: block; }
     .champ-row { display: flex; align-items: center; gap: 10px; width: 240px; margin-top: 12px; }
-    #champs-pourquoi { width: 240px; margin: 8px 0 14px; font: 500 12px/1.4 var(--police); color: rgba(0,0,0,0.68); text-align: left; }
-    .champ-titre { width: 240px; margin: 22px 0 2px; font: 700 11px var(--police); letter-spacing: 0.14em; text-transform: uppercase; color: rgba(0,0,0,0.68); text-align: left; }
+    #champs-pourquoi { width: 240px; margin: 8px 0 14px; font: 500 var(--t-s)/1.4 var(--police); color: rgba(0,0,0,0.68); text-align: left; }
+    .champ-titre { width: 240px; margin: 22px 0 2px; font: 700 var(--t-xs) var(--police); letter-spacing: var(--ls-l); text-transform: uppercase; color: rgba(0,0,0,0.68); text-align: left; }
     #step1-next { margin-top: 24px; }
-    .champ-row .icon { font: 700 11px var(--police); color: rgba(0,0,0,0.68); min-width: 16px; text-align: center; }
-    .champ-row input { flex: 1; min-width: 0; background: transparent; border: none; border-bottom: 1.5px solid rgba(0,0,0,0.25); color: var(--noir); font: 500 16px var(--police); padding: 5px 2px; -webkit-appearance: none; }
+    .champ-row .icon { font: 700 var(--t-xs) var(--police); color: rgba(0,0,0,0.68); min-width: 16px; text-align: center; }
+    .champ-row input { flex: 1; min-width: 0; background: transparent; border: none; border-bottom: 1.5px solid rgba(0,0,0,0.25); color: var(--noir); font: 500 var(--t-saisie) var(--police); padding: 5px 2px; -webkit-appearance: none; }
     .champ-row input:focus { outline: none; border-bottom-color: var(--rouge); }
     #step3-links { margin-top: 10px; }
     #step3-links { display: flex; gap: 18px; }
@@ -211,9 +222,9 @@
        place entre maillot, chapeau et engin ») : chaque réglage tient sur une
        ligne et se lit comme un bloc. */
     .skin-row { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
-    .skin-label { flex: none; font: 700 11px var(--police); letter-spacing: 0.1em; text-transform: uppercase; color: rgba(0,0,0,0.68); }
+    .skin-label { flex: none; font: 700 var(--t-xs) var(--police); letter-spacing: var(--ls-l); text-transform: uppercase; color: rgba(0,0,0,0.68); }
     .chips { display: flex; flex-wrap: wrap; gap: 6px; }
-    .chip { min-width: 24px; height: 26px; padding: 0 6px; border-radius: 3px; border: 1.5px solid rgba(0,0,0,0.25); background: #fff; font: 700 11px var(--police); letter-spacing: 0.06em; text-transform: uppercase; color: var(--noir); -webkit-tap-highlight-color: transparent; }
+    .chip { min-width: 24px; height: 26px; padding: 0 6px; border-radius: 3px; border: 1.5px solid rgba(0,0,0,0.25); background: #fff; font: 700 var(--t-xs) var(--police); letter-spacing: var(--ls-s); text-transform: uppercase; color: var(--noir); -webkit-tap-highlight-color: transparent; }
     .chip.couleur { padding: 0; width: 26px; }
     .chip.actif { border-color: var(--noir); box-shadow: 0 0 0 2px #ffcf2e; }
     #sprint-button { margin-top: 8px; }
@@ -224,8 +235,8 @@
     #expl-carte { position: relative; width: min(300px, 100%); box-sizing: border-box; padding: 30px 20px 16px; background: #fff; border: 1.5px solid var(--noir); border-radius: var(--rayon); text-align: center; animation: expl-in 0.35s ease-out both; }
     .expl-etape { display: none; }
     .expl-etape.on { display: block; animation: expl-in 0.3s ease-out both; }
-    .expl-titre { margin: 4px 0 12px; font: 900 27px/1.05 var(--titre); color: var(--noir); }
-    .expl-texte { margin: 0 0 12px; font: 500 13.5px/1.45 var(--police); color: var(--noir); }
+    .expl-titre { margin: 4px 0 12px; font: 900 var(--t-titre)/1.1 var(--titre); color: var(--noir); }
+    .expl-texte { margin: 0 0 12px; font: 500 var(--t-m)/1.45 var(--police); color: var(--noir); }
     /* Main et haut-parleur DESSINÉS (4 octobre 2026, nuit) : les emojis 👆 🔊
        changeaient de tête selon le téléphone (Samsung ≠ iPhone). */
     #expl-son { position: relative; width: 120px; height: 90px; margin: 0 auto 10px; }
@@ -237,38 +248,38 @@
     #expl-invit { width: 252px; max-width: 100%; margin: 0 auto 12px; }
     #expl-score { position: relative; display: flex; align-items: baseline; justify-content: center; gap: 4px; margin: 0 0 10px; }
     #expl-score b { font: 900 46px/1 var(--titre); color: var(--noir); font-variant-numeric: tabular-nums; }
-    #expl-score small { font: 700 14px var(--police); color: var(--noir); }
+    #expl-score small { font: 700 var(--t-m) var(--police); color: var(--noir); }
     #expl-score.pop b { animation: expl-pop 0.3s ease-out; }
-    #expl-gain { position: absolute; right: -2px; top: -6px; padding: 3px 7px; background: var(--rouge); color: #fff; font: 900 13px var(--police); border-radius: 3px; transform: rotate(4deg); opacity: 0; }
+    #expl-gain { position: absolute; right: -2px; top: -6px; padding: 3px 7px; background: var(--rouge); color: #fff; font: 700 var(--t-m) var(--police); border-radius: 3px; transform: rotate(4deg); opacity: 0; }
     #expl-gain.on { opacity: 1; animation: expl-pop 0.3s ease-out; }
     #expl-fil { list-style: none; margin: 0; padding: 2px 0; height: 124px; overflow: hidden; display: flex; flex-direction: column; gap: 6px; }
     #expl-carte .step-eyebrow { white-space: nowrap; }
-    #expl-fil li { display: flex; align-items: center; gap: 8px; padding: 6px 9px; border: 1.5px solid var(--noir); border-radius: var(--rayon); background: #fff; font: 600 12.5px var(--police); color: var(--noir); text-align: left; animation: expl-fil-in 0.28s ease-out both; }
+    #expl-fil li { display: flex; align-items: center; gap: 8px; padding: 6px 9px; border: 1.5px solid var(--noir); border-radius: var(--rayon); background: #fff; font: 700 var(--t-s) var(--police); color: var(--noir); text-align: left; animation: expl-fil-in 0.28s ease-out both; }
     #expl-fil li .ico { flex: none; width: 18px; height: 18px; }
     #expl-fil li .txt { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    #expl-fil li .plus { flex: none; font-weight: 900; color: var(--rouge); }
+    #expl-fil li .plus { flex: none; font-weight: 700; color: var(--rouge); }
     #expl-fil li.rejoint { background: #ffcf2e; }
     @keyframes expl-fil-in { from { transform: translateY(-8px); opacity: 0; } to { transform: none; opacity: 1; } }
     #expl-barre { height: 4px; background: rgba(0,0,0,0.12); overflow: hidden; }
     #expl-barre i { display: block; height: 100%; width: 0; background: var(--rouge); }
     #explication { flex-direction: column; }
-    #expl-passer { position: absolute; left: 0; right: 0; bottom: calc(28px + env(safe-area-inset-bottom, 0px)); margin: 0; font: 900 13px var(--police); letter-spacing: 0.14em; text-transform: uppercase; color: #fff; text-align: center; animation: expl-clignote 1.2s ease-in-out infinite; }
+    #expl-passer { position: absolute; left: 0; right: 0; bottom: calc(28px + env(safe-area-inset-bottom, 0px)); margin: 0; font: 700 var(--t-m) var(--police); letter-spacing: var(--ls-l); text-transform: uppercase; color: #fff; text-align: center; animation: expl-clignote 1.2s ease-in-out infinite; }
     @keyframes expl-clignote { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
     @keyframes expl-in { from { transform: scale(0.9); opacity: 0; } to { transform: none; opacity: 1; } }
     @keyframes expl-pop { 0% { transform: scale(1.25); } 100% { transform: scale(1); } }
-    #boost-ligue { margin-top: 8px; width: 100%; padding: 8px 10px; border: 1.5px solid var(--noir); border-radius: 3px; background: #ffcf2e; color: var(--noir); font: 500 11px/1.35 var(--police); text-align: left; -webkit-tap-highlight-color: transparent; }
-    #boost-ligue b { font-weight: 900; letter-spacing: 0.06em; }
-    #boost-ligue small { display: block; margin-top: 3px; font: 600 11px/1.35 var(--police); color: rgba(0,0,0,0.7); }
-    #end-rang { margin: 0; padding: 4px 10px; background: #ffcf2e; border: 1.5px solid var(--noir); transform: rotate(-1.5deg); font: 900 13px var(--police); letter-spacing: 0.08em; text-transform: uppercase; color: var(--noir); }
-    #sprint-note { margin: 6px 0 0; font: 500 11px var(--police); color: rgba(0,0,0,0.68); text-align: center; }
-    #end-max { margin: 4px 0 0; font: 500 12px/1.4 var(--police); color: rgba(0,0,0,0.68); text-align: center; }
-    #end-max b { color: var(--rouge); font-weight: 900; }
-    #end-ligue-liste .fantome { margin-left: 4px; font-size: 11px; opacity: 0.7; }
-    #end-relais { margin: 4px 0 0; font: 500 12px/1.4 var(--police); color: rgba(0,0,0,0.68); text-align: center; }
+    #boost-ligue { margin-top: 8px; width: 100%; padding: 8px 10px; border: 1.5px solid var(--noir); border-radius: 3px; background: #ffcf2e; color: var(--noir); font: 500 var(--t-xs)/1.35 var(--police); text-align: left; -webkit-tap-highlight-color: transparent; }
+    #boost-ligue b { font-weight: 700; letter-spacing: var(--ls-s); }
+    #boost-ligue small { display: block; margin-top: 3px; font: 700 var(--t-xs)/1.35 var(--police); color: rgba(0,0,0,0.7); }
+    #end-rang { margin: 0; padding: 4px 10px; background: #ffcf2e; border: 1.5px solid var(--noir); transform: rotate(-1.5deg); font: 700 var(--t-m) var(--police); letter-spacing: var(--ls-s); text-transform: uppercase; color: var(--noir); }
+    #sprint-note { margin: 6px 0 0; font: 500 var(--t-xs) var(--police); color: rgba(0,0,0,0.68); text-align: center; }
+    #end-max { margin: 4px 0 0; font: 500 var(--t-s)/1.4 var(--police); color: rgba(0,0,0,0.68); text-align: center; }
+    #end-max b { color: var(--rouge); font-weight: 700; }
+    #end-ligue-liste .fantome { margin-left: 4px; font-size: var(--t-xs); opacity: 0.7; }
+    #end-relais { margin: 4px 0 0; font: 500 var(--t-s)/1.4 var(--police); color: rgba(0,0,0,0.68); text-align: center; }
 
     /* --- Bêta fermée (16 septembre 2026) ---------------------------------- */
     body.beta .beta-off { display: none !important; }
-    #beta-tag { margin: 0 0 26px; padding: 5px 10px; background: var(--rouge); color: var(--blanc); border-radius: 2px; transform: rotate(-1.5deg); font: 900 11px var(--police); letter-spacing: 0.12em; text-transform: uppercase; }
+    #beta-tag { margin: 0 0 26px; padding: 5px 10px; background: var(--rouge); color: var(--blanc); border-radius: 2px; transform: rotate(-1.5deg); font: 700 var(--t-xs) var(--police); letter-spacing: var(--ls-l); text-transform: uppercase; }
     #end-retour { margin-top: 2px; }
     #retour-sheet { position: fixed; inset: 0; z-index: 49; display: flex; align-items: center; justify-content: center; padding: 24px; visibility: hidden; transition: visibility 0s linear 0.25s; }
     #retour-sheet.visible { visibility: visible; transition: visibility 0s; }
@@ -276,80 +287,80 @@
     #retour-sheet.visible #retour-veil { opacity: 1; }
     #retour-card { position: relative; box-sizing: border-box; width: min(320px, 100%); padding: 30px 20px 18px; border-radius: var(--rayon); border: 1.5px solid var(--panneau-bord); background: var(--panneau-fond); display: flex; flex-direction: column; align-items: center; gap: 10px; transform: scale(0.9); opacity: 0; transition: transform 0.25s ease, opacity 0.25s ease; }
     #retour-sheet.visible #retour-card { transform: scale(1); opacity: 1; }
-    #retour-title { margin: 2px 0 0; font: 900 26px/1.05 var(--titre); color: var(--noir); text-align: center; text-wrap: balance; }
-    #retour-text { margin: 0; font: 500 12.5px/1.5 var(--police); color: rgba(0,0,0,0.7); text-align: center; text-wrap: balance; }
-    #retour-input { box-sizing: border-box; width: 100%; min-height: 108px; resize: none; border: 1.5px solid rgba(0,0,0,0.35); border-radius: var(--rayon); padding: 10px; font: 500 14px/1.45 var(--police); color: var(--noir); background: transparent; -webkit-appearance: none; }
+    #retour-title { margin: 2px 0 0; font: 900 var(--t-titre)/1.1 var(--titre); color: var(--noir); text-align: center; text-wrap: balance; }
+    #retour-text { margin: 0; font: 500 var(--t-s)/1.5 var(--police); color: rgba(0,0,0,0.7); text-align: center; text-wrap: balance; }
+    #retour-input { box-sizing: border-box; width: 100%; min-height: 108px; resize: none; border: 1.5px solid rgba(0,0,0,0.35); border-radius: var(--rayon); padding: 10px; font: 500 var(--t-m)/1.45 var(--police); color: var(--noir); background: transparent; -webkit-appearance: none; }
     #retour-input:focus { outline: none; border-color: var(--rouge); }
     #retour-input, #pseudo-input, .champ-row input, #ligue-input { -webkit-user-select: text; user-select: text; -webkit-touch-callout: default; }
-    #retour-compteur { margin: -6px 0 0; align-self: flex-end; font: 500 11px var(--police); color: rgba(0,0,0,0.68); font-variant-numeric: tabular-nums; }
+    #retour-compteur { margin: -6px 0 0; align-self: flex-end; font: 500 var(--t-xs) var(--police); color: rgba(0,0,0,0.68); font-variant-numeric: tabular-nums; }
     #retour-envoyer { width: 100%; }
     #retour-form { display: flex; flex-direction: column; align-items: center; gap: 10px; width: 100%; }
     #retour-ok { display: flex; flex-direction: column; align-items: center; gap: 8px; }
-    #retour-ok .coche { width: 46px; height: 46px; border-radius: 50%; background: var(--rouge); color: var(--blanc); display: flex; align-items: center; justify-content: center; font: 900 24px var(--police); }
+    #retour-ok .coche { width: 46px; height: 46px; border-radius: 50%; background: var(--rouge); color: var(--blanc); display: flex; align-items: center; justify-content: center; font: 900 var(--t-titre)/1.1 var(--titre); }
 
     /* --- Ligue ---------------------------------------------------------- */
     #ligue-bloc { width: 240px; margin: 0 0 16px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
     #ligue-bloc.hidden { display: none; }
     #ligue-row { display: flex; gap: 8px; width: 100%; }
-    #ligue-input { flex: 1; min-width: 0; box-sizing: border-box; border: 1.5px solid rgba(0,0,0,0.35); border-radius: var(--rayon); padding: 7px 10px; font: 700 16px var(--police); letter-spacing: 0.1em; text-transform: uppercase; color: var(--noir); background: transparent; -webkit-appearance: none; }
+    #ligue-input { flex: 1; min-width: 0; box-sizing: border-box; border: 1.5px solid rgba(0,0,0,0.35); border-radius: var(--rayon); padding: 7px 10px; font: 700 var(--t-saisie) var(--police); letter-spacing: var(--ls-l); text-transform: uppercase; color: var(--noir); background: transparent; -webkit-appearance: none; }
     #ligue-input:focus { outline: none; border-color: var(--rouge); }
-    #ligue-row .btn { width: auto; min-height: 38px; padding: 8px 12px; font-size: 11px; }
+    #ligue-row .btn { width: auto; min-height: 38px; padding: 8px 12px; font-size: var(--t-xs); }
     #ligue-sans, #ligue-avec { display: flex; flex-direction: column; align-items: center; gap: 8px; width: 100%; }
-    #ligue-titre { margin: 0; font: 700 11px var(--police); letter-spacing: 0.14em; text-transform: uppercase; color: rgba(0,0,0,0.68); }
-    #end-ligue-titre b { color: var(--rouge); font-weight: 900; font-size: 15px; letter-spacing: 0.18em; }
-    #ligue-membres { margin: 0; font: 500 12px/1.4 var(--police); color: var(--noir); text-align: center; }
+    #ligue-titre { margin: 0; font: 700 var(--t-xs) var(--police); letter-spacing: var(--ls-l); text-transform: uppercase; color: rgba(0,0,0,0.68); }
+    #end-ligue-titre b { color: var(--rouge); font-weight: 700; font-size: var(--t-m); letter-spacing: var(--ls-l); }
+    #ligue-membres { margin: 0; font: 500 var(--t-s)/1.4 var(--police); color: var(--noir); text-align: center; }
     .share-inner { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; }
     .share-apps { display: flex; align-items: center; justify-content: center; gap: 7px; opacity: 0.55; }
     .share-apps svg { display: block; flex: none; }
-    #ligue-intro { margin: 0 0 6px; font: 500 13px/1.4 var(--police); color: var(--noir); text-align: center; text-wrap: balance; }
-    #ligue-intro b { font-weight: 900; }
+    #ligue-intro { margin: 0 0 6px; font: 500 var(--t-m)/1.4 var(--police); color: var(--noir); text-align: center; text-wrap: balance; }
+    #ligue-intro b { font-weight: 700; }
     #ligue-sans > #ligue-creer { width: 100%; }
-    .lp-sep { position: relative; width: 100%; margin: 4px 0 0; text-align: center; font: 700 11px var(--police); letter-spacing: 0.14em; text-transform: uppercase; color: rgba(0,0,0,0.68); }
+    .lp-sep { position: relative; width: 100%; margin: 4px 0 0; text-align: center; font: 700 var(--t-xs) var(--police); letter-spacing: var(--ls-l); text-transform: uppercase; color: rgba(0,0,0,0.68); }
     .lp-sep::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; border-top: 1px solid rgba(0,0,0,0.15); }
     .lp-sep span { position: relative; padding: 0 8px; background: #fff; }
-    .lp-ou { margin: 0 0 -2px; font: 700 12px var(--police); color: var(--noir); }
+    .lp-ou { margin: 0 0 -2px; font: 700 var(--t-s) var(--police); color: var(--noir); }
     #ligue-code-btn { display: flex; flex-direction: column; align-items: center; gap: 2px; margin: -2px 0 2px; padding: 6px 14px; border: 1.5px dashed rgba(0,0,0,0.35); border-radius: var(--rayon); background: none; cursor: pointer; -webkit-tap-highlight-color: transparent; }
-    #ligue-code-btn b { font: 900 34px/1 var(--police); letter-spacing: 0.16em; color: var(--rouge); -webkit-user-select: all; user-select: all; }
-    #ligue-code-btn small { font: 600 11px var(--police); letter-spacing: 0.1em; text-transform: uppercase; color: rgba(0,0,0,0.68); }
+    #ligue-code-btn b { font: 900 34px/1 var(--police); letter-spacing: var(--ls-l); color: var(--rouge); -webkit-user-select: all; user-select: all; }
+    #ligue-code-btn small { font: 700 var(--t-xs) var(--police); letter-spacing: var(--ls-l); text-transform: uppercase; color: rgba(0,0,0,0.68); }
     #ligue-code-btn:active { transform: scale(0.97); }
-    #ligue-avec #ligue-partager { width: 100%; min-height: 76px; font-size: 15px; }
+    #ligue-avec #ligue-partager { width: 100%; min-height: 76px; font-size: var(--t-m); }
     #ligue-avec #ligue-partager .share-inner { gap: 9px; }
     #ligue-avec #ligue-partager .share-apps { gap: 16px; opacity: 0.9; }
     #ligue-code-btn { width: 100%; box-sizing: border-box; }
     #ligue-avec, #ligue-sans { gap: 10px; }
     #ligue-peloton { display: flex; flex-wrap: wrap; justify-content: center; gap: 5px; width: 100%; margin: 2px 0 0; padding: 0; list-style: none; }
-    #ligue-peloton li { padding: 4px 8px; border: 1.5px solid var(--noir); border-radius: 3px; font: 700 11.5px var(--police); color: var(--noir); }
+    #ligue-peloton li { padding: 4px 8px; border: 1.5px solid var(--noir); border-radius: 3px; font: 700 var(--t-xs) var(--police); color: var(--noir); }
     #ligue-peloton li.moi { background: #ffcf2e; }
-    #ligue-peloton li.bot { border-style: dashed; border-color: rgba(0,0,0,0.68); color: rgba(0,0,0,0.68); font-weight: 600; }
+    #ligue-peloton li.bot { border-style: dashed; border-color: rgba(0,0,0,0.68); color: rgba(0,0,0,0.68); font-weight: 700; }
     #ligue-peloton li.nouveau { animation: expl-pop 0.3s ease-out; }
-    .btn.btn-petit { min-height: 38px; padding: 8px 14px; font-size: 11px; width: auto; }
+    .btn.btn-petit { min-height: 38px; padding: 8px 14px; font-size: var(--t-xs); width: auto; }
     #step2-liens { display: flex; gap: 26px; justify-content: center; align-items: center; margin-top: 14px; }
     #step2-liens .link-minimal { margin: 0; line-height: 1.2; }
     [data-step="2"] #step2-next { width: 100%; margin-top: 12px; }
     [data-step="2"] #step2-next.btn-petit { width: auto; }
-    #ligue-msg { width: 100%; box-sizing: border-box; margin: 0; font: 700 12.5px/1.35 var(--police); color: var(--rouge); text-align: center; }
-    #ligue-statut { width: 100%; box-sizing: border-box; margin: 0; padding: 8px 10px; background: #ffcf2e; border: 1.5px solid var(--noir); border-radius: 3px; font: 700 13px/1.35 var(--police); color: var(--noir); text-align: center; }
+    #ligue-msg { width: 100%; box-sizing: border-box; margin: 0; font: 700 var(--t-s)/1.35 var(--police); color: var(--rouge); text-align: center; }
+    #ligue-statut { width: 100%; box-sizing: border-box; margin: 0; padding: 8px 10px; background: #ffcf2e; border: 1.5px solid var(--noir); border-radius: 3px; font: 700 var(--t-m)/1.35 var(--police); color: var(--noir); text-align: center; }
     #end-ligue { width: 100%; margin: 0 0 12px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
-    #end-ligue-titre { margin: 0; padding: 0; border: none; background: none; font: 700 11px var(--police); letter-spacing: 0.14em; text-transform: uppercase; color: rgba(0,0,0,0.68); cursor: pointer; -webkit-tap-highlight-color: transparent; }
+    #end-ligue-titre { margin: 0; padding: 0; border: none; background: none; font: 700 var(--t-xs) var(--police); letter-spacing: var(--ls-l); text-transform: uppercase; color: rgba(0,0,0,0.68); cursor: pointer; -webkit-tap-highlight-color: transparent; }
     #end-ligue-titre b { text-decoration: underline; text-underline-offset: 4px; }
-    #end-ligue-titre small { font: 600 11px var(--police); letter-spacing: 0.08em; color: rgba(0,0,0,0.68); text-decoration: underline; text-underline-offset: 3px; }
+    #end-ligue-titre small { font: 700 var(--t-xs) var(--police); letter-spacing: var(--ls-s); color: rgba(0,0,0,0.68); text-decoration: underline; text-underline-offset: 3px; }
     #ligue-titre { margin: 0; }
-    #end-ligue-liste { width: 100%; margin: 0; padding: 0; list-style: none; font: 500 13px var(--police); color: var(--noir); }
+    #end-ligue-liste { width: 100%; margin: 0; padding: 0; list-style: none; font: 500 var(--t-m) var(--police); color: var(--noir); }
     #end-ligue-liste li { display: flex; gap: 8px; padding: 5px 4px; border-bottom: 1px solid rgba(0,0,0,0.08); }
-    #end-ligue-liste li.moi { background: rgba(255,207,46,0.35); border-radius: 3px; font-weight: 900; }
-    #end-ligue-liste .rang { width: 18px; color: rgba(0,0,0,0.68); font-weight: 900; }
+    #end-ligue-liste li.moi { background: rgba(255,207,46,0.35); border-radius: 3px; font-weight: 700; }
+    #end-ligue-liste .rang { width: 18px; color: rgba(0,0,0,0.68); font-weight: 700; }
     #end-ligue-liste .rang .couronne { width: 16px; height: 12px; vertical-align: -1px; }
-    #end-ecart { margin: 0; font: 600 13px/1.35 var(--police); text-align: center; color: var(--noir); }
-    #end-ecart b { font-weight: 900; color: var(--rouge); }
+    #end-ecart { margin: 0; font: 700 var(--t-m)/1.35 var(--police); text-align: center; color: var(--noir); }
+    #end-ecart b { font-weight: 700; color: var(--rouge); }
     #end-ligue-liste .nom { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    #end-ligue-liste .m { font-variant-numeric: tabular-nums; font-weight: 900; }
-    #end-ligue .btn { width: 100%; padding: 8px 10px; min-height: 40px; font-size: 12px; }
+    #end-ligue-liste .m { font-variant-numeric: tabular-nums; font-weight: 700; }
+    #end-ligue .btn { width: 100%; padding: 8px 10px; min-height: 40px; font-size: var(--t-s); }
 
     #cta-link {
       position: relative; margin: 10px auto 0; flex: none;
       display: flex; align-items: center; justify-content: center; gap: 8px; width: 240px; box-sizing: border-box; padding: 11px 22px;
       border: 1.5px solid var(--noir); border-radius: var(--rayon); background: var(--blanc); color: var(--noir);
-      font: 700 13px var(--police); letter-spacing: 0.12em; text-transform: uppercase; text-decoration: none; white-space: nowrap;
+      font: 700 var(--t-m) var(--police); letter-spacing: var(--ls-l); text-transform: uppercase; text-decoration: none; white-space: nowrap;
       touch-action: manipulation; -webkit-tap-highlight-color: transparent;
     }
     #cta-link svg { flex: none; opacity: 0.75; }
@@ -361,16 +372,16 @@
     #end-screen .btn { width: 100%; padding: 9px 10px; min-height: 44px; white-space: nowrap; }
     #end-hero { text-align: center; margin: 2px 0 14px; }
     #score-num { font: 900 clamp(52px, 16vw, 64px)/0.9 var(--titre); color: var(--noir); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; display: block; }
-    #score-num small { font: 700 16px var(--police); letter-spacing: 0.06em; margin-left: 4px; }
-    #end-sub { margin: 8px 0 0; font: 500 13px/1.4 var(--police); color: rgba(0,0,0,0.68); text-align: center; text-wrap: balance; }
+    #score-num small { font: 700 var(--t-saisie) var(--police); letter-spacing: var(--ls-s); margin-left: 4px; }
+    #end-sub { margin: 8px 0 0; font: 500 var(--t-m)/1.4 var(--police); color: rgba(0,0,0,0.68); text-align: center; text-wrap: balance; }
     /* « Nouveau record » : sticker en haut à droite de la carte (6 septembre 2026). */
     #end-best {
       position: absolute; top: 22px; right: -16px; margin: 0; padding: 6px 10px;
       transform: rotate(8deg); background: var(--rouge); color: var(--blanc); border-radius: 2px;
-      font: 900 11px var(--police); letter-spacing: 0.12em; text-transform: uppercase; white-space: nowrap;
+      font: 700 var(--t-xs) var(--police); letter-spacing: var(--ls-l); text-transform: uppercase; white-space: nowrap;
     }
     #end-links { display: flex; justify-content: space-between; width: 100%; margin-top: 6px; }
-    #end-links .link-minimal { font: 500 13px var(--police); color: rgba(0,0,0,0.68); text-decoration: underline; }
+    #end-links .link-minimal { font: 500 var(--t-m) var(--police); color: rgba(0,0,0,0.68); text-decoration: underline; }
     #end-actions { display: flex; flex-direction: column; align-items: center; gap: 10px; width: 100%; }
 
     /* --- Carte de mort -------------------------------------------------- */
@@ -391,7 +402,7 @@
     #revive-arc, #gate-arc { fill: none; stroke: var(--rouge); stroke-width: 6; stroke-linecap: round; stroke-dasharray: 207.3; stroke-dashoffset: 0; }
     #revive-timer-num, #gate-timer-num { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font: 900 30px var(--police); color: var(--noir); font-variant-numeric: tabular-nums; }
     #revive-title, #gate-title { margin: 2px 0 6px; font: 900 clamp(22px, 6.5vw, 28px)/1.05 var(--titre); color: var(--noir); text-align: center; text-wrap: balance; }
-    #revive-text, #gate-text { margin: 0 0 4px; font: 500 13.5px/1.5 var(--police); color: rgba(0,0,0,0.7); text-align: center; }
+    #revive-text, #gate-text { margin: 0 0 4px; font: 500 var(--t-m)/1.5 var(--police); color: rgba(0,0,0,0.7); text-align: center; }
     #revive-cta, #revive-replay, #gate-cta, #gate-go, #gate-later { width: 100%; }
     #gate-later { margin-top: 4px; }
 
@@ -415,43 +426,43 @@
     }
     /* Même sticker rouge de travers que toutes les cartes (28 septembre 2026,
        « je veux une cohérence dans les menus »). */
-    #gate-eyebrow, #partage-eyebrow { margin: 0 0 4px; padding: 7px 14px; background: var(--rouge); border-radius: 2px; transform: rotate(-2deg); font: 700 11.5px var(--police); letter-spacing: 0.14em; text-transform: uppercase; color: var(--blanc); text-align: center; }
+    #gate-eyebrow, #partage-eyebrow { margin: 0 0 4px; padding: 7px 14px; background: var(--rouge); border-radius: 2px; transform: rotate(-2deg); font: 700 var(--t-xs) var(--police); letter-spacing: var(--ls-l); text-transform: uppercase; color: var(--blanc); text-align: center; }
     #gate-platforms { width: 100%; display: flex; flex-direction: column; gap: 7px; margin: 2px 0 0; }
     .plat-btn {
       display: flex; align-items: center; gap: 10px; width: 100%; box-sizing: border-box; padding: 11px 14px;
       border: 1.5px solid var(--panneau-bord); border-radius: var(--rayon); background: #fff; color: var(--noir);
-      font: 700 14px var(--police); text-decoration: none; -webkit-tap-highlight-color: transparent;
+      font: 700 var(--t-m) var(--police); text-decoration: none; -webkit-tap-highlight-color: transparent;
     }
     .plat-btn:active { transform: translateY(1px); background: rgba(0,0,0,0.04); }
     .plat-btn .plat-dot { width: 11px; height: 11px; border-radius: 50%; flex: 0 0 auto; }
     .plat-btn .plat-nom { flex: 1 1 auto; text-align: left; }
-    .plat-btn .plat-fleche { flex: 0 0 auto; opacity: 0.4; font-size: 13px; }
-    #gate-platforms .plat-sep { margin: 3px 0 1px; font: 500 11px var(--police); letter-spacing: 0.18em; text-transform: uppercase; color: rgba(0,0,0,0.68); text-align: center; }
-    #gate-hint { margin: 4px 0 0; font: 500 12px/1.45 var(--police); color: rgba(0,0,0,0.68); text-align: center; }
+    .plat-btn .plat-fleche { flex: 0 0 auto; opacity: 0.4; font-size: var(--t-m); }
+    #gate-platforms .plat-sep { margin: 3px 0 1px; font: 500 var(--t-xs) var(--police); letter-spacing: var(--ls-l); text-transform: uppercase; color: rgba(0,0,0,0.68); text-align: center; }
+    #gate-hint { margin: 4px 0 0; font: 500 var(--t-s)/1.45 var(--police); color: rgba(0,0,0,0.68); text-align: center; }
     /* --- Tiroir de partage (5 octobre 2026, navigateurs intégrés) --------- */
     #partage-title { margin: 2px 0 2px; font: 900 clamp(22px, 6.5vw, 26px)/1.05 var(--titre); color: var(--noir); text-align: center; text-wrap: balance; }
-    #partage-text { margin: 0 0 4px; font: 500 13px/1.45 var(--police); color: rgba(0,0,0,0.68); text-align: center; }
+    #partage-text { margin: 0 0 4px; font: 500 var(--t-m)/1.45 var(--police); color: rgba(0,0,0,0.68); text-align: center; }
     #partage-lien {
       width: 100%; box-sizing: border-box; margin: 0; padding: 11px 12px; border: 1.5px dashed rgba(0,0,0,0.32); border-radius: var(--rayon);
-      background: #f7f5f0; font: 600 13px/1.3 var(--police); color: var(--noir); text-align: center; word-break: break-all;
+      background: #f7f5f0; font: 700 var(--t-m)/1.3 var(--police); color: var(--noir); text-align: center; word-break: break-all;
       -webkit-user-select: all; user-select: all; -webkit-touch-callout: default;
     }
     #partage-copier, #partage-plus { width: 100%; }
     #partage-copier.fait { background: #1f8a4c; border-color: #1f8a4c; }
-    #partage-hint { margin: 0; font: 700 12.5px/1.4 var(--police); color: #1f8a4c; text-align: center; }
+    #partage-hint { margin: 0; font: 700 var(--t-s)/1.4 var(--police); color: #1f8a4c; text-align: center; }
     #partage-hint.echec { color: var(--rouge); }
     #partage-apps { width: 100%; display: flex; flex-direction: column; gap: 7px; }
-    #partage-apps .plat-sep { margin: 3px 0 1px; font: 500 11px var(--police); letter-spacing: 0.18em; text-transform: uppercase; color: rgba(0,0,0,0.68); text-align: center; }
+    #partage-apps .plat-sep { margin: 3px 0 1px; font: 500 var(--t-xs) var(--police); letter-spacing: var(--ls-l); text-transform: uppercase; color: rgba(0,0,0,0.68); text-align: center; }
     #partage-apps .plat-dot.snap { box-shadow: inset 0 0 0 1px rgba(0,0,0,0.25); }
 
     /* --- Boutons flottants + pause -------------------------------------- */
     #mute-button, #pause-button {
       position: fixed; left: calc(14px + var(--safe-left)); top: calc(14px + var(--safe-top)); z-index: 30;
       width: 44px; height: 44px; border-radius: 6px; border: 1.5px solid rgba(255,255,255,0.6);
-      background: rgba(13,13,16,0.7); color: var(--blanc); font: 900 14px var(--police);
+      background: rgba(13,13,16,0.7); color: var(--blanc); font: 700 var(--t-m) var(--police);
       touch-action: manipulation; -webkit-tap-highlight-color: transparent;
     }
-    #mute-button { font-weight: 500; font-size: 16px; }
+    #mute-button { font-weight: 500; font-size: var(--t-saisie); }
     #mute-button[hidden], #pause-button[hidden] { display: none; }
     #mute-button.muted { color: rgba(255,255,255,0.4); border-color: rgba(255,255,255,0.18); }
     #pause-screen {
@@ -482,29 +493,29 @@
     /* Replié, et ABSENT pendant la saisie du pseudo ou de l'Insta : la carte doit
        tenir au-dessus du clavier d'un petit iPhone (outils/clavier.mjs). */
     #plus-contact { width: 240px; margin-top: 10px; }
-    #plus-contact summary { cursor: pointer; font: 700 12px var(--police); color: rgba(0,0,0,0.68); list-style: none; padding: 4px 0; }
+    #plus-contact summary { cursor: pointer; font: 700 var(--t-s) var(--police); color: rgba(0,0,0,0.68); list-style: none; padding: 4px 0; }
     #plus-contact summary::-webkit-details-marker { display: none; }
     #overlay.clavier #plus-contact:not(:focus-within) { display: none; }
-    #newsletter-row { display: flex; align-items: flex-start; gap: 8px; width: 240px; margin-top: 11px; font: 500 12px/1.35 var(--police); color: rgba(0,0,0,0.7); text-align: left; }
+    #newsletter-row { display: flex; align-items: flex-start; gap: 8px; width: 240px; margin-top: 11px; font: 500 var(--t-s)/1.35 var(--police); color: rgba(0,0,0,0.7); text-align: left; }
     #newsletter-row input { width: 16px; height: 16px; margin: 0; flex: 0 0 auto; accent-color: var(--rouge); }
-    #pourquoi-contact { width: 240px; margin: 9px 0 0; font: 500 11.5px/1.4 var(--police); color: rgba(0,0,0,0.68); text-align: left; }
+    #pourquoi-contact { width: 240px; margin: 9px 0 0; font: 500 var(--t-xs)/1.4 var(--police); color: rgba(0,0,0,0.68); text-align: left; }
     #pourquoi-contact a, #classement-regle a { color: var(--rouge); font-weight: 700; text-decoration: underline; text-underline-offset: 2px; }
     #ligue-nom-row { width: 100%; margin: 0 0 4px; }
-    #ligue-nom-apercu { margin: 0 0 11px; font: 600 12px/1.35 var(--police); color: rgba(0,0,0,0.68); text-align: center; overflow-wrap: anywhere; }
-    #ligue-nom-apercu b { color: var(--noir); font-weight: 800; }
-    #ligue-lien { margin: 0 0 8px; font: 600 12px/1.3 var(--police); color: rgba(0,0,0,0.68); text-align: center; overflow-wrap: anywhere; -webkit-user-select: all; user-select: all; }
-    #ligue-arrivees { margin: 4px 0 0; padding: 5px 10px; background: #ffcf2e; border: 1.5px solid var(--noir); border-radius: 3px; font: 700 12px/1.35 var(--police); color: var(--noir); text-align: center; }
-    #ligue-concours { margin: 6px 0 0; font: 600 12px/1.4 var(--police); color: rgba(0,0,0,0.68); text-align: center; }
-    #ligue-concours b { color: var(--rouge); font-weight: 900; }
+    #ligue-nom-apercu { margin: 0 0 11px; font: 700 var(--t-s)/1.35 var(--police); color: rgba(0,0,0,0.68); text-align: center; overflow-wrap: anywhere; }
+    #ligue-nom-apercu b { color: var(--noir); font-weight: 700; }
+    #ligue-lien { margin: 0 0 8px; font: 700 var(--t-s)/1.3 var(--police); color: rgba(0,0,0,0.68); text-align: center; overflow-wrap: anywhere; -webkit-user-select: all; user-select: all; }
+    #ligue-arrivees { margin: 4px 0 0; padding: 5px 10px; background: #ffcf2e; border: 1.5px solid var(--noir); border-radius: 3px; font: 700 var(--t-s)/1.35 var(--police); color: var(--noir); text-align: center; }
+    #ligue-concours { margin: 6px 0 0; font: 700 var(--t-s)/1.4 var(--police); color: rgba(0,0,0,0.68); text-align: center; }
+    #ligue-concours b { color: var(--rouge); font-weight: 700; }
 
     #end-concours { width: 100%; margin: 0 0 12px; padding: 11px 12px; box-sizing: border-box; border: 1.5px solid var(--noir); border-radius: var(--rayon); background: rgba(255,207,46,0.22); display: flex; flex-direction: column; align-items: center; gap: 5px; }
-    #end-concours-titre { margin: 0; font: 900 12px var(--police); letter-spacing: 0.1em; text-transform: uppercase; color: var(--noir); }
-    #end-concours-rang { margin: 0; font: 500 13.5px/1.35 var(--police); color: var(--noir); text-align: center; }
-    #end-concours-rang b { font-weight: 900; }
-    #end-concours-detail { margin: 0; font: 500 11.5px/1.35 var(--police); color: rgba(0,0,0,0.68); text-align: center; }
-    #end-concours-ecart { margin: 0; font: 600 13px/1.35 var(--police); color: var(--noir); text-align: center; }
-    #end-concours-ecart b { font-weight: 900; color: var(--rouge); }
-    #end-concours-temps { margin: 0; font: 600 11.5px var(--police); letter-spacing: 0.06em; text-transform: uppercase; color: rgba(0,0,0,0.68); }
+    #end-concours-titre { margin: 0; font: 700 var(--t-s) var(--police); letter-spacing: var(--ls-l); text-transform: uppercase; color: var(--noir); }
+    #end-concours-rang { margin: 0; font: 500 var(--t-m)/1.35 var(--police); color: var(--noir); text-align: center; }
+    #end-concours-rang b { font-weight: 700; }
+    #end-concours-detail { margin: 0; font: 500 var(--t-xs)/1.35 var(--police); color: rgba(0,0,0,0.68); text-align: center; }
+    #end-concours-ecart { margin: 0; font: 700 var(--t-m)/1.35 var(--police); color: var(--noir); text-align: center; }
+    #end-concours-ecart b { font-weight: 700; color: var(--rouge); }
+    #end-concours-temps { margin: 0; font: 700 var(--t-xs) var(--police); letter-spacing: var(--ls-s); text-transform: uppercase; color: rgba(0,0,0,0.68); }
     #end-concours-voir { margin-top: 1px; }
 
     /* Même tiroir que l'album et le partage : une seule grammaire. */
@@ -524,25 +535,25 @@
     @media (min-width: 700px) and (min-height: 600px) {
       #classement-card { bottom: 28px; border-radius: var(--rayon); border-bottom: 1.5px solid var(--panneau-bord); padding-bottom: 22px; max-height: min(84vh, 760px); }
     }
-    #classement-eyebrow { margin: 0 0 4px; padding: 7px 14px; background: var(--rouge); border-radius: 2px; transform: rotate(-2deg); font: 700 11.5px var(--police); letter-spacing: 0.14em; text-transform: uppercase; color: var(--blanc); text-align: center; }
-    #classement-title { margin: 0; font: 900 19px var(--police); color: var(--noir); text-align: center; }
+    #classement-eyebrow { margin: 0 0 4px; padding: 7px 14px; background: var(--rouge); border-radius: 2px; transform: rotate(-2deg); font: 700 var(--t-xs) var(--police); letter-spacing: var(--ls-l); text-transform: uppercase; color: var(--blanc); text-align: center; }
+    #classement-title { margin: 0; font: 900 var(--t-titre)/1.1 var(--titre); color: var(--noir); text-align: center; }
     #classement-onglets { display: flex; gap: 6px; margin: 2px 0 0; }
-    #classement-onglets .chip { height: 30px; padding: 0 11px; font-size: 11px; }
-    #classement-regle { margin: 0; font: 500 11.5px/1.4 var(--police); color: rgba(0,0,0,0.68); text-align: center; }
-    #classement-liste { width: 100%; margin: 0; padding: 0; list-style: none; font: 500 13px var(--police); color: var(--noir); }
+    #classement-onglets .chip { height: 30px; padding: 0 11px; font-size: var(--t-xs); }
+    #classement-regle { margin: 0; font: 500 var(--t-xs)/1.4 var(--police); color: rgba(0,0,0,0.68); text-align: center; }
+    #classement-liste { width: 100%; margin: 0; padding: 0; list-style: none; font: 500 var(--t-m) var(--police); color: var(--noir); }
     #classement-liste li { display: flex; align-items: baseline; gap: 8px; padding: 6px 4px; border-bottom: 1px solid rgba(0,0,0,0.08); }
-    #classement-liste li.moi { background: rgba(255,207,46,0.35); border-radius: 3px; font-weight: 900; }
+    #classement-liste li.moi { background: rgba(255,207,46,0.35); border-radius: 3px; font-weight: 700; }
     #classement-liste li.podium .rang { color: var(--rouge); }
-    #classement-liste li.coupure { display: block; padding: 5px 4px 6px; border-bottom: 1.5px dashed rgba(0,0,0,0.35); font: 700 11px var(--police); letter-spacing: 0.06em; text-transform: uppercase; color: var(--rouge); text-align: center; }
-    #classement-liste .rang { width: 22px; flex: 0 0 auto; color: rgba(0,0,0,0.68); font-weight: 900; }
+    #classement-liste li.coupure { display: block; padding: 5px 4px 6px; border-bottom: 1.5px dashed rgba(0,0,0,0.35); font: 700 var(--t-xs) var(--police); letter-spacing: var(--ls-s); text-transform: uppercase; color: var(--rouge); text-align: center; }
+    #classement-liste .rang { width: 22px; flex: 0 0 auto; color: rgba(0,0,0,0.68); font-weight: 700; }
     #classement-liste .nom { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    #classement-liste .nom small { display: block; font: 500 11px var(--police); color: rgba(0,0,0,0.68); letter-spacing: 0.06em; }
-    #classement-liste .m { flex: 0 0 auto; font-weight: 900; }
-    #classement-vide { margin: 0; font: 600 13px/1.4 var(--police); color: var(--noir); text-align: center; }
+    #classement-liste .nom small { display: block; font: 500 var(--t-xs) var(--police); color: rgba(0,0,0,0.68); letter-spacing: var(--ls-s); }
+    #classement-liste .m { flex: 0 0 auto; font-weight: 700; }
+    #classement-vide { margin: 0; font: 700 var(--t-m)/1.4 var(--police); color: var(--noir); text-align: center; }
 
     /* Les messages d'invitation : on en choisit un, il part avec le lien. */
     #partage-messages { display: flex; flex-direction: column; gap: 5px; width: 100%; margin: 2px 0 0; }
-    .msg-choix { display: block; width: 100%; box-sizing: border-box; padding: 9px 11px; text-align: left; border: 1.5px solid rgba(0,0,0,0.22); border-radius: var(--rayon); background: #fff; font: 500 13px/1.3 var(--police); color: var(--noir); -webkit-tap-highlight-color: transparent; }
+    .msg-choix { display: block; width: 100%; box-sizing: border-box; padding: 9px 11px; text-align: left; border: 1.5px solid rgba(0,0,0,0.22); border-radius: var(--rayon); background: #fff; font: 500 var(--t-m)/1.3 var(--police); color: var(--noir); -webkit-tap-highlight-color: transparent; }
     .msg-choix.actif { border-color: var(--noir); box-shadow: 0 0 0 2px #ffcf2e; font-weight: 700; }
 
     @media (prefers-reduced-motion: reduce) {
@@ -558,7 +569,171 @@
     #annonces { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); border: 0; white-space: nowrap; }
     #vibrations-row { display: flex; align-items: center; gap: 8px; }
     #vibrations-input { width: 22px; height: 22px; accent-color: var(--rouge); margin: 0; }
-    </style>
+    
+    /* --- CIBLES TACTILES (audit du 21 novembre 2026, outils/audit-ecrans.mjs) ---
+       Tout ce qui se touche offre au moins 44 × 44 px au doigt, du plus petit
+       iPhone au plus grand Android. Le menu devait rester COMPACT (29 sept.) :
+       plutôt que de grossir les puces et les liens, c'est leur ZONE SENSIBLE
+       qui déborde, invisible (::after), jusqu'aux 44 px — sans jamais mordre
+       sur la voisine. Les champs et les boutons, eux, grandissent pour de bon. */
+    .chip, .link-minimal, #end-ligue-titre, #classement-regle a, #pourquoi-contact a, #plus-contact summary { position: relative; }
+    .chip::after, .link-minimal::after, #classement-regle a::after, #pourquoi-contact a::after, #plus-contact summary::after { content: ""; position: absolute; }
+    .chip { height: 30px; min-width: 44px; padding: 0 8px; }
+    .chip::after { inset: -7px -3px; }
+    .chip.couleur { width: 38px; min-width: 38px; }
+    #skin-options { width: min(260px, 100%); }
+    .chips[data-cle="c1"] { flex-wrap: nowrap; gap: 8px; width: 100%; }
+    .chips[data-cle="c1"] .chip.couleur { flex: 1 1 0; width: auto; min-width: 0; max-width: 38px; }
+    .chips[data-cle="c1"] .chip.couleur::after { inset: -7px -4px; }
+    @media (max-width: 340px) { #onboarding .panel-body { padding-left: 10px; padding-right: 10px; } }
+    .link-minimal::after { inset: -14px -8px -17px; }
+    #classement-regle a::after, #pourquoi-contact a::after { inset: -16px -6px; }
+    #plus-contact summary { padding: 8px 0; }
+    #plus-contact summary::after { inset: -6px 0; }
+    #pseudo-row, .champ-row { margin-top: 0; }
+    #pseudo-row, .champ-row { align-items: flex-end; }
+    #pseudo-row .icon, .champ-row .icon { padding-bottom: 9px; }
+    #pseudo-input, .champ-row input { box-sizing: border-box; min-height: 44px; padding: 16px 2px 5px; }
+    /* Clavier ouvert : les champs ont grandi, les écarts se resserrent pour que la
+       carte tienne au-dessus du clavier d'un iPhone SE (outils/clavier.mjs). */
+    #overlay.clavier .champ-titre { margin-top: 12px; }
+    #overlay.clavier #step1-next { margin-top: 14px; }
+    #ligue-input { min-height: 44px; }
+    #ligue-row .btn, .btn.btn-petit, #end-ligue .btn { min-height: 44px; }
+    #newsletter-row { margin-top: 4px; padding: 7px 0; min-height: 44px; box-sizing: border-box; align-items: center; }
+    #newsletter-row input { width: 22px; height: 22px; }
+    #vibrations-row { min-height: 44px; }
+    #vibrations-input { width: 26px; height: 26px; }
+    #pause-volume { gap: 0; }
+    .volume-range { height: 44px; }
+    .volume-range::-webkit-slider-thumb { width: 24px; height: 24px; margin-top: -10.5px; }
+    .volume-range::-moz-range-thumb { width: 24px; height: 24px; }
+    #mute-button, #pause-button { width: 46px; height: 46px; }
+    /* Écran de fin sur un petit téléphone : la carte, plus haute que l'écran,
+       montait sous le bouton ♪ (320 × 568). Elle commence dessous. */
+    #overlay.end-view { padding-top: calc(70px + var(--safe-top)); }
+    @media (min-width: 420px) { #overlay.end-view { padding-top: calc(16px + var(--safe-top)); } }
+    /* Le titre de la ligue en fin de course : son NOM (plus un code espacé qui
+       passait à la ligne), et dessous « copier le lien ». */
+    #end-ligue-titre { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; min-height: 44px; width: 100%; }
+    #end-ligue-titre b { font-size: var(--t-m); letter-spacing: var(--ls-s); line-height: 1.15; text-wrap: balance; overflow-wrap: anywhere; }
+    #end-ligue-titre small { letter-spacing: var(--ls-s); }
+    /* Paysage sur téléphone : la carte ne tient pas en hauteur, l'écran défile. */
+    @media (orientation: landscape) and (max-height: 500px) {
+      #menu-title { margin: 0 0 18px; }
+      #menu-title .titre-mot { font-size: 40px; }
+    }
+  
+    /* ====================================================================
+       LE SYSTÈME APPLIQUÉ (21 novembre 2026, voir DESIGN.md)
+       Demandé : « les alignements, on comprend rien, les tailles de typo,
+       qu'est-ce que c'est que ça […] tout est trop gros […] trop de texte ».
+       Une carte = une colonne de 240 px, tout aligné dessus. Quatre rôles de
+       texte, pas un de plus : étiquette (xs, capitales), note (s, grise),
+       corps (m), titre (serif). Un champ = un cadre de 44 px. Un écran dit
+       une chose ; ce qui s'explique se touche (l'éclair du bonus).
+       ==================================================================== */
+    .panel-body > *, #ligue-bloc, #end-actions { max-width: 100%; }
+    .btn { font: 700 var(--t-s) var(--police); letter-spacing: var(--ls-l); min-height: 44px; padding: 10px 16px; width: 240px; }
+    .step-eyebrow, #classement-eyebrow { font: 700 var(--t-xs) var(--police); letter-spacing: var(--ls-l); }
+    .link-minimal { font: 500 var(--t-s) var(--police); color: var(--gris); }
+    .skin-label { font: 700 var(--t-xs) var(--police); letter-spacing: var(--ls-l); color: var(--gris); }
+    .chip { font: 700 var(--t-xs) var(--police); letter-spacing: var(--ls-s); }
+
+    /* Champs : le même cadre partout (pseudo, Insta, village, email, ligues). */
+    #pseudo-row .icon, .champ-row .icon { display: none; }
+    #pseudo-row, .champ-row { width: 240px; margin-top: var(--e2); }
+    #pseudo-row { margin-top: 0; }
+    #pseudo-input, .champ-row input, #ligue-input {
+      box-sizing: border-box; width: 100%; min-height: 44px; padding: 0 12px;
+      border: 1.5px solid rgba(13,13,16,0.3); border-radius: var(--rayon); background: var(--blanc);
+      font: 500 var(--t-saisie) var(--police); letter-spacing: 0; text-transform: none; color: var(--noir);
+    }
+    #pseudo-input:focus, .champ-row input:focus, #ligue-input:focus { border-color: var(--noir); }
+    #pseudo-input::placeholder, .champ-row input::placeholder, #ligue-input::placeholder { color: rgba(13,13,16,0.55); }
+    #plus-contact { margin-top: var(--e1); }
+    #plus-contact summary { font: 500 var(--t-s) var(--police); color: var(--gris); }
+    #step1-next { margin-top: var(--e3); }
+    #overlay.clavier #step1-next { margin-top: var(--e3); }
+
+    /* Ma ligue, sans ligue. */
+    #ligue-bloc { width: 240px; margin-bottom: var(--e3); }
+    #ligue-sans, #ligue-avec { gap: var(--e2); }
+    #ligue-intro { margin: 0 0 var(--e1); font: 500 var(--t-s)/1.35 var(--police); color: var(--gris); }
+    #ligue-nom-row { margin: 0; }
+    #ligue-nom-apercu { margin: 0; font: 500 var(--t-xs)/1.3 var(--police); color: var(--gris); }
+    #ligue-nom-apercu:empty { display: none; }
+    #ligue-nom-apercu b { font-weight: 700; color: var(--noir); }
+    #ligue-creer, #ligue-avec #ligue-partager { width: 100%; }
+    .lp-sep { margin: var(--e1) 0; font: 700 var(--t-xs) var(--police); letter-spacing: var(--ls-l); color: var(--gris); }
+    #ligue-row { gap: var(--e2); }
+    #ligue-row .btn { flex: none; width: auto; padding: 0 12px; font-size: var(--t-xs); }
+    #ligue-msg { font: 700 var(--t-s)/1.35 var(--police); }
+    [data-step="2"] #step2-next, [data-step="2"] #step2-next.btn-petit { width: 240px; margin-top: 0; font-size: var(--t-s); }
+    #step2-liens, #step3-links { margin-top: var(--e3); gap: var(--e5); }
+
+    /* Ma ligue, avec : le NOM en titre, le peloton, Inviter. Ni code à copier,
+       ni lien, ni compte à rebours, ni phrase sur les bots : « Inviter » envoie
+       le lien, le tiroir de partage sait le copier. */
+    #ligue-titre { margin: 2px 0 var(--e1); font: 900 var(--t-titre)/1.1 var(--titre); letter-spacing: 0; text-transform: none; color: var(--noir); text-align: center; text-wrap: balance; overflow-wrap: anywhere; }
+    #ligue-code-btn, #ligue-lien, #ligue-concours { display: none !important; }
+    #ligue-peloton { gap: var(--e1); margin: 0 0 var(--e1); }
+    #ligue-peloton li { padding: 4px 8px; font: 700 var(--t-xs) var(--police); }
+    #ligue-membres { font: 500 var(--t-s)/1.35 var(--police); color: var(--gris); }
+    #ligue-avec #ligue-partager { min-height: 60px; font-size: var(--t-s); }
+    #ligue-avec #ligue-partager .share-inner { gap: 6px; }
+    #ligue-avec #ligue-partager .share-apps { gap: 12px; }
+    #ligue-avec #ligue-partager .share-apps svg { width: 18px; height: 18px; }
+    #ligue-statut, #ligue-arrivees { font: 700 var(--t-s)/1.35 var(--police); }
+
+    /* Mon cycliste. */
+    #boost-ligue { font: 500 var(--t-xs)/1.35 var(--police); }
+
+    /* Fin de course : le score, le classement, deux boutons. */
+    #end-screen .panel { max-width: 300px; }
+    #end-screen .panel-body { padding: 28px 22px 16px; }
+    #end-hero { margin: 0 0 var(--e3); }
+    #score-num { font-size: 48px; }
+    #score-num small { font: 700 var(--t-m) var(--police); letter-spacing: 0; }
+    #end-sub { font: 500 var(--t-s)/1.35 var(--police); color: var(--gris); margin-top: var(--e1); }
+    #end-sub:empty { display: none; }
+    #end-concours { margin: 0 0 var(--e3); padding: 0; border: none; background: none; gap: var(--e1); }
+    #end-concours ~ #end-ligue .rangs, #end-rang, #end-ecart, #end-ligue-titre, #end-relais { display: none !important; }
+    #end-concours.hidden ~ #end-ligue .rangs { display: block !important; }
+    .rangs { width: 100%; margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--filet); }
+    .rangs li { display: flex; align-items: center; gap: var(--e2); min-height: 44px; padding: 0 var(--e2); box-sizing: border-box; border-bottom: 1px solid var(--filet); font: 500 var(--t-m) var(--police); color: var(--noir); }
+    .rangs li.moi { background: var(--jaune); border: 1.5px solid var(--noir); border-radius: var(--rayon); font-weight: 700; }
+    .rangs li.ecart { min-height: 0; height: 10px; border-bottom: 1.5px dotted rgba(13,13,16,0.35); }
+    .rangs .rang { flex: none; width: 22px; font-weight: 700; color: var(--gris); font-variant-numeric: tabular-nums; }
+    .rangs li.moi .rang { color: var(--noir); }
+    .rangs .rang .couronne { width: 16px; height: 12px; vertical-align: -1px; }
+    .rangs .nom { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .rangs .m { flex: none; font-weight: 700; font-variant-numeric: tabular-nums; }
+    /* L'éclair : « ce joueur a un bonus ». Le chiffre = ses potes. On le touche
+       pour savoir pourquoi — plus une ligne d'explication à l'écran. */
+    .eclair { position: relative; flex: none; display: inline-flex; align-items: center; gap: 2px; height: 22px; padding: 0 6px 0 4px; border: 1.5px solid var(--noir); border-radius: 11px; background: var(--blanc); color: var(--noir); font: 700 var(--t-xs) var(--police); font-variant-numeric: tabular-nums; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+    .eclair svg { display: block; width: 10px; height: 13px; }
+    .eclair::after { content: ""; position: absolute; inset: -11px -8px; }
+    #end-actions { gap: var(--e2); }
+    #end-screen .btn { min-height: 44px; }
+    #end-links { margin-top: var(--e3); }
+    #end-links .link-minimal { font: 500 var(--t-s) var(--police); color: var(--gris); }
+
+    #bonus-pop { position: fixed; inset: 0; z-index: 70; display: flex; align-items: center; justify-content: center; padding: 24px; background: rgba(13,13,16,0.55); }
+    #bonus-pop.hidden { display: none; }
+    #bonus-carte { width: min(260px, 100%); box-sizing: border-box; padding: 20px 18px 16px; display: flex; flex-direction: column; align-items: center; gap: var(--e2); background: var(--blanc); border: 1.5px solid var(--noir); border-radius: var(--rayon); text-align: center; }
+    #bonus-titre { margin: 0; font: 900 var(--t-titre)/1.1 var(--titre); color: var(--noir); }
+    #bonus-texte { margin: 0 0 var(--e1); font: 500 var(--t-m)/1.4 var(--police); color: var(--noir); }
+    #bonus-carte .btn { width: 100%; }
+
+    /* Tiroir des classements : mêmes lignes. */
+    #classement-title { display: none; }
+    #classement-regle { font: 500 var(--t-s)/1.35 var(--police); color: var(--gris); }
+    #classement-regle:empty { display: none; }
+    #classement-liste li { align-items: center; min-height: 40px; font: 500 var(--t-m) var(--police); }
+    #classement-liste li.coupure { min-height: 0; font: 700 var(--t-xs) var(--police); }
+    #classement-liste .nom small { font: 500 var(--t-xs) var(--police); letter-spacing: 0; }
+  </style>
 </head>
 <body>
   <!-- Écran de chargement (3 octobre 2026 : « le logo de la ville est belle
@@ -592,16 +767,14 @@
             <span class="icon">@</span>
             <input type="text" id="pseudo-input" aria-label="Ton pseudo" placeholder="ton pseudo" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="32" />
           </div>
-          <p class="champ-titre beta-off">Pour aller plus loin</p>
           <div class="champ-row beta-off"><span class="icon">IG</span><input type="text" id="insta-input" aria-label="Ton compte Instagram" placeholder="ton Instagram" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="40" /></div>
-          <div class="champ-row beta-off"><span class="icon">⌂</span><input type="text" id="ville-input" aria-label="Ton village ou ta ville, facultatif" placeholder="ton village, ta ville (facultatif)" autocomplete="off" spellcheck="false" maxlength="24" /></div>
+          <div class="champ-row beta-off"><span class="icon">⌂</span><input type="text" id="ville-input" aria-label="Ton village ou ta ville, facultatif" placeholder="ton village (facultatif)" autocomplete="off" spellcheck="false" maxlength="24" /></div>
           <details id="plus-contact" class="beta-off">
             <summary>＋ Email, règlement</summary>
             <div class="champ-row"><span class="icon">@</span><input type="email" id="email-input" aria-label="Ton email, facultatif" placeholder="ton email (facultatif)" autocomplete="email" autocapitalize="none" spellcheck="false" maxlength="80" /></div>
             <label id="newsletter-row"><input type="checkbox" id="newsletter-input" /><span>Préviens-moi des sorties de PMC par email</span></label>
-            <p id="pourquoi-contact">Ton Insta sert à te prévenir si tu gagnes. Rien n'est publié. <a id="lien-reglement" href="reglement.html" target="_blank" rel="noopener">Règlement</a></p>
+            <p id="pourquoi-contact">Ton Insta : pour te prévenir si tu gagnes. <a id="lien-reglement" href="reglement.html" target="_blank" rel="noopener">Règlement</a></p>
           </details>
-          <p id="champs-pourquoi" class="beta-off">Ton <b>village</b> s'écrit sur le panneau quand tu le traverses en course. Ton <b>Insta</b>, c'est pour te prévenir si tu gagnes un lot.</p>
           <p id="beta-note" class="field-note hidden">Bêta-test : tout le monde court la <b>même course</b>. Écris ton pseudo, joue, et laisse-moi ton retour à la fin.</p>
           <button id="step1-next" class="btn btn-primary" type="button" disabled>Continuer</button>
         </div>
@@ -615,20 +788,19 @@
                le code en gros, Inviter en gros, le peloton avec ses bots. -->
           <div id="ligue-bloc">
             <div id="ligue-sans">
-              <p id="ligue-intro">Chaque pote qui joue te rapporte des points. <b>À la clôture, le premier du classement général fait un morceau avec PMC et ses potes.</b></p>
-              <div class="champ-row" id="ligue-nom-row"><span class="icon">№</span><input type="text" id="ligue-nom" aria-label="Nom de ta ligue" placeholder="nom de ta ligue (ex. les gamers)" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="28" /></div>
+              <p id="ligue-intro">Le premier gagne un morceau avec PMC.</p>
+              <div class="champ-row" id="ligue-nom-row"><span class="icon">№</span><input type="text" id="ligue-nom" aria-label="Nom de ta ligue" placeholder="nom de ta ligue" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="28" /></div>
               <p id="ligue-nom-apercu"></p>
               <button id="ligue-creer" type="button" class="btn btn-primary">Créer ma ligue</button>
               <p class="lp-sep"><span>ou</span></p>
-              <p class="lp-ou">Un pote t'a donné le nom de sa ligue&nbsp;?</p>
               <div id="ligue-row">
-                <input type="text" id="ligue-input" aria-label="Code de la ligue à rejoindre" placeholder="NOM" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="28" />
+                <input type="text" id="ligue-input" aria-label="Code de la ligue à rejoindre" placeholder="sa ligue" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="28" />
                 <button id="ligue-rejoindre" class="btn btn-secondary" type="button">Rejoindre</button>
               </div>
               <p id="ligue-msg" class="hidden"></p>
             </div>
             <div id="ligue-avec" class="hidden">
-              <p id="ligue-titre">Ma ligue</p>
+              <h2 id="ligue-titre">Ma ligue</h2>
               <button id="ligue-code-btn" type="button" aria-label="Copier le code de la ligue"><b id="ligue-code">—</b><small id="ligue-code-aide">Touche pour copier</small></button>
               <p id="ligue-lien" class="hidden"></p>
               <p id="ligue-statut" class="hidden"></p>
@@ -679,20 +851,16 @@
             <p id="end-max" class="hidden"></p>
           </div>
           <div id="end-concours" class="hidden">
-            <p id="end-concours-titre">Classement général</p>
-            <p id="end-concours-rang"></p>
-            <p id="end-concours-detail"></p>
-            <p id="end-concours-ecart" class="hidden"></p>
-            <p id="end-concours-temps" class="hidden"></p>
-            <button id="end-concours-voir" type="button" class="link-minimal">Voir les classements →</button>
+            <ol id="end-top" class="rangs"></ol>
+            <button id="end-concours-voir" type="button" class="link-minimal">Classement →</button>
           </div>
           <div id="end-ligue" class="hidden">
             <p id="end-rang" class="hidden"></p>
             <p id="end-ecart" class="hidden"></p>
-            <ol id="end-ligue-liste"></ol>
+            <ol id="end-ligue-liste" class="rangs"></ol>
             <!-- Sous la liste depuis le 15 novembre 2026 (« c'est trop bizarre
                  que ça soit là », entre l'écart et le classement). -->
-            <button id="end-ligue-titre" type="button">Ligue <b id="end-ligue-code">—</b> <small id="end-ligue-copier">· copier</small></button>
+            <button id="end-ligue-titre" type="button"><b id="end-ligue-code">—</b><small id="end-ligue-copier">copier le lien</small></button>
             <p id="end-relais" class="hidden"></p>
           </div>
           <div id="end-actions">
@@ -777,6 +945,14 @@
     </div>
   </div>
 
+  <!-- Le bonus d'un joueur, expliqué en une ligne quand on touche son éclair. -->
+  <div id="bonus-pop" class="hidden" role="dialog" aria-modal="true" aria-labelledby="bonus-titre">
+    <div id="bonus-carte">
+      <p id="bonus-titre"></p>
+      <p id="bonus-texte"></p>
+      <button id="bonus-fermer" type="button" class="btn btn-secondary">OK</button>
+    </div>
+  </div>
   <nav aria-label="Réglages de la partie" id="commandes"><button id="mute-button" type="button" aria-label="Réglages du son et des vibrations">♪</button>
   <button id="pause-button" type="button" aria-label="Pause" hidden>❚❚</button></nav>
 

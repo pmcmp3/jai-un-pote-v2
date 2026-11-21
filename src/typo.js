@@ -6,7 +6,9 @@ const NBSP = " ";
 const BLOCS = "p, small, li, summary, label span, button, a";
 
 function corriger(texte) {
+  // L'espace FINE des milliers (toLocaleString) disparaît en gras : « 113000 ».
   return texte
+    .replace(/\u202f/g, NBSP)
     .replace(/[ \t]+([%:;?!»])/g, `${NBSP}$1`)
     .replace(/«[ \t]+/g, `«${NBSP}`)
     .replace(/(\d)[ \t]+(pts|potes?|joueurs?|jours?|heures?|min|s)\b/g, `$1${NBSP}$2`);

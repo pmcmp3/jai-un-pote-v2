@@ -1455,12 +1455,7 @@ function dessinerJetpackObjet(r, now) {
   }
   scene.drawBoxR(ctx, 0, r, 0.62 * J, 0.14 * J, 0.1 * J, "#e13e26", bas + 0.6 * J, spin);
   const t = scene.project(0, r, bas + 1.55 * J);
-  ctx.save();
-  ctx.font = `900 ${Math.max(14, Math.round(scene.scale() * 0.5))}px "Helvetica Neue", Helvetica, Arial, sans-serif`;
-  ctx.textAlign = "center"; ctx.textBaseline = "bottom";
-  ctx.shadowColor = "rgba(0,0,0,0.88)"; ctx.shadowBlur = 5; ctx.shadowOffsetY = 1;
-  ctx.fillStyle = "#ffcf2e"; ctx.fillText("JETPACK", t.x, t.y);
-  ctx.restore();
+  hud.renderPastille(ctx, t.x, t.y, "JETPACK", 1, true);
 }
 
 // Avertisseur « ! » au bord droit (comme les missiles de Jetpack Joyride) :
@@ -1788,15 +1783,7 @@ function objetsCyclistes(items, alpha, u, v, jy, pedal, flip, now, tm, tAnim, vc
   if (gp) items.push({ d: scene.depth(gp.u + 0.7, gp.v), draw: () => {
     drawRider(ctx, gp.u + 0.7, gp.v, gp.h, ghost.palette, pedal, 0.38 * gp.alpha, 0, false);
     const g = scene.project(gp.u + 0.7, gp.v, gp.h + RIDER_HEIGHT + 0.15);
-    ctx.save();
-    ctx.globalAlpha = 0.7 * gp.alpha;
-    ctx.font = `700 11px "Helvetica Neue", Helvetica, Arial, sans-serif`;
-    ctx.textAlign = "center"; ctx.textBaseline = "bottom";
-    ctx.lineWidth = 3; ctx.strokeStyle = "rgba(0,0,0,0.55)"; ctx.lineJoin = "round";
-    ctx.strokeText(`@${ghost.pseudo} · fantôme`, g.x, g.y);
-    ctx.fillStyle = "#fff";
-    ctx.fillText(`@${ghost.pseudo} · fantôme`, g.x, g.y);
-    ctx.restore();
+    hud.renderPastille(ctx, g.x, g.y, `@${ghost.pseudo} · fantôme`, 0.8 * gp.alpha);
   } });
   if (ghosts.length > 1) items.push({ d: scene.depth(player.u + 0.01, player.v), draw: traineeSalto });
   items.push({ d: scene.depth(u, v), draw: () => {
@@ -1909,24 +1896,12 @@ function messagesSurJoueur(u, v, jy) {
   if (popups.length) {
     const g = scene.project(u, v, jy + RIDER_HEIGHT + 0.3);
     const base = g.y;
-    ctx.save();
-    ctx.textAlign = "center"; ctx.textBaseline = "bottom";
+    // Des pastilles à plat (21 novembre 2026 : plus aucune ombre ni contour
+    // sous un texte), de la couleur du message.
     for (const pop of popups) {
       const t = pop.age / 1.1;
-      ctx.globalAlpha = t < 0.7 ? 1 : 1 - (t - 0.7) / 0.3;
-      // 19 px et non 18 : au-dessus de 18,66 px, un texte gras est un GRAND
-      // texte au sens de WCAG (seuil 3:1 au lieu de 4,5:1), et le jaune des
-      // pièces sur un décor clair ne tenait pas les 4,5 (mesuré 3,77:1).
-      ctx.font = `900 19px "Helvetica Neue", Helvetica, Arial, sans-serif`;
-      // Ombre douce, plus de contour (15 novembre 2026, même règle que le HUD).
-      ctx.shadowColor = "rgba(0,0,0,0.9)"; ctx.shadowBlur = 4; ctx.shadowOffsetY = 1;
-      ctx.fillStyle = pop.couleur;
-      // Ombre doublée (hud.ombreSeule) : une seule ombre floue laissait le
-      // bord des lettres jaunes sur un ciel clair.
-      hud.ombreSeule(ctx, pop.texte, g.x, base - t * 46 - pop.decalage);
-      ctx.fillText(pop.texte, g.x, base - t * 46 - pop.decalage);
+      hud.renderPastille(ctx, g.x, base - t * 46 - pop.decalage, pop.texte, t < 0.7 ? 1 : 1 - (t - 0.7) / 0.3, pop.couleur);
     }
-    ctx.restore();
   }
 }
 // LE TURBO SE VOIT (15 novembre 2026 : « on comprend pas très bien le mode
@@ -2082,7 +2057,6 @@ function dessinerPeloton(cv, t, arrivees) {
     c2.globalAlpha = Math.min(1, age * 4) * Math.max(0, 1 - Math.max(0, age - 0.8) / 0.6) * (suivant > 0 ? 1 - suivant / 0.15 : 1);
     c2.font = `900 ${Math.round(15 + 4 * Math.max(0, 0.25 - age) / 0.25)}px "Source Serif 2", Georgia, serif`;
     c2.textAlign = "center"; c2.textBaseline = "bottom";
-    c2.lineWidth = 3; c2.strokeStyle = "#ffffff"; c2.strokeText("+10 %", p.x, p.y);
     c2.fillStyle = "#e13e26"; c2.fillText("+10 %", p.x, p.y);
     c2.globalAlpha = 1;
   }
