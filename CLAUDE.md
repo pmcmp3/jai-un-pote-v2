@@ -41,7 +41,11 @@ intégré d'Instagram d'abord**, portrait natif.
 - **Boucle à pas de temps fixe** (120 Hz) ; horloge maîtresse = **Web Audio API**.
 - **`public/config.js` = SEUL fichier de réglages**, jamais de logique de jeu dedans.
 - **iOS** : `AudioContext` débloqué sur geste utilisateur, dans la pile d'appel du geste.
-- **Jamais la base Supabase de la v1** ; jamais toucher au dépôt `pmcmp3/la-ville-est-belle`.
+- **Jamais la base Supabase de la v1.** Dépôt `pmcmp3/la-ville-est-belle` : depuis le 22 novembre 2026
+  (lancement, demandé), `deploy.sh` y publie le build dans le SEUL dossier `jai-un-pote/` de sa branche
+  `gh-pages` (adresse officielle https://la-ville-est-belle-pmc.fr/jai-un-pote/, où la v2 remplace la v1).
+  Rien d'autre n'y est touché, jamais de push forcé. Même origine que le premier jeu : `?zero` n'efface
+  que les clés `jp2…`.
 - Toute modification du générateur ou des règles de route : **`VERSION_COURSE += 1`**
   (`regles.js`).
 - **`npm run verif` doit être vert** avant toute mise en ligne (voir « Le filet »).

@@ -1405,3 +1405,16 @@ qu'est-ce que c'est que ça […] fais un design system ». Fait :
 - Skieur du décor dans le sens de la course ; avion 20 % plus petit ; phrase de la carte
   « Joue avec tes potes » : « Plus tu invites de potes, plus tu as de chances de faire un
   meilleur score. »
+
+## 22 novembre 2026 — lancement
+
+- **Adresse officielle** : https://la-ville-est-belle-pmc.fr/jai-un-pote/ (la v2 y remplace la v1).
+  `deploy.sh` publie le même build aux deux adresses ; `lienJeu` pointe sur le domaine ; le
+  `deploy.sh` du premier jeu construit désormais ce dossier depuis la v2.
+- **Clôture au jeudi 31 décembre 2026, 12 h** (config + règlement ; la base se règle par
+  `supabase/REMISE-A-ZERO-LANCEMENT.sql`, qui vide aussi les données de test).
+- Règlement : organisateur rempli depuis l'avis SIRENE. Restent l'email de contact et le nombre
+  maximum de personnes du lot.
+- `?zero` et `?premiere` n'effacent plus que les clés `jp2…` (origine partagée avec le premier jeu).
+- Passage sous WebKit (moteur de Safari) et Chrome, 12 gabarits de l'iPhone SE au 1920×1080 :
+  inscription → course → fin sans erreur, 60 images/s. Simulé, pas sur de vrais téléphones.
