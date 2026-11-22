@@ -136,7 +136,7 @@ window.CONFIG = {
   // ⚠️ La DATE qui fait foi est celle de la table `concours` de la base
   // (supabase/CONCOURS-A-COLLER.sql) : le jeu la lit au chargement. Celle-ci
   // n'est que le repli quand la base ne répond pas. Les deux doivent coïncider.
-  concoursFin: "2026-11-22T12:00:00+01:00",
+  concoursFin: "2026-12-31T12:00:00+01:00",
   concoursLot: "un morceau avec PMC et ses potes",
   // Commission : +10 % du record de chaque pote de ta ligue au classement général.
   // Le taux qui fait foi est celui de la table `concours` (la base fait le calcul) ;
@@ -205,9 +205,10 @@ window.CONFIG = {
   // les tests, net.js ne contacte jamais la base (sauf `?base` dans l'adresse).
   apiBase: "https://khlxublwgcqihuezzsam.supabase.co/rest/v1",
   apiKey: "sb_publishable_RnguGhkGNTjclChOhgLP8g_tqUxO_v9",
-  // Base des liens de ligue (?ligue=CODE). L'adresse github.io reste valable
-  // quand le sous-domaine sera branché : GitHub la redirige alors (301).
-  lienJeu: "https://pmcmp3.github.io/jai-un-pote-v2/",
+  // Base des liens de ligue (?ligue=CODE). Adresse officielle depuis le
+  // 22 novembre 2026 (la v2 remplace la v1 sous /jai-un-pote/ du site de
+  // l'artiste). pmcmp3.github.io/jai-un-pote-v2/ reste servie, même build.
+  lienJeu: "https://la-ville-est-belle-pmc.fr/jai-un-pote/",
 
   // === A/B TEST ===
   // Chaque joueur tombe dans UNE variante par test, tirée de son identifiant

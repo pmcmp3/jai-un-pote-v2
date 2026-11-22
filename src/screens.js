@@ -84,17 +84,21 @@ const CODE_BETA = String(window.CONFIG.ligueBeta || "").toUpperCase();
 export function enBeta() { return Boolean(CODE_BETA) && Boolean(ligue) && ligue.code === CODE_BETA; }
 
 // `?zero` : tout effacer (pseudo, record, conversion), comme un joueur neuf.
-// Même origine que le premier jeu, donc ça le remet à zéro aussi.
+// Seulement les clés de CE jeu (`jp2…`) : il partage son adresse avec « La
+// ville est belle », dont le pseudo et les paliers ne doivent pas sauter.
+function viderCeJeu() {
+  for (const k of Object.keys(localStorage)) if (k.startsWith("jp2")) localStorage.removeItem(k);
+}
 try {
   if (new URLSearchParams(location.search).has("zero")) {
-    localStorage.clear();
+    viderCeJeu();
     const url = new URL(location.href); url.searchParams.delete("zero"); history.replaceState(null, "", url.toString());
   }
   // `?premiere` : simule une toute première connexion. Tout effacer comme
   // `?zero`, puis ligue démo VIDE — on crée sa ligue, on « invite », des
   // potes fictifs arrivent un par un et le boost monte. Rien ne part au réseau.
   if (new URLSearchParams(location.search).has("premiere")) {
-    localStorage.clear();
+    viderCeJeu();
     localStorage.setItem("jp2Demo", "cree");
     const url = new URL(location.href); url.searchParams.delete("premiere"); history.replaceState(null, "", url.toString());
   }

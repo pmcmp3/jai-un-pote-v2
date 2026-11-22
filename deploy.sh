@@ -1,7 +1,12 @@
 #!/usr/bin/env bash
 # Déploiement de « J'ai un pote v2 » sur GitHub Pages, dépôt pmcmp3/jai-un-pote-v2.
-# Indépendant du site principal (pmcmp3/la-ville-est-belle) : ce script ne
-# touche JAMAIS l'autre dépôt, donc jamais le jeu du concours ni la bêta v1.
+# ⚠️ Depuis le 22 novembre 2026 (lancement, demandé : « il faut plug dessus »),
+# le MÊME build est aussi publié à l'adresse officielle
+# https://la-ville-est-belle-pmc.fr/jai-un-pote/ — c'est-à-dire dans le dossier
+# jai-un-pote/ de la branche gh-pages de pmcmp3/la-ville-est-belle, où il
+# remplace la v1. Ce script n'y touche QUE ce dossier, par un commit ordinaire
+# (jamais de push forcé là-bas) : le premier jeu et le reste du site ne bougent pas.
+# DOMAINE=0 ./deploy.sh "…" pour ne publier que sur github.io.
 #
 # Usage :  ./deploy.sh "message de commit"
 #          DEPLOY_DRY=1 ./deploy.sh "test"   → tout sauf les deux push
@@ -57,6 +62,27 @@ git worktree add -q --detach "$TMP" HEAD
 ( cd "$TMP" && push -q origin "HEAD:gh-pages" --force )
 git worktree remove --force "$TMP"
 git branch -D gh-pages-build >/dev/null 2>&1 || true
+
+# 3. L'adresse officielle : le dossier jai-un-pote/ du site de l'artiste.
+if [ "${DOMAINE:-1}" = "1" ]; then
+  SITE="$(mktemp -d)/site"
+  git -c credential.helper= -c credential.helper="$AIDE_GIT" clone -q --depth 1 --branch gh-pages https://github.com/pmcmp3/la-ville-est-belle.git "$SITE"
+  test -f "$SITE/CNAME" && test -f "$SITE/index.html" || { echo "❌ La branche gh-pages du site ne ressemble pas à ce qui est attendu : rien n'y est poussé."; exit 1; }
+  rm -rf "$SITE/jai-un-pote"
+  mkdir "$SITE/jai-un-pote"
+  cp -R dist-pages/. "$SITE/jai-un-pote/"
+  rm -f "$SITE/jai-un-pote/.nojekyll"
+  (
+    cd "$SITE"
+    git add -A
+    if git diff --cached --quiet; then echo "→ rien de neuf pour le domaine"; else
+      git -c user.name="$(git -C "$OLDPWD" config user.name || echo pmcmp3)" -c user.email="$(git -C "$OLDPWD" config user.email || echo pmcmp3@users.noreply.github.com)" commit -q -m "J'ai un pote v2 : $MSG"
+      if [ "${DEPLOY_DRY:-0}" = "1" ]; then echo "[dry] git push origin HEAD:gh-pages (site)"; else git -c credential.helper= -c credential.helper="$AIDE_GIT" push -q origin HEAD:gh-pages; fi
+    fi
+  )
+  rm -rf "$SITE"
+  echo "✅ Aussi publié sur https://la-ville-est-belle-pmc.fr/jai-un-pote/"
+fi
 
 if [ -f public/CNAME ]; then URL="https://$(tr -d '[:space:]' < public/CNAME)/"; else URL="https://pmcmp3.github.io/jai-un-pote-v2/"; fi
 echo "✅ Déployé. Le site se rafraîchit en 1 à 2 minutes : $URL"
