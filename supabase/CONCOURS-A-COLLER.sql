@@ -28,11 +28,11 @@ alter table public.concours enable row level security;
 drop policy if exists "Lecture publique du concours" on public.concours;
 create policy "Lecture publique du concours" on public.concours for select to anon using (true);
 
--- Clôture : dimanche 22 novembre 2026 à 12 h (heure de Paris).
+-- Clôture : jeudi 31 décembre 2026 à 12 h (heure de Paris).
 -- Ouverture : l'instant où tu colles ce fichier. `do nothing` : relancer le
 -- fichier ne réécrit jamais une date que tu as corrigée après coup.
 insert into public.concours (id, debut, fin, plafond_score)
-values (1, now(), '2026-11-22 12:00:00+01', 95000)
+values (1, now(), '2026-12-31 12:00:00+01', 95000)
 on conflict (id) do nothing;
 
 -- ===========================================================================

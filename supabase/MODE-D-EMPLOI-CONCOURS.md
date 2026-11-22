@@ -50,13 +50,13 @@ ligues en course, et le classement (vide pour l'instant, c'est normal).
 
 ## Étape 2 — Vérifier la date de clôture
 
-Le fichier pose la clôture au **dimanche 22 novembre 2026 à 12 h 00** (heure de Paris), et
+Le fichier pose la clôture au **jeudi 31 décembre 2026 à 12 h 00** (heure de Paris), et
 l'ouverture à l'instant où tu l'as collé.
 
 Pour la changer, colle ça dans le SQL Editor en remplaçant la date :
 
 ```sql
-update public.concours set fin = '2026-11-22 12:00:00+01' where id = 1;
+update public.concours set fin = '2026-12-31 12:00:00+01' where id = 1;
 ```
 
 Pour décaler l'OUVERTURE (par exemple si tu colles aujourd'hui mais lances vendredi — sinon tes
@@ -178,7 +178,7 @@ Pour savoir où le poser : `node outils/plafond.mjs` dans le terminal.
 > Le principe : tu crées une ligue avec tes potes, et le score de ta ligue c'est tous vos
 > meilleurs scores additionnés. Plus t'as de potes qui jouent, plus tu montes.
 >
-> Dimanche 22 novembre à midi, la ligue n°1 gagne un son que j'écris sur eux. Leurs vannes,
+> Jeudi 31 décembre à midi, la ligue n°1 gagne un son que j'écris sur eux. Leurs vannes,
 > leurs histoires. Et s'ils sont à Paris, ils viennent poser dessus.
 >
 > C'est par là : https://pmcmp3.github.io/jai-un-pote-v2/

@@ -89,7 +89,7 @@ export async function creerLigue(code, pseudo, skin = null, nom = "") {
   return rejoindreLigue(code, pseudo, skin);
 }
 
-export const LIGUE_MAX = 21; // toi + 20 potes (boost de ligue)
+export const LIGUE_MAX = 31; // toi + 30 potes (boost de ligue, 22 novembre 2026)
 // La bêta fermée a son propre plafond, porté par la colonne `ligues.plafond`
 // (supabase-migration-beta.sql) ; sans cette colonne, repli sur plafondLigue().
 export function estBeta(code) { return Boolean(window.CONFIG.ligueBeta) && code === window.CONFIG.ligueBeta; }
