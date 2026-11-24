@@ -548,7 +548,11 @@ const SCENES = {
     const vus = new Set();
     for (let i = 0; i < 160 && vus.size < 2; i++) {
       const t = await course(() => window.__pote.projo());
-      if (t && !vus.has(t)) { vus.add(t); await attendre(700); await photo(`45-projo-${t}`); await page.mouse.click(180, 400); }
+      if (t && !vus.has(t)) {
+        vus.add(t); await attendre(700); await photo(`45-projo-${t}`); await page.mouse.click(180, 400);
+        // Projecteur en plusieurs écrans (brique de lait) : on photographie chacun.
+        for (let k = 2; k <= 4; k++) { await attendre(700); if (!(await course(() => window.__pote.projo()))) break; await photo(`45-projo-${t}-${k}`); await page.mouse.click(180, 400); }
+      }
       await attendre(500);
     }
     console.log("projecteurs vus :", [...vus].join(", ") || "aucun");

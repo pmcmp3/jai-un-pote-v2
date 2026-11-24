@@ -471,7 +471,7 @@ export function renderCible(ctx, width, height, c, alpha, t) {
   ctx.restore();
 }
 
-export function renderProjecteur(ctx, width, height, p, info, t) {
+export function renderProjecteur(ctx, width, height, p, info, t, pages = 1) {
   const a = Math.min(1, p.age * 5);
   const r = p.r * (1 + 0.06 * Math.sin(t * 6));
   ctx.save();
@@ -496,7 +496,8 @@ export function renderProjecteur(ctx, width, height, p, info, t) {
   if (p.age > 0.5) {
     ctx.globalAlpha = a * (0.6 + 0.4 * Math.sin(t * 5));
     ctx.font = `900 15px ${POLICE}`; ctx.fillStyle = BLANC;
-    ctx.fillText("TOUCHE POUR CONTINUER", width / 2, height - 60);
+    const suite = pages > 1 ? ` · ${p.page + 1}/${pages}` : "";
+    ctx.fillText("TOUCHE POUR CONTINUER" + suite, width / 2, height - 60);
   }
   ctx.restore();
 }

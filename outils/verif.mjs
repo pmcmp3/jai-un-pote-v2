@@ -27,6 +27,7 @@ const TESTS = [
   ["classement", ["outils/classement-general.mjs"], {}, "classement général, commission, joueur sans ligue (base simulée)"],
   ["ligue-nom", ["outils/ligue-nom.mjs"], {}, "nom de ligue choisi → lien ?ligue=…, WhatsApp/SMS/Snap, nom pris, pote qui rejoint (base simulée)"],
   ["turbo", ["outils/turbo.mjs"], {}, "le lait fait exploser les obstacles, sans perdre de pote"],
+  ["bouclier", ["outils/bouclier.mjs"], {}, "aucune invincibilité ne passe d'une course à la suivante"],
   ["accessibilite", ["outils/accessibilite.mjs"], {}, "axe-core sur chaque écran, clavier dans les tiroirs"],
   ["lignes", ["outils/lignes.mjs"], {}, "aucun mot seul en bout de texte, de 320 à 430 px"],
   ["contraste", ["outils/contraste.mjs"], {}, "le contraste de tout ce qui est écrit, du menu à la plage"],

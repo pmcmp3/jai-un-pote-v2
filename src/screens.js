@@ -212,7 +212,7 @@ let derniereEtape = null;
 export function setStep(n) {
   if (enBeta() && n === 2) n = 3; // pas d'étape « ma ligue » en bêta : elle est imposée
   if (n !== derniereEtape) { derniereEtape = n; suivi("menu_etape", { etape: ["", "pseudo", "ligue", "cycliste"][n] || n }); }
-  onboarding.dataset.step = String(n); if (n === 3) construireSkinUi(); majSprint(); majBoutonJouer();
+  onboarding.dataset.step = String(n); if (n === 3) construireSkinUi(); if (n === 2) rafraichirBoost(); majSprint(); majBoutonJouer();
   requestAnimationFrame(centrerMenu);
 }
 // Ordre du premier passage : pseudo → cycliste (« Continuer ») → ligue
@@ -718,6 +718,22 @@ function calculerBoost(potes) {
   const n = Math.min(potes.length, C.boostLigueMaxPotes || 20);
   boost = { potes, mult: Math.round((1 + n * (C.boostLigueParPote || 0.1)) * 100) / 100 };
   afficherBoost();
+  majBonusLigue();
+}
+// Le bonus de ligue sur l'écran « Ma ligue », au-dessus d'Inviter : le
+// pourcentage acquis en gros, la règle en une phrase. Les pourcentages de la
+// règle (ici et sur la carte « Joue avec tes potes ») viennent de config.js.
+let bonusAffiche = null;
+function majBonusLigue() {
+  const pct = Math.round((window.CONFIG.boostLigueParPote || 0.1) * 100);
+  document.querySelectorAll(".pct-pote").forEach((e) => { e.textContent = String(pct); });
+  document.querySelectorAll(".pct-cinq").forEach((e) => { e.textContent = String(pct * 5); });
+  const el = $("ligue-bonus-val");
+  if (!el) return;
+  const v = Math.round((boost.mult - 1) * 100);
+  el.textContent = `+${v}\u00a0%`;
+  if (bonusAffiche !== null && v > bonusAffiche) { el.classList.remove("pop"); void el.offsetWidth; el.classList.add("pop"); }
+  bonusAffiche = v;
 }
 function afficherBoost() {
   const el = $("boost-ligue");
@@ -752,7 +768,7 @@ async function rafraichirBoost() {
 // Deux places pour les messages : sans ligue, sous le champ du code
 // (erreurs) ; avec une ligue, le bandeau jaune SOUS le code.
 let statutLigue = "";
-const MSG_CREEE = "Ta ligue est créée. Tu peux inviter tes potes.";
+const MSG_CREEE = "Ta ligue est créée.";
 function ligueMessage(txt) {
   if (ligue) { statutLigue = txt || ""; ligueMsg.classList.add("hidden"); majStatut(); return; }
   ligueMsg.textContent = txt || ""; ligueMsg.classList.toggle("hidden", !txt);
@@ -777,12 +793,14 @@ function afficherLigue() {
   ligueQuitter.classList.toggle("hidden", !ligue);
   const suivant = $("step2-next");
   // Hiérarchie : sans ligue → CRÉER en rouge, « Jouer sans ligue » en petit ;
-  // seul dans sa ligue → INVITER en rouge ; des potes sont là → JOUER.
+  // dans une ligue → INVITER est le seul bouton rouge, même quand des potes
+  // sont déjà là (deux rouges, et l'œil part sur JOUER). En attente d'une
+  // invitation (Inviter caché), JOUER reprend le rouge.
   const autres = ligue ? ligue.membres.filter((m) => m.nom !== getPseudo()) : [];
-  const seul = !!ligue && !ligue.enAttente && autres.length === 0;
+  const attente = !!ligue && !!ligue.enAttente;
   suivant.textContent = ligue ? "Jouer" : "Jouer sans ligue";
-  suivant.classList.toggle("btn-primary", !!ligue && !seul);
-  suivant.classList.toggle("btn-secondary", !ligue || seul);
+  suivant.classList.toggle("btn-primary", attente);
+  suivant.classList.toggle("btn-secondary", !attente);
   suivant.classList.toggle("btn-petit", !ligue);
   if (!ligue) {
     pelotonAffiche = new Set(); statutLigue = "";
@@ -797,6 +815,9 @@ function afficherLigue() {
   // le code en gros et « Inviter tes potes » suffisent (21 novembre 2026, « trop de texte »).
   if (lienEl) { lienEl.textContent = lienCourt(ligue.code); lienEl.classList.add("hidden"); }
   liguePartager.classList.toggle("hidden", !!ligue.enAttente);
+  const bonusEl = $("ligue-bonus");
+  if (bonusEl) bonusEl.classList.toggle("hidden", !!ligue.enAttente);
+  majBonusLigue();
   const ul = $("ligue-peloton");
   ul.textContent = "";
   const slots = [{ nom: getPseudo() || "toi", cls: "moi" }].concat(autres.map((m) => ({ nom: m.nom, cls: "" })));
@@ -1416,6 +1437,8 @@ function initLigue() {
     }
   } catch (e) { /* rien */ }
   afficherLigue(); appliquerNomsLigue();
+  // Le boost compte les potes de la ligue : on le recalcule une fois la ligue lue.
+  rafraichirBoost();
   ligueRejoindre.addEventListener("click", () => rejoindre(ligueInput.value));
   ligueCreer.addEventListener("click", () => rejoindre(codeACreer(), true));
   const nomEl = $("ligue-nom");
@@ -1647,15 +1670,14 @@ function lireVolume(cle) {
 function ecrireVolume(cle, v) { try { localStorage.setItem(cle, String(v)); } catch (e) { /* stockage indisponible */ } }
 
 // --- Démarrage ---------------------------------------------------------------
-// Explication au lancement, en DEUX cartes depuis le 15 novembre 2026 :
-// 1) monte le son ; 2) joue avec tes potes. « 1 tap = 1 saut » et « Arrivée »
-// sont parties (« c'est logique, tu peux l'enlever »). Un tap passe à l'étape
+// Explication au lancement, en trois cartes : 1) monte le son ; 2) sauter
+// (tap, appui maintenu, re-tap en l'air) ; 3) joue avec tes potes. Un tap passe à l'étape
 // suivante ; après la dernière, la course part toute seule. Le contexte audio
 // est débloqué AVANT, dans le geste du JOUER. 3 premières parties + toujours
 // en ligue démo.
 // ⚠️ Les cartes se reconnaissent à leur NOM (data-e), pas à leur rang.
 // Durées par carte :
-const EXPL_DUREES = { son: 5.0, potes: 9.6 };
+const EXPL_DUREES = { son: 5.0, saut: 6.5, potes: 9.6 };
 // « Monte le son » reste ~5 s avant le départ : deux bruitages pour régler le
 // volume.
 let annonceSon = false;
@@ -1727,7 +1749,7 @@ function montrerExplication(ensuite) {
     $("expl-passer").textContent = i < etapes.length - 1 ? "Touche pour continuer" : "Touche pour jouer";
     barre.style.transition = "none"; barre.style.width = "0";
     requestAnimationFrame(() => requestAnimationFrame(() => { barre.style.transition = `width ${duree}s linear`; barre.style.width = "100%"; }));
-    if (nom === "potes") animerInvitations();
+    if (nom === "potes") { majBonusLigue(); animerInvitations(); }
     // « Monte le son » : un klaxon puis la sonnette du vélo, les vrais bruitages
     // du jeu (bruitages.js), un peu plus fort qu'en course.
     if (nom === "son") { annonceSon = true; [[300, "klaxon_contresens"], [1300, "sonnette"]].forEach(([ms, son]) => minuteurs.push(setTimeout(() => { try { bruitages.jouer(son, { volume: 1.6, prioritaire: true }); } catch (e) { /* pas de son */ } }, ms))); }

@@ -1418,3 +1418,32 @@ qu'est-ce que c'est que ça […] fais un design system ». Fait :
 - `?zero` et `?premiere` n'effacent plus que les clés `jp2…` (origine partagée avec le premier jeu).
 - Passage sous WebKit (moteur de Safari) et Chrome, 12 gabarits de l'iPhone SE au 1920×1080 :
   inscription → course → fin sans erreur, 60 images/s. Simulé, pas sur de vrais téléphones.
+
+## 24 novembre 2026 — retours d'une testeuse, et un joueur invincible
+
+Retours pris à l'oral pendant qu'une amie jouait (village « Bobville », ligue créée seule).
+
+- **« Inviter des potes » pas assez clair** : elle a tapé sur l'encadré jaune « Ta ligue est
+  créée » puis sur un « Bot », pris pour des boutons ; avec des potes dans la ligue, JOUER était
+  rouge comme INVITER. Maintenant INVITER est le seul bouton rouge, l'encadré et les étiquettes du
+  peloton sont du simple texte, et le bonus s'affiche en gros au-dessus du bouton : « Ton bonus
+  +0 % · chaque pote invité qui joue : +10 % sur tous tes points. 5 potes = +50 % » (« ce que je
+  veux, c'est que les gens invitent le plus de gens possible […] il faut que j'arrive à
+  extrêmement bien l'expliquer »). Même phrase sur la carte « Joue avec tes potes ».
+- **Le saut tenu et le double saut n'étaient pas compris** (« le truc que j'ai pas expliqué ») :
+  carte « Sauter » remise dans « Comment jouer », entre le son et les potes — tape / reste appuyé /
+  re-tape en l'air, avec la courbe de chaque saut. ⚠️ Renversement assumé de la carte
+  « 1 tap = 1 saut » retirée le 15 novembre : le tap va de soi, l'appui et le re-tap non.
+- **Brique de lait** : « qu'elle appuie une fois pour passer et qu'on lui rajoute un deuxième écran
+  qui dit qu'elle est invincible » → projecteur en deux écrans.
+- **Jetpack à la première partie** (« à la partie d'initiation, un jetpack qui apparaît après
+  1 minute, et après on garde le même ratio ») : `jetpackPremierePartie`, vers 60 s.
+- **BUG — un joueur invincible toute la course, sans brique de lait, puis plus rien d'un coup.**
+  Cause : `reviveShieldUntil` (bouclier de fin de turbo et de reprise) est une date sur l'horloge
+  du morceau, et `resetRun()` ne le remettait pas à zéro. Une course finie sur un turbo vers
+  150 s rendait la suivante invincible de 0 à ~150 s — tout ce qu'on percutait était éjecté, sans
+  coût. Reproduit (159 s de bouclier au départ de la course suivante, 20 chocs sans perte),
+  corrigé, gardé par `outils/bouclier.mjs`. ⚠️ Des scores du concours ont pu en profiter
+  (seulement chez qui a rejoué juste après un turbo ou un « Continuer » tardif) : ils sont
+  dans la base, rien ne les distingue.
+

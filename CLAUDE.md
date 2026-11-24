@@ -117,6 +117,10 @@ intégré d'Instagram d'abord**, portrait natif.
 - **Multiplicateur ENTIER** (`regles.multiplicateur`) : 3 potes = ×3, 5 potes = ×5, ×1 en
   dessous de deux ; ×2 en plus au turbo. Jamais de demi-multiplication à l'écran (le boost de
   ligue, lui, reste en pourcentage). Un choc coûte des potes ; seul le joueur meurt.
+- ⚠️ **Le bouclier (`reviveShieldUntil`) est une date sur l'horloge du MORCEAU**, qui repart de
+  0 à chaque course : `resetRun()` le remet à zéro. Oublié, un turbo fini (ou un « Continuer »)
+  à 150 s rendait la course SUIVANTE invincible jusqu'à 150 s — vécu par un joueur le
+  24 novembre 2026, en plein concours. Gardé par le test `bouclier`.
 - **Brique de lait** : turbo 5 s, invincible, points doublés ; ce qu'on percute est éjecté.
   Plus grande qu'une pièce, avec un halo qui pulse au rythme du morceau. ⚠️ **Une tous les 96
   rangs** depuis le 15 novembre 2026 (48 avant : « je suis tout le temps invincible »). Le
@@ -134,7 +138,8 @@ intégré d'Instagram d'abord**, portrait natif.
   (`balayageVisible`, rows.js), et **aucune pièce à moins de 3 rangées d'une brique de lait**
   (`LAIT_ISOLE` : on cherche une place loin des arcs, sinon les pièces voisines s'effacent — le
   quota de briques reste le même pour toutes les graines). Gardé par le test `conflits`.
-- **Jetpack** une partie sur cinq, posé hors du générateur (une course à jetpack peut dépasser
+- **Jetpack** à la **première partie** de chaque joueur (vers 60 s, `jetpackPremiereTempsS`),
+  puis une partie sur cinq (la 3e, la 8e…, vers 70 s), posé hors du générateur (une course à jetpack peut dépasser
   le score parfait). ×1,5 et un anneau qui bat depuis le 15 novembre 2026 (« je suis tombé
   dessus sans faire exprès ») ; après la prise, une **main qui reste appuyée**
   (`hud.renderHoldHint`) jusqu'au premier appui.
@@ -153,8 +158,12 @@ intégré d'Instagram d'abord**, portrait natif.
   jamais mal et la route est dégagée autour (`rows.degagerTutos`).
 - **Projecteur** (brique de lait, première mouette) : l'écran s'assombrit à 70 % avec un FONDU
   jusqu'à l'objet (dégradé radial, pas de cercle net), visé sur le centre réel de l'objet.
-- **Explication au lancement** en étapes (`EXPL_ETAPES`, screens.js) : 3 premières parties et
-  toujours en ligue démo. Projecteur une fois par joueur sur la première brique de lait. Le
+  La brique de lait a **deux écrans** (« BRIQUE DE LAIT = TURBO », puis « TU ES INVINCIBLE ! »),
+  un tap pour passer de l'un à l'autre (`PROJECTEURS`, main.js : un tableau d'écrans par objet).
+- **Explication au lancement** en trois cartes (`montrerExplication`, screens.js) : « Monte le
+  son », **« Sauter »** (tape = petit saut, reste appuyé = grand saut, re-tape en l'air = double
+  saut, chacun avec la courbe de son saut), « Joue avec tes potes » (+10 % par pote qui joue,
+  5 potes = +50 %, chiffres lus dans `config.js`). 3 premières parties et toujours en ligue démo. Projecteur une fois par joueur sur la première brique de lait. Le
   panneau « attention » n'a PAS de tuto : il se comprend seul (retour de joueurs).
 
 ### Rendu (`scene.js`, `props.js`, `voxrider.js`, `humains.js`)
@@ -211,6 +220,12 @@ intégré d'Instagram d'abord**, portrait natif.
   CHANGE, et seulement si elle porte de quoi joindre quelqu'un. ⚠️ Table en insertion seule,
   AUCUNE règle de lecture : les contacts sont illisibles avec la clé publique, ils se lisent
   dans le Table editor (vue `contacts`).
+- **Écran « Ma ligue »** : INVITER TES POTES est le **seul bouton rouge** (JOUER en blanc, même
+  quand des potes sont là ; rouge seulement en attente d'une invitation). Juste au-dessus,
+  **« Ton bonus : +N % »** en gros et la règle en une phrase. Le peloton (@pseudo, Bot 1…) est une
+  liste de texte et « Ta ligue est créée. » une ligne grise : ni bord ni aplat jaune, une testeuse
+  tapait dessus en les prenant pour des boutons. Le boost se recalcule à l'ouverture de l'écran
+  (avant, il ne l'était qu'au départ d'une course). Capture : `node outils/ligue-ecran.mjs`.
 - **Ligues** : 21 membres maximum, complétées par 3 bots ; **boost de ligue** (+10 % par pote
   qui a joué au moins 30 s, jusqu'à ×3) ; relais de ligue ; sprint du dimanche **coupé**
   (`config.sprintDimanche: false`, 15 novembre 2026) ; `liguesParVague` (0 = aucune
@@ -438,7 +453,7 @@ chaque choc payé vibre.
 
 ## Le filet et les outils
 
-- **`npm run verif`** (≈ 6 min) : 19 tests du vrai jeu, chacun conclut par ✅ OK ou ❌ ÉCHEC
+- **`npm run verif`** (≈ 6 min) : 23 tests du vrai jeu, chacun conclut par ✅ OK ou ❌ ÉCHEC
   (`outils/verdict.mjs`) ; un test qui échoue est relancé une fois et signalé « instable » s'il
   passe au second essai. `npm run verif -- collisions clavier` pour n'en lancer que certains.
   Ce qu'il garantit : joueur idéal sans choc et joueur immobile qui touche tout (`regles`),

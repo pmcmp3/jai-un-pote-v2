@@ -195,11 +195,14 @@ const targetSpeed = targetSpeedRegle;
 const HAUT_HUD_PX = 112;   // sous le score et le chrono
 const jet = { r: null, pris: false, reste: 0, pieces: [], trace: [], flamme: false, enregistre: false, appuiVu: false };
 let jetpackForce = new URLSearchParams(location.search).has("jetpack");
-function partieJetpack() { const C = window.CONFIG; return jetpackForce || (!game.sprint && screens.getParties() % (C.jetpackUneSur || 5) === (C.jetpackPartie ?? 3)); }
+// La partie se compte AVANT la pose (compterPartie) : la première vaut 1.
+function premierePartie() { return screens.getParties() === 1 && !!window.CONFIG.jetpackPremierePartie; }
+function partieJetpack() { const C = window.CONFIG; return jetpackForce || (!game.sprint && (premierePartie() || screens.getParties() % (C.jetpackUneSur || 5) === (C.jetpackPartie ?? 3))); }
 function poserJetpack() {
   jet.r = null; jet.pris = false; jet.reste = 0; jet.pieces = []; jet.trace = []; jet.flamme = false; jet.enregistre = false; jet.appuiVu = false;
   if (!partieJetpack()) return;
-  const cible = Math.round(rangAuTemps(window.CONFIG.jetpackTempsS || 70));
+  const C = window.CONFIG;
+  const cible = Math.round(rangAuTemps(premierePartie() ? C.jetpackPremiereTempsS || 60 : C.jetpackTempsS || 70));
   for (let d = 0; d < 60; d++) for (const r of [cible + d, cible - d]) {
     const row = rows.rowAt(r);
     if (row.type === "safe" && !row.coins.length && row.lait === undefined && rows.solAt(r) < 0.05 && !rows.rowAt(r - 1).coins.length && !rows.rowAt(r + 1).coins.length) { jet.r = r; return; }
@@ -389,7 +392,15 @@ function conseilTap(tap, tm, vitesse) {
   // Le tap qui FERME un projecteur n'est jamais un saut — ni celui qui le suit
   // de près (double tap, appui nerveux) : fermer « ne saute pas, roule dessous »
   // envoyait droit dans la mouette (21 novembre 2026).
-  if (projo.type) { if (tap && projo.age > 0.5) { projoFin(); tapMuetJusqua = perfClock() + 0.6; } return false; }
+  if (projo.type) {
+    if (tap && projo.age > 0.5) {
+      // Plusieurs écrans : un tap passe au suivant, le dernier fait repartir.
+      // L'écran suivant arrive déjà opaque, mais n'accepte un tap qu'après 0,3 s.
+      if (projo.page < PROJECTEURS[projo.type].length - 1) { projo.page++; projo.age = 0.2; }
+      else { projoFin(); tapMuetJusqua = perfClock() + 0.6; }
+    }
+    return false;
+  }
   if (tap && perfClock() < tapMuetJusqua) return false;
   if (conseil.r === null) return tap;
   if (conseil.phase === "approche") {
@@ -479,15 +490,19 @@ function cibleConseil(tm) {
 // --- Projecteur ------------------------------------------------------------------
 // Première brique de lait : une fois par joueur (jp2-conseils-vus), le monde
 // gèle, l'écran s'assombrit sauf autour de l'objet, une indication s'affiche,
-// et un tap fait repartir. Le panneau « attention » n'a pas de projecteur : il
-// se comprend seul.
+// et un tap passe à l'écran suivant, puis fait repartir. Le panneau
+// « attention » n'a pas de projecteur : il se comprend seul.
 const PROJECTEURS = {
-  // On dit ce que la brique FAIT (l'invincibilité surtout, c'est ce qui se
-  // voit en jeu), pas seulement ce qu'elle est.
-  lait: { titre: "BRIQUE DE LAIT = TURBO", sous: "Tu es invincible pendant 5 secondes." },
-  mouette: { titre: "ATTENTION, LES MOUETTES !", sous: "Elles volent à hauteur de saut : ne saute pas, roule dessous" },
+  // La brique en DEUX écrans : ce qu'elle est, puis l'invincibilité seule —
+  // c'est elle qui change la façon de jouer, elle ne doit pas se lire en
+  // sous-titre d'un écran qu'on passe d'un tap.
+  lait: [
+    { titre: "BRIQUE DE LAIT = TURBO", sous: "Attrape-la : 5 secondes à fond, et tes points doublés." },
+    { titre: "TU ES INVINCIBLE !", sous: "Pendant ces 5 secondes, fonce dans tout : ce que tu touches explose, ça ne te coûte rien." },
+  ],
+  mouette: [{ titre: "ATTENTION, LES MOUETTES !", sous: "Elles volent à hauteur de saut : ne saute pas, roule dessous" }],
 };
-const projo = { type: null, x: 0, y: 0, r: 40, age: 0 };
+const projo = { type: null, x: 0, y: 0, r: 40, age: 0, page: 0 };
 function projoLancer(type, x, y, r) {
   if (!gameStarted || game.sprint || game.ended || clock.now() < 1 || projo.type) return;
   // Jamais pendant un turbo ou une consigne, ni juste avant un tuto : deux
@@ -503,7 +518,7 @@ function projoLancer(type, x, y, r) {
   const vus = lireJson(CLE_VUS, {});
   if ((vus[type] || 0) >= 1) return;
   vus[type] = 1; ecrireJson(CLE_VUS, vus);
-  Object.assign(projo, { type, x, y, r, age: 0 });
+  Object.assign(projo, { type, x, y, r, age: 0, page: 0 });
   audio.setRalenti(true);
 }
 function projoSuivre(type, x, y) { if (projo.type === type) { projo.x = x; projo.y = y; } }
@@ -624,6 +639,10 @@ function resetRun() {
   game.metres = 0; game.points = 0; game.potesGagnes = 0; game.etoiles = 0;
   game.ended = false; game.endReason = null; game.reviveOffered = false; game.sansFaute = true;
   game.turbo = 0; game.finAge = -1; game.arriveeR = null; game.surHalle = false; tombes.clear(); ejectes.clear(); ecrases.clear(); game.invincibleAnnonce = false;
+  // ⚠️ Le bouclier est une date sur l'horloge du MORCEAU, qui repart de 0 :
+  // gardé, un turbo fini à 150 s rendait la course suivante invincible
+  // jusqu'à 150 s (outils/bouclier.mjs).
+  reviveShieldUntil = -Infinity; canvas.classList.remove("turbo");
   audio.oublierMarchand();
   game.startedAt = perfClock();
   player.u = 0; player.prevU = 0; player.v = 0; player.prevV = 0; cameraX = null;
@@ -1979,7 +1998,7 @@ function interfaceDeCourse(now, tAnim) {
     const ecoule = (window.CONFIG.jetpackDureeS || 10) - jet.reste;
     if (ecoule < 4) hud.renderHoldHint(ctx, width, height, tAnim, Math.min(1, ecoule * 4, (4 - ecoule) * 2));
   }
-  if (projo.type) hud.renderProjecteur(ctx, width, height, projo, PROJECTEURS[projo.type], tAnim);
+  if (projo.type) hud.renderProjecteur(ctx, width, height, projo, PROJECTEURS[projo.type][projo.page], tAnim, PROJECTEURS[projo.type].length);
   if (gameStarted && hudAlpha > 0.001 && banner) {
     ctx.save();
     ctx.globalAlpha = hudAlpha;
@@ -2226,6 +2245,7 @@ if (debugOverlay.isEnabled()) {
     tombes: () => tombes.size,
     explosions: () => nbExplosions,
     setInvincible: (oui) => { invincible = !!oui; },
+    bouclier: () => Math.max(0, reviveShieldUntil - clock.now()),
     lait: () => gagnerLait(player.u, player.v),
     eclats: () => eclats.length,
     conseil: () => ({ ...conseil, ralenti }),
